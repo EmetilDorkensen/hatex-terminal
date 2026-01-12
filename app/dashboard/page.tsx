@@ -223,9 +223,13 @@ export default function Dashboard() {
               <div className="w-1.5 h-1.5 bg-red-600 rounded-full mb-1"></div>
               <span className="text-[10px] font-black uppercase tracking-tighter">Akey</span>
           </div>
-          <div onClick={() => router.push('/card')} className="flex flex-col items-center gap-1 opacity-40 cursor-pointer text-white">
-            <span className="text-[10px] font-black uppercase tracking-tighter">Kat</span>
-          </div>
+          <div 
+  onClick={() => router.push('/kat')} 
+  className="flex flex-col items-center gap-1 cursor-pointer text-white hover:opacity-100 transition-opacity"
+>
+  {/* Ou ka ajoute yon icon isit la si w vle */}
+  <span className="text-[10px] font-black uppercase tracking-tighter">Kat</span>
+</div>
           <div onClick={() => router.push('/terminal')} className="relative -mt-14 cursor-pointer">
             <div className="bg-red-600 w-14 h-14 rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-red-600/40 rotate-45">
                 <span className="text-2xl font-black -rotate-45 text-white">T</span>
