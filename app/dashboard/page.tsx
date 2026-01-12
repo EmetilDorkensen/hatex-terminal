@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
 
-export default function Dashboard() {
+export default function 
+dashboard() {
   const router = useRouter();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
