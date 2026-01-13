@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "app/kat", "supabase/functions/notify-payment/public/sdk.js"  ],
+, "app/kat", "supabase/functions/notify-payment/public/sdk.js", "middleware.ts.old"  ],
   "exclude": ["node_modules"]
 }
