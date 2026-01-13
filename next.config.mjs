@@ -2,18 +2,16 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'imgur.com' },
-      { protocol: 'https', hostname: 'moncash.sh' },
-      { protocol: 'https', hostname: 'natcom.com.ht' },
+      { protocol: 'https', hostname: '**.imgur.com' },
+      { protocol: 'https', hostname: '**.moncash.sh' },
+      { protocol: 'https', hostname: '**.natcom.com.ht' },
     ],
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '50mb', // Sa ap ranje erè 413 "Body exceeded limit" la
+      bodySizeLimit: '50mb',
     },
   },
 };
 
 export default nextConfig;
-
-// force rebuild 1
