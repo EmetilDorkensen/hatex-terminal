@@ -16,12 +16,12 @@ export default function DepositPage() {
     // KONFIGIRE ENFÒMASYON PEMAN OU YO ISIT LA
     const paymentInfo = {
         'MonCash': {
-            number: '4X XX XX XX', // Mete nimewo MonCash ou
-            name: 'HATEX CARD SERVICES' // Mete non ki sou MonCash la
+            number: '37201241', // Mete nimewo MonCash ou
+            name: 'Emetil Dorkensen' // Mete non ki sou MonCash la
         },
         'NatCash': {
-            number: '4X XX XX XX', // Mete nimewo NatCash ou
-            name: 'HATEX CARD SERVICES' // Mete non ki sou NatCash la
+            number: '41242743', // Mete nimewo NatCash ou
+            name: 'SEXE SEKS' // Mete non ki sou NatCash la
         }
     };
 

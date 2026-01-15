@@ -22,7 +22,18 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  await supabase.auth.getSession()
+  const { data: { session } } = await supabase.auth.getSession()
+
+  // SEKIRITE POU PAJ ADMIN
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Ranplase email sa a ak email pa ou
+    const ADMIN_EMAIL = "emetilsuper@gmail.com"; 
+
+    if (!session || session.user.email !== ADMIN_EMAIL) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
   return response
 }
 
