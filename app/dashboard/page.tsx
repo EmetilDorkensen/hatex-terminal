@@ -185,16 +185,6 @@ dashboard() {
           </button>
 
         </div>
-
-{userData?.email === "hatexcard@gmail.com" && (
-          <button 
-            onClick={() => router.push('/admin')}
-            className="w-full mb-8 bg-red-600/10 border border-red-600/50 py-4 rounded-3xl font-black text-red-500 uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-red-600/5 active:scale-95 transition-all"
-          >
-            🛡️ Panèl Kontwòl Admin
-          </button>
-        )}
-
         {/* 2. BALANS WALLET */}
 
         <div className="bg-zinc-900/30 backdrop-blur-md p-6 rounded-[2.5rem] mb-6 border border-white/5 relative overflow-hidden">
