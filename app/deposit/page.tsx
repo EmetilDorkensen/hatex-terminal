@@ -171,7 +171,7 @@ export default function DepositPage() {
                             <label className="text-[9px] font-black ml-2 uppercase text-zinc-500">Nimewo Tranzaksyon (ID)</label>
                             <input 
                                 type="text" 
-                                placeholder="Egz: 456789012" 
+                                placeholder="Egz: 45678901278954" 
                                 value={txnId} 
                                 onChange={(e) => setTxnId(e.target.value)} 
                                 className="w-full bg-black/40 p-5 rounded-2xl outline-none text-xs border border-white/5 focus:border-red-600 transition-colors" 
