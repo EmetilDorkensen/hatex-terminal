@@ -150,8 +150,6 @@ dashboard() {
 
           </button>
 
-
-
           <div className="flex items-center gap-3">
 
             <div className="w-11 h-11 rounded-full border-2 border-red-600 p-0.5 bg-zinc-900 overflow-hidden flex items-center justify-center font-black">
@@ -217,8 +215,6 @@ dashboard() {
 
         </div>
 
-
-
         {/* 3. TWA BOUTON AKSYON YO */}
 
 <div className="flex flex-row justify-between gap-3 mb-10">
@@ -237,8 +233,6 @@ dashboard() {
 
   </button>
 
-
-
   {/* Bouton Retrè - Kounye a li pral chèche folder 'withdraw' la */}
 
   <button
@@ -252,8 +246,6 @@ dashboard() {
     <span className="text-[16px] font-black uppercase italic tracking-widest">Retrè</span>
 
   </button>
-
-
 
   {/* Bouton Transfè */}
 
@@ -271,8 +263,6 @@ dashboard() {
 
 </div>
 
-
-
         {/* 4. KAT VITYÈL DOUBLE FAS */}
 
         <div className="mb-10 perspective-1000 relative">
@@ -284,9 +274,6 @@ dashboard() {
               {isActivated && <span className="text-red-600 animate-pulse">Klike pou vire</span>}
 
             </p>
-
-           
-
             <div className="relative aspect-[1.58/1] w-full">
 
               {!isActivated && (
@@ -314,9 +301,6 @@ dashboard() {
                 </div>
 
               )}
-
-
-
               <div
 
                 className={`relative h-full w-full transition-all duration-700 preserve-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`}
@@ -342,9 +326,6 @@ dashboard() {
                           <h2 className="text-[14px] font-black italic tracking-tighter text-white uppercase font-mono">Hatex Premium</h2>
 
                         </div>
-
-                       
-
                         <div className="space-y-4 text-white">
 
                           <p className="text-2xl font-mono font-bold tracking-[0.25em]">
@@ -390,9 +371,6 @@ dashboard() {
                     </div>
 
                 </div>
-
-
-
                 {/* DÈYÈ */}
 
                 <div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2.5rem] bg-zinc-900 p-8 border border-white/10 flex flex-col items-center justify-center shadow-2xl">
@@ -414,9 +392,6 @@ dashboard() {
             </div>
 
         </div>
-
-
-
         {/* 5. DÈNYE AKTIVITE */}
 
         <div className="mb-32">
@@ -443,7 +418,6 @@ dashboard() {
 
         </div>
 
-
         {/* 6. NAVIGASYON ANBA */}
 
         <div className="fixed bottom-6 left-6 right-6 bg-zinc-900/80 backdrop-blur-xl border border-white/5 h-20 rounded-[2.5rem] flex justify-between items-center px-8 z-50 shadow-2xl">
@@ -463,7 +437,6 @@ dashboard() {
   className="flex flex-col items-center gap-1 cursor-pointer text-white hover:opacity-100 transition-opacity"
 
 >
-
 
   {/* Ou ka ajoute yon icon isit la si w vle */}
 
@@ -494,13 +467,7 @@ dashboard() {
           </div>
 
         </div>
-
-
-
       </div>
-
-
-
 
       <style jsx>{`
 
