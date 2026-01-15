@@ -13,6 +13,18 @@ export default function DepositPage() {
     const [loading, setLoading] = useState(false);
     const [files, setFiles] = useState<{f1: File | null, f2: File | null}>({f1: null, f2: null});
 
+    // KONFIGIRE ENFÒMASYON PEMAN OU YO ISIT LA
+    const paymentInfo = {
+        'MonCash': {
+            number: '4X XX XX XX', // Mete nimewo MonCash ou
+            name: 'HATEX CARD SERVICES' // Mete non ki sou MonCash la
+        },
+        'NatCash': {
+            number: '4X XX XX XX', // Mete nimewo NatCash ou
+            name: 'HATEX CARD SERVICES' // Mete non ki sou NatCash la
+        }
+    };
+
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -24,36 +36,56 @@ export default function DepositPage() {
             if (user) {
                 const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
                 setProfile(data);
+            } else {
+                router.push('/login');
             }
         };
         getProfile();
-    }, [supabase]);
+    }, [supabase, router]);
 
     const fee = amount * 0.05;
     const total = amount + fee;
 
     const handleFileUpload = async (file: File) => {
-        const fileName = `${Date.now()}_${file.name}`;
-        const { data, error } = await supabase.storage.from('proofs').upload(fileName, file);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+            .from('proofs')
+            .upload(fileName, file, { upsert: true });
+
         if (error) throw error;
-        const { data: { publicUrl } } = supabase.storage.from('proofs').getPublicUrl(data.path);
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('proofs')
+            .getPublicUrl(data.path);
+
         return publicUrl;
     };
 
     const notifyTelegram = async (imgUrl: string) => {
         const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY'; 
         const CHAT_ID = '8392894841'; 
-        const msg = `🔔 *DEPO HATEX NOUVO*\n👤: ${profile?.full_name}\n💰: ${amount} HTG\n💳: ${method}\n🆔: ${txnId}`;
+        const msg = `🔔 *DEPO HATEX NOUVO*\n👤 Kliyan: ${profile?.full_name}\n📞 Tel: ${profile?.phone}\n💰 Montan Nèt: ${amount} HTG\n📉 Frais (5%): ${fee} HTG\n💸 Total pou peye: ${total} HTG\n💳 Metòd: ${method}\n🆔 Trans ID: ${txnId}`;
         
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: CHAT_ID, photo: imgUrl, caption: msg, parse_mode: 'Markdown' })
-        });
+        try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    chat_id: CHAT_ID, 
+                    photo: imgUrl, 
+                    caption: msg, 
+                    parse_mode: 'Markdown' 
+                })
+            });
+        } catch (e) {
+            console.error("Telegram error:", e);
+        }
     };
 
     const handleSubmit = async () => {
-        if (!txnId || !files.f1) return alert("Ranpli ID Tranzaksyon ak omwen yon foto prèv");
+        if (!txnId || !files.f1) return alert("Tanpri antre ID tranzaksyon an ak omwen premye foto prèv la.");
         setLoading(true);
         try {
             const url1 = await handleFileUpload(files.f1!);
@@ -72,11 +104,12 @@ export default function DepositPage() {
             }]);
 
             if (error) throw error;
+
             await notifyTelegram(url1);
-            alert("Depo soumèt! N ap verifye sa nan 15-45 minit.");
+            alert("Depo w lan soumèt ak siksè! N ap verifye l nan 15 a 45 minit.");
             router.push('/dashboard');
         } catch (err: any) {
-            alert("Erè: " + err.message);
+            alert("Erè: " + (err.message || "Pwoblèm koneksyon"));
         } finally {
             setLoading(false);
         }
@@ -85,36 +118,94 @@ export default function DepositPage() {
     return (
         <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic">
             <h1 className="text-xl font-black uppercase text-red-600 mb-8">Depoze Fon</h1>
+            
             {step === 1 ? (
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => setMethod('MonCash')} className={`p-6 rounded-3xl border ${method === 'MonCash' ? 'border-red-600 bg-red-600/10' : 'border-white/5 bg-zinc-900'}`}>MONCASH</button>
-                        <button onClick={() => setMethod('NatCash')} className={`p-6 rounded-3xl border ${method === 'NatCash' ? 'border-red-600 bg-red-600/10' : 'border-white/5 bg-zinc-900'}`}>NATCASH</button>
+                        <button onClick={() => setMethod('MonCash')} className={`p-6 rounded-3xl border transition-all ${method === 'MonCash' ? 'border-red-600 bg-red-600/20' : 'border-white/5 bg-zinc-900'}`}>MONCASH</button>
+                        <button onClick={() => setMethod('NatCash')} className={`p-6 rounded-3xl border transition-all ${method === 'NatCash' ? 'border-red-600 bg-red-600/20' : 'border-white/5 bg-zinc-900'}`}>NATCASH</button>
                     </div>
+
                     <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5 text-center">
-                        <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="w-full bg-transparent text-4xl font-black text-center outline-none" placeholder="0" />
-                        <p className="text-[10px] mt-4 text-zinc-500 uppercase font-black tracking-widest">Total: {(total).toFixed(2)} HTG</p>
-                    </div>
-                    <button onClick={() => amount >= 500 ? setStep(2) : alert("Min 500 HTG")} className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm">Kontinye</button>
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    <div className="bg-white text-black p-6 rounded-[2.5rem] text-center font-black">
-                        <p className="text-xs mb-2">VOYE KÒB LA SOU:</p>
-                        <p className="text-lg uppercase">{method}: 4X XX XX XX</p>
-                    </div>
-                    <div className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 space-y-4">
-                        <input type="text" placeholder="ID TRANZAKSYON" value={txnId} onChange={(e) => setTxnId(e.target.value)} className="w-full bg-black/40 p-4 rounded-xl outline-none text-xs border border-white/5" />
-                        <div className="grid grid-cols-2 gap-2">
-                            <input type="file" id="f1" hidden onChange={(e) => setFiles({...files, f1: e.target.files![0]})} />
-                            <label htmlFor="f1" className={`h-20 rounded-xl border border-dashed flex items-center justify-center text-[8px] uppercase font-black ${files.f1 ? 'border-green-500 text-green-500' : 'border-white/10'}`}>Foto 1</label>
-                            <input type="file" id="f2" hidden onChange={(e) => setFiles({...files, f2: e.target.files![0]})} />
-                            <label htmlFor="f2" className={`h-20 rounded-xl border border-dashed flex items-center justify-center text-[8px] uppercase font-black ${files.f2 ? 'border-green-500 text-green-500' : 'border-white/10'}`}>Foto 2</label>
+                        <p className="text-[10px] mb-4 text-zinc-500 uppercase font-black">Konbe ou vle depoze?</p>
+                        <input 
+                            type="number" 
+                            value={amount || ''} 
+                            onChange={(e) => setAmount(Number(e.target.value))} 
+                            className="w-full bg-transparent text-5xl font-black text-center outline-none text-white" 
+                            placeholder="0" 
+                        />
+                        <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center">
+                            <span className="text-[10px] text-zinc-500 uppercase font-black">Frais (5%):</span>
+                            <span className="text-sm font-bold">{fee.toFixed(2)} HTG</span>
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                            <span className="text-[10px] text-zinc-500 uppercase font-black">Total pou peye:</span>
+                            <span className="text-lg font-black text-red-600">{total.toFixed(2)} HTG</span>
                         </div>
                     </div>
-                    <button onClick={handleSubmit} disabled={loading} className="w-full bg-white text-black py-6 rounded-full font-black uppercase text-sm">
-                        {loading ? 'Y ap voye...' : 'Finalize Depo'}
+
+                    <button 
+                        onClick={() => amount >= 500 ? setStep(2) : alert("Depo minimòm lan se 500 HTG")} 
+                        className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20"
+                    >
+                        Kontinye
                     </button>
+                </div>
+            ) : (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* SEKSYON ENFÒMASYON PEMAN POU KLIYAN AN */}
+                    <div className="bg-white text-black p-8 rounded-[2.5rem] text-center shadow-xl">
+                        <p className="text-[10px] font-black mb-1 opacity-60">VOYE {total.toFixed(2)} HTG SOU:</p>
+                        <h2 className="text-3xl font-black mb-1 tracking-tighter">
+                            {paymentInfo[method as keyof typeof paymentInfo].number}
+                        </h2>
+                        <p className="text-xs font-black uppercase bg-black text-white inline-block px-4 py-1 rounded-full">
+                            Non: {paymentInfo[method as keyof typeof paymentInfo].name}
+                        </p>
+                        <p className="text-[9px] mt-4 font-bold text-zinc-400">Pran yon screenshot apre w fin voye kòb la.</p>
+                    </div>
+
+                    <div className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-[9px] font-black ml-2 uppercase text-zinc-500">Nimewo Tranzaksyon (ID)</label>
+                            <input 
+                                type="text" 
+                                placeholder="Egz: 456789012" 
+                                value={txnId} 
+                                onChange={(e) => setTxnId(e.target.value)} 
+                                className="w-full bg-black/40 p-5 rounded-2xl outline-none text-xs border border-white/5 focus:border-red-600 transition-colors" 
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <input type="file" id="f1" hidden accept="image/*" onChange={(e) => setFiles({...files, f1: e.target.files![0]})} />
+                                <label htmlFor="f1" className={`h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${files.f1 ? 'border-green-500 bg-green-500/5 text-green-500' : 'border-white/10 bg-black/20 text-zinc-500'}`}>
+                                    <span className="text-[18px] mb-1">{files.f1 ? '✅' : '📸'}</span>
+                                    <span className="text-[8px] uppercase font-black tracking-tighter">Prèv Foto 1</span>
+                                </label>
+                            </div>
+                            <div>
+                                <input type="file" id="f2" hidden accept="image/*" onChange={(e) => setFiles({...files, f2: e.target.files![0]})} />
+                                <label htmlFor="f2" className={`h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${files.f2 ? 'border-green-500 bg-green-500/5 text-green-500' : 'border-white/10 bg-black/20 text-zinc-500'}`}>
+                                    <span className="text-[18px] mb-1">{files.f2 ? '✅' : '📸'}</span>
+                                    <span className="text-[8px] uppercase font-black tracking-tighter">Prèv Foto 2 (Opsyonèl)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button onClick={() => setStep(1)} className="w-1/3 bg-zinc-800 py-6 rounded-full font-black uppercase text-xs">Retou</button>
+                        <button 
+                            onClick={handleSubmit} 
+                            disabled={loading} 
+                            className="flex-1 bg-white text-black py-6 rounded-full font-black uppercase text-sm disabled:opacity-50"
+                        >
+                            {loading ? 'Y ap verifye...' : 'Mwen voye kòb la'}
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
