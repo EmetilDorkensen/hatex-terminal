@@ -76,7 +76,7 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2">
             {/* BOUTON ADMIN - AP PARÈT SÈLMAN POU OU */}
-            {userData?.email === 'emetildorkensen@gmail.com' && (
+            {userData?.email === 'hatexcard@gmail.com' && (
               <button 
                 onClick={() => router.push('/admin')}
                 className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce"

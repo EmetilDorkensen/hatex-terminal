@@ -45,7 +45,7 @@ export default function Login() {
     <div className="min-h-screen bg-[#0a0b14] text-white flex flex-col items-center justify-center p-6 italic">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-black tracking-tighter italic text-red-600 mb-2">HATEXCARD</h1>
+          <h1 className="text-4xl font-black tracking-tighter italic text-red-600 mb-2">HatexCard</h1>
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold">Koneksyon</p>
         </div>
 
