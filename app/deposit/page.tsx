@@ -140,7 +140,7 @@ export default function DepositPage() {
                             <span className="text-sm font-bold">{fee.toFixed(2)} HTG</span>
                         </div>
                         <div className="flex justify-between items-center mt-2">
-                            <span className="text-[10px] text-zinc-500 uppercase font-black">Total pou peye:</span>
+                            <span className="text-[12px] text-zinc-500 uppercase font-black">Total pou peye:</span>
                             <span className="text-lg font-black text-red-600">{total.toFixed(2)} HTG</span>
                         </div>
                     </div>
