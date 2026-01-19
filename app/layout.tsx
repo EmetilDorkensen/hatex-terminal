@@ -1,4 +1,5 @@
 // Nan app/layout.tsx
+import "./globals.css"; // Liy sa a te manke, se li ki pote tout style yo!
 
 export const metadata = {
   title: "HATEXCARD",
@@ -6,8 +7,8 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: "/logo.png", // Asire w foto a rele logo.png epi li nan folder public la
-        href: "/logo.png",
+        url: "/logo-hatex.png", 
+        href: "/logo-hatex.png",
       },
     ],
   },
@@ -20,7 +21,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ht">
-      <body className="antialiased bg-[#0a0b14]">
+      {/* Nou ajoute "antialiased" ak font si w genyen l, men globals.css se kle a */}
+      <body className="antialiased bg-[#0a0b14] text-white">
         {children}
       </body>
     </html>
