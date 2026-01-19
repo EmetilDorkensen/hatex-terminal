@@ -1,9 +1,16 @@
-import type { Metadata } from "next";
-import "./globals.css";
+// Nan app/layout.tsx
 
-export const metadata: Metadata = {
-  title: "HatexCard",
-  description: "Sistèm tèminal peman HatexCard",
+export const metadata = {
+  title: "HATEXCARD",
+  description: "Tèminal Peman Pwofesyonèl",
+  icons: {
+    icon: [
+      {
+        url: "/logo.png", // Asire w foto a rele logo.png epi li nan folder public la
+        href: "/logo.png",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

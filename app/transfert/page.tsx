@@ -42,27 +42,52 @@ export default function TransferPage() {
     return () => clearTimeout(delay);
   }, [email]);
 
-  const handleTransfer = async () => {
-    if (!receiverName || !amount) return;
-    setLoading(true);
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase.rpc('process_transfer_by_email', {
-        p_sender_id: user.id,
-        p_receiver_email: email.toLowerCase().trim(),
-        p_amount: Number(amount)
+// Ranplase fonksyon handleTransfer la ak sa a:
+const handleTransfer = async () => {
+  if (!receiverName || !amount || Number(amount) <= 0) return;
+  setLoading(true);
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    // 1. Egzekite Transfè a nan Balans yo
+    const { data: receiverId, error: rpcError } = await supabase.rpc('process_transfer_by_email', {
+      p_sender_id: user.id,
+      p_receiver_email: email.toLowerCase().trim(),
+      p_amount: Number(amount)
+    });
+
+    if (rpcError) {
+      setStatus({ type: 'error', msg: rpcError.message });
+    } else {
+      // 2. Anrejistre pou moun ki VOYE a (Sender)
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        amount: -Number(amount), // Negatif paske kòb la soti
+        type: 'P2P',
+        description: `Voye bay ${receiverName}`,
+        status: 'success',
+        method: 'WALLET'
       });
 
-      if (error) {
-        setStatus({ type: 'error', msg: error.message });
-      } else {
-        setStatus({ type: 'success', msg: 'Transfè a reyisi!' });
-        setTimeout(() => router.push('/dashboard'), 2000);
+      // 3. Anrejistre pou moun ki RESEVWA a (Receiver)
+      // Nòt: receiverId dwe retounen pa RPC a oswa ou dwe chache l
+      if (receiverId) {
+        await supabase.from('transactions').insert({
+          user_id: receiverId,
+          amount: Number(amount), // Pozitif paske li resevwa
+          type: 'P2P',
+          description: `Resevwa nan men yon zanmi`,
+          status: 'success',
+          method: 'WALLET'
+        });
       }
+
+      setStatus({ type: 'success', msg: 'Transfè a reyisi!' });
+      setTimeout(() => router.push('/dashboard'), 2000);
     }
-    setLoading(false);
-  };
+  }
+  setLoading(false);
+};
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic">

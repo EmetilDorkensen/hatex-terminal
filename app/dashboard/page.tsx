@@ -146,7 +146,7 @@ export default function Dashboard() {
                           <div className="w-10 h-10 bg-white/10 rounded-xl border border-white/20 flex items-center justify-center overflow-hidden">
                              {isActivated && <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-full h-full object-cover" />}
                           </div>
-                          <h2 className="text-[10px] font-black italic tracking-tighter uppercase font-mono">Hatex Premium</h2>
+                          <h2 className="text-[10px] font-black italic tracking-tighter uppercase font-mono">HatexCard</h2>
                         </div>
                         <div className="space-y-3">
                           <p className="text-lg sm:text-xl font-mono font-bold tracking-[0.2em]">
