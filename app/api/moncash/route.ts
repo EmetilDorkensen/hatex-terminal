@@ -1,38 +1,62 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { amount, userId } = await request.json(); // Nou resevwa ID itilizatè a isit la
+    const { amount, userId } = await req.json();
 
-    // 1. Pran Token nan men MonCash
-    const auth = Buffer.from(`${process.env.MONCASH_CLIENT_ID}:${process.env.MONCASH_SECRET_KEY}`).toString('base64');
-    const tokenRes = await fetch('https://sandbox.moncashbutton.com/Api/oauth/token?grant_type=client_credentials', {
-      method: 'POST',
-      headers: { 'Authorization': `Basic ${auth}` }
+    const clientID = process.env.MONCASH_CLIENT_ID;
+    const secretKey = process.env.MONCASH_SECRET_KEY;
+    const mode = process.env.NEXT_PUBLIC_MONCASH_MODE || 'sandbox';
+
+    if (!clientID || !secretKey) {
+      return NextResponse.json({ error: "Kle API yo manke sou Vercel" }, { status: 500 });
+    }
+
+    const url = mode === 'live' 
+      ? 'https://moncashbutton.digicelgroup.com/Moncash-middleware' 
+      : 'https://sandbox.moncashbutton.digicelgroup.com/Moncash-middleware';
+
+    // 1. Jwenn Token nan men MonCash
+    const authRes = await fetch(`${url}/v1/CreateToken`, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(clientID + ':' + secretKey).toString('base64')
+      }
     });
-    const tokenData = await tokenRes.json();
 
-    // 2. Kreye Peman an ak "reference" (sa enpòtan anpil!)
-    const paymentRes = await fetch('https://sandbox.moncashbutton.com/Api/v1/CreatePayment', {
+    const authData = await authRes.json();
+    const token = authData.access_token;
+
+    if (!token) {
+      return NextResponse.json({ error: "MonCash refize koneksyon an. Verifye kle yo." }, { status: 401 });
+    }
+
+    // 2. Kreye Peman an
+    const orderId = Date.now().toString();
+    const paymentRes = await fetch(`${url}/v1/CreatePayment`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         amount: amount,
-        orderId: Date.now().toString(),
-        reference: userId // ISIT LA: Nou voye ID itilizatè a bay MonCash
+        orderId: orderId,
+        custom: userId // n ap voye ID itilizatè a isit la
       })
     });
 
     const paymentData = await paymentRes.json();
-    const redirectUrl = `https://sandbox.moncashbutton.com/MonCash/Pay?token=${paymentData.payment_token.token}`;
     
+    // Lyen redireksyon an
+    const redirectUrl = mode === 'live'
+      ? `https://moncashbutton.digicelgroup.com/Moncash-middleware/Payment/Redirect?token=${paymentData.payment_token.token}`
+      : `https://sandbox.moncashbutton.digicelgroup.com/Moncash-middleware/Payment/Redirect?token=${paymentData.payment_token.token}`;
+
     return NextResponse.json({ url: redirectUrl });
 
-  } catch (error) {
-    return NextResponse.json({ error: 'Erè koneksyon' }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erè API MonCash:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
