@@ -190,7 +190,7 @@ export default function Dashboard() {
               <button onClick={() => router.push('/transactions')} className="text-[9px] font-bold text-red-500 uppercase italic">Wè tout</button>
             </div>
             <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[1.5rem] text-center backdrop-blur-md">
-                <p className="text-[8px] font-black uppercase text-zinc-600 italic tracking-widest">Pa gen tranzaksyon ankò</p>
+                <p className="text-[8px] font-black uppercase text-zinc-600 italic tracking-widest">Gade tranzaksyon yo</p>
             </div>
         </div>
 
