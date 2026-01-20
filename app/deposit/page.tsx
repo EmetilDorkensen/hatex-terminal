@@ -39,36 +39,6 @@ export default function DepositPage() {
     const fee = amount * 0.05;
     const total = amount + fee;
 
-    // FONKSYON MONCASH OTOMATIK
-    const handleMonCashPayment = async (montan: number) => {
-        if (!montan || montan < 500) return alert("Depo minimòm lan se 500 HTG");
-        try {
-            setLoading(true);
-
-            const res = await fetch('/api/moncash', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: montan,
-                    userId: profile?.id,
-                }),
-            });
-            
-            const data = await res.json();
-            console.log("Repons MonCash:", data); // Gade sa nan Console (F12)
-            
-            if (data.url) {
-                window.location.href = data.url;
-            } else {
-                // Sa ap di w egzakteman si se kle yo ki pa bon oswa lòt bagay
-                alert(`Erè: ${data.error || "Poblèm koneksyon"}`);
-            }
-
-         } finally {
-            setLoading(false);
-        }
-    };
-
     const handleFileUpload = async (file: File) => {
         const fileExt = file.name.split('.').pop();
         const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
@@ -103,7 +73,7 @@ export default function DepositPage() {
 
     return (
         <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic relative">
-            <h1 className="text-xl font-black uppercase text-red-600 mb-8">Depoze Fon</h1>
+            <h1 className="text-xl font-black uppercase text-red-600 mb-8">Depoze Fon (Manyèl)</h1>
             
             {step === 1 ? (
                 <div className="space-y-6">
@@ -135,21 +105,12 @@ export default function DepositPage() {
                     </div>
 
                     {amount >= 500 ? (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                            {method === 'MonCash' && (
-                                <button 
-                                    onClick={() => handleMonCashPayment(amount)}
-                                    disabled={loading}
-                                    className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20"
-                                >
-                                    {loading ? 'Ap Konekte...' : 'Peye ak MonCash Otomatik'}
-                                </button>
-                            )}
+                        <div className="space-y-4">
                             <button 
                                 onClick={() => setStep(2)} 
-                                className="w-full bg-zinc-800 py-4 rounded-full font-black uppercase text-[10px] text-zinc-400"
+                                className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20"
                             >
-                                Transfè Manyèl (Screenshot)
+                                Kontiye pou Voye Prèv
                             </button>
                         </div>
                     ) : (
