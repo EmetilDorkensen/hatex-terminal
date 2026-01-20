@@ -13,6 +13,10 @@ export default function DepositPage() {
     const [loading, setLoading] = useState(false);
     const [files, setFiles] = useState<{f1: File | null, f2: File | null}>({f1: null, f2: null});
 
+    // KONFIGIRASYON TELEGRAM
+    const TELEGRAM_BOT_TOKEN = "7547195325:AAH3M_qYvK1S3-m1MshWn2A9WskE6v4mP8s"; 
+    const TELEGRAM_CHAT_ID = "6232776856";
+
     const paymentInfo = {
         'MonCash': { number: '37201241', name: 'Emetil Dorkensen' },
         'NatCash': { number: '41242743', name: 'SEXE SEKS' }
@@ -39,6 +43,36 @@ export default function DepositPage() {
     const fee = amount * 0.05;
     const total = amount + fee;
 
+    // FONKSYON POU VOYE NOTIFIKASYON TELEGRAM
+    const sendTelegramNotification = async (depoData: any) => {
+        const mesaj = `
+🔔 *NEW DEPOSIT ALERT* 🔔
+━━━━━━━━━━━━━━━━━━
+👤 *Kliyan:* ${profile?.full_name || 'Itilizatè'}
+💰 *Montan:* ${depoData.amount} HTG
+📈 *Fee (5%):* ${depoData.fee} HTG
+💳 *Total:* ${depoData.total_to_pay} HTG
+🏦 *Metòd:* ${depoData.method}
+🆔 *Tranzaksyon:* \`${depoData.transaction_id}\`
+━━━━━━━━━━━━━━━━━━
+🔎 _Verifye Dashboard Admin lan pou valide l._
+        `;
+
+        try {
+            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TELEGRAM_CHAT_ID,
+                    text: mesaj,
+                    parse_mode: 'Markdown',
+                }),
+            });
+        } catch (err) {
+            console.error("Telegram error:", err);
+        }
+    };
+
     const handleFileUpload = async (file: File) => {
         const fileExt = file.name.split('.').pop();
         const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
@@ -54,7 +88,8 @@ export default function DepositPage() {
         try {
             const url1 = await handleFileUpload(files.f1!);
             const url2 = files.f2 ? await handleFileUpload(files.f2) : url1;
-            const { error } = await supabase.from('deposits').insert([{
+            
+            const depoInfo = {
                 user_id: profile.id,
                 amount: amount,
                 fee: fee,
@@ -64,16 +99,27 @@ export default function DepositPage() {
                 proof_img_1: url1,
                 proof_img_2: url2,
                 status: 'pending'
-            }]);
+            };
+
+            const { error } = await supabase.from('deposits').insert([depoInfo]);
             if (error) throw error;
+
+            // VOYE NOTIFIKASYON TELEGRAM
+            await sendTelegramNotification(depoInfo);
+
             alert("Depo w lan soumèt! N ap verifye l.");
             router.push('/dashboard');
-        } catch (err: any) { alert("Erè: " + err.message); } finally { setLoading(false); }
+        } catch (err: any) { 
+            alert("Erè: " + err.message); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     return (
+        // ... (menm pati HTML ak anvan an)
         <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic relative">
-            <h1 className="text-xl font-black uppercase text-red-600 mb-8">Depoze Fon (Manyèl)</h1>
+            <h1 className="text-xl font-black uppercase text-red-600 mb-8">Depoze Fon</h1>
             
             {step === 1 ? (
                 <div className="space-y-6">
