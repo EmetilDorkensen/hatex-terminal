@@ -11,11 +11,7 @@ export default function DepositPage() {
     const [txnId, setTxnId] = useState('');
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const [files, setFiles] = useState<{f1: File | null, f2: File | null}>({f1: null, f2: null});
-
-    // KONFIGIRASYON TELEGRAM
-    const TELEGRAM_BOT_TOKEN = "7547195325:AAH3M_qYvK1S3-m1MshWn2A9WskE6v4mP8s"; 
-    const TELEGRAM_CHAT_ID = "6232776856";
+    const [files, setFiles] = useState<{ f1: File | null, f2: File | null }>({ f1: null, f2: null });
 
     const paymentInfo = {
         'MonCash': { number: '37201241', name: 'Emetil Dorkensen' },
@@ -43,36 +39,6 @@ export default function DepositPage() {
     const fee = amount * 0.05;
     const total = amount + fee;
 
-    // FONKSYON POU VOYE NOTIFIKASYON TELEGRAM
-    const sendTelegramNotification = async (depoData: any) => {
-        const mesaj = `
-🔔 *NEW DEPOSIT ALERT* 🔔
-━━━━━━━━━━━━━━━━━━
-👤 *Kliyan:* ${profile?.full_name || 'Itilizatè'}
-💰 *Montan:* ${depoData.amount} HTG
-📈 *Fee (5%):* ${depoData.fee} HTG
-💳 *Total:* ${depoData.total_to_pay} HTG
-🏦 *Metòd:* ${depoData.method}
-🆔 *Tranzaksyon:* \`${depoData.transaction_id}\`
-━━━━━━━━━━━━━━━━━━
-🔎 _Verifye Dashboard Admin lan pou valide l._
-        `;
-
-        try {
-            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: TELEGRAM_CHAT_ID,
-                    text: mesaj,
-                    parse_mode: 'Markdown',
-                }),
-            });
-        } catch (err) {
-            console.error("Telegram error:", err);
-        }
-    };
-
     const handleFileUpload = async (file: File) => {
         const fileExt = file.name.split('.').pop();
         const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
@@ -82,14 +48,54 @@ export default function DepositPage() {
         return publicUrl;
     };
 
+    const notifyTelegram = async (imgUrl: string) => {
+        const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY';
+        const CHAT_ID = '8392894841';
+        const msg = `🔔 *DEPO HATEX NOUVO*\n👤 Kliyan: ${profile?.full_name}\n📞 Tel: ${profile?.phone}\n💰 Montan Nèt: ${amount} HTG\n📉 Frais (5%): ${fee} HTG\n💸 Total pou peye: ${total} HTG\n💳 Metòd: ${method}\n🆔 Trans ID: ${txnId}`;
+        try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: CHAT_ID,
+                    photo: imgUrl,
+                    caption: msg,
+                    parse_mode: 'Markdown'
+                })
+            });
+        } catch (e) { console.error("Telegram error:", e); }
+    };
+
+    // FONKSYON MONCASH OTOMATIK
+    const handleMonCashPayment = async (montan: number) => {
+        if (montan < 500) return alert("Depo minimòm lan se 500 HTG");
+        try {
+            setLoading(true);
+            const res = await fetch('/api/moncash', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: montan,
+                    userId: profile?.id
+                }),
+            });
+            const data = await res.json();
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                alert("Gen yon pwoblèm ak MonCash (401/500), itilize metòd manyèl la.");
+            }
+        } catch (err) { alert("Erè koneksyon."); } 
+        finally { setLoading(false); }
+    };
+
     const handleSubmitManual = async () => {
         if (!txnId || !files.f1) return alert("Tanpri antre ID tranzaksyon an ak foto prèv la.");
         setLoading(true);
         try {
             const url1 = await handleFileUpload(files.f1!);
             const url2 = files.f2 ? await handleFileUpload(files.f2) : url1;
-            
-            const depoInfo = {
+            const { error } = await supabase.from('deposits').insert([{
                 user_id: profile.id,
                 amount: amount,
                 fee: fee,
@@ -99,25 +105,16 @@ export default function DepositPage() {
                 proof_img_1: url1,
                 proof_img_2: url2,
                 status: 'pending'
-            };
-
-            const { error } = await supabase.from('deposits').insert([depoInfo]);
+            }]);
             if (error) throw error;
-
-            // VOYE NOTIFIKASYON TELEGRAM
-            await sendTelegramNotification(depoInfo);
-
-            alert("Depo w lan soumèt! N ap verifye l.");
+            await notifyTelegram(url1);
+            alert("Depo w lan soumèt ak siksè! N ap verifye l nan 15 a 45 minit.");
             router.push('/dashboard');
-        } catch (err: any) { 
-            alert("Erè: " + err.message); 
-        } finally { 
-            setLoading(false); 
-        }
+        } catch (err: any) { alert("Erè: " + err.message); } 
+        finally { setLoading(false); }
     };
 
     return (
-        // ... (menm pati HTML ak anvan an)
         <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic relative">
             <h1 className="text-xl font-black uppercase text-red-600 mb-8">Depoze Fon</h1>
             
@@ -128,18 +125,9 @@ export default function DepositPage() {
                         <button onClick={() => setMethod('NatCash')} className={`p-6 rounded-3xl border transition-all ${method === 'NatCash' ? 'border-red-600 bg-red-600/20' : 'border-white/5 bg-zinc-900'}`}>NATCASH</button>
                     </div>
 
-                    <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5 text-center relative z-20">
+                    <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5 text-center">
                         <p className="text-[10px] mb-4 text-zinc-500 uppercase font-black">Konbe ou vle depoze?</p>
-                        <div className="flex items-center justify-center">
-                            <input 
-                                type="number" 
-                                value={amount || ''} 
-                                onChange={(e) => setAmount(Number(e.target.value))} 
-                                className="w-full bg-transparent text-6xl font-black text-center outline-none text-white placeholder-zinc-800" 
-                                placeholder="0" 
-                                autoFocus
-                            />
-                        </div>
+                        <input type="number" value={amount || ''} onChange={(e) => setAmount(Number(e.target.value))} className="w-full bg-transparent text-5xl font-black text-center outline-none text-white" placeholder="0" />
                         <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center text-zinc-500">
                             <span className="text-[10px] uppercase font-black">Frais (5%):</span>
                             <span className="text-sm font-bold">{fee.toFixed(2)} HTG</span>
@@ -150,23 +138,21 @@ export default function DepositPage() {
                         </div>
                     </div>
 
-                    {amount >= 500 ? (
-                        <div className="space-y-4">
-                            <button 
-                                onClick={() => setStep(2)} 
-                                className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20"
-                            >
-                                Kontiye pou Voye Prèv
+                    <div className="space-y-4">
+                        {method === 'MonCash' && (
+                            <button onClick={() => handleMonCashPayment(amount)} disabled={loading || amount < 500} className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20 disabled:opacity-50">
+                                {loading ? 'Ap konekte...' : 'Peye ak MonCash Otomatik'}
                             </button>
-                        </div>
-                    ) : (
-                        <p className="text-center text-[10px] text-zinc-600 uppercase font-bold">Antre omwen 500 HTG</p>
-                    )}
+                        )}
+                        <button onClick={() => amount >= 500 ? setStep(2) : alert("Minimòm 500 HTG")} className="w-full bg-zinc-800 py-4 rounded-full font-black uppercase text-[10px] text-zinc-400">
+                            Transfè Manyèl (Screenshot)
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-6 animate-in fade-in duration-300">
                     <div className="bg-white text-black p-8 rounded-[2.5rem] text-center">
-                        <p className="text-[10px] font-black mb-1 opacity-60 uppercase">Voye kòb la sou nimewo sa a:</p>
+                        <p className="text-[10px] font-black mb-1 opacity-60 uppercase">Voye {total.toFixed(2)} HTG sou:</p>
                         <h2 className="text-3xl font-black mb-1 tracking-tighter">{paymentInfo[method as keyof typeof paymentInfo].number}</h2>
                         <p className="text-xs font-black uppercase bg-black text-white inline-block px-4 py-1 rounded-full">Non: {paymentInfo[method as keyof typeof paymentInfo].name}</p>
                     </div>
