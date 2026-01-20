@@ -1,54 +1,14 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
-  try {
-    const { amount, userId } = await req.json();
-    const clientID = process.env.MONCASH_CLIENT_ID;
-    const secretKey = process.env.MONCASH_SECRET_KEY;
-    const mode = process.env.NEXT_PUBLIC_MONCASH_MODE || 'sandbox';
+    const clientID = process.env.MONCASH_CLIENT_ID || "";
+    const secretKey = process.env.MONCASH_SECRET_KEY || "";
 
-    if (!clientID || !secretKey) {
-      return NextResponse.json({ error: "Kle API manke nan Vercel" }, { status: 500 });
-    }
-
-    const baseUrl = mode === 'live' 
-      ? 'https://moncashbutton.digicelgroup.com/Moncash-middleware' 
-      : 'https://sandbox.moncashbutton.digicelgroup.com/Moncash-middleware';
-
-    // 1. Jwenn Token
-    const authRes = await fetch(`${baseUrl}/v1/CreateToken`, {
-      method: 'GET',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(clientID + ':' + secretKey).toString('base64')
-      }
+    return NextResponse.json({ 
+        msg: "Tès Kle yo",
+        longè_ID: clientID.length,
+        longè_Secret: secretKey.length,
+        kòmanse_ak_espas: clientID.startsWith(" ") || secretKey.startsWith(" "),
+        fini_ak_espas: clientID.endsWith(" ") || secretKey.endsWith(" ")
     });
-    const authData = await authRes.json();
-    
-    if (!authData.access_token) {
-      return NextResponse.json({ error: "MonCash refize koneksyon (401). Verifye kle yo." }, { status: 401 });
-    }
-
-    // 2. Kreye Peman
-    const paymentRes = await fetch(`${baseUrl}/v1/CreatePayment`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authData.access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount: amount,
-        orderId: Date.now().toString(),
-        custom: userId 
-      })
-    });
-    const paymentData = await paymentRes.json();
-
-    const redirectUrl = mode === 'live'
-      ? `https://moncashbutton.digicelgroup.com/Moncash-middleware/Payment/Redirect?token=${paymentData.payment_token.token}`
-      : `https://sandbox.moncashbutton.digicelgroup.com/Moncash-middleware/Payment/Redirect?token=${paymentData.payment_token.token}`;
-
-    return NextResponse.json({ url: redirectUrl });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
 }
