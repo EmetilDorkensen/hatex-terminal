@@ -44,24 +44,27 @@ export default function DepositPage() {
         if (!montan || montan < 500) return alert("Depo minimòm lan se 500 HTG");
         try {
             setLoading(true);
+
             const res = await fetch('/api/moncash', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     amount: montan,
-                    userId: profile?.id 
+                    userId: profile?.id,
                 }),
             });
             
             const data = await res.json();
+            console.log("Repons MonCash:", data); // Gade sa nan Console (F12)
+            
             if (data.url) {
                 window.location.href = data.url;
             } else {
-                alert("Erè: MonCash pako konfigire nan Vercel (Kle API manke).");
+                // Sa ap di w egzakteman si se kle yo ki pa bon oswa lòt bagay
+                alert(`Erè: ${data.error || "Poblèm koneksyon"}`);
             }
-        } catch (err) {
-            alert("Erè koneksyon ak sèvè a.");
-        } finally {
+
+         } finally {
             setLoading(false);
         }
     };
