@@ -66,29 +66,6 @@ export default function DepositPage() {
         } catch (e) { console.error("Telegram error:", e); }
     };
 
-    // FONKSYON MONCASH OTOMATIK
-    const handleMonCashPayment = async (montan: number) => {
-        if (montan < 500) return alert("Depo minimòm lan se 500 HTG");
-        try {
-            setLoading(true);
-            const res = await fetch('/api/moncash', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: montan,
-                    userId: profile?.id
-                }),
-            });
-            const data = await res.json();
-            if (data.url) {
-                window.location.href = data.url;
-            } else {
-                alert("Gen yon pwoblèm ak MonCash (401/500), itilize metòd manyèl la.");
-            }
-        } catch (err) { alert("Erè koneksyon."); } 
-        finally { setLoading(false); }
-    };
-
     const handleSubmitManual = async () => {
         if (!txnId || !files.f1) return alert("Tanpri antre ID tranzaksyon an ak foto prèv la.");
         setLoading(true);
@@ -138,16 +115,9 @@ export default function DepositPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        {method === 'MonCash' && (
-                            <button onClick={() => handleMonCashPayment(amount)} disabled={loading || amount < 500} className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20 disabled:opacity-50">
-                                {loading ? 'Ap konekte...' : 'Peye ak MonCash Otomatik'}
-                            </button>
-                        )}
-                        <button onClick={() => amount >= 500 ? setStep(2) : alert("Minimòm 500 HTG")} className="w-full bg-zinc-800 py-4 rounded-full font-black uppercase text-[10px] text-zinc-400">
-                            Transfè Manyèl (Screenshot)
-                        </button>
-                    </div>
+                    <button onClick={() => amount >= 500 ? setStep(2) : alert("Minimòm 500 HTG")} className="w-full bg-red-600 py-6 rounded-full font-black uppercase text-sm shadow-lg shadow-red-600/20">
+                        Kontinye
+                    </button>
                 </div>
             ) : (
                 <div className="space-y-6 animate-in fade-in duration-300">
