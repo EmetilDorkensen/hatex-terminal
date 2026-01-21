@@ -20,62 +20,71 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* 2. HERO SECTION - DASHBOARD NAN TELEFÒN */}
-      <section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        <div className="z-10">
-          <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">SISTÈM PÈMAN #1 AN AYITI</div>
-          <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic">
-            IDANTITE <br /> <span className="text-red-600">FINANSYÈ</span> <br /> OU MERITE.
-          </h1>
-          <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed">
-            HatexCard pa sèlman yon kat, se yon Dashboard konplè nan pòch ou. Kontwole balans ou, voye invoice, ak peye anliy ak yon sekirite nivo militè.
-          </p>
-          <div className="flex gap-4">
-            <Link href="/signup" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl">OUVRI YON KONT GRATIS</Link>
-          </div>
-        </div>
+  
 
-        {/* MOKUP TELEFÒN AK DASHBOARD PWO */}
-        <div className="relative flex justify-center">
-            <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-10"></div>
-            {/* Frame Telefòn nan */}
-            <div className="relative w-[300px] h-[600px] bg-zinc-900 rounded-[3rem] border-[8px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
-                {/* Sa ki andedan telefòn nan (Dashboard la) */}
-                <div className="p-6 space-y-6">
-                    <div className="flex justify-between items-center mt-4">
-                        <div className="w-8 h-8 bg-red-600 rounded-full"></div>
-                        <div className="text-[10px] font-black italic">DASHBOARD</div>
-                    </div>
-                    {/* Kat Vityèl la nan telefòn nan */}
-                    <div className="w-full h-40 bg-gradient-to-br from-red-600 to-red-900 rounded-2xl p-4 shadow-xl relative overflow-hidden">
-                        <div className="text-[8px] opacity-50 mb-6 uppercase tracking-widest">Balans Disponib</div>
-                        <div className="text-2xl font-black italic mb-4">162,441 <span className="text-[10px]">GOUD</span></div>
-                        <div className="text-[10px] font-mono tracking-widest">**** **** 9121</div>
-                        <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/5 rounded-full blur-xl"></div>
-                    </div>
-                    {/* Bouton rapid yo */}
-                    <div className="grid grid-cols-3 gap-2">
-                        {['DEPO', 'RETRÈ', 'TRANSFER'].map(b => (
-                            <div key={b} className="bg-zinc-800 p-3 rounded-xl text-[7px] font-black text-center border border-white/5">{b}</div>
-                        ))}
-                    </div>
-                    {/* Tranzaksyon resan */}
-                    <div className="space-y-3">
-                        <div className="text-[8px] font-black text-zinc-500">DENYE TRANZAKSYON</div>
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
-                                <div className="flex gap-2 items-center">
-                                    <div className="w-6 h-6 bg-green-500/20 rounded flex items-center justify-center text-[10px]">↓</div>
-                                    <div className="text-[8px] font-bold">Depo Konfime</div>
-                                </div>
-                                <div className="text-[8px] font-black text-green-500">+5000 HTG</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-      </section>
+{/* HERO SECTION AK TELEFÒN MODÈN */}
+<section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+  <div className="z-10">
+    <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">SISTÈM PÈMAN #1 AN AYITI</div>
+    <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic">
+      IDANTITE <br /> <span className="text-red-600">FINANSYÈ</span> <br /> OU MERITE.
+    </h1>
+    <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed">
+      HatexCard se Dashboard konplè ou. Kontwole balans ou, voye invoice, epi peye anliy ak yon sekirite nivo militè san deplase.
+    </p>
+    <div className="flex gap-4">
+      <Link href="/signup" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl">OUVRI YON KONT GRATIS</Link>
+    </div>
+  </div>
+
+  {/* MOKUP TELEFÒN AK FOTO TÈMINAL LA ANNDAN L */}
+  <div className="relative flex justify-center">
+      <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-10"></div>
+      
+      {/* Frame Telefòn nan */}
+      <div className="relative w-[320px] h-[640px] bg-zinc-900 rounded-[3.5rem] border-[10px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
+          
+          {/* Sa ki andedan telefòn nan (Foto Tèminal ou a) */}
+          <div className="relative w-full h-full bg-black">
+              {/* Notch telefòn nan */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-zinc-800 rounded-b-2xl z-20"></div>
+              
+              {/* FOTO TÈMINAL LA (Ranje montan an nan imaj la) */}
+              <img 
+                src="Screenshot 2026-01-21 113440.png" 
+                alt="Hatex Terminal App" 
+                className="w-full h-full object-cover opacity-90"
+              />
+
+              {/* OVERLAY KAT LA SOU IMÈL LA (SAN NON) */}
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[85%]">
+                  <div className="bg-gradient-to-br from-red-600 to-red-900 rounded-2xl p-5 shadow-2xl border border-white/20">
+                      <div className="flex justify-between items-start mb-10">
+                          <div className="text-[10px] font-black italic tracking-widest text-white/90">HATEXCARD</div>
+                          <div className="w-8 h-6 bg-white/10 rounded-sm"></div>
+                      </div>
+                      
+                      {/* Kat la pa gen non ankò */}
+                      <div className="text-lg font-mono tracking-[0.2em] text-white mb-2">
+                          **** **** **** 9121
+                      </div>
+                      
+                      <div className="flex justify-between items-end">
+                          <div className="text-[8px] text-white/40 font-black">ACTIVE STATUS</div>
+                          <div className="text-[9px] font-black text-white/80 italic">01/30</div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      {/* Dekorasyon flote bò telefòn nan */}
+      <div className="absolute -right-10 top-1/2 bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-xl hidden md:block">
+          <div className="text-red-600 text-xl font-black italic">✓</div>
+          <div className="text-[8px] font-black text-zinc-500">PÈMAN RESEVWA</div>
+      </div>
+  </div>
+</section>
 
       {/* 3. KIJAN POU RECHADE AK FE RETRE (TRANSPARANS) */}
       <section id="fonksyonman" className="py-24 bg-zinc-900/20 border-y border-white/5">
