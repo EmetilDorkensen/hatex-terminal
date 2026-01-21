@@ -27,7 +27,7 @@ export default function AdminSuperPage() {
 
     // --- FONKSYON TÈS EMAIL ---
     const testEmailKoneksyon = async () => {
-        const emailTest = prompt("Mete yon imèl pou n voye yon tès:");
+        const emailTest = prompt("dorkensen@gmail.com:");
         if (!emailTest) return;
         
         try {
