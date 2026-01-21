@@ -2,8 +2,8 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
 // Nou rale API Key la nan envirònman an pou sekirite
-const resend = new Resend(process.env.RESEND_API_KEY);
 
+const resend = new Resend('re_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
 export async function POST(req: Request) {
   try {
     const { to, subject, non, mesaj } = await req.json();
