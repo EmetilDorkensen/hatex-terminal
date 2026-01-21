@@ -1,40 +1,37 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-// Ranplase liy sa a ak kle Resend ou a si w pa itilize .env
-const resend = new Resend('re_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
+// Pou tès la, ou ka mete kle a dirèkteman isit la si .env la gen pwoblèm
+const resend = new Resend(process.env.RESEND_API_KEY || 're_kle_ou_la');
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { to, subject, non, mesaj } = body;
+    const { to, non, mesaj, subject } = await req.json();
 
-    console.log("LOG: Ap voye email bay:", to);
+    // 1. Tcheke si imèl la valid
+    if (!to || !to.includes('@')) {
+      return NextResponse.json({ error: 'Email kliyan an pa valid' }, { status: 400 });
+    }
 
-    const { data, error } = await resend.emails.send({
-      from: 'Hatex <contact@hatexcard.com>', // Fòk li ekri konsa egzakteman
+    // 2. Voye imèl la via Resend
+    const data = await resend.emails.send({
+      from: 'Hatex <contact@hatexcard.com>',
       to: [to],
-      subject: subject || 'Mizajou Hatex Card',
+      subject: subject || 'HATEX CARD - MIZAJOU',
       html: `
-        <div style="font-family: sans-serif; padding: 20px; border: 2px solid #dc2626; border-radius: 10px;">
-          <h1 style="color: #dc2626;">HATEX CARD</h1>
-          <p>Bonjou <strong>${non}</strong>,</p>
-          <p style="font-size: 16px;">${mesaj}</p>
-          <hr />
-          <p style="font-size: 10px; color: #666;">Notifikasyon sa a otomatik. Pa reponn li.</p>
+        <div style="font-family: sans-serif; border: 1px solid #eee; padding: 20px;">
+          <h2 style="color: #dc2626;">HATEX CARD</h2>
+          <p>Bonjou <b>${non}</b>,</p>
+          <p>${mesaj}</p>
+          <br/>
+          <p style="font-size: 12px; color: #888;">Mèsi paske ou chwazi Hatex Card.</p>
         </div>
       `,
     });
 
-    if (error) {
-      console.error("LOG: Erè Resend:", error);
-      return NextResponse.json({ error }, { status: 400 });
-    }
-
-    console.log("LOG: Email pati ak siksè!");
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error("LOG: Erè Server:", error.message);
+    console.error("Erè Resend:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
