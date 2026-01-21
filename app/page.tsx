@@ -19,66 +19,62 @@ export default function LandingPage() {
           <Link href="/signup" className="bg-red-600 px-8 py-3 rounded-full text-[10px] font-black shadow-lg shadow-red-600/20 hover:bg-red-700 transition">KÒMANSE KOUNYE A</Link>
         </div>
       </nav>
-{/* HERO SECTION AK TELEFÒN MODÈN */}
+{/* SECTION HERO AK DASHBOARD APP HATEX */}
 <section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-  <div className="z-10">
-    <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">SISTÈM PÈMAN #1 AN AYITI</div>
+  <div className="z-10 text-left">
+    <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">APLIKASYON HATEXCARD V2</div>
     <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic">
       IDANTITE <br /> <span className="text-red-600">FINANSYÈ</span> <br /> OU MERITE.
     </h1>
-    <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed">
-      HatexCard se Dashboard konplè ou. Kontwole balans ou, voye invoice, epi peye anliy ak yon sekirite nivo militè san deplase.
+    <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed border-l-2 border-red-600 pl-4">
+      Jere tout tranzaksyon ou yo dirèkteman nan Dashboard ou. Peye, resevwa, ak kontwole lajan ou an goud ak yon sekirite total kote ou ye a.
     </p>
     <div className="flex gap-4">
       <Link href="/signup" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl">OUVRI YON KONT GRATIS</Link>
     </div>
   </div>
 
-  {/* MOKUP TELEFÒN AK FOTO TÈMINAL LA ANNDAN L */}
+  {/* MOKUP TELEFÒN AK DASHBOARD LA */}
   <div className="relative flex justify-center">
       <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-10"></div>
       
-      {/* Frame Telefòn nan */}
-      <div className="relative w-[320px] h-[640px] bg-zinc-900 rounded-[3.5rem] border-[10px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
+      {/* FRAME TELEFÒN NAN */}
+      <div className="relative w-[320px] h-[650px] bg-zinc-900 rounded-[3.5rem] border-[10px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
           
-          {/* Sa ki andedan telefòn nan (Foto Tèminal ou a) */}
           <div className="relative w-full h-full bg-black">
               {/* Notch telefòn nan */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-zinc-800 rounded-b-2xl z-20"></div>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-800 rounded-b-3xl z-30"></div>
               
-              {/* FOTO TÈMINAL LA (Ranje montan an nan imaj la) */}
+              {/* FOTO DASHBOARD LA */}
               <img 
-                src="Screenshot 2026-01-21 113440.png" 
-                alt="Hatex Terminal App" 
-                className="w-full h-full object-cover opacity-90"
+                src="/Screenshot 2026-01-21 113440.png" 
+                alt="Hatex Dashboard App" 
+                className="w-full h-full object-cover"
               />
 
-              {/* OVERLAY KAT LA SOU IMÈL LA (SAN NON) */}
-              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[85%]">
-                  <div className="bg-gradient-to-br from-red-600 to-red-900 rounded-2xl p-5 shadow-2xl border border-white/20">
-                      <div className="flex justify-between items-start mb-10">
-                          <div className="text-[10px] font-black italic tracking-widest text-white/90">HATEXCARD</div>
-                          <div className="w-8 h-6 bg-white/10 rounded-sm"></div>
-                      </div>
-                      
-                      {/* Kat la pa gen non ankò */}
-                      <div className="text-lg font-mono tracking-[0.2em] text-white mb-2">
-                          **** **** **** 9121
-                      </div>
-                      
-                      <div className="flex justify-between items-end">
-                          <div className="text-[8px] text-white/40 font-black">ACTIVE STATUS</div>
-                          <div className="text-[9px] font-black text-white/80 italic">01/30</div>
-                      </div>
-                  </div>
-              </div>
+              {/* OVERLAY POU KACHE NON KI SOU DASHBOARD LA */}
+              {/* Kare nwa pou kache non anlè a */}
+              <div className="absolute top-[14%] left-0 w-full h-[55px] bg-black z-10"></div>
+
+              {/* Kare wouj fonse pou kache non sou kat la anba */}
+              <div className="absolute bottom-[11%] left-[10%] w-[160px] h-[25px] bg-[#8B0000] z-20"></div>
+              
+              {/* Yon ti efè vè (glass) sou ekran an pou l parèt reyèl */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-20"></div>
           </div>
       </div>
 
-      {/* Dekorasyon flote bò telefòn nan */}
-      <div className="absolute -right-10 top-1/2 bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-xl hidden md:block">
-          <div className="text-red-600 text-xl font-black italic">✓</div>
-          <div className="text-[8px] font-black text-zinc-500">PÈMAN RESEVWA</div>
+      {/* TI BADGE STATUS */}
+      <div className="absolute -right-10 top-1/2 bg-zinc-900/90 backdrop-blur-xl p-5 rounded-[2rem] border border-white/10 shadow-2xl hidden md:block">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center animate-pulse">
+                <div className="w-3 h-3 bg-white rounded-full"></div>
+             </div>
+             <div>
+                <p className="text-[8px] text-zinc-500 font-black">SISTÈM</p>
+                <p className="text-[10px] font-black italic uppercase text-green-500">LIVE / ACTIVE</p>
+             </div>
+          </div>
       </div>
   </div>
 </section>
