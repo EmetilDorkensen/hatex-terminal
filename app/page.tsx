@@ -19,9 +19,6 @@ export default function LandingPage() {
           <Link href="/signup" className="bg-red-600 px-8 py-3 rounded-full text-[10px] font-black shadow-lg shadow-red-600/20 hover:bg-red-700 transition">KÒMANSE KOUNYE A</Link>
         </div>
       </nav>
-
-  
-
 {/* HERO SECTION AK TELEFÒN MODÈN */}
 <section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
   <div className="z-10">
