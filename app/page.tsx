@@ -6,132 +6,187 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans uppercase italic selection:bg-red-600 overflow-x-hidden">
       
-      {/* NAVBAR */}
+      {/* 1. NAVBAR PWO`}
       <nav className="flex justify-between items-center p-6 max-w-7xl mx-auto relative z-50">
-        <div className="text-2xl font-black text-red-600 tracking-tighter italic underline decoration-white/10">HATEXCARD</div>
-        <div className="space-x-6">
-          <Link href="/login" className="text-[10px] font-black hover:text-red-600 transition tracking-widest">LOGIN</Link>
-          <Link href="/signup" className="bg-red-600 px-8 py-3 rounded-full text-[10px] font-black hover:bg-red-700 transition shadow-lg shadow-red-600/30">REGISTER</Link>
+        <div className="text-2xl font-black text-red-600 tracking-tighter italic">HATEXCARD</div>
+        <div className="hidden lg:flex gap-8 text-[10px] font-black tracking-widest text-zinc-400">
+            <a href="#fonksyonman" className="hover:text-white transition">KIJAN L MACHE</a>
+            <a href="#biznis" className="hover:text-white transition">BIZNIS</a>
+            <a href="#sekirite" className="hover:text-white transition">SEKIRITE</a>
+        </div>
+        <div className="space-x-4">
+          <Link href="/login" className="text-[10px] font-black hover:text-red-600 transition">LOGIN</Link>
+          <Link href="/signup" className="bg-red-600 px-8 py-3 rounded-full text-[10px] font-black shadow-lg shadow-red-600/20 hover:bg-red-700 transition">KÒMANSE KOUNYE A</Link>
         </div>
       </nav>
 
-      {/* HERO SECTION - KAT LA AN AKSYON */}
-      <section className="relative pt-12 pb-24 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          
-          <div className="text-left z-10">
-            <h1 className="text-5xl md:text-[80px] font-black tracking-tighter leading-[0.9] mb-8 italic">
-              PEYE <span className="text-red-600">NÈNPÒT KOTE</span> <br /> KI RESEVWA GOUD
-            </h1>
-            <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed border-l-2 border-red-600 pl-4">
-              Peye sèvis ou, achte anliy oswa nan magazen lokal. HatexCard se solisyon final pou tranzaksyon an goud san pwoblèm nan menm segonn lan.
-            </p>
-            <Link href="/signup" className="inline-block bg-white text-black px-12 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl">
-                KÒMANSE KOUNYE A
-            </Link>
-          </div>
-
-          {/* Imaj Moun kap kenbe kat la (Dwa bò kote tèks la) */}
-          <div className="relative group">
-            <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-10 rounded-full"></div>
-            {/* Si ou gen pwòp imaj ou, ranplase URL sa a */}
-            <img 
-              src="https://images.unsplash.com/photo-1556742044-3c52d6e88c62?q=80&w=1000&auto=format&fit=crop" 
-              alt="Moun ap peye nan shop" 
-              className="relative w-full h-[400px] object-cover rounded-[3rem] shadow-2xl border border-white/5 grayscale-[50%] group-hover:grayscale-0 transition duration-700"
-            />
-            {/* Ti Kat la ki flote sou imaj la */}
-            <div className="absolute -bottom-10 -left-10 w-64 h-40 bg-gradient-to-br from-red-600 to-red-900 rounded-2xl p-4 shadow-2xl border border-white/20 rotate-[-10deg] animate-bounce-slow">
-               <div className="text-[8px] font-black mb-4">HATEXCARD</div>
-               <div className="text-sm font-mono tracking-widest mb-4">**** **** **** 9121</div>
-               <div className="text-[10px] font-black italic">JOHN DOE</div>
-            </div>
+      {/* 2. HERO SECTION - DASHBOARD NAN TELEFÒN */}
+      <section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div className="z-10">
+          <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">SISTÈM PÈMAN #1 AN AYITI</div>
+          <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic">
+            IDANTITE <br /> <span className="text-red-600">FINANSYÈ</span> <br /> OU MERITE.
+          </h1>
+          <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed">
+            HatexCard pa sèlman yon kat, se yon Dashboard konplè nan pòch ou. Kontwole balans ou, voye invoice, ak peye anliy ak yon sekirite nivo militè.
+          </p>
+          <div className="flex gap-4">
+            <Link href="/signup" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl">OUVRI YON KONT GRATIS</Link>
           </div>
         </div>
-      </section>
 
-      {/* BUSINESS & INVOICE SECTION */}
-      <section className="py-24 bg-zinc-900/30 border-y border-white/5 relative">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
-          
-          <div className="order-2 md:order-1 relative">
-             <div className="w-full aspect-square bg-zinc-900 rounded-full flex items-center justify-center p-8 border border-white/5">
-                <div className="relative">
-                   {/* Imaj kote yap pran kat la nan men moun nan */}
-                   <img 
-                    src="https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?q=80&w=600&auto=format&fit=crop" 
-                    alt="Transaksyon biwo" 
-                    className="w-full h-full object-cover rounded-full"
-                   />
-                   {/* Circle Invoice la */}
-                   <div className="absolute top-0 right-0 w-24 h-24 bg-red-600 rounded-full flex flex-col items-center justify-center border-4 border-[#0a0b14] shadow-xl">
-                      <div className="text-[8px] font-black italic">Voye</div>
-                      <div className="text-[10px] font-black uppercase italic tracking-tighter">INVOICE</div>
-                   </div>
+        {/* MOKUP TELEFÒN AK DASHBOARD PWO */}
+        <div className="relative flex justify-center">
+            <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-10"></div>
+            {/* Frame Telefòn nan */}
+            <div className="relative w-[300px] h-[600px] bg-zinc-900 rounded-[3rem] border-[8px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
+                {/* Sa ki andedan telefòn nan (Dashboard la) */}
+                <div className="p-6 space-y-6">
+                    <div className="flex justify-between items-center mt-4">
+                        <div className="w-8 h-8 bg-red-600 rounded-full"></div>
+                        <div className="text-[10px] font-black italic">DASHBOARD</div>
+                    </div>
+                    {/* Kat Vityèl la nan telefòn nan */}
+                    <div className="w-full h-40 bg-gradient-to-br from-red-600 to-red-900 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+                        <div className="text-[8px] opacity-50 mb-6 uppercase tracking-widest">Balans Disponib</div>
+                        <div className="text-2xl font-black italic mb-4">162,441 <span className="text-[10px]">GOUD</span></div>
+                        <div className="text-[10px] font-mono tracking-widest">**** **** 9121</div>
+                        <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/5 rounded-full blur-xl"></div>
+                    </div>
+                    {/* Bouton rapid yo */}
+                    <div className="grid grid-cols-3 gap-2">
+                        {['DEPO', 'RETRÈ', 'TRANSFER'].map(b => (
+                            <div key={b} className="bg-zinc-800 p-3 rounded-xl text-[7px] font-black text-center border border-white/5">{b}</div>
+                        ))}
+                    </div>
+                    {/* Tranzaksyon resan */}
+                    <div className="space-y-3">
+                        <div className="text-[8px] font-black text-zinc-500">DENYE TRANZAKSYON</div>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
+                                <div className="flex gap-2 items-center">
+                                    <div className="w-6 h-6 bg-green-500/20 rounded flex items-center justify-center text-[10px]">↓</div>
+                                    <div className="text-[8px] font-bold">Depo Konfime</div>
+                                </div>
+                                <div className="text-[8px] font-black text-green-500">+5000 HTG</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-             </div>
-          </div>
+            </div>
+        </div>
+      </section>
 
-          <div className="order-1 md:order-2">
-            <h2 className="text-4xl font-black italic mb-6 tracking-tighter">SOLISYON POU <br /><span className="text-red-600">MOUN KI GEN BIZNIS</span></h2>
-            <div className="space-y-6">
-               <div className="flex gap-4">
-                  <div className="bg-red-600/10 p-3 rounded-xl text-red-600 font-black">✓</div>
-                  <p className="text-[11px] font-bold text-zinc-400 italic normal-case">Voye fakti (invoice) bay kliyan ou yo dirèkteman epi resevwa lajan an goud nan yon klike.</p>
-               </div>
-               <div className="flex gap-4">
-                  <div className="bg-red-600/10 p-3 rounded-xl text-red-600 font-black">✓</div>
-                  <p className="text-[11px] font-bold text-zinc-400 italic normal-case">Jere tout lavant ou nan yon sèl tablodbò san danje.</p>
-               </div>
+      {/* 3. KIJAN POU RECHADE AK FE RETRE (TRANSPARANS) */}
+      <section id="fonksyonman" className="py-24 bg-zinc-900/20 border-y border-white/5">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl font-black italic tracking-tighter mb-4">RECHADE AK RETIRE <span className="text-red-600">SAN TÈT CHAKE</span></h2>
+            <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest italic">Sistèm nan fonksyone ak tout metòd lokal yo</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Metòd Rechaj */}
+            <div className="bg-zinc-900/50 p-10 rounded-[3rem] border border-white/5 hover:border-red-600/30 transition group">
+              <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-8 text-2xl group-hover:scale-110 transition">📥</div>
+              <h3 className="text-xl font-black italic mb-6">KIJAN POU RECHADE?</h3>
+              <ul className="space-y-4 text-[11px] font-bold text-zinc-400 italic normal-case">
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Voye prèv transfè w la (MonCash, NatCash oswa Bank) dirèkteman nan Dashboard la.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Admin yo ap verifye epi kredite balans ou nan mwens pase 5 minit.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Resevwa notifikasyon pa imèl ak Telegram yon fwa kont ou pare.</li>
+              </ul>
+            </div>
+
+            {/* Metòd Retrè */}
+            <div className="bg-zinc-900/50 p-10 rounded-[3rem] border border-white/5 hover:border-red-600/30 transition group">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-8 text-2xl group-hover:scale-110 transition grayscale group-hover:grayscale-0">📤</div>
+              <h3 className="text-xl font-black italic mb-6">KIJAN POU FE RETRE?</h3>
+              <ul className="space-y-4 text-[11px] font-bold text-zinc-400 italic normal-case">
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Klike sou bouton "Retrè" a, mete montan an epi chwazi ki kote w vle resevwa lajan an.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Transfè a ap fèt dirèkteman sou nimewo MonCash oswa kont bankè ou.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Peye sèlman yon ti frè minimòm pou tranzaksyon an.</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER - STYLE KREZYPAY OU TE MANDE A */}
-      <footer className="bg-black py-20 border-t border-white/5">
+      {/* 4. BUSINESS & INVOICE SECTION */}
+      <section id="biznis" className="py-24 max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+            <div className="relative">
+                <img 
+                    src="https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=800" 
+                    className="rounded-[3rem] border border-white/10 grayscale hover:grayscale-0 transition duration-700" 
+                    alt="Business Hatex" 
+                />
+                {/* Floating Invoice Circle */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-600 rounded-full border-[8px] border-[#0a0b14] flex items-center justify-center animate-pulse">
+                    <div className="text-center">
+                        <div className="text-[10px] font-black italic">VOYE</div>
+                        <div className="text-xs font-black">INVOICE</div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h2 className="text-5xl font-black italic mb-8 tracking-tighter leading-none">SOLISYON POU <br /> <span className="text-red-600">BIZNISMAN AK SHOP</span>.</h2>
+                <p className="text-zinc-400 text-[12px] font-bold italic mb-8 normal-case leading-relaxed">
+                    Si ou se yon machann oswa ou gen yon magazen, HatexCard pèmèt ou voye fakti bay kliyan ou yo pou yo ka peye w rapidman. Peye nenpòt kote ki resevwa goud epi ogmante lavant ou kounye a.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
+                        <div className="text-red-600 font-black mb-2 italic">99.9%</div>
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase">Sekirite Garanti</div>
+                    </div>
+                    <div className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
+                        <div className="text-red-600 font-black mb-2 italic">0 FRÈ</div>
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase">Pou kreyasyon kont</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </section>
+
+      {/* 5. FOOTER STYLE KREZYPAY */}
+      <footer className="bg-black py-20 border-t border-white/5 mt-20">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-16">
-          
-          {/* Logo & Slogan */}
           <div className="space-y-6">
             <div className="text-2xl font-black text-red-600 italic">HATEXCARD</div>
             <p className="text-[11px] text-zinc-500 font-bold italic normal-case leading-relaxed">
-              Fè tranzaksyon an sekirite nenpòt ki lè nan jounen an. Nou gen pi bon to mache a ak frè ki pi ba yo.
+              Pi gwo platfòm pèman an Ayiti. Sekirite w se priyorite nou. Trete tout tranzaksyon w yo nan yon klike.
             </p>
           </div>
-
-          {/* Quick Links */}
-          <div className="space-y-4">
-            <h4 className="font-black text-sm italic mb-6">QUICK LINKS</h4>
-            <ul className="text-[11px] font-bold text-zinc-400 space-y-3 italic">
-              <li className="hover:text-red-600 cursor-pointer transition flex items-center gap-2"><span>&gt;</span> Pèman Entegrasyon</li>
-              <li className="hover:text-red-600 cursor-pointer transition flex items-center gap-2"><span>&gt;</span> Kijan pou itilize</li>
-              <li className="hover:text-red-600 cursor-pointer transition flex items-center gap-2"><span>&gt;</span> FAQ & Sipò</li>
-              <li className="hover:text-red-600 cursor-pointer transition flex items-center gap-2"><span>&gt;</span> Solisyon Biznis</li>
+          <div>
+            <h4 className="font-black text-sm italic mb-8 tracking-[0.2em]">QUICK LINKS</h4>
+            <ul className="text-[11px] font-bold text-zinc-500 space-y-4 italic">
+              <li className="hover:text-red-600 cursor-pointer transition">› KIJAN POU ITILIZE</li>
+              <li className="hover:text-red-600 cursor-pointer transition">› FAQ & SIPÒ</li>
+              <li className="hover:text-red-600 cursor-pointer transition">› SOLISYON BIZNIS</li>
+              <li className="hover:text-red-600 cursor-pointer transition">› SEKIRITE DONE</li>
             </ul>
           </div>
-
-          {/* Kontak Info */}
-          <div className="space-y-4">
-             <h4 className="font-black text-sm italic mb-6">KONTAKTE NOU</h4>
-             <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-white/5 hover:border-red-600/30 transition">
-                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-black">📞</div>
-                <div>
-                   <p className="text-[8px] text-zinc-500 font-black">TELEFÒN</p>
-                   <p className="text-[10px] font-black italic">+509 0000 0000</p>
+          <div>
+            <h4 className="font-black text-sm italic mb-8 tracking-[0.2em]">KONTAK</h4>
+            <div className="space-y-4">
+                <div className="flex items-center gap-4 bg-zinc-900 p-4 rounded-2xl border border-white/5">
+                    <div className="text-xl">📞</div>
+                    <div>
+                        <div className="text-[8px] text-zinc-500 font-black tracking-widest uppercase">Telefòn</div>
+                        <div className="text-[11px] font-black italic">+509 0000 0000</div>
+                    </div>
                 </div>
-             </div>
-             <div className="flex items-center gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-white/5 hover:border-red-600/30 transition mt-4">
-                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-black">✉️</div>
-                <div>
-                   <p className="text-[8px] text-zinc-500 font-black">IMÈL NOU</p>
-                   <p className="text-[10px] font-black italic">support@hatexcard.com</p>
+                <div className="flex items-center gap-4 bg-zinc-900 p-4 rounded-2xl border border-white/5">
+                    <div className="text-xl">✉️</div>
+                    <div>
+                        <div className="text-[8px] text-zinc-500 font-black tracking-widest uppercase">Imèl Sipò</div>
+                        <div className="text-[11px] font-black italic">support@hatexcard.com</div>
+                    </div>
                 </div>
-             </div>
+            </div>
           </div>
         </div>
-        <div className="mt-20 text-center border-t border-white/5 pt-8">
-           <p className="text-[9px] font-black text-zinc-600 tracking-[0.3em]">© 2026 HATEXCARD - PWOPRIYETE HATEX GROUP</p>
+        <div className="mt-20 pt-8 border-t border-white/5 text-center">
+            <p className="text-[9px] font-black text-zinc-700 tracking-[0.5em]">© 2026 HATEXCARD - TOUT DWA REZÈVE</p>
         </div>
       </footer>
     </div>
