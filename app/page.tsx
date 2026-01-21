@@ -111,41 +111,96 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. BUSINESS & INVOICE SECTION */}
-      <section id="biznis" className="py-24 max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-            <div className="relative">
-                <img 
-                    src="Screenshot 2026-01-21 113440.png" 
-                    className="rounded-[3rem] border border-white/10 grayscale hover:grayscale-0 transition duration-700" 
-                    alt="Business Hatex" 
-                />
-                {/* Floating Invoice Circle */}
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-600 rounded-full border-[8px] border-[#0a0b14] flex items-center justify-center animate-pulse">
-                    <div className="text-center">
-                        <div className="text-[10px] font-black italic">VOYE</div>
-                        <div className="text-xs font-black">INVOICE</div>
-                    </div>
-                </div>
+     {/* 4. BUSINESS, INVOICE & TERMINAL API SECTION */}
+<section id="biznis" className="py-24 max-w-7xl mx-auto px-6">
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+    
+    {/* BÒ GÒCH: TERMINAL VITYÈL AK API MOCKUP */}
+    <div className="relative group">
+      <div className="absolute inset-0 bg-red-600 blur-[100px] opacity-10 rounded-full group-hover:opacity-20 transition"></div>
+      
+      {/* TERMINAL PÈMAN MODÈN */}
+      <div className="relative bg-[#0d0e1a] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl transform group-hover:scale-[1.02] transition-transform duration-500">
+        {/* Header Terminal la */}
+        <div className="bg-zinc-900/80 p-4 border-b border-white/5 flex justify-between items-center px-8">
+          <div className="flex gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-zinc-600"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-zinc-600"></div>
+          </div>
+          <div className="text-[9px] font-black text-zinc-500 tracking-[0.2em]">HATEX TERMINAL V2</div>
+        </div>
+
+        {/* Kontni Terminal la */}
+        <div className="p-8 space-y-6">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-xs font-black italic">ESTATI PÈMAN</h4>
+            <span className="bg-green-500/10 text-green-500 text-[8px] px-3 py-1 rounded-full font-black animate-pulse uppercase">An tèminal...</span>
+          </div>
+
+          {/* Vizyèl Kat k ap glise nan tèminal la */}
+          <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 flex items-center gap-6">
+            <div className="w-16 h-10 bg-gradient-to-br from-red-600 to-red-900 rounded-md shadow-lg flex items-center justify-center">
+                <div className="w-4 h-4 bg-yellow-500/20 rounded-sm"></div>
             </div>
             <div>
-                <h2 className="text-5xl font-black italic mb-8 tracking-tighter leading-none">SOLISYON POU <br /> <span className="text-red-600">BIZNISMAN AK SHOP</span>.</h2>
-                <p className="text-zinc-400 text-[12px] font-bold italic mb-8 normal-case leading-relaxed">
-                    Si ou se yon machann oswa ou gen yon magazen, HatexCard pèmèt ou voye fakti bay kliyan ou yo pou yo ka peye w rapidman. Peye nenpòt kote ki resevwa goud epi ogmante lavant ou kounye a.
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
-                        <div className="text-red-600 font-black mb-2 italic">99.9%</div>
-                        <div className="text-[9px] font-bold text-zinc-500 uppercase">Sekirite Garanti</div>
-                    </div>
-                    <div className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
-                        <div className="text-red-600 font-black mb-2 italic">0 FRÈ</div>
-                        <div className="text-[9px] font-bold text-zinc-500 uppercase">Pou kreyasyon kont</div>
-                    </div>
-                </div>
+              <p className="text-[10px] font-black italic">IDANTITE FINANSYÈ</p>
+              <p className="text-[8px] text-zinc-500 font-bold uppercase">**** **** **** 9121</p>
             </div>
+          </div>
+
+          {/* API Code Snippet pou montre li ka entegre sou sit */}
+          <div className="bg-black/50 p-4 rounded-xl font-mono text-[9px] text-zinc-400 border-l-2 border-red-600">
+            <p className="text-red-500 font-bold italic mb-1">// Entegre sou sit entènèt ou</p>
+            <p><span className="text-zinc-500">hatex.</span><span className="text-white">createPayment</span>({'{'}</p>
+            <p className="pl-4">amount: <span className="text-green-500">"AUTO"</span>,</p>
+            <p className="pl-4">currency: <span className="text-green-500">"HTG"</span>,</p>
+            <p className="pl-4">terminalId: <span className="text-green-500">"HX-99"</span></p>
+            <p>{'}'});</p>
+          </div>
         </div>
-      </section>
+      </div>
+
+      {/* Floating Invoice Badge */}
+      <div className="absolute -top-6 -right-6 w-28 h-28 bg-red-600 rounded-full border-[6px] border-[#0a0b14] flex items-center justify-center shadow-xl rotate-12 group-hover:rotate-0 transition-transform duration-500">
+        <div className="text-center">
+          <div className="text-[8px] font-black italic">SEND</div>
+          <div className="text-[11px] font-black uppercase tracking-tighter leading-none">INVOICE</div>
+        </div>
+      </div>
+    </div>
+
+    {/* BÒ DWAT: TÈKS AK DETAY BIZNIS */}
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-5xl font-black italic mb-6 tracking-tighter leading-none">
+          POU <span className="text-red-600">BIZNIS</span> <br />& DEVELOPERS.
+        </h2>
+        <p className="text-zinc-400 text-[12px] font-bold italic mb-8 normal-case leading-relaxed">
+          HatexCard ofri pi plis pase yon kat. Nou bay biznis yo yon **Terminal API** konplè pou yo ka resevwa pèman dirèkteman sou sit entènèt yo, nan shop yo, oswa voye Invoice bay kliyan.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-zinc-900/50 p-6 rounded-[2rem] border border-white/5 hover:border-red-600/20 transition">
+          <div className="text-red-600 font-black mb-2 italic uppercase text-[10px]">TERMINAL API</div>
+          <p className="text-[10px] text-zinc-500 font-bold normal-case italic">Entegre bouton pèman Hatex la sou nenpòt sit entènèt nan kèk minit.</p>
+        </div>
+        <div className="bg-zinc-900/50 p-6 rounded-[2rem] border border-white/5 hover:border-red-600/20 transition">
+          <div className="text-red-600 font-black mb-2 italic uppercase text-[10px]">RESEVWA GOUD</div>
+          <p className="text-[10px] text-zinc-500 font-bold normal-case italic">Solisyon ideyal pou tout biznis ki resevwa Goud kòm pèman prensipal.</p>
+        </div>
+      </div>
+
+      <div className="pt-4">
+        <button className="bg-white text-black px-8 py-4 rounded-2xl font-black text-[10px] uppercase italic hover:bg-red-600 hover:text-white transition-all shadow-xl">
+           Mande aksè API kounye a
+        </button>
+      </div>
+    </div>
+
+  </div>
+</section>
 
       {/* 5. FOOTER STYLE KREZYPAY */}
       <footer className="bg-black py-20 border-t border-white/5 mt-20">
