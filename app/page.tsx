@@ -23,7 +23,7 @@ export default function LandingPage() {
 <section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
   <div className="z-10 text-left">
     <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">APLIKASYON HATEXCARD V2</div>
-    <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic">
+    <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic text-white">
       IDANTITE <br /> <span className="text-red-600">FINANSYÈ</span> <br /> OU MERITE.
     </h1>
     <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed border-l-2 border-red-600 pl-4">
@@ -34,9 +34,9 @@ export default function LandingPage() {
     </div>
   </div>
 
-  {/* MOKUP TELEFÒN AK DASHBOARD LA */}
+  {/* MOKUP TELEFÒN NAN */}
   <div className="relative flex justify-center">
-      <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-10"></div>
+      <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-20"></div>
       
       {/* FRAME TELEFÒN NAN */}
       <div className="relative w-[320px] h-[650px] bg-zinc-900 rounded-[3.5rem] border-[10px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
@@ -45,35 +45,22 @@ export default function LandingPage() {
               {/* Notch telefòn nan */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-800 rounded-b-3xl z-30"></div>
               
-              {/* FOTO DASHBOARD LA */}
+              {/* FOTO DASHBOARD LA - Asire w li nan folder /public/ */}
               <img 
                 src="/Screenshot 2026-01-21 113440.png" 
-                alt="Hatex Dashboard App" 
-                className="w-full h-full object-cover"
+                alt="Hatex Dashboard" 
+                className="w-full h-full object-cover relative z-10"
+                onError={(e) => {
+                  e.currentTarget.src = "https://via.placeholder.com/320x650?text=Foto+a+manke+nan+folder+public";
+                }}
               />
 
-              {/* OVERLAY POU KACHE NON KI SOU DASHBOARD LA */}
-              {/* Kare nwa pou kache non anlè a */}
-              <div className="absolute top-[14%] left-0 w-full h-[55px] bg-black z-10"></div>
+              {/* OVERLAY POU KACHE NON YO */}
+              {/* 1. Kache non anlè a */}
+              <div className="absolute top-[14.5%] left-0 w-full h-[50px] bg-black z-20"></div>
 
-              {/* Kare wouj fonse pou kache non sou kat la anba */}
-              <div className="absolute bottom-[11%] left-[10%] w-[160px] h-[25px] bg-[#8B0000] z-20"></div>
-              
-              {/* Yon ti efè vè (glass) sou ekran an pou l parèt reyèl */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-20"></div>
-          </div>
-      </div>
-
-      {/* TI BADGE STATUS */}
-      <div className="absolute -right-10 top-1/2 bg-zinc-900/90 backdrop-blur-xl p-5 rounded-[2rem] border border-white/10 shadow-2xl hidden md:block">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center animate-pulse">
-                <div className="w-3 h-3 bg-white rounded-full"></div>
-             </div>
-             <div>
-                <p className="text-[8px] text-zinc-500 font-black">SISTÈM</p>
-                <p className="text-[10px] font-black italic uppercase text-green-500">LIVE / ACTIVE</p>
-             </div>
+              {/* 2. Kache non sou kat la */}
+              <div className="absolute bottom-[11.5%] left-[8%] w-[160px] h-[22px] bg-[#8B0000] z-20"></div>
           </div>
       </div>
   </div>
