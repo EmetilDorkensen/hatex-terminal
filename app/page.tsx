@@ -91,9 +91,9 @@ export default function LandingPage() {
               <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-8 text-2xl group-hover:scale-110 transition">📥</div>
               <h3 className="text-xl font-black italic mb-6">KIJAN POU RECHADE?</h3>
               <ul className="space-y-4 text-[11px] font-bold text-zinc-400 italic normal-case">
-                <li className="flex gap-3"> <span className="text-red-600">●</span> Voye prèv transfè w la (MonCash, NatCash oswa Bank) dirèkteman nan Dashboard la.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span>  (MonCash, NatCash oswa Bank) .</li>
                 <li className="flex gap-3"> <span className="text-red-600">●</span> Admin yo ap verifye epi kredite balans ou nan mwens pase 5 minit.</li>
-                <li className="flex gap-3"> <span className="text-red-600">●</span> Resevwa notifikasyon pa imèl ak Telegram yon fwa kont ou pare.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Resevwa notifikasyon pa imèl .</li>
               </ul>
             </div>
 
@@ -103,8 +103,8 @@ export default function LandingPage() {
               <h3 className="text-xl font-black italic mb-6">KIJAN POU FE RETRE?</h3>
               <ul className="space-y-4 text-[11px] font-bold text-zinc-400 italic normal-case">
                 <li className="flex gap-3"> <span className="text-red-600">●</span> Klike sou bouton "Retrè" a, mete montan an epi chwazi ki kote w vle resevwa lajan an.</li>
-                <li className="flex gap-3"> <span className="text-red-600">●</span> Transfè a ap fèt dirèkteman sou nimewo MonCash oswa kont bankè ou.</li>
-                <li className="flex gap-3"> <span className="text-red-600">●</span> Peye sèlman yon ti frè minimòm pou tranzaksyon an.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Transfè a ap fèt dirèkteman sou nimewo MonCash/Natcash oswa kont bankè ou.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> .</li>
               </ul>
             </div>
           </div>
@@ -116,7 +116,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
             <div className="relative">
                 <img 
-                    src="https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=800" 
+                    src="Screenshot 2026-01-21 113440.png" 
                     className="rounded-[3rem] border border-white/10 grayscale hover:grayscale-0 transition duration-700" 
                     alt="Business Hatex" 
                 />
@@ -169,7 +169,7 @@ export default function LandingPage() {
             <h4 className="font-black text-sm italic mb-8 tracking-[0.2em]">KONTAK</h4>
             <div className="space-y-4">
                 <div className="flex items-center gap-4 bg-zinc-900 p-4 rounded-2xl border border-white/5">
-                    <div className="text-xl">📞</div>
+                    <div className="text-xl"></div>
                     <div>
                         <div className="text-[8px] text-zinc-500 font-black tracking-widest uppercase">Telefòn</div>
                         <div className="text-[11px] font-black italic">+509 0000 0000</div>
