@@ -203,47 +203,85 @@ export default function LandingPage() {
 </section>
 
       {/* 5. FOOTER STYLE KREZYPAY */}
-      <footer className="bg-black py-20 border-t border-white/5 mt-20">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-16">
-          <div className="space-y-6">
-            <div className="text-2xl font-black text-red-600 italic">HATEXCARD</div>
-            <p className="text-[11px] text-zinc-500 font-bold italic normal-case leading-relaxed">
-              Pi gwo platfòm pèman an Ayiti. Sekirite w se priyorite nou. Trete tout tranzaksyon w yo nan yon klike.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-black text-sm italic mb-8 tracking-[0.2em]">QUICK LINKS</h4>
-            <ul className="text-[11px] font-bold text-zinc-500 space-y-4 italic">
-              <li className="hover:text-red-600 cursor-pointer transition">› KIJAN POU ITILIZE</li>
-              <li className="hover:text-red-600 cursor-pointer transition">› FAQ & SIPÒ</li>
-              <li className="hover:text-red-600 cursor-pointer transition">› SOLISYON BIZNIS</li>
-              <li className="hover:text-red-600 cursor-pointer transition">› SEKIRITE DONE</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-black text-sm italic mb-8 tracking-[0.2em]">KONTAK</h4>
-            <div className="space-y-4">
-                <div className="flex items-center gap-4 bg-zinc-900 p-4 rounded-2xl border border-white/5">
-                    <div className="text-xl"></div>
-                    <div>
-                        <div className="text-[8px] text-zinc-500 font-black tracking-widest uppercase">Telefòn</div>
-                        <div className="text-[11px] font-black italic">+509 0000 0000</div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-4 bg-zinc-900 p-4 rounded-2xl border border-white/5">
-                    <div className="text-xl">✉️</div>
-                    <div>
-                        <div className="text-[8px] text-zinc-500 font-black tracking-widest uppercase">Imèl Sipò</div>
-                        <div className="text-[11px] font-black italic">support@hatexcard.com</div>
-                    </div>
-                </div>
-            </div>
-          </div>
+      <footer className="bg-[#05050a] border-t border-white/5 pt-20 pb-10">
+  <div className="max-w-7xl mx-auto px-6">
+    {/* GRID SEKSYON YO */}
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-20">
+      
+      {/* KOLÒN 1: KONPAYI */}
+      <div className="space-y-4">
+        <h4 className="text-white font-black text-[10px] tracking-[0.2em] mb-6">KONPAYI</h4>
+        <ul className="text-zinc-500 text-[10px] font-bold space-y-3 italic">
+          <li><Link href="/about" className="hover:text-red-600 transition">SOU NOU</Link></li>
+          <li><Link href="/karie" className="hover:text-red-600 transition">KARYÈ</Link></li>
+          <li><Link href="/blog" className="hover:text-red-600 transition">BLOG HATEX</Link></li>
+        </ul>
+      </div>
+
+      {/* KOLÒN 2: PWODWI */}
+      <div className="space-y-4">
+        <h4 className="text-white font-black text-[10px] tracking-[0.2em] mb-6">PWODWI</h4>
+        <ul className="text-zinc-500 text-[10px] font-bold space-y-3 italic">
+          <li><Link href="/terminal" className="hover:text-red-600 transition">TERMINAL API</Link></li>
+          <li><Link href="/invoice" className="hover:text-red-600 transition">VIRTUAL INVOICE</Link></li>
+          <li><Link href="/cards" className="hover:text-red-600 transition">KAT VITYÈL</Link></li>
+        </ul>
+      </div>
+
+      {/* KOLÒN 3: RESOUS */}
+      <div className="space-y-4">
+        <h4 className="text-white font-black text-[10px] tracking-[0.2em] mb-6">RESOUS</h4>
+        <ul className="text-zinc-500 text-[10px] font-bold space-y-3 italic">
+          <li><Link href="/docs" className="hover:text-red-600 transition">DOKIMANTASYON</Link></li>
+          <li><Link href="/help" className="hover:text-red-600 transition">SANT ÈD</Link></li>
+          <li><Link href="/status" className="hover:text-red-600 transition">STATUS SISTÈM</Link></li>
+        </ul>
+      </div>
+
+      {/* KOLÒN 4: LEGAL */}
+      <div className="space-y-4">
+        <h4 className="text-white font-black text-[10px] tracking-[0.2em] mb-6">LEGAL</h4>
+        <ul className="text-zinc-500 text-[10px] font-bold space-y-3 italic">
+          <li><Link href="/privacy" className="hover:text-red-600 transition">KONFIDANSYALITE</Link></li>
+          <li><Link href="/terms" className="hover:text-red-600 transition">KONDISYON ITILIZASYON</Link></li>
+          <li><Link href="/cookies" className="hover:text-red-600 transition">COOKIES</Link></li>
+        </ul>
+      </div>
+
+      {/* KOLÒN 5: SOSYAL (Pou Desktop) */}
+      <div className="hidden lg:block space-y-6">
+        <div className="text-red-600 font-black italic text-xl tracking-tighter">HATEXCARD</div>
+        <p className="text-[9px] text-zinc-600 font-bold leading-relaxed">
+          Solisyon pèman ki pi rapid nan Karayib la.
+        </p>
+        <div className="flex gap-4">
+            <div className="w-8 h-8 bg-zinc-900 rounded-lg border border-white/5 flex items-center justify-center text-xs hover:border-red-600 transition cursor-pointer">f</div>
+            <div className="w-8 h-8 bg-zinc-900 rounded-lg border border-white/5 flex items-center justify-center text-xs hover:border-red-600 transition cursor-pointer">𝕏</div>
+            <div className="w-8 h-8 bg-zinc-900 rounded-lg border border-white/5 flex items-center justify-center text-xs hover:border-red-600 transition cursor-pointer">in</div>
         </div>
-        <div className="mt-20 pt-8 border-t border-white/5 text-center">
-            <p className="text-[9px] font-black text-zinc-700 tracking-[0.5em]">© 2026 HATEXCARD - TOUT DWA REZÈVE</p>
+      </div>
+
+    </div>
+
+    {/* LINE ANBA NÈT LA */}
+    <div className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+      <p className="text-[9px] font-black text-zinc-600 tracking-[0.3em]">
+        © 2026 HATEXCARD - YON PWODWI HATEX GROUP.
+      </p>
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-[8px] font-black text-zinc-500">SISTÈM OPERASYONÈL</span>
         </div>
-      </footer>
+        <select className="bg-transparent text-[8px] font-black text-zinc-500 border-none outline-none cursor-pointer hover:text-white">
+            <option>KREYÒL</option>
+            <option>ENGLISH</option>
+            <option>FRANÇAIS</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</footer>
     </div>
   );
 }
