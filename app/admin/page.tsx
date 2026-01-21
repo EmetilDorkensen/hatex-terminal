@@ -33,15 +33,31 @@ export default function AdminSuperPage() {
     useEffect(() => { raleDone(); }, []);
 
     const voyeEmailKliyan = async (email: string, non: string, mesaj: string) => {
+        if (!email) {
+            console.error("ERÈ: Pa gen imèl pou kliyan sa a.");
+            return;
+        }
+    
         try {
-            await fetch('/api/send-email', {
+            console.log("LOG: Ap voye bay:", email);
+            const res = await fetch('/api/send-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: email, subject: 'Mizajou Hatex Card', non, mesaj }),
+                body: JSON.stringify({ 
+                    to: email.trim(), // Netwaye espas si genyen
+                    non: non || "Kliyan Hatex", 
+                    mesaj: mesaj,
+                    subject: 'HATEX CARD - NOTIFIKASYON'
+                }),
             });
-        } catch (error) { console.error("Erè imèl:", error); }
+    
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "API Email bay erè");
+            console.log("LOG: Email pati!", data);
+        } catch (error) { 
+            console.error("ERÈ EMAIL:", error); 
+        }
     };
-
     const voyeNotifikasyonTelegram = async (mesaj: string) => {
         try {
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
