@@ -16,13 +16,11 @@ export default function AdminSuperPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // Done Telegram ou yo
     const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY';
     const CHAT_ID = '8392894841';
 
     const raleDone = async () => {
         setLoading(true);
-        // Nou rale yo separe pou evite erè 400 Bad Request
         const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
         const { data: w } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
         setDeposits(d || []);
@@ -33,31 +31,16 @@ export default function AdminSuperPage() {
     useEffect(() => { raleDone(); }, []);
 
     const voyeEmailKliyan = async (email: string, non: string, mesaj: string) => {
-        if (!email) {
-            console.error("ERÈ: Pa gen imèl pou kliyan sa a.");
-            return;
-        }
-    
+        if (!email) return;
         try {
-            console.log("LOG: Ap voye bay:", email);
-            const res = await fetch('/api/send-email', {
+            await fetch('/api/send-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    to: email.trim(), // Netwaye espas si genyen
-                    non: non || "Kliyan Hatex", 
-                    mesaj: mesaj,
-                    subject: 'HATEX CARD - NOTIFIKASYON'
-                }),
+                body: JSON.stringify({ to: email.trim(), subject: 'Mizajou Hatex Card', non, mesaj }),
             });
-    
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "API Email bay erè");
-            console.log("LOG: Email pati!", data);
-        } catch (error) { 
-            console.error("ERÈ EMAIL:", error); 
-        }
+        } catch (error) { console.error("Erè imèl:", error); }
     };
+
     const voyeNotifikasyonTelegram = async (mesaj: string) => {
         try {
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -80,9 +63,16 @@ export default function AdminSuperPage() {
 
             await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', d.user_id);
             await supabase.from('deposits').update({ status: 'approved' }).eq('id', d.id);
+            
+            // Korije ak kolòn 'fee' pou evite erè 400
             await supabase.from('transactions').insert({
-                user_id: d.user_id, amount: Number(d.amount), type: 'DEPOSIT',
-                description: 'Depo konfime ak siksè', status: 'success', method: 'SISTÈM'
+                user_id: d.user_id, 
+                amount: Number(d.amount), 
+                fee: 0,
+                type: 'DEPOSIT',
+                description: 'Depo konfime ak siksè', 
+                status: 'success', 
+                method: 'SISTÈM'
             });
 
             voyeEmailKliyan(p.email, p.full_name, `Depo ${d.amount} HTG ou a apwouve. Balans: ${nouvoBalans} HTG.`);
@@ -102,8 +92,13 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('profiles').select('*').eq('id', d.user_id).single();
             await supabase.from('deposits').update({ status: 'rejected', admin_notes: rezon }).eq('id', d.id);
             await supabase.from('transactions').insert({
-                user_id: d.user_id, amount: Number(d.amount), type: 'DEPOSIT',
-                description: `Anile: ${rezon}`, status: 'rejected', method: 'SISTÈM'
+                user_id: d.user_id, 
+                amount: Number(d.amount), 
+                fee: 0,
+                type: 'DEPOSIT',
+                description: `Anile: ${rezon}`, 
+                status: 'rejected', 
+                method: 'SISTÈM'
             });
 
             if (p) voyeEmailKliyan(p.email, p.full_name, `Depo anile. Rezon: ${rezon}`);
@@ -112,16 +107,22 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
-    // --- 3. KONFIME RETRÈ ---
+    // --- 3. KONFIME PÈMAN RETRÈ ---
     const finPeyeRetre = async (w: any) => {
         if (!confirm(`Konfime pèman ${w.amount} HTG?`)) return;
         setProcessingId(w.id);
         try {
             const { data: p } = await supabase.from('profiles').select('*').eq('id', w.user_id).single();
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
+            
             await supabase.from('transactions').insert({
-                user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL',
-                description: `Retrè peye via ${w.method}`, status: 'success', method: w.method
+                user_id: w.user_id, 
+                amount: -Number(w.amount), 
+                fee: 0,
+                type: 'WITHDRAWAL',
+                description: `Retrè peye via ${w.method}`, 
+                status: 'success', 
+                method: w.method
             });
 
             if (p) voyeEmailKliyan(p.email, p.full_name, `Retrè ${w.amount} HTG ou a fin peye.`);
@@ -140,7 +141,7 @@ export default function AdminSuperPage() {
     return (
         <div className="min-h-screen bg-[#0a0b14] text-white p-4 font-sans uppercase italic pb-24">
             <div className="max-w-md mx-auto flex justify-between items-center mb-6">
-                <h1 className="text-xl font-black text-red-600 italic">Hatex Admin</h1>
+                <h1 className="text-xl font-black text-red-600">Admin Hatex</h1>
                 <button onClick={raleDone} className="bg-zinc-800 px-4 py-2 rounded-xl text-[10px] font-black">REFRESH</button>
             </div>
 
@@ -150,7 +151,7 @@ export default function AdminSuperPage() {
             </div>
 
             {loading ? (
-                <div className="text-center py-20 animate-pulse font-black">Y AP CHACHE DONE...</div>
+                <div className="text-center py-20 animate-pulse font-black">CHACHE DONE...</div>
             ) : (
                 <div className="space-y-4 max-w-md mx-auto">
                     {(view === 'depo' ? deposits : withdrawals).map((item) => (
@@ -165,9 +166,9 @@ export default function AdminSuperPage() {
                             {view === 'depo' ? (
                                 <div className="space-y-2">
                                     <div className="grid grid-cols-2 gap-2">
-                                        <a href={item.proof_img_1} target="_blank" className="bg-zinc-800 py-3 rounded-xl text-center text-[10px] font-black border border-white/5 uppercase">Foto Prèv</a>
+                                        <a href={item.proof_img_1} target="_blank" className="bg-zinc-800 py-3 rounded-xl text-center text-[10px] font-black border border-white/5">Foto Prèv</a>
                                         {item.status === 'pending' && (
-                                            <button disabled={processingId === item.id} onClick={() => apwouveDepo(item)} className="bg-white text-black py-3 rounded-xl text-[10px] font-black uppercase shadow-lg">
+                                            <button disabled={processingId === item.id} onClick={() => apwouveDepo(item)} className="bg-white text-black py-3 rounded-xl text-[10px] font-black">
                                                 {processingId === item.id ? 'Loading...' : 'Apwouve'}
                                             </button>
                                         )}
@@ -190,7 +191,7 @@ export default function AdminSuperPage() {
                                 </div>
                             )}
 
-                            <button onClick={() => suprime(item.id, view === 'depo' ? 'deposits' : 'withdrawals')} className="absolute top-5 right-5 text-zinc-700 hover:text-red-600">X</button>
+                            <button onClick={() => suprime(item.id, view === 'depo' ? 'deposits' : 'withdrawals')} className="absolute top-5 right-5 text-zinc-700 hover:text-red-600 font-black">X</button>
                         </div>
                     ))}
                 </div>
