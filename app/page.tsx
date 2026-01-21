@@ -19,48 +19,108 @@ export default function LandingPage() {
           <Link href="/signup" className="bg-red-600 px-8 py-3 rounded-full text-[10px] font-black shadow-lg shadow-red-600/20 hover:bg-red-700 transition">KÒMANSE KOUNYE A</Link>
         </div>
       </nav>
-{/* SECTION HERO AK DASHBOARD APP HATEX */}
+{/* SECTION HERO AK DASHBOARD RE-KREYE AK KÒD */}
 <section className="relative pt-20 pb-32 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
   <div className="z-10 text-left">
     <div className="inline-block bg-red-600/10 border border-red-600/20 px-4 py-1 rounded-full text-[8px] font-black text-red-500 mb-6 tracking-[0.2em]">APLIKASYON HATEXCARD V2</div>
-    <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic text-white">
+    <h1 className="text-6xl md:text-[90px] font-black tracking-tighter leading-[0.85] mb-8 italic text-white uppercase">
       IDANTITE <br /> <span className="text-red-600">FINANSYÈ</span> <br /> OU MERITE.
     </h1>
     <p className="max-w-md text-zinc-400 text-[11px] font-bold mb-10 normal-case italic leading-relaxed border-l-2 border-red-600 pl-4">
       Jere tout tranzaksyon ou yo dirèkteman nan Dashboard ou. Peye, resevwa, ak kontwole lajan ou an goud ak yon sekirite total kote ou ye a.
     </p>
     <div className="flex gap-4">
-      <Link href="/signup" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl">OUVRI YON KONT GRATIS</Link>
+      <Link href="/signup" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs hover:scale-105 transition-all shadow-2xl uppercase">OUVRI YON KONT GRATIS</Link>
     </div>
   </div>
 
-  {/* MOKUP TELEFÒN NAN */}
+  {/* MOKUP TELEFÒN NAN - DASHBOARD RE-KREYE AK KÒD */}
   <div className="relative flex justify-center">
       <div className="absolute inset-0 bg-red-600 blur-[150px] opacity-20"></div>
       
       {/* FRAME TELEFÒN NAN */}
       <div className="relative w-[320px] h-[650px] bg-zinc-900 rounded-[3.5rem] border-[10px] border-zinc-800 shadow-[0_50px_100px_rgba(0,0,0,0.8)] overflow-hidden">
           
-          <div className="relative w-full h-full bg-black">
+          {/* KONTNI DASHBOARD (RE-KREYE AK CSS) */}
+          <div className="relative w-full h-full bg-[#0a0b14] p-5 flex flex-col pt-10">
+              
               {/* Notch telefòn nan */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-800 rounded-b-3xl z-30"></div>
               
-              {/* FOTO DASHBOARD LA - Asire w li nan folder /public/ */}
-              <img 
-                src="/Screenshot 2026-01-21 113440.png" 
-                alt="Hatex Dashboard" 
-                className="w-full h-full object-cover relative z-10"
-                onError={(e) => {
-                  e.currentTarget.src = "https://via.placeholder.com/320x650?text=Foto+a+manke+nan+folder+public";
-                }}
-              />
+              {/* HEADER DASHBOARD */}
+              <div className="flex justify-between items-center mb-8">
+                  <div className="text-red-600 font-black italic text-sm">HATEXCARD</div>
+                  <div className="w-8 h-8 bg-zinc-900 rounded-full border border-white/10 flex items-center justify-center text-[10px]">🔔</div>
+              </div>
 
-              {/* OVERLAY POU KACHE NON YO */}
-              {/* 1. Kache non anlè a */}
-              <div className="absolute top-[14.5%] left-0 w-full h-[50px] bg-black z-20"></div>
+              {/* BALANS SECTION */}
+              <div className="mb-8">
+                  <p className="text-[10px] text-zinc-500 font-black italic uppercase mb-1">Balans Disponib</p>
+                  <h2 className="text-3xl font-black italic text-white">150,000.00 <span className="text-xs text-red-600">HTG</span></h2>
+              </div>
 
-              {/* 2. Kache non sou kat la */}
-              <div className="absolute bottom-[11.5%] left-[8%] w-[160px] h-[22px] bg-[#8B0000] z-20"></div>
+              {/* KAT HATEX LA (SAN NON) */}
+              <div className="w-full aspect-[1.58/1] bg-gradient-to-br from-red-600 to-red-900 rounded-2xl p-5 shadow-2xl relative overflow-hidden mb-8">
+                  <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+                  
+                  <div className="flex justify-between items-start mb-10">
+                      <div className="text-[8px] font-black italic tracking-widest text-white/80">PREMIUM CARD</div>
+                      <div className="w-8 h-6 bg-white/20 rounded-sm"></div>
+                  </div>
+                  
+                  {/* Nimewo Kat */}
+                  <div className="text-lg font-mono tracking-[0.2em] text-white mb-6">
+                      **** **** **** 9121
+                  </div>
+                  
+                  <div className="flex justify-between items-end">
+                      <div>
+                        <div className="text-[6px] text-white/40 font-black uppercase">Exp Date</div>
+                        <div className="text-[9px] font-black text-white italic">01/30</div>
+                      </div>
+                      <div className="w-10 h-6 bg-orange-400/20 rounded-md border border-orange-400/30"></div>
+                  </div>
+              </div>
+
+              {/* QUICK ACTIONS */}
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                  {['Depo', 'Retrè', 'Voye'].map((item) => (
+                      <div key={item} className="flex flex-col items-center gap-2">
+                          <div className="w-12 h-12 bg-zinc-900 rounded-2xl border border-white/5 flex items-center justify-center text-lg shadow-lg">
+                              {item === 'Depo' ? '↓' : item === 'Retrè' ? '↑' : '→'}
+                          </div>
+                          <span className="text-[9px] font-black italic uppercase text-zinc-400">{item}</span>
+                      </div>
+                  ))}
+              </div>
+
+              {/* TRANZAKSYON RESAN */}
+              <div className="flex-1 overflow-hidden">
+                  <div className="flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-black italic text-zinc-500 uppercase">Tranzaksyon Resan</span>
+                      <span className="text-[8px] text-red-600 font-black italic">WÈ TOUT</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                      {[
+                        { label: 'Shop Market', type: 'PAYMENT', price: '-1,500.00', color: 'text-white' },
+                        { label: 'Depo MonCash', type: 'DEPOSIT', price: '+5,000.00', color: 'text-green-500' },
+                        { label: 'Retrè Bank', type: 'WITHDRAW', price: '-2,000.00', color: 'text-zinc-500' }
+                      ].map((tx, i) => (
+                          <div key={i} className="flex justify-between items-center bg-zinc-900/50 p-3 rounded-xl border border-white/5">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center text-[10px]">🛒</div>
+                                  <div>
+                                      <p className="text-[9px] font-black italic text-white">{tx.label}</p>
+                                      <p className="text-[7px] font-bold text-zinc-500 uppercase">{tx.type}</p>
+                                  </div>
+                              </div>
+                              <div className={`text-[9px] font-black italic ${tx.color}`}>{tx.price}</div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
           </div>
       </div>
   </div>
