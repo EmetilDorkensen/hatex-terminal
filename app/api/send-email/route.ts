@@ -1,32 +1,40 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-// Ranplase 're_123456789' ak API Key ou jwenn nan dashboard Resend lan
-const resend = new Resend('re_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
+// Nou rale API Key la nan envirònman an pou sekirite
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
     const { to, subject, non, mesaj } = await req.json();
 
+    // Tcheke si tout enfòmasyon yo la
+    if (!to || !non || !mesaj) {
+      return NextResponse.json({ error: "Enfòmasyon manke" }, { status: 400 });
+    }
+
     const data = await resend.emails.send({
-      from: 'contact@hatex.com>', // Mete email pwofesyonèl ou a la
+      from: 'Hatex <contact@hatexcard.com>', // Adrès ou te verifye a
       to: [to],
-      subject: subject,
+      subject: subject || 'Mizajou Hatex Card',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-          <h2 style="color: #dc2626; text-align: center; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">HATEX NOTIFIKASYON</h2>
-          <p style="font-size: 16px;">Bonjou <strong>${non}</strong>,</p>
-          <p style="font-size: 15px; line-height: 1.5; color: #333;">${mesaj}</p>
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 12px; color: #888;">
-            <p>Mèsi paske ou fè nou konfyans!</p>
-            <p>&copy; 2024 HATEX - Tout dwa rezève.</p>
+        <div style="font-family: sans-serif; padding: 20px; border: 1px dashed #dc2626; border-radius: 15px; background-color: #f9f9f9;">
+          <h1 style="color: #dc2626; text-transform: uppercase; font-size: 20px;">HATEX CARD</h1>
+          <p style="font-size: 16px; color: #333;">Bonjou <strong>${non}</strong>,</p>
+          <div style="background: white; padding: 15px; border-radius: 10px; margin: 15px 0;">
+             <p style="font-size: 15px; line-height: 1.5; color: #555;">${mesaj}</p>
           </div>
+          <p style="font-size: 12px; color: #888; margin-top: 20px;">
+            Mèsi paske ou chwazi sèvis nou yo. <br>
+            &copy; 2026 Hatex Card - Tout dwa rezève.
+          </p>
         </div>
       `,
     });
 
-    return NextResponse.json(data);
-  } catch (error) {
-    return NextResponse.json({ error: 'Erè voye imèl' }, { status: 500 });
+    return NextResponse.json({ success: true, data });
+  } catch (error: any) {
+    console.error("Erè Resend:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
