@@ -1,37 +1,30 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-// Pou tès la, ou ka mete kle a dirèkteman isit la si .env la gen pwoblèm
-const resend = new Resend(process.env.RESEND_API_KEY || 're_kle_ou_la');
+// Sèvi ak kle API ou a
+const resend = new Resend('re_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
 
 export async function POST(req: Request) {
   try {
-    const { to, non, mesaj, subject } = await req.json();
+    const body = await req.json();
+    const { to, non, mesaj, subject } = body;
 
-    // 1. Tcheke si imèl la valid
-    if (!to || !to.includes('@')) {
-      return NextResponse.json({ error: 'Email kliyan an pa valid' }, { status: 400 });
-    }
-
-    // 2. Voye imèl la via Resend
-    const data = await resend.emails.send({
+    // Resend bezwen yon objè byen fòme
+    const { data, error } = await resend.emails.send({
       from: 'Hatex <contact@hatexcard.com>',
-      to: [to],
+      to: [to.trim()],
       subject: subject || 'HATEX CARD - MIZAJOU',
-      html: `
-        <div style="font-family: sans-serif; border: 1px solid #eee; padding: 20px;">
-          <h2 style="color: #dc2626;">HATEX CARD</h2>
-          <p>Bonjou <b>${non}</b>,</p>
-          <p>${mesaj}</p>
-          <br/>
-          <p style="font-size: 12px; color: #888;">Mèsi paske ou chwazi Hatex Card.</p>
-        </div>
-      `,
+      html: `<strong>Bonjou ${non},</strong><p>${mesaj}</p>`,
     });
 
+    if (error) {
+      console.error("Erè Resend:", error);
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-    console.error("Erè Resend:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (err: any) {
+    console.error("Erè Server:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
