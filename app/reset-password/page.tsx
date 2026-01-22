@@ -1,68 +1,95 @@
 "use client";
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import React, { useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-export default function ResetPasswordPage() {
+// Konfigirasyon Supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const router = useRouter();
+  const [msg, setMsg] = useState({ type: '', text: '' });
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (newPassword !== confirmPassword) {
+      setMsg({ type: 'error', text: 'Modpas yo pa menm.' });
+      return;
+    }
+
     setLoading(true);
-    setMessage({ type: '', text: '' });
+    setMsg({ type: '', text: '' });
 
-    // Nou mete nouvo modpas la nan baz done a
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-    if (error) {
-      setMessage({ type: 'error', text: "Erè: " + error.message });
-    } else {
-      setMessage({ type: 'success', text: "Modpas ou chanje ak siksè! W'ap redireksyone..." });
-      // Tann 2 segonn epi voye l nan login
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
+      if (error) {
+        setMsg({ type: 'error', text: error.message });
+      } else {
+        setMsg({ type: 'success', text: 'Modpas ou chanje ak siksè! Ou ka konekte kounye a.' });
+        // Redirije apre 2 segonn
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Gen yon pwoblèm koneksyon.' });
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0b14] flex flex-col items-center justify-center p-6 text-white italic font-sans">
-      <div className="w-full max-w-md bg-zinc-900/50 p-10 rounded-[3rem] border border-white/5 backdrop-blur-xl shadow-2xl">
-        <h1 className="text-2xl font-black uppercase mb-2 text-center text-red-600 tracking-tighter italic">HATEXCARD</h1>
-        <p className="text-[10px] text-zinc-500 text-center uppercase font-black mb-8 tracking-widest italic opacity-60">
-          Kreye yon nouvo modpas
-        </p>
-
-        {message.text && (
-          <div className={`p-4 rounded-2xl mb-6 text-[10px] font-black uppercase text-center border ${
-            message.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-green-500/10 border-green-500/20 text-green-500'
-          }`}>
-            {message.text}
-          </div>
-        )}
+    <div className="min-h-screen bg-[#0a0b14] text-white flex flex-col items-center justify-center p-6 italic uppercase font-black">
+      <div className="w-full max-w-md bg-zinc-900/30 p-10 rounded-[2.5rem] border border-white/5 shadow-2xl backdrop-blur-md">
+        
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-black tracking-tighter italic text-red-600 mb-2">NOUVO MODPAS</h1>
+          <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold">Chwazi yon modpas solid</p>
+        </div>
 
         <form onSubmit={handleUpdatePassword} className="space-y-4">
-          <input 
-            type="password" 
-            placeholder="TAPE NOUVO MODPAS LA" 
-            required
-            minLength={6}
-            className="w-full bg-zinc-800/40 p-5 rounded-2xl outline-none border border-white/5 focus:border-red-600 font-bold transition-all text-center"
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
+          <div className="space-y-2 text-left">
+            <label className="text-[8px] text-zinc-600 ml-2">NOUVO MODPAS</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs text-white"
+              required
+            />
+          </div>
 
-          <button 
-            type="submit" 
+          <div className="space-y-2 text-left">
+            <label className="text-[8px] text-zinc-600 ml-2">KONFIME MODPAS LA</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs text-white"
+              required
+            />
+          </div>
+
+          {msg.text && (
+            <div className={`p-4 rounded-xl border ${msg.type === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' : 'bg-green-600/10 border-green-600/20 text-green-500'}`}>
+               <p className="text-[10px] font-black uppercase text-center">{msg.text}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
             disabled={loading}
-            className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95 transition-all text-sm italic"
+            className="w-full bg-red-600 py-5 rounded-2xl font-black uppercase italic shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all text-sm mt-4 disabled:opacity-50 text-white"
           >
-            {loading ? "Ap anrejistre..." : "Anrejistre Modpas"}
+            {loading ? "AP ANREJISTRE..." : "CHANJE MODPAS LA"}
           </button>
         </form>
       </div>
