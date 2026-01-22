@@ -19,9 +19,9 @@ export default function ForgotPassword() {
     setMsg({ type: '', text: '' });
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: 'https://hatexcard.com/reset-password',
+          });
 
       if (error) {
         setMsg({ type: 'error', text: "Erè: Nou pa jwenn imèl sa a." });
