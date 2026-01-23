@@ -24,17 +24,32 @@ export default function DepositPage() {
     );
 
     useEffect(() => {
-        const getProfile = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-                setProfile(data);
+        const checkUser = async () => {
+            // Nou itilize getSession pou n wè si gen yon koneksyon ki sove nan navigatè a
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session?.user) {
+                // Si nou jwenn itilizatè a, nou chache pwofil li
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+                
+                if (data) {
+                    setProfile(data);
+                } else {
+                    // Si pwofil la poko kreye nan tablo 'profiles' la
+                    console.log("Pwofil pa jwenn nan tablo a");
+                }
             } else {
+                // Si pa gen sesyon ditou, ale nan login
                 router.push('/login');
             }
         };
-        getProfile();
-    }, [supabase, router]);
+        checkUser();
+    }, []); // Retire dependencies yo pou l kouri yon sèl fwa byen pwòp
+ ;
 
     const fee = amount * 0.05;
     const total = amount + fee;
