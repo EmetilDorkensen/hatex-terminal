@@ -88,8 +88,8 @@ export default function KYCPage() {
     setLoading(true);
     setErrorMsg("");
     try {
-      if (!userData || (userData.wallet_balance || 0) < 0) {
-        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0,0 HTG.");
+      if (!userData || (userData.wallet_balance || 0) < 2000) {
+        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 2,000 HTG.");
       }
 
       const timestamp = Date.now();
@@ -120,7 +120,7 @@ export default function KYCPage() {
         .update({ 
           kyc_status: 'approved',
           full_name: `${extractedData.firstName} ${extractedData.lastName}`,
-          wallet_balance: userData.wallet_balance - 0 
+          wallet_balance: userData.wallet_balance - 2000 
         })
         .eq('id', userData.id);
 
@@ -163,7 +163,7 @@ export default function KYCPage() {
 
       {step === 2 && (
         <div className="space-y-6">
-          <h2 className="text-2xl font-black uppercase italic leading-tight">Biometri ak IA</h2>
+          <h2 className="text-2xl font-black uppercase italic leading-tight">KYC</h2>
           
           {/* Chan pou Non ak Siyati manyèl */}
           <div className="grid grid-cols-2 gap-4 mb-2">
@@ -219,7 +219,7 @@ export default function KYCPage() {
             <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">Non: {extractedData.firstName} {extractedData.lastName}</p>
           </div>
           <button onClick={handleFinalActivation} disabled={loading} className="w-full bg-red-600 py-6 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all">
-            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (0,0 HTG)'}
+            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (2,000 HTG)'}
           </button>
         </div>
       )}
