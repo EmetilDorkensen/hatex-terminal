@@ -2,7 +2,7 @@
 import "./globals.css"; // Liy sa a te manke, se li ki pote tout style yo!
 
 export const metadata = {
-  title: "HATEXCARD",
+  title: "HatexCard",
   description: "Tèminal Peman Pwofesyonèl",
   icons: {
     icon: [
