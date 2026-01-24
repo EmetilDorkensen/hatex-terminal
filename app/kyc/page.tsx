@@ -88,8 +88,8 @@ export default function KYCPage() {
     setLoading(true);
     setErrorMsg("");
     try {
-      if (!userData || (userData.wallet_balance || 0) < 2000) {
-        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 2,000 HTG.");
+      if (!userData || (userData.wallet_balance || 0) < 0) {
+        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0,0 HTG.");
       }
 
       const timestamp = Date.now();
@@ -120,7 +120,7 @@ export default function KYCPage() {
         .update({ 
           kyc_status: 'approved',
           full_name: `${extractedData.firstName} ${extractedData.lastName}`,
-          wallet_balance: userData.wallet_balance - 2000 
+          wallet_balance: userData.wallet_balance - 0 
         })
         .eq('id', userData.id);
 
