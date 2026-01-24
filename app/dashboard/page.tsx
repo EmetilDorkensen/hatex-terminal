@@ -78,7 +78,7 @@ export default function Dashboard() {
  {/* BOUTON ADMIN KI PA DEPANN DE KYC */}
 {userData?.email === 'hatexcard@gmail.com' && (
   <button 
-    onClick={() => router.push('/super')} // Asire w non paj la match ak sa w te kreye a
+    onClick={() => router.push('/admin')} // Asire w non paj la match ak sa w te kreye a
     className="bg-red-600 text-[10px] font-black px-4 py-2 rounded-xl animate-pulse shadow-lg shadow-red-600/40 border border-white/20"
   >
     ⚙️ ADMIN PANEL
