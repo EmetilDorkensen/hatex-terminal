@@ -90,7 +90,7 @@ export default function KYCPage() {
     setErrorMsg("");
     try {
       if (!userData || (userData.wallet_balance || 0) < 0) {
-        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0,000 HTG.");
+        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0 HTG.");
       }
 
       const timestamp = Date.now();
@@ -220,7 +220,7 @@ export default function KYCPage() {
             <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">Non: {extractedData.firstName} {extractedData.lastName}</p>
           </div>
           <button onClick={handleFinalActivation} disabled={loading} className="w-full bg-red-600 py-6 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all">
-            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (2,000 HTG)'}
+            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (0 HTG)'}
           </button>
         </div>
       )}

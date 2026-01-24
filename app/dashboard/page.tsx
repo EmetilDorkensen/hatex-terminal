@@ -75,15 +75,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
- {/* BOUTON ADMIN KI PA DEPANN DE KYC */}
+{/* BOUTON ADMIN - AP PARÈT SÈLMAN POU OU */}
 {userData?.email === 'hatexcard@gmail.com' && (
-  <button 
-    onClick={() => router.push('/admin')} // Asire w non paj la match ak sa w te kreye a
-    className="bg-red-600 text-[10px] font-black px-4 py-2 rounded-xl animate-pulse shadow-lg shadow-red-600/40 border border-white/20"
-  >
-    ⚙️ ADMIN PANEL
-  </button>
-)}
+              <button 
+                onClick={() => router.push('/admin')}
+                className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce"
+              >
+                ADMIN
+              </button>
+            )}
             
             <button
               onClick={() => setShowNumbers(!showNumbers)}
