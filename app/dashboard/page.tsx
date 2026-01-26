@@ -20,9 +20,11 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUserAndProfile = async () => {
       try {
+        // 1. Nou jwenn session itilizatè a anvan
         const { data: { user } } = await supabase.auth.getUser();
       
         if (user) {
+          // 2. Nou rale pwofil la
           let { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -30,9 +32,24 @@ export default function Dashboard() {
             .maybeSingle();
           
           if (profile) {
-            setUserData({ ...profile, email: user.email }); // Nou ajoute email la pou admin check
+            setUserData({ ...profile, email: user.email });
             setIsActivated(profile.kyc_status === 'approved');
           }
+
+          // 3. NOU PWOVITE METE YON "REALTIME" POU BALANS LAN CHANJE OTOMATIK
+          const channel = supabase
+            .channel('realtime_profile')
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'profiles', 
+                filter: `id=eq.${user.id}` 
+            }, (payload) => {
+                setUserData((prev: any) => ({ ...prev, ...payload.new }));
+            })
+            .subscribe();
+
+          return () => { supabase.removeChannel(channel); };
         }
       } catch (err) {
         console.error("Erè grav:", err);
@@ -76,8 +93,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-{/* BOUTON ADMIN - AP PARÈT SÈLMAN POU OU */}
-{userData?.email === 'hatexcard@gmail.com' && (
+            {userData?.email === 'hatexcard@gmail.com' && (
               <button 
                 onClick={() => router.push('/admin')}
                 className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce"
