@@ -73,7 +73,6 @@ export default function KYCPage() {
 
       if (result.error) throw new Error(result.error);
 
-      // Si Face Comparison mache, nou pase nan Step 3
       setFileStatus({ idFront: 'success', idBack: isCIN ? 'success' : 'none', selfie: 'success' });
       setStep(3);
       
@@ -84,14 +83,11 @@ export default function KYCPage() {
     }
   };
 
-  
   const handleFinalActivation = async () => {
     setLoading(true);
     setErrorMsg("");
     try {
-      if (!userData || (userData.wallet_balance || 0) < 0) {
-        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0.00 HTG.");
-      }
+      if (!userData) throw new Error("Itilizatè pa jwenn.");
 
       const timestamp = Date.now();
       
@@ -115,24 +111,24 @@ export default function KYCPage() {
         .upload(`${userData.id}/selfie_${timestamp}.jpg`, files.selfie!);
       if (selfieErr) throw selfieErr;
 
-      // 2. Mizajou pwofil la (Koupe kòb la epi aktive KYC)
+      // 2. Mizajou pwofil la (GRATIS - PA GEN KOUPE KÒB)
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
           kyc_status: 'approved',
           full_name: `${extractedData.firstName} ${extractedData.lastName}`,
-          wallet_balance: userData.wallet_balance - 0.00 
+          is_activated: true // Nou fòse aktivasyon an isit la
         })
         .eq('id', userData.id);
 
       if (updateError) throw updateError;
       
-      setSuccessMsg("KONT OU AKTIVE! KAT OU AP PREPARE...");
+      setSuccessMsg("KONT OU AKTIVE AVÈK SIKSÈ!");
       
-      // 3. Redireksyon ak "Hard Refresh" pou wè nouvo balans lan
+      // 3. Redireksyon rapid
       setTimeout(() => {
         window.location.href = '/dashboard';
-      }, 0.00);
+      }, 1500);
 
     } catch (err: any) {
       setErrorMsg("Erè nan sove done: " + err.message);
@@ -166,7 +162,6 @@ export default function KYCPage() {
         <div className="space-y-6">
           <h2 className="text-2xl font-black uppercase italic leading-tight">KYC</h2>
           
-          {/* Chan pou Non ak Siyati manyèl */}
           <div className="grid grid-cols-2 gap-4 mb-2">
             <input 
               type="text" 
@@ -216,11 +211,11 @@ export default function KYCPage() {
         <div className="text-center space-y-8 animate-in zoom-in duration-500">
           <div className="py-10">
             <div className="w-24 h-24 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl border border-green-500/30">✓</div>
-            <h2 className="text-2xl font-black uppercase italic">Siksè!</h2>
-            <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">Non: {extractedData.firstName} {extractedData.lastName}</p>
+            <h2 className="text-2xl font-black uppercase italic">Vérifié!</h2>
+            <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">{extractedData.firstName} {extractedData.lastName}</p>
           </div>
           <button onClick={handleFinalActivation} disabled={loading} className="w-full bg-red-600 py-6 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all">
-            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (0.00 HTG)'}
+            {loading ? 'Aktivasyon...' : 'FINI AKTIVASYON'}
           </button>
         </div>
       )}
