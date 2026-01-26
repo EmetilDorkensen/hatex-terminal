@@ -90,7 +90,7 @@ export default function KYCPage() {
     setErrorMsg("");
     try {
       if (!userData || (userData.wallet_balance || 0) < 0) {
-        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0 HTG.");
+        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 0.00 HTG.");
       }
 
       const timestamp = Date.now();
@@ -115,12 +115,24 @@ export default function KYCPage() {
         .upload(`${userData.id}/selfie_${timestamp}.jpg`, files.selfie!);
       if (selfieErr) throw selfieErr;
 
+      // 2. Mizajou pwofil la (Koupe kòb la epi aktive KYC)
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          kyc_status: 'approved',
+          full_name: `${extractedData.firstName} ${extractedData.lastName}`,
+          wallet_balance: userData.wallet_balance - 0.00 
+        })
+        .eq('id', userData.id);
+
+      if (updateError) throw updateError;
       
+      setSuccessMsg("KONT OU AKTIVE! KAT OU AP PREPARE...");
       
       // 3. Redireksyon ak "Hard Refresh" pou wè nouvo balans lan
       setTimeout(() => {
         window.location.href = '/dashboard';
-      }, 2500);
+      }, 0.00);
 
     } catch (err: any) {
       setErrorMsg("Erè nan sove done: " + err.message);
@@ -208,7 +220,7 @@ export default function KYCPage() {
             <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">Non: {extractedData.firstName} {extractedData.lastName}</p>
           </div>
           <button onClick={handleFinalActivation} disabled={loading} className="w-full bg-red-600 py-6 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all">
-            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (0 HTG)'}
+            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (0.00 HTG)'}
           </button>
         </div>
       )}
