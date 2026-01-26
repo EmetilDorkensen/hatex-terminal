@@ -32,8 +32,26 @@ export default function Login() {
       }
 
       if (data?.user) {
-        // Redirije itilizatè a nan dashboard
-        window.location.href = '/dashboard';
+        // 1. Nou rale done pwofil la pou n wè si moun nan te pase KYC deja
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('kyc_status')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+           // Si gen yon erè nou voye l Dashboard quand même pa sekirite
+           window.location.href = '/dashboard';
+           return;
+        }
+      
+        // 2. Tcheke si pwofil la "approved"
+        if (profile?.kyc_status === 'approved') {
+          window.location.href = '/dashboard';
+        } else {
+          // Si li pako pase l, nou voye l nan paj KYC a
+          window.location.href = '/kyc';
+        }
       }
     } catch (err) {
       setErrorMsg("Gen yon pwoblèm rezo, eseye ankò.");
@@ -95,13 +113,12 @@ export default function Login() {
           </p>
           <Link href="/forgot-password" title="Kontakte sipò">
             <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest cursor-pointer hover:text-red-500">
-                Mwen bliye modpas mwen
+                 Mwen bliye modpas mwen
             </p>
           </Link>
         </div>
       </div>
       
-      {/* Ti detay anba pou konfyans */}
       <div className="mt-8 flex items-center gap-3 opacity-20">
          <div className="h-[1px] w-12 bg-white"></div>
          <span className="text-[8px] tracking-[0.4em]">SECURED BY HATEX GROUP</span>
