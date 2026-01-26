@@ -50,8 +50,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Matcher a dwe gen tout paj ki bezwen pwoteksyon
   matcher: [
+    '/',              // <--- SI LIY SA PA LA, L-AP TOUJOURS VOYE-W SOU LANDING PAGE LA
     '/dashboard/:path*', 
     '/admin/:path*',
   ],
