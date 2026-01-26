@@ -177,7 +177,7 @@ export default function Dashboard() {
                     <div className="mt-8 bg-white p-2 rounded-xl">
                        <QRCodeSVG value={`Card:${userData?.card_number}`} size={90} />
                     </div>
-                    <p className="text-[8px] font-black uppercase mt-4 text-red-600 tracking-widest italic animate-pulse">Scan pou peye</p>
+                    <p className="text-[8px] font-black uppercase mt-4 text-red-600 tracking-widest italic animate-pulse">Eskane pou peye</p>
                 </div>
               </div>
             </div>

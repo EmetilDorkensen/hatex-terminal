@@ -73,6 +73,7 @@ export default function KYCPage() {
 
       if (result.error) throw new Error(result.error);
 
+      // Si Face Comparison mache, nou pase nan Step 3
       setFileStatus({ idFront: 'success', idBack: isCIN ? 'success' : 'none', selfie: 'success' });
       setStep(3);
       
@@ -83,52 +84,56 @@ export default function KYCPage() {
     }
   };
 
+  
   const handleFinalActivation = async () => {
     setLoading(true);
     setErrorMsg("");
     try {
-      // Nou rale sesyon an fre isit la menm pou n sèten nou gen ID a
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-  
-      if (!userId) throw new Error("Ou dwe konekte pou w fè aktivasyon an.");
-  
+      if (!userData || (userData.wallet_balance || 0) < 2000) {
+        throw new Error("BALANS ENSIFIZAN. OU BEZWEN 2.000 HTG.");
+      }
+
       const timestamp = Date.now();
       
-      // 1. Upload foto yo
+      // 1. Upload foto yo nan Storage
       const { data: frontData, error: frontErr } = await supabase.storage
         .from('kyc-documents')
-        .upload(`${userId}/id_front_${timestamp}.jpg`, files.idFront!);
+        .upload(`${userData.id}/id_front_${timestamp}.jpg`, files.idFront!);
       if (frontErr) throw frontErr;
-  
+
+      let backPath = null;
       if (files.idBack) {
-        await supabase.storage
+        const { data: backData, error: backErr } = await supabase.storage
           .from('kyc-documents')
-          .upload(`${userId}/id_back_${timestamp}.jpg`, files.idBack!);
+          .upload(`${userData.id}/id_back_${timestamp}.jpg`, files.idBack!);
+        if (backErr) throw backErr;
+        backPath = backData.path;
       }
-  
-      await supabase.storage
+
+      const { data: selfieData, error: selfieErr } = await supabase.storage
         .from('kyc-documents')
-        .upload(`${userId}/selfie_${timestamp}.jpg`, files.selfie!);
-  
-      // 2. Mizajou pwofil la (GRATIS)
+        .upload(`${userData.id}/selfie_${timestamp}.jpg`, files.selfie!);
+      if (selfieErr) throw selfieErr;
+
+      // 2. Mizajou pwofil la (Koupe kòb la epi aktive KYC)
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
           kyc_status: 'approved',
           full_name: `${extractedData.firstName} ${extractedData.lastName}`,
-          is_activated: true 
+          wallet_balance: userData.wallet_balance - 2000 
         })
-        .eq('id', userId); // Sèvi ak userId dirèk
-  
+        .eq('id', userData.id);
+
       if (updateError) throw updateError;
       
-      setSuccessMsg("KONT OU AKTIVE AVÈK SIKSÈ!");
+      setSuccessMsg("KONT OU AKTIVE! KAT OU AP PREPARE...");
       
+      // 3. Redireksyon ak "Hard Refresh" pou wè nouvo balans lan
       setTimeout(() => {
         window.location.href = '/dashboard';
-      }, 1500);
-  
+      }, 2500);
+
     } catch (err: any) {
       setErrorMsg("Erè nan sove done: " + err.message);
     } finally {
@@ -161,6 +166,7 @@ export default function KYCPage() {
         <div className="space-y-6">
           <h2 className="text-2xl font-black uppercase italic leading-tight">KYC</h2>
           
+          {/* Chan pou Non ak Siyati manyèl */}
           <div className="grid grid-cols-2 gap-4 mb-2">
             <input 
               type="text" 
@@ -210,11 +216,11 @@ export default function KYCPage() {
         <div className="text-center space-y-8 animate-in zoom-in duration-500">
           <div className="py-10">
             <div className="w-24 h-24 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl border border-green-500/30">✓</div>
-            <h2 className="text-2xl font-black uppercase italic">Vérifié!</h2>
-            <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">{extractedData.firstName} {extractedData.lastName}</p>
+            <h2 className="text-2xl font-black uppercase italic">Siksè!</h2>
+            <p className="text-zinc-400 text-xs mt-2 uppercase font-bold">Non: {extractedData.firstName} {extractedData.lastName}</p>
           </div>
           <button onClick={handleFinalActivation} disabled={loading} className="w-full bg-red-600 py-6 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all">
-            {loading ? 'Aktivasyon...' : 'FINI AKTIVASYON'}
+            {loading ? 'Aktivasyon...' : 'Peye Aktivasyon (2.000 HTG)'}
           </button>
         </div>
       )}
