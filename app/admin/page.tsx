@@ -15,14 +15,13 @@ export default function AdminSuperPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // --- TELEGRAM CONFIG ---
+    // --- CONFIGURATION ---
     const BOT_TOKEN = "7547464134:AAH3M_R89D0UuN-WlOclj2D-Hj9S9I_K28Y";
     const CHAT_ID = "5352352512";
 
-    // 1. Chèk Modpas ak Rale Done
     useEffect(() => {
         const pass = prompt("Antre modpas Admin lan:");
-        if (pass === "fiokes1234") { // <--- CHANJE SA LA
+        if (pass === "fiokes1234") {
             setAccessGranted(true);
             raleDone();
         } else {
@@ -30,6 +29,20 @@ export default function AdminSuperPage() {
             window.location.href = "/";
         }
     }, []);
+
+    const raleDone = async () => {
+        setLoading(true);
+        try {
+            const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
+            const { data: w } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
+            setDeposits(d || []);
+            setWithdrawals(w || []);
+        } catch (err) {
+            console.error("Erè rale done:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const voyeTelegram = async (msg: string) => {
         try {
@@ -41,22 +54,13 @@ export default function AdminSuperPage() {
         } catch (e) { console.error("Telegram error", e); }
     };
 
-    const raleDone = async () => {
-        setLoading(true);
-        const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
-        const { data: w } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
-        setDeposits(d || []);
-        setWithdrawals(w || []);
-        setLoading(false);
-    };
-
-    const voyeEmailKliyan = async (email: string, non: string, mesaj: string) => {
+    const voyeEmailKliyan = async (email: string, non: string, mesaj: string, subject: string) => {
         if (!email) return;
         try {
             await fetch('/api/send-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: email.trim(), subject: 'MIZAJOU HATEX CARD', non, mesaj }),
+                body: JSON.stringify({ to: email.trim(), subject, non, mesaj }),
             });
         } catch (error) { console.error("Erè email:", error); }
     };
@@ -69,10 +73,10 @@ export default function AdminSuperPage() {
             if (error) throw error;
             alert("🗑️ Efase nèt!");
             raleDone();
-        } catch (err: any) {
-            alert("Erè nan efase: " + err.message);
-        } finally {
-            setProcessingId(null);
+        } catch (err: any) { 
+            alert(err.message); 
+        } finally { 
+            setProcessingId(null); 
         }
     };
 
@@ -81,7 +85,7 @@ export default function AdminSuperPage() {
         setProcessingId(d.id);
         try {
             const { data: p } = await supabase.from('profiles').select('*').eq('id', d.user_id).single();
-            if (!p) throw new Error("Kliyan pa jwenn");
+            if (!p) throw new Error("Kliyan pa jwenn nan sistèm nan");
 
             const nouvoBalans = Number(p.wallet_balance || 0) + Number(d.amount);
 
@@ -93,12 +97,17 @@ export default function AdminSuperPage() {
                 type: 'DEPOSIT', description: `Depo konfime: +${d.amount} HTG`, status: 'success', method: 'WALLET' 
             });
 
-            await voyeEmailKliyan(p.email, p.full_name, `Kont ou kredite ak ${d.amount} HTG. Nouvo balans: ${nouvoBalans} HTG.`);
-            await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan: ${d.amount} HTG`);
+            const mesajEmail = `Bonjou ${p.full_name}, depo ou a ki te fè pou ${d.amount} HTG fin apwouve ak siksè. Kont ou kredite. Nouvo balans ou se: ${nouvoBalans} HTG.`;
+            await voyeEmailKliyan(p.email, p.full_name, mesajEmail, '✅ DEPO APWOUVE - HATEX CARD');
+            await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan: ${d.amount} HTG\nNouvo Balans: ${nouvoBalans} HTG`);
             
             alert("✅ DEPO APWOUVE!");
             raleDone();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+        } catch (err: any) { 
+            alert(err.message); 
+        } finally { 
+            setProcessingId(null); 
+        }
     };
 
     const apwouveRetre = async (w: any) => {
@@ -106,7 +115,8 @@ export default function AdminSuperPage() {
         setProcessingId(w.id);
         try {
             const { data: p } = await supabase.from('profiles').select('*').eq('id', w.user_id).single();
-            
+            if (!p) throw new Error("Kliyan sa a pa jwenn");
+
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
             
             await supabase.from('transactions').insert({
@@ -114,12 +124,17 @@ export default function AdminSuperPage() {
                 type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success', method: 'WALLET' 
             });
 
-            await voyeEmailKliyan(p.email, p.full_name, `Retrè ${w.amount} HTG ou a fin trete ak siksè.`);
+            const mesajEmail = `Bonjou ${p.full_name}, retrè ou te mande pou ${w.amount} HTG a fin trete. Lajan an voye sou kont ou te bay la. Mèsi pou pasyans ou.`;
+            await voyeEmailKliyan(p.email, p.full_name, mesajEmail, '💸 RETRÈ KONFIME - HATEX CARD');
             await voyeTelegram(`💸 <b>RETRÈ KONFIME</b>\nKliyan: ${p.full_name}\nMontan: ${w.amount} HTG`);
 
             alert("✅ RETRÈ FINI!");
             raleDone();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+        } catch (err: any) { 
+            alert(err.message); 
+        } finally { 
+            setProcessingId(null); 
+        }
     };
 
     const anileTranzaksyon = async (item: any, table: string) => {
@@ -128,14 +143,29 @@ export default function AdminSuperPage() {
         setProcessingId(item.id);
         try {
             await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
-            const { data: p } = await supabase.from('profiles').select('email, full_name').eq('id', item.user_id).single();
+            const { data: p } = await supabase.from('profiles').select('email, full_name, wallet_balance').eq('id', item.user_id).single();
             
-            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, `Tranzaksyon anile. Rezon: ${rezon}`);
-            await voyeTelegram(`❌ <b>TRANZAKSYON ANILE</b>\nTablo: ${table}\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
+            if (table === 'withdrawals') {
+                const balansRetounen = Number(p?.wallet_balance || 0) + Number(item.amount);
+                await supabase.from('profiles').update({ wallet_balance: balansRetounen }).eq('id', item.user_id);
+            }
+
+            await supabase.from('transactions').insert({
+                user_id: item.user_id, amount: 0, fee: 0,
+                type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed', method: 'WALLET' 
+            });
+
+            const mesajEmail = `Bonjou ${p?.full_name}, malerezman tranzaksyon ou a (${item.amount} HTG) pa t ka apwouve. Rezon: ${rezon}.`;
+            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, mesajEmail, '❌ TRANZAKSYON ANILE');
+            await voyeTelegram(`❌ <b>TRANZAKSYON ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
 
             alert("⚠️ Anile ak siksè");
             raleDone();
-        } finally { setProcessingId(null); }
+        } catch (err: any) { 
+            alert(err.message); 
+        } finally { 
+            setProcessingId(null); 
+        }
     };
 
     if (!accessGranted) return <div className="bg-black h-screen"></div>;
@@ -153,21 +183,20 @@ export default function AdminSuperPage() {
             </div>
 
             <div className="space-y-4 max-w-md mx-auto">
-                {(view === 'depo' ? deposits : withdrawals).map((item) => (
+                {loading ? (
+                    <p className="text-center text-zinc-500 text-[10px] font-bold">Chache done...</p>
+                ) : (view === 'depo' ? deposits : withdrawals).map((item) => (
                     <div key={item.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-white/5 relative">
-                        {/* BOUTON DELETE POU TRANZAKSYON KI FINI */}
-                        {(item.status === 'approved' || item.status === 'completed' || item.status === 'rejected') && (
+                        {item.status !== 'pending' && (
                             <button 
                                 onClick={() => deleteTranzaksyon(item.id, view === 'depo' ? 'deposits' : 'withdrawals')}
-                                className="absolute top-5 right-5 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-black shadow-lg shadow-red-600/20 active:scale-75 transition-all"
-                            >
-                                X
-                            </button>
+                                className="absolute top-5 right-5 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-black"
+                            >X</button>
                         )}
 
                         <div className="flex justify-between mb-4 pr-8">
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase">ID: {item.user_id?.slice(0,8)}</span>
-                            <span className={`text-[8px] px-3 py-1 rounded-full font-black uppercase ${item.status === 'pending' ? 'bg-yellow-500 text-black' : 'bg-green-600 text-white'}`}>{item.status}</span>
+                            <span className="text-[9px] text-zinc-500 font-bold">ID: {item.user_id?.slice(0,8)}</span>
+                            <span className={`text-[8px] px-3 py-1 rounded-full font-black ${item.status === 'pending' ? 'bg-yellow-500 text-black' : 'bg-green-600 text-white'}`}>{item.status}</span>
                         </div>
 
                         <p className="text-4xl font-black mb-6 tracking-tighter italic">{item.amount} <span className="text-xs text-red-600">HTG</span></p>
@@ -180,13 +209,16 @@ export default function AdminSuperPage() {
                                         onClick={() => view === 'depo' ? apwouveDepo(item) : apwouveRetre(item)} 
                                         className="flex-1 bg-white text-black py-4 rounded-xl text-[10px] font-black uppercase"
                                     >
-                                        {processingId === item.id ? 'Loading...' : 'Apwouve'}
+                                        {processingId === item.id ? '...' : 'Apwouve'}
                                     </button>
-                                    <button onClick={() => anileTranzaksyon(item, view === 'depo' ? 'deposits' : 'withdrawals')} className="bg-red-600/20 text-red-600 border border-red-600/30 px-4 py-4 rounded-xl text-[10px] font-black uppercase">Anile</button>
+                                    <button 
+                                        onClick={() => anileTranzaksyon(item, view === 'depo' ? 'deposits' : 'withdrawals')}
+                                        className="bg-red-600/20 text-red-600 border border-red-600/30 px-4 py-4 rounded-xl text-[10px] font-black uppercase"
+                                    >Anile</button>
                                 </>
                             )}
                             {view === 'depo' && item.proof_img_1 && (
-                                <a href={item.proof_img_1} target="_blank" rel="noreferrer" className="bg-zinc-800 px-6 py-4 rounded-xl text-[9px] font-black uppercase flex items-center">Prèv</a>
+                                <a href={item.proof_img_1} target="_blank" rel="noreferrer" className="bg-zinc-800 px-6 py-4 rounded-xl text-[9px] font-black uppercase flex items-center justify-center">Gade Prèv</a>
                             )}
                         </div>
                     </div>
