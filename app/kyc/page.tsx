@@ -115,19 +115,7 @@ export default function KYCPage() {
         .upload(`${userData.id}/selfie_${timestamp}.jpg`, files.selfie!);
       if (selfieErr) throw selfieErr;
 
-      // 2. Mizajou pwofil la (Koupe kòb la epi aktive KYC)
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          kyc_status: 'approved',
-          full_name: `${extractedData.firstName} ${extractedData.lastName}`,
-          wallet_balance: userData.wallet_balance - 2000 
-        })
-        .eq('id', userData.id);
-
-      if (updateError) throw updateError;
       
-      setSuccessMsg("KONT OU AKTIVE! KAT OU AP PREPARE...");
       
       // 3. Redireksyon ak "Hard Refresh" pou wè nouvo balans lan
       setTimeout(() => {
