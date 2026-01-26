@@ -20,11 +20,11 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUserAndProfile = async () => {
       try {
-        // 1. Nou jwenn session itilizatè a anvan
+        // Jwenn session itilizatè a
         const { data: { user } } = await supabase.auth.getUser();
       
         if (user) {
-          // 2. Nou rale pwofil la
+          // Rale tout done pwofil la
           let { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -36,9 +36,9 @@ export default function Dashboard() {
             setIsActivated(profile.kyc_status === 'approved');
           }
 
-          // 3. NOU PWOVITE METE YON "REALTIME" POU BALANS LAN CHANJE OTOMATIK
+          // LISTEN REALTIME: Sa a ap fè balans lan moute san rafrechi paj la
           const channel = supabase
-            .channel('realtime_profile')
+            .channel(`profile_realtime_${user.id}`)
             .on('postgres_changes', { 
                 event: 'UPDATE', 
                 schema: 'public', 
@@ -50,15 +50,17 @@ export default function Dashboard() {
             .subscribe();
 
           return () => { supabase.removeChannel(channel); };
+        } else {
+          router.push('/login');
         }
       } catch (err) {
-        console.error("Erè grav:", err);
+        console.error("Erè grav Dashboard:", err);
       } finally {
         setLoading(false);
       }
     };
     fetchUserAndProfile();
-  }, [supabase]);
+  }, [supabase, router]);
 
   const formatCardNumber = (num: string) => {
     if (!num) return "**** **** **** ****";
@@ -93,6 +95,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* BOUTON ADMIN - AP PARÈT SÈLMAN POU OU */}
             {userData?.email === 'hatexcard@gmail.com' && (
               <button 
                 onClick={() => router.push('/admin')}
@@ -116,7 +119,7 @@ export default function Dashboard() {
           <p className="text-[11px] uppercase text-zinc-500 font-black mb-1 tracking-[0.2em]">Balans Wallet</p>
           <div className="flex items-baseline gap-2 overflow-hidden">
             <h3 className="text-4xl sm:text-5xl font-black italic tracking-tighter truncate">
-              {userData?.wallet_balance?.toLocaleString() || "0.00"}
+              {userData?.wallet_balance ? Number(userData.wallet_balance).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "0.00"}
             </h3>
             <span className="text-[10px] font-bold text-red-600 uppercase italic">Goud</span>
           </div>
