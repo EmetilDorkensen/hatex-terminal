@@ -21,6 +21,7 @@ export default function Dashboard() {
     const fetchUserAndProfile = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+      
         if (user) {
           let { data: profile } = await supabase
             .from('profiles')
