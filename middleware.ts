@@ -25,11 +25,9 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
 
   // --- 1. Jesyon Sou-domèn admin.hatexcard.com ---
-  // Nou netwaye hostname lan pou evite konfizyon ak "www" oswa "pò"
-  const isAdminSubdomain = hostname.startsWith('admin.');
-
-  if (isAdminSubdomain) {
-    // Si li tape admin.hatexcard.com, nou fòse li wè kontni ki nan folder /admin
+  // Si moun nan ap itilize admin.hatexcard.com
+  if (hostname.includes('admin.hatexcard.com')) {
+    // Si li pa deja nan folder /admin, nou voye l la an kachèt (rewrite)
     if (!url.pathname.startsWith('/admin')) {
       url.pathname = `/admin${url.pathname}`;
       return NextResponse.rewrite(url);
@@ -37,12 +35,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- 2. Sekirite Aksè Admin (via Email) ---
-  // Sa ap pwoteje paj la menm si moun nan tape hatexcard.com/admin
+  // Nou tcheke sa pou tout moun ki eseye wè kontni /admin lan
   if (url.pathname.startsWith('/admin')) {
     const ADMIN_EMAIL = "hatexcard@gmail.com"; 
     
+    // Si pa gen sesyon oswa si se pa email ou, voye l sou login
     if (!session || session.user.email !== ADMIN_EMAIL) {
-      // Si se pa admin nan, nou voye l sou login
       const loginUrl = new URL('/login', request.url);
       return NextResponse.redirect(loginUrl);
     }
@@ -52,7 +50,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Nou mete matcher a pou l tcheke tout paj ki kòmanse ak /dashboard oswa /admin
+  // Matcher a dwe gen tout paj ki bezwen pwoteksyon
   matcher: [
     '/dashboard/:path*', 
     '/admin/:path*',
