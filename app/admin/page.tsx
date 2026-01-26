@@ -22,7 +22,7 @@ export default function AdminSuperPage() {
     // 1. Chèk Modpas ak Rale Done
     useEffect(() => {
         const pass = prompt("Antre modpas Admin lan:");
-        if (pass === "MODPAS_SEKRÈ_OU") { // <--- CHANJE SA LA
+        if (pass === "fiokes1234") { // <--- CHANJE SA LA
             setAccessGranted(true);
             raleDone();
         } else {
