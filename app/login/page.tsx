@@ -32,24 +32,18 @@ export default function Login() {
       }
 
       if (data?.user) {
-        // 1. Nou rale done pwofil la pou n wè si moun nan te pase KYC deja
+        // Nou fòse ID a tounen miniskil pou n sèten li matche ak Supabase
+        const cleanId = data.user.id.toLowerCase();
+      
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('kyc_status')
-          .eq('id', data.user.id)
+          .select('*')
+          .eq('id', cleanId) // Sèvi ak ID ki netwaye a
           .single();
-
-        if (profileError) {
-           // Si gen yon erè nou voye l Dashboard quand même pa sekirite
-           window.location.href = '/dashboard';
-           return;
-        }
       
-        // 2. Tcheke si pwofil la "approved"
         if (profile?.kyc_status === 'approved') {
           window.location.href = '/dashboard';
         } else {
-          // Si li pako pase l, nou voye l nan paj KYC a
           window.location.href = '/kyc';
         }
       }
