@@ -21,11 +21,21 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
+  const url = request.nextUrl;
+  const hostname = request.headers.get('host');
 
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    const ADMIN_EMAIL = "hatexcard@gmail.com"; // VERIFIE EMAIL SA A BYEN
+  // --- 1. Jesyon Sou-domèn admin.hatexcard.com ---
+  if (hostname === 'admin.hatexcard.com') {
+    if (!url.pathname.startsWith('/admin')) {
+      return NextResponse.rewrite(new URL(`/admin${url.pathname}`, request.url));
+    }
+  }
+
+  // --- 2. Sekirite Aksè Admin (via Email) ---
+  if (url.pathname.startsWith('/admin')) {
+    const ADMIN_EMAIL = "hatexcard@gmail.com"; 
     if (!session || session.user.email !== ADMIN_EMAIL) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      return NextResponse.redirect(new URL('/login', request.url))
     }
   }
 
