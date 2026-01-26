@@ -87,49 +87,48 @@ export default function KYCPage() {
     setLoading(true);
     setErrorMsg("");
     try {
-      if (!userData) throw new Error("Itilizatè pa jwenn.");
-
+      // Nou rale sesyon an fre isit la menm pou n sèten nou gen ID a
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+  
+      if (!userId) throw new Error("Ou dwe konekte pou w fè aktivasyon an.");
+  
       const timestamp = Date.now();
       
-      // 1. Upload foto yo nan Storage
+      // 1. Upload foto yo
       const { data: frontData, error: frontErr } = await supabase.storage
         .from('kyc-documents')
-        .upload(`${userData.id}/id_front_${timestamp}.jpg`, files.idFront!);
+        .upload(`${userId}/id_front_${timestamp}.jpg`, files.idFront!);
       if (frontErr) throw frontErr;
-
-      let backPath = null;
+  
       if (files.idBack) {
-        const { data: backData, error: backErr } = await supabase.storage
+        await supabase.storage
           .from('kyc-documents')
-          .upload(`${userData.id}/id_back_${timestamp}.jpg`, files.idBack!);
-        if (backErr) throw backErr;
-        backPath = backData.path;
+          .upload(`${userId}/id_back_${timestamp}.jpg`, files.idBack!);
       }
-
-      const { data: selfieData, error: selfieErr } = await supabase.storage
+  
+      await supabase.storage
         .from('kyc-documents')
-        .upload(`${userData.id}/selfie_${timestamp}.jpg`, files.selfie!);
-      if (selfieErr) throw selfieErr;
-
-      // 2. Mizajou pwofil la (GRATIS - PA GEN KOUPE KÒB)
+        .upload(`${userId}/selfie_${timestamp}.jpg`, files.selfie!);
+  
+      // 2. Mizajou pwofil la (GRATIS)
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
           kyc_status: 'approved',
           full_name: `${extractedData.firstName} ${extractedData.lastName}`,
-          is_activated: true // Nou fòse aktivasyon an isit la
+          is_activated: true 
         })
-        .eq('id', userData.id);
-
+        .eq('id', userId); // Sèvi ak userId dirèk
+  
       if (updateError) throw updateError;
       
       setSuccessMsg("KONT OU AKTIVE AVÈK SIKSÈ!");
       
-      // 3. Redireksyon rapid
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 1500);
-
+  
     } catch (err: any) {
       setErrorMsg("Erè nan sove done: " + err.message);
     } finally {
