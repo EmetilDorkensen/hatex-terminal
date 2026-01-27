@@ -20,45 +20,50 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUserAndProfile = async () => {
       try {
-        // Jwenn session itilizatè a
-        const { data: { user } } = await supabase.auth.getUser();
-      
-        if (user) {
-          // Rale tout done pwofil la
-          let { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle();
-          
-          if (profile) {
-            setUserData({ ...profile, email: user.email });
-            setIsActivated(profile.kyc_status === 'approved');
-          }
-
-          // LISTEN REALTIME: Sa a ap fè balans lan moute san rafrechi paj la
-          const channel = supabase
-            .channel(`profile_realtime_${user.id}`)
-            .on('postgres_changes', { 
-                event: 'UPDATE', 
-                schema: 'public', 
-                table: 'profiles', 
-                filter: `id=eq.${user.id}` 
-            }, (payload) => {
-                setUserData((prev: any) => ({ ...prev, ...payload.new }));
-            })
-            .subscribe();
-
-          return () => { supabase.removeChannel(channel); };
-        } else {
+        // 1. Tcheke sesyon an dabò
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
           router.push('/login');
+          return;
         }
+
+        const user = session.user;
+
+        // 2. Rale tout done pwofil la
+        let { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (profile) {
+          setUserData({ ...profile, email: user.email });
+          setIsActivated(profile.kyc_status === 'approved');
+        }
+
+        // 3. LISTEN REALTIME
+        const channel = supabase
+          .channel(`profile_realtime_${user.id}`)
+          .on('postgres_changes', { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'profiles', 
+              filter: `id=eq.${user.id}` 
+          }, (payload) => {
+              setUserData((prev: any) => ({ ...prev, ...payload.new }));
+          })
+          .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+
       } catch (err) {
-        console.error("Erè grav Dashboard:", err);
+        console.error("Erè Dashboard:", err);
       } finally {
         setLoading(false);
       }
     };
+
     fetchUserAndProfile();
   }, [supabase, router]);
 
@@ -75,6 +80,9 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // Si pa gen userData apre loading fin fèt, nou anpeche rann paj la
+  if (!userData) return null;
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
@@ -95,7 +103,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* BOUTON ADMIN - AP PARÈT SÈLMAN POU OU */}
             {userData?.email === 'hatexcard@gmail.com' && (
               <button 
                 onClick={() => router.push('/admin')}
@@ -221,7 +228,7 @@ export default function Dashboard() {
               <span className="text-[8px] font-black uppercase">Akey</span>
           </div>
           <div onClick={() => router.push('/kat')} className="flex flex-col items-center opacity-40">
-            <span className="text-[8px] font-black uppercase text-white">Kat</span>
+            <span className="text-[8px] font-black uppercase text-white font-black">Kat</span>
           </div>
           <div onClick={() => router.push('/terminal')} className="relative -mt-10">
             <div className="bg-red-600 w-12 h-12 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-red-600/40 rotate-45">
@@ -229,10 +236,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div onClick={() => router.push('/transactions')} className="flex flex-col items-center opacity-40">
-            <span className="text-[8px] font-black uppercase text-white">Istorik</span>
+            <span className="text-[8px] font-black uppercase text-white font-black">Istorik</span>
           </div>
-          <div onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login'; }} className="flex flex-col items-center opacity-40">
-            <span className="text-[8px] font-black uppercase text-red-400">Soti</span>
+          <div onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login'; }} className="flex flex-col items-center opacity-40 cursor-pointer">
+            <span className="text-[8px] font-black uppercase text-red-400 font-black">Soti</span>
           </div>
         </div>
       </div>
