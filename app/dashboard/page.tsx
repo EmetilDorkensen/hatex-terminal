@@ -20,13 +20,11 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUserAndProfile = async () => {
       try {
-        // Nou tcheke sesyon an an premye san kouri dèyè login
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user } } = await supabase.auth.getUser();
       
-        if (session) {
-          const user = session.user;
-          // Rale tout done pwofil la
-          let { data: profile } = await supabase
+        if (user) {
+          // Rale done pwofil la
+          let { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
@@ -37,7 +35,7 @@ export default function Dashboard() {
             setIsActivated(profile.kyc_status === 'approved');
           }
 
-          // LISTEN REALTIME
+          // LISTEN REALTIME: Pou balans lan chanje otomatikman
           const channel = supabase
             .channel(`profile_realtime_${user.id}`)
             .on('postgres_changes', { 
@@ -50,15 +48,13 @@ export default function Dashboard() {
             })
             .subscribe();
 
-          setLoading(false); // Nou fini chaje isit la
+          setLoading(false);
           return () => { supabase.removeChannel(channel); };
         } else {
-          // Si apre tès la pa gen sesyon menm, lè sa a nou redireksyon
           router.push('/login');
         }
       } catch (err) {
         console.error("Erè grav Dashboard:", err);
-      } finally {
         setLoading(false);
       }
     };
@@ -98,7 +94,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* BOUTON ADMIN - AP PARÈT SÈLMAN POU OU */}
             {userData?.email === 'hatexcard@gmail.com' && (
               <button 
                 onClick={() => router.push('/admin')}
