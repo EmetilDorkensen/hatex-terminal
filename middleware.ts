@@ -25,9 +25,7 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
 
   // --- 1. Jesyon Sou-domèn admin.hatexcard.com ---
-  // Si moun nan ap itilize admin.hatexcard.com
   if (hostname.includes('admin.hatexcard.com')) {
-    // Si li pa deja nan folder /admin, nou voye l la an kachèt (rewrite)
     if (!url.pathname.startsWith('/admin')) {
       url.pathname = `/admin${url.pathname}`;
       return NextResponse.rewrite(url);
@@ -35,15 +33,19 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- 2. Sekirite Aksè Admin (via Email) ---
-  // Nou tcheke sa pou tout moun ki eseye wè kontni /admin lan
   if (url.pathname.startsWith('/admin')) {
     const ADMIN_EMAIL = "hatexcard@gmail.com"; 
     
-    // Si pa gen sesyon oswa si se pa email ou, voye l sou login
     if (!session || session.user.email !== ADMIN_EMAIL) {
       const loginUrl = new URL('/login', request.url);
       return NextResponse.redirect(loginUrl);
     }
+  }
+
+  // Sekirite Dashboard: Si moun nan ap eseye ale nan dashboard san li pa konekte
+  if (url.pathname.startsWith('/dashboard') && !session) {
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return response
@@ -51,8 +53,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/',              // <--- SI LIY SA PA LA, L-AP TOUJOURS VOYE-W SOU LANDING PAGE LA
-    '/dashboard/:path*', 
-    '/admin/:path*',
+    /*
+     * Match tout rout yo eksepte fichye estatik yo (pwa, images, etsetera)
+     * Sa a pèmèt Middleware la toujou tcheke si moun nan konekte pou l ka afiche balans lan.
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
