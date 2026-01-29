@@ -48,16 +48,17 @@ export default function WithdrawPage() {
 
       if (balanceError) throw new Error("Erè nan mizajou balans");
 
-      // 2. ANREJISTRE DEMANN RETRÈ A
-      const { error: withdrawError } = await supabase.from('withdrawals').insert([{
-        user_id: profile.id,
-        amount: amount,
-        fee: withdrawFee,
-        net_amount: netAmount,
-        method: method,
-        phone: phone,
-        status: 'pending'
-      }]);
+// Nan fonksyon handleSubmit la, ranplase pati insert withdrawals la:
+const { error: withdrawError } = await supabase.from('withdrawals').insert([{
+  user_id: profile.id,
+  amount: amount,
+  fee: withdrawFee,
+  net_amount: netAmount,
+  method: method,
+  phone: phone,
+  user_email: profile.email, // AJOUTE SA POU NOTIFIKASYON
+  status: 'pending'
+}]);
 
       if (withdrawError) {
         // SI GEN ERÈ ISIT LA, NOU REMÈT KLIYAN AN KÒB LI SOU BALANS LAN

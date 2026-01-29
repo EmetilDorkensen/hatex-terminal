@@ -65,6 +65,7 @@ const handleTransfer = async () => {
         amount: -Number(amount), // Negatif paske kòb la soti
         type: 'P2P',
         description: `Voye bay ${receiverName}`,
+        sender_email: user.email,
         status: 'success',
         method: 'WALLET'
       });
@@ -77,6 +78,7 @@ const handleTransfer = async () => {
           amount: Number(amount), // Pozitif paske li resevwa
           type: 'P2P',
           description: `Resevwa nan men yon zanmi`,
+          receiver_email: email.toLowerCase().trim(), // MOUN K AP RESEVWA A
           status: 'success',
           method: 'WALLET'
         });
