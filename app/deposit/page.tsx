@@ -1,14 +1,17 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'; // CHANJE ISIT LA
 import { useRouter } from 'next/navigation';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function DepositPage() {
     const router = useRouter();
+    
+    // Konfigirasyon ki an ako ak Middleware la
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
     const [step, setStep] = useState(1);
     const [method, setMethod] = useState('MonCash');
     const [amount, setAmount] = useState<number>(0);
@@ -25,28 +28,25 @@ export default function DepositPage() {
 
     useEffect(() => {
         const getProfile = async () => {
-            // Nou rale sesyon an ak yon ti delè pou asire Cookies yo pare
-            const { data: { session } } = await supabase.auth.getSession();
+            // Sèvi ak getUser() ki pi an sekirite pou Middleware
+            const { data: { user } } = await supabase.auth.getUser();
             
-            if (session?.user) {
+            if (user) {
                 const { data: profileData } = await supabase
                     .from('profiles')
                     .select('*')
-                    .eq('id', session.user.id)
+                    .eq('id', user.id)
                     .single();
                 
-                setProfile(profileData || { id: session.user.id, full_name: 'Kliyan Hatex' });
+                setProfile(profileData || { id: user.id, full_name: 'Kliyan Hatex' });
                 setCheckingAuth(false);
             } else {
-                // Si apre 2 segonn li pa jwenn sesyon, li voye l nan login
-                const timeout = setTimeout(() => {
-                    router.push('/login');
-                }, 2000);
-                return () => clearTimeout(timeout);
+                // Si pa gen user, voye l nan login dirèkteman
+                router.replace('/login');
             }
         };
         getProfile();
-    }, [router]);
+    }, [router, supabase]);
 
     const fee = amount * 0.05;
     const total = amount + fee;
@@ -63,7 +63,7 @@ export default function DepositPage() {
     const notifyTelegram = async (imgUrl: string) => {
         const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY';
         const CHAT_ID = '8392894841';
-        const msg = `🔔 *DEPO HATEX NOUVO*\n👤 Kliyan: ${profile?.full_name || 'Enkoni'}\n💰 Montan Nèt: ${amount} HTG\n📉 Frais (5%): ${fee} HTG\n💸 Total pou peye: ${total} HTG\n💳 Metòd: ${method}\n🆔 Trans ID: ${txnId}`;
+        const msg = `🔔 *DEPO HATEX NOUVO*\n👤 Kliyan: ${profile?.full_name || 'Enkoni'}\n📧 Email: ${profile?.email || 'Pa disponib'}\n💰 Montan Nèt: ${amount} HTG\n📉 Frais (5%): ${fee} HTG\n💸 Total pou peye: ${total} HTG\n💳 Metòd: ${method}\n🆔 Trans ID: ${txnId}`;
         
         try {
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
@@ -95,13 +95,14 @@ export default function DepositPage() {
                 transaction_id: txnId,
                 proof_img_1: url1,
                 proof_img_2: url2,
-                status: 'pending'
+                status: 'pending',
+                user_email: profile.email // Nou sove email la pou fasilite notifikasyon apre a
             }]);
 
             if (error) throw error;
             
             await notifyTelegram(url1);
-            alert("Depo w lan soumèt ak siksè! N ap verifye l.");
+            alert("Depo w lan soumèt ak siksè! N ap voye yon imèl ba ou lè admin lan fin apwouve l.");
             router.push('/dashboard');
         } catch (err: any) { 
             alert("Erè: " + err.message); 
@@ -114,7 +115,7 @@ export default function DepositPage() {
         return (
             <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center">
                 <div className="text-red-600 font-black animate-pulse uppercase italic tracking-widest text-sm">
-                    Sekirite HatexCard ap chaje...
+                    Sekirite HatexCard ap verifye sesyon...
                 </div>
             </div>
         );
