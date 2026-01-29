@@ -48,7 +48,7 @@ export default function WithdrawPage() {
 
       if (balanceError) throw new Error("Erè nan mizajou balans");
 
-// Nan fonksyon handleSubmit la, ranplase pati insert withdrawals la:
+// Nan paj Withdraw ou a, asire w pati sa a la:
 const { error: withdrawError } = await supabase.from('withdrawals').insert([{
   user_id: profile.id,
   amount: amount,
@@ -56,7 +56,7 @@ const { error: withdrawError } = await supabase.from('withdrawals').insert([{
   net_amount: netAmount,
   method: method,
   phone: phone,
-  user_email: profile.email, // AJOUTE SA POU NOTIFIKASYON
+  user_email: profile.email, // Sa ap ranpli kolon an otomatikman
   status: 'pending'
 }]);
 
