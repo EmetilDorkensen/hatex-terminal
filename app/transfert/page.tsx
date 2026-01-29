@@ -17,7 +17,7 @@ export default function TransferPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Lojik pou chache non moun nan otomatikman
+  // 1. Lojik pou chache non moun nan otomatikman
   useEffect(() => {
     const findUser = async () => {
       if (email.includes('@') && email.length > 5) {
@@ -42,43 +42,52 @@ export default function TransferPage() {
     return () => clearTimeout(delay);
   }, [email]);
 
-// Ranplase fonksyon handleTransfer la ak sa a:
-const handleTransfer = async () => {
-  if (!receiverName || !amount || Number(amount) <= 0) return;
-  setLoading(true);
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    // 1. Egzekite Transfè a nan Balans yo
-    const { data: receiverId, error: rpcError } = await supabase.rpc('process_transfer_by_email', {
-      p_sender_id: user.id,
-      p_receiver_email: email.toLowerCase().trim(),
-      p_amount: Number(amount)
-    });
+  // 2. FONKSYON TRANSFÈ A
+  const handleTransfer = async () => {
+    if (!receiverName || !amount || Number(amount) <= 0) return;
+    setLoading(true);
+    
+    try {
+      // Rekipere enfòmasyon moun k ap voye a (Sender)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Ou dwe konekte");
 
-    if (rpcError) {
-      setStatus({ type: 'error', msg: rpcError.message });
-    } else {
-      // 2. Anrejistre pou moun ki VOYE a (Sender)
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      const senderName = senderProfile?.full_name || "Yon Kliyan";
+
+      // EGZEKITE TRANSFÈ A NAN BALANS (RPC)
+      const { data: receiverId, error: rpcError } = await supabase.rpc('process_transfer_by_email', {
+        p_sender_id: user.id,
+        p_receiver_email: email.toLowerCase().trim(),
+        p_amount: Number(amount)
+      });
+
+      if (rpcError) throw rpcError;
+
+      // 3. ANREJISTRE POU MOUN KI VOYE A (Sender)
       await supabase.from('transactions').insert({
         user_id: user.id,
-        amount: -Number(amount), // Negatif paske kòb la soti
+        amount: -Number(amount),
         type: 'P2P',
-        description: `Voye bay ${receiverName}`,
-        sender_email: user.email,
+        description: `Ou voye ${amount} HTG bay ${receiverName}`,
+        sender_email: user.email, // Sa ap deklanche imèl pou Sender a
         status: 'success',
         method: 'WALLET'
       });
 
-      // 3. Anrejistre pou moun ki RESEVWA a (Receiver)
-      // Nòt: receiverId dwe retounen pa RPC a oswa ou dwe chache l
+      // 4. ANREJISTRE POU MOUN KI RESEVWA A (Receiver)
       if (receiverId) {
         await supabase.from('transactions').insert({
           user_id: receiverId,
-          amount: Number(amount), // Pozitif paske li resevwa
+          amount: Number(amount),
           type: 'P2P',
-          description: `Resevwa nan men yon zanmi`,
-          receiver_email: email.toLowerCase().trim(), // MOUN K AP RESEVWA A
+          description: `Ou resevwa ${amount} HTG nan men ${senderName}`,
+          receiver_email: email.toLowerCase().trim(), // Sa ap deklanche imèl pou Receiver a
           status: 'success',
           method: 'WALLET'
         });
@@ -86,14 +95,16 @@ const handleTransfer = async () => {
 
       setStatus({ type: 'success', msg: 'Transfè a reyisi!' });
       setTimeout(() => router.push('/dashboard'), 2000);
+
+    } catch (err: any) {
+      setStatus({ type: 'error', msg: err.message });
+    } finally {
+      setLoading(false);
     }
-  }
-  setLoading(false);
-};
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic">
-      {/* HEADER */}
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => router.back()} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800 active:scale-90">
           <span className="text-xl">←</span>
@@ -102,9 +113,8 @@ const handleTransfer = async () => {
       </div>
 
       <div className="space-y-5">
-        {/* BLÒK EMAIL */}
         <div className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 transition-all">
-          <p className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest">Email moun nan</p>
+          <p className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest">Email moun k ap resevwa a</p>
           <input 
             type="email" 
             value={email}
@@ -112,26 +122,24 @@ const handleTransfer = async () => {
             placeholder="egzamp@gmail.com"
             className="bg-transparent text-lg font-bold w-full outline-none placeholder:text-zinc-800"
           />
-          {searching && <div className="mt-2 text-[9px] text-red-600 animate-pulse font-black uppercase">Y ap verifye...</div>}
+          {searching && <div className="mt-2 text-[9px] text-red-600 animate-pulse font-black uppercase">Verifye baz de done...</div>}
         </div>
 
-        {/* KAT KONFIMASYON NON (Parèt sèlman si email la bon) */}
         {receiverName && (
           <div className="bg-red-600 p-6 rounded-[2.5rem] shadow-xl shadow-red-600/10 animate-in fade-in zoom-in duration-300">
             <div className="flex items-center gap-4">
                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-xl">👤</div>
                <div>
-                  <p className="text-[9px] font-black uppercase text-white/60 tracking-widest leading-none mb-1">Benefisyè verifye</p>
+                  <p className="text-[9px] font-black uppercase text-white/60 tracking-widest mb-1">Benefisyè HatexCard</p>
                   <h2 className="text-lg font-black uppercase tracking-tight">{receiverName}</h2>
                </div>
             </div>
           </div>
         )}
 
-        {/* BLÒK MONTAN (Parèt apre verifye moun nan) */}
         <div className={`transition-all duration-500 ${receiverName ? 'opacity-100' : 'opacity-20 pointer-events-none'}`}>
-          <div className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 mb-6">
-            <p className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest text-center">Montan pou voye (HTG)</p>
+          <div className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 mb-6 text-center">
+            <p className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest">Montan pou voye (HTG)</p>
             <input 
               type="number" 
               value={amount}
@@ -151,10 +159,10 @@ const handleTransfer = async () => {
             onClick={handleTransfer}
             disabled={loading || !amount}
             className={`w-full py-8 rounded-[4rem] font-black uppercase italic tracking-widest transition-all ${
-              loading ? 'bg-zinc-800' : 'bg-white text-red-600 active:scale-95 shadow-xl shadow-white/5'
+              loading ? 'bg-zinc-800 animate-pulse' : 'bg-white text-red-600 active:scale-95 shadow-xl shadow-white/5'
             }`}
           >
-            {loading ? 'Y ap voye...' : `Voye bay ${receiverName?.split(' ')[0]}`}
+            {loading ? 'Sistèm nan ap travay...' : `KONFIME TRANSFÈ BAY ${receiverName?.split(' ')[0]}`}
           </button>
         </div>
       </div>
