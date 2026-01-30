@@ -50,16 +50,16 @@ export default function TransferPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
   
-      // Rekipere Non moun k ap voye a pou n ka mete l nan istorik moun k ap resevwa a
+      // 1. Rekipere Non Moun k ap voye a (Sender)
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('full_name')
         .eq('id', user.id)
         .single();
   
-      const senderFullName = senderProfile?.full_name || "Yon Kliyan Hatex";
+      const senderFullName = senderProfile?.full_name || "Yon Kliyan";
   
-      // EGZEKITE TRANSFÈ NAN BALANS (Sèvi ak RPC ou a)
+      // 2. Egzekite transfè a nan baz de done a
       const { data: receiverId, error: rpcError } = await supabase.rpc('process_transfer_by_email', {
         p_sender_id: user.id,
         p_receiver_email: email.toLowerCase().trim(),
@@ -68,26 +68,27 @@ export default function TransferPage() {
   
       if (rpcError) throw rpcError;
   
-      // --- 2. ANREJISTRE POU MOUN K AP VOYE A (Sender) ---
-      // Nou sèvi ak 'user_email' pou deklanche Resend
+      // --- 3. ANREJISTRE POU MOUN K AP VOYE A (Sender: Emetil) ---
       await supabase.from('transactions').insert({
         user_id: user.id,
-        user_email: user.email, // OBLIGATWA POU EMAIL PATI
+        user_email: user.email, 
         amount: -Number(amount),
         type: 'P2P',
-        description: `TRANSFÈ BAY: ${receiverName}`, // Sa ap parèt nan istorik li
+        // ISIT LA: Nou ekri klè se bay ki moun kòb la ale
+        description: `Transfè reyisi bay ${receiverName}`, 
         status: 'success',
         method: 'WALLET'
       });
   
-      // --- 3. ANREJISTRE POU MOUN K AP RESEVWA A (Receiver) ---
+      // --- 4. ANREJISTRE POU MOUN K AP RESEVWA A (Receiver: Kalibous) ---
       if (receiverId) {
         await supabase.from('transactions').insert({
           user_id: receiverId,
-          user_email: email.toLowerCase().trim(), // OBLIGATWA POU EMAIL PATI
+          user_email: email.toLowerCase().trim(), // Email moun k ap resevwa a
           amount: Number(amount),
           type: 'P2P',
-          description: `TRANSFÈ SOTI NAN MEN: ${senderFullName}`, // Sa ap parèt nan istorik li
+          // ISIT LA: Nou ekri klè nan men ki moun kòb la soti
+          description: `Ou resevwa ${amount} HTG nan men ${senderFullName}`, 
           status: 'success',
           method: 'WALLET'
         });
