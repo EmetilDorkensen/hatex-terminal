@@ -83,27 +83,44 @@ export default function TerminalPage() {
           </button>
         </div>
       )}
-
-      {/* GID ENTEGRASYON AK SDK */}
-      {mode === 'api' && (
-        <div className="space-y-6 animate-in zoom-in duration-300">
-          <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10">
-            <h2 className="text-[14px] font-black uppercase text-red-600 mb-4 italic">Gid Entegrasyon</h2>
-            <div className="space-y-4 text-[9px] text-zinc-400 uppercase leading-relaxed">
-              <p>1. Kopi div sa a kote ou vle bouton an parèt:</p>
-              <code className="block bg-black p-4 rounded-xl text-red-500 font-mono">{`<div id="hatex-btn"></div>`}</code>
-              <p>2. Mete script sa a nan footer paj ou a:</p>
-              <code className="block bg-black p-4 rounded-xl text-green-500 font-mono">
-                {`<script \n src="https://hatexcard.com/sdk-hatex.js" \n data-terminal="${profile.id}" \n data-amount="100" \n data-container="hatex-btn">\n</script>`}
-              </code>
-            </div>
-            <a href="/docs/hatex-terminal-guide.pdf" download className="mt-8 w-full bg-white text-black py-4 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-[10px]">
-              📥 Telechaje Gid PDF la
-            </a>
-          </div>
-          <button onClick={() => setMode('menu')} className="w-full text-zinc-500 font-black uppercase text-[10px]">Tounen</button>
+{/* GID ENTEGRASYON NAN PAJ TERMINAL LA */}
+{mode === 'api' && (
+  <div className="space-y-6 animate-in zoom-in duration-300">
+    <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10">
+      <h2 className="text-[14px] font-black uppercase text-red-600 mb-4 italic tracking-widest text-center">API Entegrasyon</h2>
+      
+      <div className="space-y-6">
+        <p className="text-[9px] text-zinc-500 uppercase font-black text-center">Kopye kòd sa a epi mete l sou sit ou a pou resevwa peman.</p>
+        
+        <div className="relative group">
+          <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[10px] text-green-500 font-mono overflow-x-auto">
+{`<a href="https://hatexcard.com/checkout?terminal=${profile?.id}&amount=100" 
+   style="background:#dc2626;color:white;padding:15px 30px;border-radius:50px;text-decoration:none;font-weight:900;font-family:sans-serif;display:inline-flex;align-items:center;gap:10px;font-style:italic;">
+   <span>💳</span> PEYE AK HATEXCARD
+</a>`}
+          </pre>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(`<a href="https://hatexcard.com/checkout?terminal=${profile?.id}&amount=100" style="...">PEYE AK HATEXCARD</a>`);
+              alert("Kòd kopye!");
+            }}
+            className="absolute top-4 right-4 bg-white/10 p-2 rounded-lg text-[10px] uppercase font-black"
+          >
+            Kopye
+          </button>
         </div>
-      )}
+
+        <div className="bg-red-600/5 p-4 rounded-2xl border border-red-600/10">
+          <p className="text-[8px] text-red-500 font-black uppercase mb-1">REMAK:</p>
+          <p className="text-[8px] text-zinc-500 font-bold leading-relaxed uppercase">
+            Chanje valè <span className="text-white">"amount=100"</span> an pou mete pri pwodwi ou a.
+          </p>
+        </div>
+      </div>
+    </div>
+    <button onClick={() => setMode('menu')} className="w-full text-zinc-500 font-black uppercase text-[10px]">Tounen nan Menu</button>
+  </div>
+)}
 
       {/* ISTORIK PEMAN DETAYE */}
       {mode === 'history' && (
