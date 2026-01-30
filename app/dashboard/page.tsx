@@ -16,6 +16,10 @@ export default function Dashboard() {
   const [isActivated, setIsActivated] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const [showNumbers, setShowNumbers] = useState(false);
+  
+  // NOU AJOUTE 2 LIY SA YO SÈLMAN POU RANJE ERE A:
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
 
   useEffect(() => {
     const fetchUserAndProfile = async () => {
@@ -23,8 +27,8 @@ export default function Dashboard() {
         const { data: { user } } = await supabase.auth.getUser();
       
         if (user) {
-          // Rale done pwofil la
-          let { data: profile, error } = await supabase
+          // 1. Rale done pwofil la
+          let { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
@@ -34,8 +38,21 @@ export default function Dashboard() {
             setUserData({ ...profile, email: user.email });
             setIsActivated(profile.kyc_status === 'approved');
           }
-
-          // LISTEN REALTIME: Pou balans lan chanje otomatikman
+  
+          // 2. Rale 3 dènye aktivite yo
+          const { data: transactions } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .not('description', 'ilike', '%Voye bay%') 
+            .order('created_at', { ascending: false })
+            .limit(3);
+  
+          if (transactions) {
+            setRecentTransactions(transactions);
+          }
+  
+          // 3. LISTEN REALTIME
           const channel = supabase
             .channel(`profile_realtime_${user.id}`)
             .on('postgres_changes', { 
@@ -47,15 +64,18 @@ export default function Dashboard() {
                 setUserData((prev: any) => ({ ...prev, ...payload.new }));
             })
             .subscribe();
-
+  
           setLoading(false);
+          setLoadingRecent(false);
+          
           return () => { supabase.removeChannel(channel); };
         } else {
           router.push('/login');
         }
       } catch (err) {
-        console.error("Erè grav Dashboard:", err);
+        console.error("Erè Dashboard:", err);
         setLoading(false);
+        setLoadingRecent(false);
       }
     };
     fetchUserAndProfile();
@@ -207,8 +227,46 @@ export default function Dashboard() {
               <p className="text-[10px] font-black uppercase italic text-zinc-500 tracking-widest">Dènye Aktivite</p>
               <button onClick={() => router.push('/transactions')} className="text-[9px] font-bold text-red-500 uppercase italic">Wè tout</button>
             </div>
-            <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[1.5rem] text-center backdrop-blur-md">
-                <p className="text-[8px] font-black uppercase text-zinc-600 italic tracking-widest">Gade tranzaksyon yo</p>
+
+            <div className="space-y-3">
+                {loadingRecent ? (
+                    <div className="text-center py-4"><div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+                ) : recentTransactions.length === 0 ? (
+                    <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[1.5rem] text-center backdrop-blur-md">
+                        <p className="text-[8px] font-black uppercase text-zinc-600 italic tracking-widest">Pa gen aktivite ankò</p>
+                    </div>
+                ) : (
+                    recentTransactions.map((t) => (
+                        <div key={t.id} className="bg-zinc-900/40 border border-white/5 p-4 rounded-[2rem] backdrop-blur-md active:scale-95 transition-all">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-zinc-800/80 border border-white/5">
+                                        {t.type === 'DEPOSIT' ? '📥' : 
+                                         t.type === 'WITHDRAWAL' ? '📤' : 
+                                         t.type === 'P2P' ? '🔄' : 
+                                         t.type === 'CARD_RECHARGE' ? '💳' : '📄'}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[10px] font-black uppercase tracking-tight text-zinc-100 line-clamp-1">
+                                            {t.description}
+                                        </h3>
+                                        {t.user_email && (
+                                            <p className="text-[8px] text-zinc-600 font-bold lowercase">
+                                                {t.user_email.substring(0, 3)}.....@{t.user_email.split('@')[1]}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className={`text-[12px] font-black ${t.amount > 0 ? 'text-green-500' : 'text-white'}`}>
+                                        {t.amount > 0 ? '+' : '-'}{Math.abs(t.amount).toLocaleString()} 
+                                        <span className="text-[7px] ml-1">HTG</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
 
