@@ -35,45 +35,36 @@ export default function RechargeKatPage() {
   }, [supabase, router]);
 
   const handleRecharge = async () => {
-    const val = parseFloat(amount);
+    const val = Number(amount); // Asire sa se yon Number
     
-    // 1. Validasyon bò kliyan (Frontend)
-    if (!val || val <= 0) {
-      return setStatus({ type: 'error', msg: 'Mete yon montan ki valid' });
-    }
-
-    if (val > LIMIT_MAKSIMOM) {
-      return setStatus({ type: 'error', msg: `Limit la se ${LIMIT_MAKSIMOM.toLocaleString()} HTG` });
-    }
-
-    if (val > userData.wallet_balance) {
-      return setStatus({ type: 'error', msg: 'Balans Wallet ou pa ase' });
-    }
-
+    if (!val || val <= 0) return setStatus({ type: 'error', msg: 'Mete yon montan valid' });
+    if (val > 50000) return setStatus({ type: 'error', msg: 'Limit la se 50,000 HTG' });
+  
     setLoading(true);
     setStatus({ type: '', msg: '' });
-
+  
     try {
-      // 2. Rele RPC a (Sekirite maksimòm nan Supabase)
+      // Tcheke non paramèt yo byen (p_user_id ak p_amount)
       const { data, error } = await supabase.rpc('process_card_recharge', {
         p_user_id: userData.id,
-        p_amount: val
+        p_amount: val 
       });
-
-      if (error) throw error;
-
-      if (data.success) {
+  
+      if (error) {
+        console.error("Detay Erè Supabase:", error); // Sa ap ede w wè egzakteman sak pa mache
+        throw error;
+      }
+  
+      if (data && data.success) {
         setStatus({ type: 'success', msg: data.message });
-        setAmount('');
-        // Retounen nan paj kat la apre siksè
         setTimeout(() => router.push('/kat'), 2000);
       } else {
-        setStatus({ type: 'error', msg: data.message });
+        setStatus({ type: 'error', msg: data?.message || 'Erè nan tranzaksyon an' });
       }
-
+  
     } catch (err: any) {
-      console.error("Erè Rechaj:", err);
-      setStatus({ type: 'error', msg: 'Sistèm nan okipe, re-eseye ankò.' });
+      console.error("Erè Konplè:", err);
+      setStatus({ type: 'error', msg: 'Sistèm nan okipe (Erè 400). Re-eseye.' });
     } finally {
       setLoading(false);
     }
