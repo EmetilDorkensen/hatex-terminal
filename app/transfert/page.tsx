@@ -50,17 +50,9 @@ export default function TransferPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
   
-      // 1. Rekipere Non Moun k ap voye a (Sender)
-      const { data: senderProfile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-  
-      const senderFullName = senderProfile?.full_name || "Yon Kliyan";
-  
-      // 2. Egzekite transfè a nan baz de done a
-      const { data: receiverId, error: rpcError } = await supabase.rpc('process_transfer_by_email', {
+      // NOU RELE RPC A SÈLMAN. 
+      // Baz de done a pral kreye tranzaksyon yo pou kont li.
+      const { error: rpcError } = await supabase.rpc('process_transfer_by_email', {
         p_sender_id: user.id,
         p_receiver_email: email.toLowerCase().trim(),
         p_amount: Number(amount)
@@ -68,33 +60,15 @@ export default function TransferPage() {
   
       if (rpcError) throw rpcError;
   
-      // --- 3. ANREJISTRE POU MOUN K AP VOYE A (Sender: Emetil) ---
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        user_email: user.email, 
-        amount: -Number(amount),
-        type: 'P2P',
-        // ISIT LA: Nou ekri klè se bay ki moun kòb la ale
-        description: `Transfè reyisi bay ${receiverName}`, 
-        status: 'success',
-        method: 'WALLET'
-      });
-  
-      // --- 4. ANREJISTRE POU MOUN K AP RESEVWA A (Receiver: Kalibous) ---
-      if (receiverId) {
-        await supabase.from('transactions').insert({
-          user_id: receiverId,
-          user_email: email.toLowerCase().trim(), // Email moun k ap resevwa a
-          amount: Number(amount),
-          type: 'P2P',
-          // ISIT LA: Nou ekri klè nan men ki moun kòb la soti
-          description: `Ou resevwa ${amount} HTG nan men ${senderFullName}`, 
-          status: 'success',
-          method: 'WALLET'
-        });
-      }
-  
+      // Pa mete okenn "supabase.from('transactions').insert" isit la ankò!
+      
       setStatus({ type: 'success', msg: 'Transfè a reyisi!' });
+      
+      // Nou netwaye fòm nan
+      setAmount('');
+      setEmail('');
+      setReceiverName('');
+      
       setTimeout(() => router.push('/dashboard'), 2000);
   
     } catch (err: any) {
