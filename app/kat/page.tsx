@@ -30,7 +30,6 @@ export default function KatPage() {
           
           if (profile) setUserData({ ...profile, email: user.email });
 
-          // LISTEN REALTIME: Si balans kat la chanje, l ap update otomatik
           supabase
             .channel(`card_update_${user.id}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, 
@@ -97,7 +96,7 @@ export default function KatPage() {
         </div>
       </div>
 
-      {/* KAT LA (UI LONG) */}
+      {/* KAT LA */}
       <div className="mb-12 perspective-1000 relative">
         {!isActivated && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[3rem] bg-black/80 backdrop-blur-xl p-8 text-center border border-white/5">
@@ -109,46 +108,51 @@ export default function KatPage() {
         )}
 
         <div className={`relative aspect-[1.58/1] w-full max-w-[420px] mx-auto transition-all duration-1000 preserve-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => isActivated && setIsFlipped(!isFlipped)}>
-          {/* DEVAN */}
-          <div className="absolute inset-0 backface-hidden rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-900 to-red-950 p-8 shadow-2xl border border-white/10 shadow-red-900/20">
-              <div className={`flex flex-col h-full justify-between ${!isActivated ? 'blur-2xl' : ''}`}>
+          
+          {/* DEVAN (MODIFIE POU MATCH DASHBOARD) */}
+          <div className="absolute inset-0 backface-hidden rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-red-600 via-zinc-900 to-black p-8 shadow-2xl border border-white/10 shadow-red-900/30">
+              {/* EFÈ LIMYÈ SOU KAT LA */}
+              <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-white/5 blur-[80px] rounded-full"></div>
+              
+              <div className={`relative flex flex-col h-full justify-between ${!isActivated ? 'blur-2xl' : ''}`}>
                   <div className="flex justify-between items-start">
-                    <div className="w-14 h-14 bg-gradient-to-br from-white/20 to-transparent rounded-2xl border border-white/20 flex items-center justify-center p-2 backdrop-blur-md">
+                    <div className="w-14 h-14 bg-white/10 rounded-2xl border border-white/10 flex items-center justify-center p-2 backdrop-blur-md shadow-inner">
                        <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-full h-full object-contain" />
                     </div>
                     <div className="text-right">
-                      <p className="text-[11px] font-black italic tracking-widest text-zinc-100">HatexCard</p>
-                      <p className="text-[7px] font-black uppercase text-red-600 opacity-80">Virtual Platinum</p>
+                      <p className="text-[11px] font-black italic tracking-widest text-white">HatexCard</p>
+                      <p className="text-[7px] font-black uppercase text-red-500 tracking-[0.3em]">Virtual Premium</p>
                     </div>
                   </div>
                   
                   <div className="space-y-6">
-                    <div className="flex items-center justify-between bg-black/20 p-3 rounded-2xl border border-white/5 backdrop-blur-sm">
-                      <p className="text-xl sm:text-2xl font-mono font-bold tracking-[0.2em] text-zinc-100">
+                    <div className="flex items-center justify-between bg-black/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md shadow-lg">
+                      <p className="text-xl sm:text-2xl font-mono font-bold tracking-[0.25em] text-white/90">
                         {showNumbers ? userData?.card_number : `**** **** **** ${userData?.card_number?.slice(-4)}`}
                       </p>
-                      <button onClick={(e) => { e.stopPropagation(); setShowNumbers(!showNumbers); }} className="w-10 h-10 flex items-center justify-center text-lg">{showNumbers ? "🔒" : "👁️"}</button>
+                      <button onClick={(e) => { e.stopPropagation(); setShowNumbers(!showNumbers); }} className="w-10 h-10 flex items-center justify-center text-lg hover:scale-110 transition-transform">{showNumbers ? "🔒" : "👁️"}</button>
                     </div>
 
                     <div className="flex justify-between items-end">
                       <div className="flex-1">
-                         <p className="text-[7px] opacity-40 uppercase font-black mb-1">Card Holder</p>
-                         <p className="text-[12px] font-black uppercase tracking-wide truncate">{userData?.full_name}</p>
+                         <p className="text-[7px] text-white/40 uppercase font-black mb-1 tracking-widest">Card Holder</p>
+                         <p className="text-[12px] font-black uppercase tracking-wide truncate text-white/90">{userData?.full_name}</p>
                       </div>
                       <div className="flex gap-6">
                          <div className="text-center" onClick={(e) => { e.stopPropagation(); handleCopy(userData?.exp_date, "EXP"); }}>
-                            <p className="text-[7px] opacity-40 uppercase font-black mb-1">Expires</p>
-                            <p className="text-[10px] font-bold">{isActivated ? userData?.exp_date : "**/**"}</p>
+                            <p className="text-[7px] text-white/40 uppercase font-black mb-1">Expires</p>
+                            <p className="text-[10px] font-bold text-white/90">{isActivated ? userData?.exp_date : "**/**"}</p>
                          </div>
                          <div className="text-center" onClick={(e) => { e.stopPropagation(); handleCopy(userData?.cvv, "CVV"); }}>
-                            <p className="text-[7px] opacity-40 uppercase font-black mb-1">CVV</p>
-                            <p className="text-[10px] font-bold">{showNumbers ? userData?.cvv : "***"}</p>
+                            <p className="text-[7px] text-white/40 uppercase font-black mb-1">CVV</p>
+                            <p className="text-[10px] font-bold text-white/90">{showNumbers ? userData?.cvv : "***"}</p>
                          </div>
                       </div>
                     </div>
                   </div>
               </div>
           </div>
+
           {/* DÈYÈ */}
           <div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2.5rem] bg-[#0d0e14] p-8 border border-white/10 flex flex-col items-center justify-between shadow-2xl">
               <div className="w-full h-14 bg-zinc-950 absolute top-10 left-0 border-y border-white/5"></div>
@@ -164,11 +168,11 @@ export default function KatPage() {
       {isActivated && (
         <div className="space-y-4 animate-in slide-in-from-bottom-10 duration-700">
            <div className="grid grid-cols-2 gap-3">
-             <button onClick={() => handleCopy(userData?.card_number, "Nimewo")} className="bg-zinc-900/50 border border-white/5 p-5 rounded-[2rem] text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all"><span>📋</span> Kopye Nimewo</button>
-             <button onClick={() => handleCopy(userData?.cvv, "CVV")} className="bg-zinc-900/50 border border-white/5 p-5 rounded-[2rem] text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all"><span>📋</span> Kopye CVV</button>
+             <button onClick={() => handleCopy(userData?.card_number, "Nimewo")} className="bg-zinc-900/50 border border-white/5 p-5 rounded-[2rem] text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-zinc-900"><span>📋</span> Kopye Nimewo</button>
+             <button onClick={() => handleCopy(userData?.cvv, "CVV")} className="bg-zinc-900/50 border border-white/5 p-5 rounded-[2rem] text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-zinc-900"><span>📋</span> Kopye CVV</button>
            </div>
            
-           <div className="bg-gradient-to-r from-red-600 to-red-800 p-1 rounded-[2.5rem]">
+           <div className="bg-gradient-to-r from-red-600 to-red-800 p-1 rounded-[2.5rem] shadow-xl shadow-red-900/20">
              <button 
                onClick={() => router.push('/kat/recharge')}
                className="w-full bg-[#0a0b14] py-6 rounded-[2.4rem] font-black uppercase italic text-[13px] tracking-widest active:scale-[0.98] transition-all flex items-center justify-center gap-3"
