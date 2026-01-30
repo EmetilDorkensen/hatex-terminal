@@ -42,60 +42,60 @@ export default function TransferPage() {
     return () => clearTimeout(delay);
   }, [email]);
 
-  // 2. FONKSYON TRANSFÈ A
   const handleTransfer = async () => {
     if (!receiverName || !amount || Number(amount) <= 0) return;
     setLoading(true);
     
     try {
-      // Rekipere enfòmasyon moun k ap voye a (Sender)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
-
+  
+      // Rekipere Non moun k ap voye a pou n ka mete l nan istorik moun k ap resevwa a
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('full_name')
         .eq('id', user.id)
         .single();
-
-      const senderName = senderProfile?.full_name || "Yon Kliyan";
-
-      // EGZEKITE TRANSFÈ A NAN BALANS (RPC)
+  
+      const senderFullName = senderProfile?.full_name || "Yon Kliyan Hatex";
+  
+      // EGZEKITE TRANSFÈ NAN BALANS (Sèvi ak RPC ou a)
       const { data: receiverId, error: rpcError } = await supabase.rpc('process_transfer_by_email', {
         p_sender_id: user.id,
         p_receiver_email: email.toLowerCase().trim(),
         p_amount: Number(amount)
       });
-
+  
       if (rpcError) throw rpcError;
-
-      // 3. ANREJISTRE POU MOUN KI VOYE A (Sender)
+  
+      // --- 2. ANREJISTRE POU MOUN K AP VOYE A (Sender) ---
+      // Nou sèvi ak 'user_email' pou deklanche Resend
       await supabase.from('transactions').insert({
         user_id: user.id,
+        user_email: user.email, // OBLIGATWA POU EMAIL PATI
         amount: -Number(amount),
         type: 'P2P',
-        description: `Ou voye ${amount} HTG bay ${receiverName}`,
-        sender_email: user.email, // Sa ap deklanche imèl pou Sender a
+        description: `TRANSFÈ BAY: ${receiverName}`, // Sa ap parèt nan istorik li
         status: 'success',
         method: 'WALLET'
       });
-
-      // 4. ANREJISTRE POU MOUN KI RESEVWA A (Receiver)
+  
+      // --- 3. ANREJISTRE POU MOUN K AP RESEVWA A (Receiver) ---
       if (receiverId) {
         await supabase.from('transactions').insert({
           user_id: receiverId,
+          user_email: email.toLowerCase().trim(), // OBLIGATWA POU EMAIL PATI
           amount: Number(amount),
           type: 'P2P',
-          description: `Ou resevwa ${amount} HTG nan men ${senderName}`,
-          receiver_email: email.toLowerCase().trim(), // Sa ap deklanche imèl pou Receiver a
+          description: `TRANSFÈ SOTI NAN MEN: ${senderFullName}`, // Sa ap parèt nan istorik li
           status: 'success',
           method: 'WALLET'
         });
       }
-
+  
       setStatus({ type: 'success', msg: 'Transfè a reyisi!' });
       setTimeout(() => router.push('/dashboard'), 2000);
-
+  
     } catch (err: any) {
       setStatus({ type: 'error', msg: err.message });
     } finally {
