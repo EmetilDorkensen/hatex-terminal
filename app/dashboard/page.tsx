@@ -51,7 +51,6 @@ export default function Dashboard() {
           if (transactions) {
             setRecentTransactions(transactions);
           }
-  
           // 3. LISTEN REALTIME
           const channel = supabase
             .channel(`profile_realtime_${user.id}`)
@@ -80,6 +79,7 @@ export default function Dashboard() {
     };
     fetchUserAndProfile();
   }, [supabase, router]);
+
 
   const formatCardNumber = (num: string) => {
     if (!num) return "**** **** **** ****";
