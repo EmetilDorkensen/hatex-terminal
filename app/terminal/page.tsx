@@ -12,6 +12,7 @@ export default function TerminalPage() {
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
+  const [bizName, setBizName] = useState('');
 
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -103,6 +104,42 @@ export default function TerminalPage() {
         </div>
     );
   }
+
+  if (mode === 'api' && !profile.business_name) {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-red-500 font-bold">Ou dwe mete non biznis ou anvan ou wè kòd API a.</p>
+        <button onClick={() => setMode('menu')} className="mt-4 underline">Tounen pou ranpli l</button>
+      </div>
+    );
+  }
+
+  const updateBusinessName = async () => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ business_name: bizName })
+      .eq('id', profile.id);
+    if (!error) {
+      alert("Biznis anrejistre!");
+      window.location.reload();
+    }
+  };
+  
+  // Nan pati HTML la, anlè MENU a:
+  {!profile.business_name && (
+    <div className="bg-red-600/10 p-6 rounded-[2rem] border border-red-600/20 mb-6 italic">
+      <p className="text-[10px] font-black uppercase mb-3 text-red-500">Aksyon Obligatwa: Mete non Biznis ou</p>
+      <div className="flex gap-2">
+        <input 
+          className="bg-black border border-white/10 p-3 rounded-xl flex-1 text-xs outline-none"
+          placeholder="Egz: Hatex Shop"
+          onChange={(e) => setBizName(e.target.value)}
+        />
+        <button onClick={updateBusinessName} className="bg-white text-black px-4 rounded-xl text-[10px] font-black uppercase">Sove</button>
+      </div>
+    </div>
+  )}
+  
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans">

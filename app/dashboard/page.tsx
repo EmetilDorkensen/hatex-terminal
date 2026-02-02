@@ -80,7 +80,6 @@ export default function Dashboard() {
     fetchUserAndProfile();
   }, [supabase, router]);
 
-
   const formatCardNumber = (num: string) => {
     if (!num) return "**** **** **** ****";
     if (showNumbers) return num.match(/.{1,4}/g)?.join(' ');
