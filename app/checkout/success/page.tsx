@@ -1,41 +1,52 @@
 "use client";
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { CheckCircle2, ShoppingBag, ArrowRight } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // Nou rale tout enfòmasyon dinamik yo nan URL la
+  // Rale enfòmasyon dinamik yo
   const amount = searchParams.get('amount') || "0.00";
   const transactionId = searchParams.get('id') || "TX-UNKNOWN";
   const orderId = searchParams.get('order_id') || "N/A";
+  const invoiceId = searchParams.get('invoice_id'); // Detekte si se yon invoice
 
-// Sa a ale nan paj SUCCESS HatexCard ou a
-useEffect(() => {
-  const notifyBusiness = async () => {
-    try {
-      // Isit la nou voye done yo bay Webhook biznis la
-      await fetch("https://sit-biznis-kliyan-an.com/api/hatex-webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer_name: "Non Kliyan an", // Ou ka rale sa nan baz de done
-          amount: amount,
-          order_details: `Commande #${orderId}`,
-          status: "SUCCESS"
-        })
-      });
-    } catch (err) {
-      console.error("Webhook failed");
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    const notifyBusiness = async () => {
+      try {
+        // 1. Notifye webhook biznis la (pou SDK)
+        await fetch("https://sit-biznis-kliyan-an.com/api/hatex-webhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: amount,
+            order_details: `Commande #${orderId}`,
+            status: "SUCCESS"
+          })
+        });
+
+        // 2. Si se te yon invoice, nou asire nou li make "paid" (double check)
+        if (invoiceId) {
+          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
+        }
+      } catch (err) {
+        console.error("Webhook failed");
+      }
+    };
+
+    if (transactionId !== "TX-UNKNOWN") {
+      notifyBusiness();
     }
-  };
+  }, [transactionId, invoiceId, amount, orderId, supabase]);
 
-  if (transactionId !== "TX-UNKNOWN") {
-    notifyBusiness();
-  }
-}, [transactionId]);
   return (
     <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl p-10 text-center relative overflow-hidden">
       {/* Dekorasyon vèt nan background nan */}
@@ -53,7 +64,7 @@ useEffect(() => {
       <div className="bg-gray-50 rounded-3xl p-6 mb-8 border border-gray-100">
         <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200/50">
           <span className="text-[10px] font-bold text-gray-400 uppercase">Montant Payé</span>
-          <span className="text-xl font-black text-gray-900">{amount} HTG</span>
+          <span className="text-xl font-black text-gray-900">{amount} <span className="text-sm">HTG</span></span>
         </div>
         
         <div className="space-y-3">
@@ -62,8 +73,8 @@ useEffect(() => {
             <span className="text-gray-900 font-mono">{transactionId.slice(0, 12)}...</span>
           </div>
           <div className="flex justify-between text-[10px] font-bold uppercase">
-            <span className="text-gray-400">Numéro Commande</span>
-            <span className="text-gray-900">#{orderId}</span>
+            <span className="text-gray-400">{invoiceId ? "Numéro Invoice" : "Numéro Commande"}</span>
+            <span className="text-gray-900">{invoiceId ? `#${invoiceId.slice(0,8)}` : `#${orderId}`}</span>
           </div>
         </div>
       </div>
@@ -71,13 +82,13 @@ useEffect(() => {
       <div className="space-y-3">
         <button 
           onClick={() => router.push('/dashboard')}
-          className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold text-xs uppercase flex items-center justify-center gap-2 hover:bg-black transition-all"
+          className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold text-xs uppercase flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xl shadow-gray-200"
         >
           <ShoppingBag size={14} /> Retour au Dashboard
         </button>
         
         <p className="text-[9px] text-gray-400 font-bold uppercase animate-pulse">
-          Redirection automatique vers la boutique...
+          Un reçu a été envoyé à votre adresse email
         </p>
       </div>
     </div>

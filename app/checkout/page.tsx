@@ -1,17 +1,25 @@
 "use client";
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, Suspense, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { ShieldCheck, Lock, CreditCard, Calendar, Key } from 'lucide-react';
+import { ShieldCheck, Lock, CreditCard, Calendar, Key, Store } from 'lucide-react';
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // Resevwa montan dinamik sot nan sit biznis la
-  const amount = parseFloat(searchParams.get('amount') || '0');
-  const terminalId = searchParams.get('terminal');
-  const orderId = searchParams.get('order_id') || 'N/A';
+  const supabase = useMemo(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
+
+  // Done dinamik yo
+  const [amount, setAmount] = useState(parseFloat(searchParams.get('amount') || '0'));
+  const [terminalId, setTerminalId] = useState(searchParams.get('terminal'));
+  const [orderId, setOrderId] = useState(searchParams.get('order_id') || 'N/A');
+  const [businessName, setBusinessName] = useState('Hatex Secure Pay');
+  
+  const invoiceId = searchParams.get('invoice_id'); // Nouvo: Pou detekte si se yon invoice
 
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
@@ -19,10 +27,26 @@ function CheckoutContent() {
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [form, setForm] = useState({ name: '', card: '', expiry: '', cvv: '' });
 
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
+  // --- NOUVO: SI SE YON INVOICE, RALE DONE YO ---
+  useEffect(() => {
+    const fetchInvoice = async () => {
+      if (invoiceId) {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('id', invoiceId)
+          .single();
+
+        if (data) {
+          setAmount(data.amount);
+          setTerminalId(data.owner_id);
+          setOrderId(`INV-${data.id.slice(0, 5)}`);
+          setBusinessName(data.business_name || 'Hatex Merchant');
+        }
+      }
+    };
+    fetchInvoice();
+  }, [invoiceId, supabase]);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +54,7 @@ function CheckoutContent() {
     setStatus({ type: '', msg: '' });
 
     try {
+      // Nou itilize RPC a menm jan an, li pral jere tranzaksyon an
       const { data, error } = await supabase.rpc('process_sdk_payment', {
         p_terminal_id: terminalId,
         p_card_number: form.card,
@@ -40,7 +65,6 @@ function CheckoutContent() {
 
       if (error) throw error;
 
-      // LOJIK OTP A: Si montan an depase 50,000
       if (data.require_otp) {
         setShowOtp(true);
         alert("Tanpri tcheke imèl ou pou kòd konfimasyon an.");
@@ -48,6 +72,11 @@ function CheckoutContent() {
       }
 
       if (data.success) {
+        // Si se yon invoice, nou mete l kòm "paid"
+        if (invoiceId) {
+          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
+        }
+        
         router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
       } else {
         throw new Error(data.error || "Erè enkoni");
@@ -67,10 +96,9 @@ function CheckoutContent() {
         </div>
       </div>
 
-      <h1 className="text-center text-white font-black uppercase text-lg mb-1">Hatex Secure Pay</h1>
-      <p className="text-center text-zinc-500 text-[9px] font-bold uppercase mb-8">Peman Panyen #{orderId}</p>
+      <h1 className="text-center text-white font-black uppercase text-lg mb-1">{businessName}</h1>
+      <p className="text-center text-zinc-500 text-[9px] font-bold uppercase mb-8">Peman Sekirize #{orderId}</p>
       
-      {/* Montan ki soti nan sit la (Kliyan pa ka chanje l) */}
       <div className="bg-zinc-900/50 p-6 rounded-3xl mb-8 border border-white/5 text-center">
         <p className="text-[9px] text-zinc-500 uppercase font-black mb-1">Montan pou Peye</p>
         <p className="text-3xl font-black italic">{amount.toLocaleString()} <span className="text-sm text-red-600">HTG</span></p>
@@ -82,7 +110,7 @@ function CheckoutContent() {
             <div className="space-y-1">
               <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Nimewo Kat Hatex</label>
               <div className="relative">
-                <input required placeholder="0000 0000 0000 0000" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none" 
+                <input required placeholder="0000 0000 0000 0000" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all" 
                   onChange={e => setForm({...form, card: e.target.value})} />
                 <CreditCard className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
               </div>
@@ -92,14 +120,14 @@ function CheckoutContent() {
               <div className="space-y-1">
                 <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Dat Expirasyon</label>
                 <div className="relative">
-                  <input required placeholder="MM/YY" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none" 
+                  <input required placeholder="MM/YY" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all" 
                     onChange={e => setForm({...form, expiry: e.target.value})} />
                   <Calendar className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
                 </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">CVV</label>
-                <input required type="password" maxLength={3} placeholder="***" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none text-center" 
+                <input required type="password" maxLength={3} placeholder="***" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none text-center focus:border-red-600/50 transition-all" 
                   onChange={e => setForm({...form, cvv: e.target.value})} />
               </div>
             </div>
@@ -118,12 +146,18 @@ function CheckoutContent() {
           </div>
         )}
 
-        <button disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase text-[11px] mt-4 shadow-lg active:scale-95 transition-all">
+        <button disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase text-[11px] mt-4 shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50">
           {loading ? "TRAITEMENT..." : showOtp ? "KONFIME KÒD LA" : "PAYER MAINTENANT"}
         </button>
       </form>
 
       {status.msg && <p className="mt-4 text-red-500 text-[9px] text-center font-black uppercase">{status.msg}</p>}
+
+      {/* Footer Sekirite */}
+      <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-center gap-4 opacity-30">
+        <Lock className="w-3 h-3" />
+        <span className="text-[8px] font-black uppercase tracking-widest">SSL 256-BIT ENCRYPTION</span>
+      </div>
     </div>
   );
 }
