@@ -184,34 +184,53 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {mode === 'api' && profile.business_name && (
-        <div className="space-y-6 animate-in zoom-in duration-300">
-          <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10">
-            <h2 className="text-[14px] font-black uppercase text-red-600 mb-4 italic tracking-widest text-center">SDK Entegrasyon</h2>
-            <div className="space-y-6">
-              <p className="text-[9px] text-zinc-500 uppercase font-black text-center">Kopye kòd sa a pou {profile.business_name}.</p>
-              <div className="relative group">
-                <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed text-left">
-{`<a href="https://hatexcard.com/checkout?terminal=${profile?.id}&amount=PRI_PANYEN&order_id=LOD_ID" 
-   style="background:#dc2626;color:white;padding:15px 30px;border-radius:50px;text-decoration:none;font-weight:900;font-style:italic;display:inline-flex;align-items:center;gap:10px;">
-   <span>💳</span> PEYE AK HATEXCARD
-</a>`}
-                </pre>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(`<a href="https://hatexcard.com/checkout?terminal=${profile?.id}&amount=PRI_PANYEN&order_id=LOD_ID" style="...">PEYE AK HATEXCARD</a>`);
-                    alert("Kòd kopye!");
-                  }}
-                  className="absolute top-4 right-4 bg-white/10 p-2 rounded-lg text-[8px] uppercase font-black"
-                >
-                  KOPYE
-                </button>
-              </div>
-            </div>
-          </div>
-          <button onClick={() => setMode('menu')} className="w-full text-zinc-500 font-black uppercase text-[10px] tracking-widest">Tounen nan Menu</button>
+{mode === 'api' && profile.business_name && (
+  <div className="space-y-6 animate-in zoom-in duration-300">
+    <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10">
+      <h2 className="text-[14px] font-black uppercase text-red-600 mb-4 italic tracking-widest text-center">SDK Inivèsèl (Kopi/Kole)</h2>
+      <div className="space-y-4">
+        <p className="text-[9px] text-zinc-500 uppercase font-black text-center">Kòd sa ap rale pri panyen an otomatikman pou {profile.business_name}.</p>
+        
+        <div className="relative group">
+          <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed text-left h-64">
+{`<div id="hatex-secure-pay"></div>
+<script>
+(function() {
+  const TID = "${profile?.id}"; // ID tèminal ou a otomatik
+  const btn = document.createElement('button');
+  btn.innerHTML = "PAYER AVEC HATEXCARD";
+  btn.style = "background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";
+  
+  btn.onclick = () => {
+    const selectors = ['.total-price', '.cart__subtotal', '.order-total', '.woocommerce-Price-amount', '#cart-total'];
+    let amount = "0";
+    for (let s of selectors) {
+      const el = document.querySelector(s);
+      if (el) { amount = el.innerText.replace(/[^\\d.]/g, ''); break; }
+    }
+    if (parseFloat(amount) <= 0) return alert("Erreur: Montant introuvable.");
+    window.location.href = "https://hatexcard.com/checkout?terminal=" + TID + "&amount=" + amount + "&order_id=HTX-" + Date.now();
+  };
+  document.getElementById('hatex-secure-pay').appendChild(btn);
+})();
+</script>`}
+          </pre>
+          <button 
+            onClick={() => {
+              const code = `\n<div id="hatex-secure-pay"></div>\n<script>(function(){const TID="${profile?.id}";const btn=document.createElement('button');btn.innerHTML="PAYER AVEC HATEXCARD";btn.style="background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";btn.onclick=()=>{const selectors=['.total-price','.cart__subtotal','.order-total','.woocommerce-Price-amount','#cart-total'];let amount="0";for(let s of selectors){const el=document.querySelector(s);if(el){amount=el.innerText.replace(/[^\\d.]/g,'');break;}}if(parseFloat(amount)<=0)return alert("Erreur: Montant introuvable.");window.location.href="https://hatexcard.com/checkout?terminal="+TID+"&amount="+amount+"&order_id=HTX-"+Date.now();};document.getElementById('hatex-secure-pay').appendChild(btn);})();</script>`;
+              navigator.clipboard.writeText(code);
+              alert("Kòd SDK kopye!");
+            }}
+            className="absolute top-4 right-4 bg-red-600 p-2 rounded-lg text-[8px] uppercase font-black"
+          >
+            KOPYE SDK
+          </button>
         </div>
-      )}
+      </div>
+    </div>
+    <button onClick={() => setMode('menu')} className="w-full text-zinc-500 font-black uppercase text-[10px] tracking-widest">Tounen nan Menu</button>
+  </div>
+)}
 
       <div className="mt-8 bg-black rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
         <div className="p-4 bg-zinc-900/50 border-b border-white/5">
