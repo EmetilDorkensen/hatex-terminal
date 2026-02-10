@@ -13,7 +13,6 @@ function CheckoutContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
-  // --- DONE SDK YO (Nou rekiperre yo nan URL la) ---
   const sdkData = useMemo(() => ({
     platform: searchParams.get('platform'),
     customer_name: searchParams.get('customer_name'),
@@ -31,7 +30,6 @@ function CheckoutContent() {
   const [businessName, setBusinessName] = useState('Hatex Secure Pay');
   
   const invoiceId = searchParams.get('invoice_id');
-
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -41,12 +39,7 @@ function CheckoutContent() {
   useEffect(() => {
     const fetchInvoice = async () => {
       if (invoiceId) {
-        const { data, error } = await supabase
-          .from('invoices')
-          .select('*')
-          .eq('id', invoiceId)
-          .single();
-
+        const { data } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
         if (data) {
           setAmount(data.amount);
           setTerminalId(data.owner_id);
@@ -64,14 +57,12 @@ function CheckoutContent() {
     setStatus({ type: '', msg: '' });
 
     try {
-      // NOU MODIYE RPC A POU L RESEVWA TOUT DONE SDK YO
       const { data, error } = await supabase.rpc('process_sdk_payment', {
         p_terminal_id: terminalId,
         p_card_number: form.card,
         p_amount: amount,
         p_order_id: orderId,
         p_otp_code: showOtp ? otpCode : null,
-        // NOUVO: Nou ajoute paramèt SDK yo pou RPC a ka mete yo nan tab 'transactions'
         p_platform: sdkData.platform,
         p_customer_name: sdkData.customer_name,
         p_customer_phone: sdkData.customer_phone,
@@ -86,11 +77,21 @@ function CheckoutContent() {
 
       if (data.require_otp) {
         setShowOtp(true);
-        alert("Tanpri tcheke imèl ou pou kòd konfimasyon an.");
         return;
       }
 
       if (data.success) {
+        // --- DEBLOKAJ WEBHOOK LA ---
+        try {
+          // RANPLASE URL SA A AK URL REYÈL EDGE FUNCTION OU A
+          await fetch(`https://${process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/hatex-webhook`, {
+            method: 'POST',
+            body: JSON.stringify({ transaction_id: data.transaction_id, sdk: sdkData })
+          });
+        } catch (wError) {
+          console.log("Webhook failed but payment secured");
+        }
+
         if (invoiceId) {
           await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
         }
@@ -108,7 +109,6 @@ function CheckoutContent() {
 
   return (
     <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic">
-      {/* ... (Rès UI a rete menm jan an) */}
       <div className="flex justify-center mb-6">
         <div className="bg-red-600/10 p-3 rounded-2xl border border-red-600/20">
           <ShieldCheck className="text-red-600 w-6 h-6" />
@@ -119,15 +119,15 @@ function CheckoutContent() {
       <p className="text-center text-zinc-500 text-[9px] font-bold uppercase mb-8">Peman Sekirize #{orderId}</p>
       
       {sdkData.product_name && (
-  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl mb-4 border border-white/5">
-    {/* Nou fòse src la tounen yon string vide si li null pou TypeScript pa bay erè */}
-    <img src={sdkData.product_image || ""} className="w-10 h-10 rounded-lg object-cover" />
-    <div className="text-left">
-      <p className="text-[10px] font-black text-white uppercase">{sdkData.product_name}</p>
-      <p className="text-[8px] text-zinc-500 font-bold uppercase">Kantite: {sdkData.quantity}</p>
-    </div>
-  </div>
-)}
+        <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl mb-4 border border-white/5">
+          {/* TypeScript Fix: Nou itilize || "" */}
+          <img src={sdkData.product_image || ""} alt="product" className="w-10 h-10 rounded-lg object-cover" />
+          <div className="text-left">
+            <p className="text-[10px] font-black text-white uppercase">{sdkData.product_name}</p>
+            <p className="text-[8px] text-zinc-500 font-bold uppercase">Kantite: {sdkData.quantity}</p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-zinc-900/50 p-6 rounded-3xl mb-8 border border-white/5 text-center">
         <p className="text-[9px] text-zinc-500 uppercase font-black mb-1">Montan pou Peye</p>
@@ -145,7 +145,6 @@ function CheckoutContent() {
                 <CreditCard className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Dat Expirasyon</label>
@@ -175,14 +174,11 @@ function CheckoutContent() {
             </div>
           </div>
         )}
-
         <button disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase text-[11px] mt-4 shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50">
           {loading ? "TRAITEMENT..." : showOtp ? "KONFIME KÒD LA" : "PAYER MAINTENANT"}
         </button>
       </form>
-
       {status.msg && <p className="mt-4 text-red-500 text-[9px] text-center font-black uppercase">{status.msg}</p>}
-
       <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-center gap-4 opacity-30">
         <Lock className="w-3 h-3" />
         <span className="text-[8px] font-black uppercase tracking-widest">SSL 256-BIT ENCRYPTION</span>
@@ -194,7 +190,7 @@ function CheckoutContent() {
 export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center p-6 italic font-sans">
-      <Suspense fallback={<div className="font-black uppercase italic animate-pulse">Chargement de la sécurité...</div>}>
+      <Suspense fallback={<div className="font-black uppercase italic animate-pulse">Chargement...</div>}>
         <CheckoutContent />
       </Suspense>
     </div>

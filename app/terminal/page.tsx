@@ -276,34 +276,68 @@ btn.innerHTML = "PAYER AVEC HATEXCARD (HTG)";
           <div className="flex justify-between items-start">
             <div className="flex gap-3">
               <div className="w-10 h-10 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-600 font-black text-[9px]">
-                {inv.platform ? inv.platform.slice(0,3) : 'HTX'}
+                {inv.platform ? inv.platform.slice(0,3).toUpperCase() : 'SDK'}
               </div>
               <div>
-                <p className="text-[10px] font-black uppercase text-white leading-none mb-1">{inv.platform || 'Vant'}</p>
-                <p className="text-[7px] text-zinc-600 uppercase font-bold">{new Date(inv.created_at).toLocaleString('fr-FR')}</p>
+                <p className="text-[10px] font-black uppercase text-white leading-none mb-1">{inv.platform || 'Vant Anliy'}</p>
+                <p className="text-[7px] text-zinc-600 uppercase font-bold">
+                  {new Date(inv.created_at).toLocaleString('fr-FR', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
               </div>
             </div>
-            <p className="text-sm font-black text-green-500 italic">+{inv.amount} HTG</p>
+            {/* Nou itilize abs(inv.amount) paske nan transactions li sove an negatif pou kliyan an */}
+            <p className="text-sm font-black text-green-500 italic">
+              +{Math.abs(inv.amount).toLocaleString()} HTG
+            </p>
           </div>
 
-          {/* Seksyon Pwodwi (si SDK a rale l) */}
+          {/* Seksyon Pwodwi: Foto ak Detay */}
           {inv.product_name && (
             <div className="flex gap-3 items-center bg-black/40 p-3 rounded-2xl border border-white/5">
-              <img src={inv.product_image} className="w-10 h-10 rounded-lg object-cover border border-white/5" />
+              {inv.product_image ? (
+                <img 
+                  src={inv.product_image} 
+                  alt="Pwodwi"
+                  className="w-12 h-12 rounded-xl object-cover border border-white/10 shadow-lg" 
+                />
+              ) : (
+                <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center text-[8px] text-zinc-600 uppercase font-black">No img</div>
+              )}
               <div className="flex-1 overflow-hidden">
-                <p className="text-[9px] font-black text-zinc-300 truncate uppercase">{inv.product_name}</p>
-                <p className="text-[8px] text-zinc-500">Kantite: <span className="text-red-600">{inv.quantity || 1}</span></p>
-                <a href={inv.product_url} target="_blank" className="text-[7px] text-blue-500 underline uppercase font-bold">Wè pwodwi</a>
+                <p className="text-[9px] font-black text-zinc-300 truncate uppercase tracking-tighter">{inv.product_name}</p>
+                <p className="text-[8px] text-zinc-500 font-bold uppercase mt-0.5">
+                  Kantite: <span className="text-red-600">{inv.quantity || 1}</span>
+                </p>
+                {inv.product_url && (
+                  <a href={inv.product_url} target="_blank" rel="noopener noreferrer" className="text-[7px] text-blue-500 underline uppercase font-black mt-1 block">Wè atik la</a>
+                )}
               </div>
             </div>
           )}
 
           {/* Seksyon Kliyan & Livrezon */}
           {(inv.customer_name || inv.customer_address) && (
-            <div className="pl-2 border-l-2 border-red-600/30">
-              <p className="text-[9px] text-white font-black uppercase">{inv.customer_name}</p>
-              <p className="text-[8px] text-zinc-500 font-medium">{inv.customer_phone}</p>
-              <p className="text-[8px] text-zinc-400 italic mt-1 leading-tight">📍 {inv.customer_address}</p>
+            <div className="pl-3 py-1 border-l-2 border-red-600/30 bg-white/[0.02] rounded-r-xl">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-[9px] text-white font-black uppercase tracking-tight">
+                  {inv.customer_name || 'Kliyan Enkoni'}
+                </p>
+                <span className="text-[7px] text-zinc-600">•</span>
+                <p className="text-[8px] text-red-500 font-black">{inv.customer_phone}</p>
+              </div>
+              {inv.customer_address && (
+                <div className="flex items-start gap-1">
+                  <span className="text-[8px]">📍</span>
+                  <p className="text-[8px] text-zinc-400 font-medium leading-tight italic max-w-[200px]">
+                    {inv.customer_address}
+                  </p>
+                </div>
+              )}
             </div>
           )}
           
