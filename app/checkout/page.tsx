@@ -118,16 +118,16 @@ function CheckoutContent() {
       <h1 className="text-center text-white font-black uppercase text-lg mb-1">{businessName}</h1>
       <p className="text-center text-zinc-500 text-[9px] font-bold uppercase mb-8">Peman Sekirize #{orderId}</p>
       
-      {/* AFICHE PWODWI SI SE SDK */}
       {sdkData.product_name && (
-        <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl mb-4 border border-white/5">
-          <img src={sdkData.product_image} className="w-10 h-10 rounded-lg object-cover" />
-          <div className="text-left">
-            <p className="text-[10px] font-black text-white uppercase">{sdkData.product_name}</p>
-            <p className="text-[8px] text-zinc-500 font-bold uppercase">Kantite: {sdkData.quantity}</p>
-          </div>
-        </div>
-      )}
+  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl mb-4 border border-white/5">
+    {/* Nou fòse src la tounen yon string vide si li null pou TypeScript pa bay erè */}
+    <img src={sdkData.product_image || ""} className="w-10 h-10 rounded-lg object-cover" />
+    <div className="text-left">
+      <p className="text-[10px] font-black text-white uppercase">{sdkData.product_name}</p>
+      <p className="text-[8px] text-zinc-500 font-bold uppercase">Kantite: {sdkData.quantity}</p>
+    </div>
+  </div>
+)}
 
       <div className="bg-zinc-900/50 p-6 rounded-3xl mb-8 border border-white/5 text-center">
         <p className="text-[9px] text-zinc-500 uppercase font-black mb-1">Montan pou Peye</p>
