@@ -200,8 +200,9 @@ export default function TerminalPage() {
 (function() {
   const TID = "${profile?.id}"; 
   const TAUX = 135; 
-  const btn = document.createElement('button');
-  btn.innerHTML = "PAYER AVEC HATEXCARD (HTG)";
+const btn = document.createElement('button');
+btn.type = "button"; // SA A AP BLOQUE MOD "ADD TO CART" LA
+btn.innerHTML = "PAYER AVEC HATEXCARD (HTG)";
   btn.style = "background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";
   
   btn.onclick = () => {
