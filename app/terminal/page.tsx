@@ -199,17 +199,21 @@ export default function TerminalPage() {
 <script>
 (function() {
   const TID = "${profile?.id}"; 
-  const TAUX = 135; // Konvèsyon otomatik
+  const TAUX = 135; 
   const btn = document.createElement('button');
   btn.innerHTML = "PAYER AVEC HATEXCARD (HTG)";
   btn.style = "background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";
   
   btn.onclick = () => {
-    const selectors = ['.woocommerce-Price-amount', '.total-price', '.cart__subtotal', '.order-total', '#cart-total'];
+    // Lis selectors ki sipòte Shopify, WooCommerce, ak Wix
+    const selectors = ['.product-price', '.woocommerce-Price-amount', '.totals__subtotal-value', '.total-price', '.order-total'];
     let rawAmount = "0";
     for (let s of selectors) {
       const el = document.querySelector(s);
-      if (el) { rawAmount = el.innerText.replace(/[^\\d.]/g, ''); break; }
+      if (el) { 
+        rawAmount = el.innerText.replace(/[^\\d.]/g, ''); 
+        if (parseFloat(rawAmount) > 0) break; 
+      }
     }
     
     const amountUSD = parseFloat(rawAmount);
@@ -226,7 +230,7 @@ export default function TerminalPage() {
           </pre>
           <button 
             onClick={() => {
-              const code = `<div id="hatex-secure-pay"></div><script>(function(){const TID="${profile?.id}";const TAUX=135;const btn=document.createElement('button');btn.innerHTML="PAYER AVEC HATEXCARD (HTG)";btn.style="background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";btn.onclick=()=>{const selectors=['.woocommerce-Price-amount','.total-price','.cart__subtotal','.order-total','#cart-total'];let rawAmount="0";for(let s of selectors){const el=document.querySelector(s);if(el){rawAmount=el.innerText.replace(/[^\\d.]/g,'');break;}}const amountUSD=parseFloat(rawAmount);if(isNaN(amountUSD)||amountUSD<=0)return alert("Erreur: Montant introuvable.");const amountHTG=(amountUSD*TAUX).toFixed(2);if(confirm("Payer "+amountHTG+" HTG ($"+amountUSD+" USD)?")){window.location.href="https://hatexcard.com/checkout?terminal="+TID+"&amount="+amountHTG+"&order_id=HTX-"+Date.now();}};document.getElementById('hatex-secure-pay').appendChild(btn);})();</script>`;
+              const code = `<div id="hatex-secure-pay"></div><script>(function(){const TID="${profile?.id}";const TAUX=135;const btn=document.createElement('button');btn.innerHTML="PAYER AVEC HATEXCARD (HTG)";btn.style="background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";btn.onclick=()=>{const selectors=['.product-price','.woocommerce-Price-amount','.totals__subtotal-value','.total-price','.order-total'];let rawAmount="0";for(let s of selectors){const el=document.querySelector(s);if(el){rawAmount=el.innerText.replace(/[^\\d.]/g,'');if(parseFloat(rawAmount)>0)break;}}const amountUSD=parseFloat(rawAmount);if(isNaN(amountUSD)||amountUSD<=0)return alert("Erreur: Montant introuvable.");const amountHTG=(amountUSD*TAUX).toFixed(2);if(confirm("Payer "+amountHTG+" HTG ($"+amountUSD+" USD)?")){window.location.href="https://hatexcard.com/checkout?terminal="+TID+"&amount="+amountHTG+"&order_id=HTX-"+Date.now();}};document.getElementById('hatex-secure-pay').appendChild(btn);})();</script>`;
               navigator.clipboard.writeText(code);
               alert("SDK Konvèsyon kopye!");
             }}
