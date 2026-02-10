@@ -260,29 +260,58 @@ btn.innerHTML = "PAYER AVEC HATEXCARD (HTG)";
       </div>
 
       {mode === 'history' && (
-        <div className="space-y-4 animate-in slide-in-from-right-4">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em]">Vant Live</h2>
-            <button onClick={() => setMode('menu')} className="text-[10px] font-bold text-red-600 underline uppercase">FÈMEN</button>
-          </div>
-          {invoices.length === 0 ? (
-            <p className="text-center text-[10px] text-zinc-700 py-10 uppercase font-black italic">Okenn tranzaksyon poko fèt</p>
-          ) : (
-            invoices.map((inv) => (
-              <div key={inv.id} className="bg-zinc-900/60 p-5 rounded-[2rem] border border-white/5 flex justify-between items-center hover:border-red-600/20 transition-all">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-red-600/10 rounded-full flex items-center justify-center text-red-600 font-black text-[9px]">TX</div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-tighter">{inv.description || 'Vente'}</p>
-                    <p className="text-[8px] text-zinc-600 uppercase font-bold">{new Date(inv.created_at).toLocaleString()}</p>
-                  </div>
-                </div>
-                <p className="text-sm font-black text-white italic">+{inv.amount} HTG</p>
+  <div className="space-y-4 animate-in slide-in-from-right-4">
+    <div className="flex justify-between items-center mb-6">
+      <h2 className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em]">Istorik Vant SDK</h2>
+      <button onClick={() => setMode('menu')} className="text-[10px] font-bold text-red-600 underline uppercase">FÈMEN</button>
+    </div>
+    
+    {invoices.length === 0 ? (
+      <p className="text-center text-[10px] text-zinc-700 py-10 uppercase font-black italic">Okenn vant poko fèt</p>
+    ) : (
+      invoices.map((inv) => (
+        <div key={inv.id} className="bg-zinc-900/40 p-5 rounded-[2.5rem] border border-white/5 hover:border-red-600/20 transition-all space-y-4">
+          
+          {/* Tèt: Platfòm ak Montan */}
+          <div className="flex justify-between items-start">
+            <div className="flex gap-3">
+              <div className="w-10 h-10 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-600 font-black text-[9px]">
+                {inv.platform ? inv.platform.slice(0,3) : 'HTX'}
               </div>
-            ))
+              <div>
+                <p className="text-[10px] font-black uppercase text-white leading-none mb-1">{inv.platform || 'Vant'}</p>
+                <p className="text-[7px] text-zinc-600 uppercase font-bold">{new Date(inv.created_at).toLocaleString('fr-FR')}</p>
+              </div>
+            </div>
+            <p className="text-sm font-black text-green-500 italic">+{inv.amount} HTG</p>
+          </div>
+
+          {/* Seksyon Pwodwi (si SDK a rale l) */}
+          {inv.product_name && (
+            <div className="flex gap-3 items-center bg-black/40 p-3 rounded-2xl border border-white/5">
+              <img src={inv.product_image} className="w-10 h-10 rounded-lg object-cover border border-white/5" />
+              <div className="flex-1 overflow-hidden">
+                <p className="text-[9px] font-black text-zinc-300 truncate uppercase">{inv.product_name}</p>
+                <p className="text-[8px] text-zinc-500">Kantite: <span className="text-red-600">{inv.quantity || 1}</span></p>
+                <a href={inv.product_url} target="_blank" className="text-[7px] text-blue-500 underline uppercase font-bold">Wè pwodwi</a>
+              </div>
+            </div>
           )}
+
+          {/* Seksyon Kliyan & Livrezon */}
+          {(inv.customer_name || inv.customer_address) && (
+            <div className="pl-2 border-l-2 border-red-600/30">
+              <p className="text-[9px] text-white font-black uppercase">{inv.customer_name}</p>
+              <p className="text-[8px] text-zinc-500 font-medium">{inv.customer_phone}</p>
+              <p className="text-[8px] text-zinc-400 italic mt-1 leading-tight">📍 {inv.customer_address}</p>
+            </div>
+          )}
+          
         </div>
-      )}
+      ))
+    )}
+  </div>
+)}
 
       {mode === 'request' && (
         <div className="space-y-4 animate-in zoom-in duration-300">
