@@ -187,10 +187,10 @@ export default function TerminalPage() {
 {mode === 'api' && profile.business_name && (
   <div className="space-y-6 animate-in zoom-in duration-300">
     <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10">
-      <h2 className="text-[14px] font-black uppercase text-red-600 mb-4 italic tracking-widest text-center">SDK Inivèsèl V2 (Smart Data)</h2>
+      <h2 className="text-[14px] font-black uppercase text-red-600 mb-4 italic tracking-widest text-center">SDK Smart Checkout (Livrezon Inclus)</h2>
       <div className="space-y-4">
         <p className="text-[9px] text-zinc-500 uppercase font-black text-center">
-          Kòd sa a rale tout detay acha a (pwodwi, foto, kliyan) pou {profile.business_name} ka wè yo nan istorik li.
+          Kòd sa a ap louvri yon fòm pou kliyan an antre enfòmasyon livrezon li anvan li peye.
         </p>
         
         <div className="relative group">
@@ -200,62 +200,82 @@ export default function TerminalPage() {
 (function() {
   const TID = "${profile?.id}"; 
   const TAUX = 135; 
+  const target = document.getElementById('hatex-secure-pay');
+
+  // 1. KREYE BOUTON PEMAN AN
   const btn = document.createElement('button');
-  btn.type = "button";
-  btn.innerHTML = "PAYER AVEC HATEXCARD (HTG)";
-  btn.style = "background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";
+  btn.innerHTML = "ACHETER MAINTENANT (HTG)";
+  btn.style = "background:#dc2626;color:white;width:100%;padding:20px;border-radius:15px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;box-shadow:0 10px 20px rgba(220,38,38,0.2);";
   
+  // 2. KREYE FÒM LIVREZON AN (Hidden pa defo)
+  const formHtml = \`
+    <div id="hatex-form" style="display:none;margin-top:20px;padding:20px;background:#1a1a1a;border-radius:20px;border:1px solid #333;font-family:sans-serif;color:white;">
+      <p style="font-size:10px;font-weight:900;text-transform:uppercase;color:#dc2626;margin-bottom:15px;">Informations de Livraison</p>
+      <input id="htx_name" placeholder="Nom Complet" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;">
+      <input id="htx_phone" placeholder="Téléphone" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;">
+      <textarea id="htx_address" placeholder="Adresse complète de livraison" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;height:60px;"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:15px;">
+         <label style="font-size:10px;font-weight:bold;">KANTITE:</label>
+         <input id="htx_qty" type="number" value="1" min="1" style="width:60px;background:#000;border:1px solid #333;padding:8px;border-radius:8px;color:white;text-align:center;">
+      </div>
+      <button id="htx_confirm" style="width:100%;background:#dc2626;color:white;padding:15px;border-radius:10px;font-weight:900;border:none;cursor:pointer;">CONFIRMER ET PAYER</button>
+    </div>
+  \`;
+  target.innerHTML = formHtml;
+  target.prepend(btn);
+
   btn.onclick = () => {
-    // 1. CHÈCHE MONTAN (Shopify/Woo)
-    const priceSelectors = ['.product-price', '.woocommerce-Price-amount', '.price', '.total-price'];
+    document.getElementById('hatex-form').style.display = 'block';
+    btn.style.display = 'none';
+  };
+
+  document.getElementById('htx_confirm').onclick = () => {
+    const name = document.getElementById('htx_name').value;
+    const phone = document.getElementById('htx_phone').value;
+    const address = document.getElementById('htx_address').value;
+    const qty = document.getElementById('htx_qty').value;
+
+    if(!name || !phone || !address) return alert("Tanpri ranpli tout bwat yo.");
+
+    // RALE PRI PWODWI A SOU PAJ LA
+    const priceSelectors = ['.product-price', '.price', '.woocommerce-Price-amount'];
     let rawAmount = "0";
     for (let s of priceSelectors) {
       const el = document.querySelector(s);
-      if (el) { 
-        rawAmount = el.innerText.replace(/[^\\d.]/g, ''); 
-        if (parseFloat(rawAmount) > 0) break; 
-      }
+      if (el) { ra = el.innerText.replace(/[^\\d.]/g, ''); break; }
     }
-    
-    // 2. RALE DETAY PWODWI & KLIYAN (Smart Scraping)
+
+    const amountHTG = (parseFloat(ra || 0) * TAUX * qty).toFixed(2);
     const productName = document.querySelector('h1')?.innerText || document.title;
-    const productImage = document.querySelector('meta[property="og:image"]')?.content || document.querySelector('img')?.src;
-    const customerName = document.querySelector('.customer-name, #billing_first_name')?.value || "Client SDK";
+    const productImage = document.querySelector('meta[property="og:image"]')?.content || "";
 
-    const amountUSD = parseFloat(rawAmount);
-    if (isNaN(amountUSD) || amountUSD <= 0) return alert("Erreur: Montant introuvable.");
-    
-    const amountHTG = (amountUSD * TAUX).toFixed(2);
-
-    // 3. KONSTRI URL LA AK TOUT PARAMÈT YO
     const params = new URLSearchParams({
       terminal: TID,
       amount: amountHTG,
-      order_id: "SDK-" + Date.now(),
-      platform: window.location.hostname,
+      order_id: "HTX-" + Date.now(),
+      customer_name: name,
+      customer_phone: phone,
+      customer_address: address,
       product_name: productName,
-      product_image: productImage || "",
-      customer_name: customerName,
-      quantity: "1"
+      product_image: productImage,
+      quantity: qty,
+      platform: window.location.hostname
     });
 
-    if (confirm("Payer " + amountHTG + " HTG pou " + productName + "?")) {
-      window.location.href = "https://hatexcard.com/checkout?" + params.toString();
-    }
+    window.location.href = "https://hatexcard.com/checkout?" + params.toString();
   };
-  document.getElementById('hatex-secure-pay').appendChild(btn);
 })();
 </script>`}
           </pre>
           <button 
             onClick={() => {
-              const code = `<div id="hatex-secure-pay"></div><script>(function(){const TID="${profile?.id}";const TAUX=135;const btn=document.createElement('button');btn.innerHTML="PAYER AVEC HATEXCARD (HTG)";btn.style="background:#dc2626;color:white;width:100%;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;";btn.onclick=()=>{const ps=['.product-price','.woocommerce-Price-amount','.price'];let ra="0";for(let s of ps){const el=document.querySelector(s);if(el){ra=el.innerText.replace(/[^\\d.]/g,'');if(parseFloat(ra)>0)break;}}const au=parseFloat(ra);if(isNaN(au)||au<=0)return alert("Erreur montant");const ah=(au*TAUX).toFixed(2);const pn=document.querySelector('h1')?.innerText||document.title;const pi=document.querySelector('meta[property="og:image"]')?.content||"";const p=new URLSearchParams({terminal:TID,amount:ah,order_id:"SDK-"+Date.now(),platform:window.location.hostname,product_name:pn,product_image:pi,quantity:"1"});if(confirm("Payer "+ah+" HTG?")){window.location.href="https://hatexcard.com/checkout?"+p.toString();}};document.getElementById('hatex-secure-pay').appendChild(btn);})();</script>`;
+              const code = document.querySelector('pre')?.innerText || "";
               navigator.clipboard.writeText(code);
-              alert("SDK Smart Data kopye!");
+              alert("SDK Konplè kopye!");
             }}
             className="absolute top-4 right-4 bg-red-600 p-2 rounded-lg text-[8px] uppercase font-black shadow-lg active:scale-90 transition-all"
           >
-            KOPYE SDK SMART
+            KOPYE KÒD KONPLÈ
           </button>
         </div>
       </div>
