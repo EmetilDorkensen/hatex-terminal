@@ -23,41 +23,46 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
+  // FONKSYON REFRESH POU RALE BALANS AK TRANZAKSYON LIVE
+  const refreshTerminalData = async (userId: string) => {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (prof) setProfile(prof);
+
+    const { data: tx } = await supabase
+      .from('transactions')
+      .select(`*`)
+      .eq('user_id', userId)
+      .in('type', ['PAYMENT', 'SALE', 'SALE_SDK', 'INVOICE_PAYMENT'])
+      .order('created_at', { ascending: false });
+    setTransactions(tx || []);
+  };
+
   useEffect(() => {
     const initTerminal = async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) return router.push('/login');
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      await refreshTerminalData(user.id);
 
-      if (!prof) return;
-      setProfile(prof);
-
-      // Rale tranzaksyon yo
-      const { data: tx } = await supabase
-        .from('transactions')
-        .select(`*`)
-        .eq('user_id', user.id)
-        .in('type', ['PAYMENT', 'SALE', 'SALE_SDK', 'INVOICE_PAYMENT'])
-        .order('created_at', { ascending: false });
-
-      setTransactions(tx || []);
-
-      // Realtime listener pou nouvo vant
+      // REALTIME LISTENER: Koute chanjman nan BALANS (profiles) ak nouvo VANT (transactions)
       const channel = supabase
-        .channel('peman-live')
+        .channel('terminal-updates')
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'profiles',
+            filter: `id=eq.${user.id}` 
+        }, () => refreshTerminalData(user.id))
         .on('postgres_changes', { 
             event: 'INSERT', 
             schema: 'public', 
             table: 'transactions',
             filter: `user_id=eq.${user.id}` 
-        }, (payload) => {
-            setTransactions(prev => [payload.new, ...prev]);
-        })
+        }, () => refreshTerminalData(user.id))
         .subscribe();
 
       return () => { supabase.removeChannel(channel); };
@@ -92,8 +97,6 @@ export default function TerminalPage() {
 
   if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic animate-pulse uppercase">Hatex Terminal ap chaje...</div>;
 
-  const totalVant = transactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
-
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
       
@@ -120,15 +123,17 @@ export default function TerminalPage() {
         </button>
       </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-2 gap-4 mb-10">
-        <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-white/5">
-          <p className="text-[8px] text-zinc-500 uppercase font-black mb-1 tracking-widest text-red-600">Revenu</p>
-          <p className="text-2xl font-black italic">{totalVant.toLocaleString()} <span className="text-[10px] opacity-50">HTG</span></p>
+      {/* STATS - KONEKTE AK BALANS PRENSIPAL LA */}
+      <div className="grid grid-cols-2 gap-4 mb-10 text-left">
+        <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-red-600/20 shadow-xl">
+          <p className="text-[8px] text-red-600 uppercase font-black mb-1 tracking-widest">Balans Prensipal</p>
+          <p className="text-2xl font-black italic">
+            {parseFloat(profile.balance || 0).toLocaleString()} <span className="text-[10px] opacity-50">HTG</span>
+          </p>
         </div>
-        <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-white/5">
+        <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-white/5 shadow-xl">
           <p className="text-[8px] text-zinc-500 uppercase font-black mb-1 tracking-widest">Ventes</p>
-          <p className="text-2xl font-black italic">{transactions.length}</p>
+          <p className="text-2xl font-black italic">{transactions.length} <span className="text-[10px] opacity-50 text-red-600">TX</span></p>
         </div>
       </div>
 
@@ -156,7 +161,7 @@ export default function TerminalPage() {
           <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
             <div className="flex items-center gap-3 mb-6">
               <Globe className="text-red-600 w-5 h-5" />
-              <h2 className="text-[11px] font-black uppercase italic">SDK Inivèsèl (Shopify/Woo)</h2>
+              <h2 className="text-[11px] font-black uppercase italic">SDK Inivèsèl (Shopify/Woo/etc)</h2>
             </div>
             <div className="relative">
               <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-96 overflow-y-auto scrollbar-hide whitespace-pre-wrap">
@@ -243,8 +248,9 @@ export default function TerminalPage() {
           <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600">Tounen</button>
         </div>
       )}
-{/* MODE HISTORY (LIVREZON) */}
-{mode === 'history' && (
+
+      {/* MODE HISTORY (LIVREZON) */}
+      {mode === 'history' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500 pb-10">
           <div className="flex justify-between items-center px-2">
             <h2 className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em] italic">Istorik Livrezon & Vant</h2>
@@ -260,7 +266,7 @@ export default function TerminalPage() {
               <div key={tx.id} className="bg-gradient-to-br from-zinc-900/60 to-black p-6 rounded-[2.5rem] border border-white/5 hover:border-red-600/30 transition-all space-y-5 shadow-2xl">
                 
                 {/* Header TX */}
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start text-left">
                   <div className="flex gap-3">
                     <div className="w-10 h-10 bg-red-600/10 rounded-2xl flex items-center justify-center">
                       <ShoppingCart className="text-red-600 w-5 h-5" />
@@ -293,7 +299,7 @@ export default function TerminalPage() {
 
                 {/* Detay Kliyan & Livrezon */}
                 {tx.customer_name && (
-                  <div className="pl-4 py-1 border-l-2 border-red-600/30 bg-white/[0.01] rounded-r-3xl space-y-2">
+                  <div className="pl-4 py-1 border-l-2 border-red-600/30 bg-white/[0.01] rounded-r-3xl space-y-2 text-left">
                     <div className="flex items-center gap-2">
                        <p className="text-[10px] font-black uppercase text-white">{tx.customer_name}</p>
                        <span className="text-zinc-800">•</span>
@@ -314,6 +320,7 @@ export default function TerminalPage() {
           )}
         </div>
       )}
+
       {/* INVOICE MODE */}
       {mode === 'request' && (
         <div className="space-y-4 animate-in zoom-in-95">
