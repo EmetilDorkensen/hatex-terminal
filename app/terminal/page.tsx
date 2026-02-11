@@ -49,19 +49,26 @@ export default function TerminalPage() {
 
   // FONKSYON POU SYNC BALANS
   const handleSyncBalance = async () => {
-    const totalVant = transactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
-    if (totalVant <= 0) return alert("Ou pa gen okenn vant pou senkronize.");
+    // Nou kalkile sèlman tranzaksyon ki pozitif (SALE_SDK)
+    const totalVant = transactions
+      .filter(tx => tx.type === 'SALE_SDK' || tx.type === 'SALE')
+      .reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
+  
+    if (totalVant <= 0) return alert("Ou pa gen okenn vant SDK pou senkronize.");
     
     setSyncing(true);
     try {
       const { error } = await supabase.rpc('increment_merchant_balance', {
-        merchant_id: profile.id,
+        merchant_id: profile.id,       // Non sa yo dwe mème jan ak SQL la
         amount_to_add: totalVant
       });
+  
       if (error) throw error;
-      alert("Balans Prensipal ou ajou!");
+  
+      alert("Bravo! Balans ou ajou ak " + totalVant + " HTG.");
       refreshData();
     } catch (err: any) {
+      console.error(err);
       alert("Erè: " + err.message);
     } finally {
       setSyncing(false);
@@ -164,8 +171,8 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {/* SDK SECTION - FULL UNIVERSAL CODE */}
-      {mode === 'api' && (
+{/* SDK SECTION - FULL UNIVERSAL CODE */}
+{mode === 'api' && (
         <div className="space-y-6 animate-in zoom-in-95 duration-300 pb-10">
           <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
             <div className="flex items-center gap-3 mb-6">
@@ -209,8 +216,8 @@ export default function TerminalPage() {
   target.prepend(btn);
 
   function getUniversalPrice() {
-    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details, .shopify-section') || document.body;
-    const selectors = ['meta[property="product:price:amount"]', '.price-item--sale', '.product__price .price-item', '.woocommerce-Price-amount', '.current-price', '.price', '#price', '[data-price]'];
+    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details, .shopify-section, [itemtype*="Product"]') || document.body;
+    const selectors = ['meta[property="product:price:amount"]', '.price-item--sale', '.product__price .price-item', '.woocommerce-Price-amount', '.current-price', '.price', '#price', '[data-price]', '.amount'];
     let foundText = ""; let foundVal = 0;
     for (let s of selectors) {
       const el = productArea.querySelector(s);
@@ -225,7 +232,7 @@ export default function TerminalPage() {
 
   function calculateTotal() {
     const priceData = getUniversalPrice();
-    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD');
+    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD') || priceData.val < 1000; 
     const qty = parseInt(document.getElementById('htx_qty').value) || 1;
     let unitHTG = isUSD ? (Math.max(priceData.val, 0.99) * TAUX) : Math.max(priceData.val, 5);
     const total = (unitHTG * qty).toFixed(2);
@@ -237,9 +244,12 @@ export default function TerminalPage() {
   document.getElementById('htx_qty').oninput = calculateTotal;
 
   document.getElementById('htx_confirm').onclick = () => {
+    const totalFinal = calculateTotal();
+    if (totalFinal <= 0) return alert("Prix non détecté.");
+    
     const params = new URLSearchParams({
       terminal: TID,
-      amount: calculateTotal(),
+      amount: totalFinal,
       order_id: "HTX-" + Date.now(),
       customer_name: document.getElementById('htx_name').value,
       customer_phone: document.getElementById('htx_phone').value,
