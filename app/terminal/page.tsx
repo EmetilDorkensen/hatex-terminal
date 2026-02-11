@@ -243,40 +243,70 @@ export default function TerminalPage() {
           <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600">Tounen</button>
         </div>
       )}
-
-      {/* HISTORY MODE */}
-      {mode === 'history' && (
-        <div className="space-y-4 animate-in slide-in-from-bottom-5 duration-500">
-          <div className="flex justify-between px-2">
-            <h2 className="text-[10px] font-black uppercase text-zinc-500 italic">Istorik Peman & Livrezon</h2>
-            <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase">Fèmen</button>
+{/* MODE HISTORY (LIVREZON) */}
+{mode === 'history' && (
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-500 pb-10">
+          <div className="flex justify-between items-center px-2">
+            <h2 className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em] italic">Istorik Livrezon & Vant</h2>
+            <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase underline">Fèmen</button>
           </div>
+
           {transactions.length === 0 ? (
-            <div className="p-10 text-center text-zinc-800 uppercase font-black italic">Okenn vant poko fèt</div>
+            <div className="bg-zinc-900/40 p-10 rounded-[3rem] text-center border border-white/5 italic">
+               <p className="text-zinc-600 text-[10px] font-black uppercase">Okenn vant poko fèt sou tèminal sa</p>
+            </div>
           ) : (
             transactions.map((tx) => (
-              <div key={tx.id} className="bg-zinc-900/60 p-5 rounded-[2rem] border border-white/5 space-y-4 text-left">
+              <div key={tx.id} className="bg-gradient-to-br from-zinc-900/60 to-black p-6 rounded-[2.5rem] border border-white/5 hover:border-red-600/30 transition-all space-y-5 shadow-2xl">
+                
+                {/* Header TX */}
                 <div className="flex justify-between items-start">
                   <div className="flex gap-3">
-                    <div className="w-10 h-10 bg-red-600/10 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-red-600/10 rounded-2xl flex items-center justify-center">
                       <ShoppingCart className="text-red-600 w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black uppercase text-white">{tx.platform || 'Direct'}</p>
-                      <p className="text-[7px] text-zinc-600 font-bold uppercase">{new Date(tx.created_at).toLocaleDateString()}</p>
+                      <p className="text-[10px] font-black uppercase text-white tracking-tighter">{tx.platform || 'Vant Direct'}</p>
+                      <p className="text-[7px] text-zinc-600 font-bold uppercase">{new Date(tx.created_at).toLocaleString()}</p>
                     </div>
                   </div>
-                  <p className="text-sm font-black italic text-green-500">+{tx.amount} HTG</p>
+                  <div className="text-right">
+                    <p className="text-sm font-black italic text-green-500">+{Math.abs(tx.amount).toLocaleString()} HTG</p>
+                    <span className="text-[7px] text-zinc-700 uppercase font-black">Success ✅</span>
+                  </div>
                 </div>
+
+                {/* Detay Pwodwi */}
+                {(tx.product_name || tx.description) && (
+                  <div className="flex gap-4 items-center bg-black/40 p-4 rounded-3xl border border-white/5">
+                    {tx.product_image ? (
+                      <img src={tx.product_image} className="w-14 h-14 rounded-2xl object-cover border border-white/10 shadow-lg" alt="prod" />
+                    ) : (
+                      <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center italic text-[8px] text-zinc-600 uppercase font-black">No Pic</div>
+                    )}
+                    <div className="flex-1 overflow-hidden text-left">
+                      <p className="text-[10px] font-black uppercase text-zinc-200 truncate">{tx.product_name || tx.description}</p>
+                      <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1">Kantite: <span className="text-red-600">{tx.quantity || 1}</span></p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Detay Kliyan & Livrezon */}
                 {tx.customer_name && (
-                  <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-2">
-                    <p className="text-[9px] font-black text-white uppercase">{tx.customer_name}</p>
-                    <div className="flex items-center gap-2 text-red-500 text-[8px] font-bold">
-                       <Phone size={10} /> {tx.customer_phone}
+                  <div className="pl-4 py-1 border-l-2 border-red-600/30 bg-white/[0.01] rounded-r-3xl space-y-2">
+                    <div className="flex items-center gap-2">
+                       <p className="text-[10px] font-black uppercase text-white">{tx.customer_name}</p>
+                       <span className="text-zinc-800">•</span>
+                       <div className="flex items-center gap-1 text-red-500 font-black text-[9px]">
+                         <Phone size={10} /> {tx.customer_phone}
+                       </div>
                     </div>
-                    <div className="flex items-start gap-2 text-zinc-500 text-[8px] font-bold uppercase italic">
-                       <MapPin size={10} className="shrink-0" /> {tx.customer_address}
-                    </div>
+                    {tx.customer_address && (
+                      <div className="flex items-start gap-2 text-zinc-500 italic">
+                        <MapPin size={10} className="text-red-600 mt-1 shrink-0" />
+                        <p className="text-[9px] font-bold leading-relaxed uppercase">{tx.customer_address}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -284,7 +314,6 @@ export default function TerminalPage() {
           )}
         </div>
       )}
-
       {/* INVOICE MODE */}
       {mode === 'request' && (
         <div className="space-y-4 animate-in zoom-in-95">
