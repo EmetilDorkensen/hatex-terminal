@@ -38,8 +38,8 @@ serve(async (req: Request) => {
           </div>
         </div>`
     } 
-    // --- KA 2: KONFIMASYON PEMAN (Ansyen Lojik la) ---
-    else if (table === 'transactions' && record.type === 'PAYMENT') {
+    // --- KA 2: KONFIMASYON PEMAN (Standard) ---
+    else if (table === 'transactions' && record.type === 'PAYMENT' && !record.sdk) {
       emailTo = record.customer_email
       emailSubject = `Konfimasyon Peman - ${record.description}`
       emailHtml = `
@@ -57,28 +57,77 @@ serve(async (req: Request) => {
           </div>
         </div>`
     }
-    // --- KA 3: NOTIFIKASYON SDK (Livrezon) ---
+    // --- KA 3: NOTIFIKASYON SDK (LIVREZON) - VOYE 2 IMÈL ---
     else if (record.transaction_id && record.sdk) {
-      emailTo = "notifikasyon@hatexcard.com" 
-      emailSubject = `Livrezon nesesè: ${record.business_name}`
-      emailHtml = `
-        <div style="font-family: sans-serif; padding: 20px; border: 2px solid #dc2626; border-radius: 15px;">
-          <h2 style="color: #dc2626; text-transform: uppercase;">Nouvo Lòd Livrezon! 🚀</h2>
-          <hr>
-          <p><strong>Pwodwi:</strong> ${record.sdk.product_name}</p>
-          <p><strong>Kliyan:</strong> ${record.sdk.customer_name}</p>
-          <p><strong>Telefòn:</strong> ${record.sdk.customer_phone}</p>
-          <p><strong>Adrès Livrezon:</strong> ${record.sdk.customer_address}</p>
-          <p><strong>ID Tranzaksyon:</strong> ${record.transaction_id}</p>
-        </div>`
+      
+      // A) HTML POU MACHANN (Detay konplè livrezon)
+      const merchantHtml = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 2px solid #dc2626; border-radius: 15px; overflow: hidden;">
+          <div style="background-color: #dc2626; padding: 20px; text-align: center;">
+            <h2 style="color: #ffffff; margin: 0; text-transform: uppercase;">Nouvo Lòd Livrezon! 🚀</h2>
+          </div>
+          <div style="padding: 30px;">
+            <p style="color: #666; font-size: 12px; text-transform: uppercase;"><strong>Sous:</strong> ${record.sdk.platform || 'SDK'}</p>
+            <h3 style="margin-top: 5px;">${record.sdk.product_name}</h3>
+            ${record.sdk.product_image ? `<img src="${record.sdk.product_image}" style="width: 150px; border-radius: 10px; margin-bottom: 20px;" />` : ''}
+            
+            <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px;">
+              <p style="margin: 5px 0;"><strong>Kliyan:</strong> ${record.sdk.customer_name}</p>
+              <p style="margin: 5px 0;"><strong>Telefòn:</strong> ${record.sdk.customer_phone}</p>
+              <p style="margin: 5px 0;"><strong>Adrès:</strong> ${record.sdk.customer_address}</p>
+              <p style="margin: 5px 0;"><strong>Kantite:</strong> ${record.sdk.quantity}</p>
+            </div>
+            <p style="font-size: 11px; color: #999; margin-top: 20px;">Tranzaksyon: ${record.transaction_id}</p>
+          </div>
+        </div>`;
+
+      // B) HTML POU KLIYAN (Konfimasyon acha)
+      const customerHtml = `
+        <div style="font-family: sans-serif; max-width: 500px; margin: auto; text-align: center; border: 1px solid #eee; padding: 40px; border-radius: 20px;">
+          <h1 style="font-style: italic;">HATEX<span style="color: #dc2626;">CARD</span></h1>
+          <h2 style="color: #222;">Mèsi pou acha w la! ✅</h2>
+          <p style="color: #666;">Ou sot achte <strong>${record.sdk.product_name}</strong> nan men <strong>${record.business_name}</strong>.</p>
+          <div style="margin: 20px 0; padding: 15px; background: #fdf2f2; border-radius: 10px; color: #dc2626; font-weight: bold;">
+            Montan: ${record.amount || '---'} HTG <br>
+            Kantite: ${record.sdk.quantity} <br>
+            Dat: ${new Date().toLocaleDateString()}
+          </div>
+          <p style="font-size: 12px; color: #999;">Machann nan resevwa detay livrezon ou yo epi l ap kontakte w talè.</p>
+        </div>`;
+
+      // 1. Voye bay Machann nan
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
+        body: JSON.stringify({
+          from: 'HatexCard <notifications@hatexcard.com>',
+          to: record.sdk.merchant_email || "notifikasyon@hatexcard.com",
+          subject: `Livrezon Nesesè (${record.sdk.platform}): ${record.sdk.product_name}`,
+          html: merchantHtml
+        }),
+      });
+
+      // 2. Voye bay Kliyan an
+      if (record.sdk.customer_email) {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
+          body: JSON.stringify({
+            from: 'HatexCard <notifications@hatexcard.com>',
+            to: record.sdk.customer_email,
+            subject: `Acha reyisi nan ${record.business_name}`,
+            html: customerHtml
+          }),
+        });
+      }
+      
+      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders, status: 200 });
     }
     else {
       return new Response(JSON.stringify({ message: "Ignore: Event not supported" }), { headers: corsHeaders, status: 200 })
     }
 
-    // RANJE ERÈ 422 A: Sa asire ke 'to' a pa janm null pou Resend pa rejte l
-    const finalEmail = emailTo || "notifikasyon@hatexcard.com"
-
+    // Ekzekisyon pou KA 1 ak KA 2
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -87,7 +136,7 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         from: 'HatexCard <notifications@hatexcard.com>',
-        to: finalEmail,
+        to: emailTo || "notifikasyon@hatexcard.com",
         subject: emailSubject,
         html: emailHtml,
       }),

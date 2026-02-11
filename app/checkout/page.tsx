@@ -94,8 +94,8 @@ function CheckoutContent() {
             },
             body: JSON.stringify({ 
               transaction_id: data.transaction_id,
-              business_name: data.business_name || businessName,
-              // Nou pase imèl yo RPC a te jwenn yo bay fonksyon an
+              business_name: data.business_name,
+              amount: amount, // Nou ajoute sa pou imèl kliyan an ka montre kòb la
               sdk: {
                 ...sdkData,
                 customer_email: data.customer_email,
