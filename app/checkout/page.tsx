@@ -82,12 +82,18 @@ function CheckoutContent() {
       }
 
       if (data.success) {
-        // --- DEBLOKAJ WEBHOOK LA ---
+        // --- DEBLOKAJ WEBHOOK LA (RESEND) ---
         try {
-          const PROJECT_ID = "psdnklsqttyqhqhkhmgq"; 
-          await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/resend-email`, {
+          // Nou itilize URL Fonksyon an dirèkteman ak kle ANON pou sekirite
+          const FUNCTION_URL = `https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/resend-email`;
+          
+          await fetch(FUNCTION_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              // SA A OBLIGATWA POU EVITE ERÈ 401
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+            },
             body: JSON.stringify({ 
               transaction_id: data.transaction_id,
               business_name: businessName,
@@ -95,7 +101,7 @@ function CheckoutContent() {
             })
           });
         } catch (wError) {
-          console.log("resend-email failed but payment secured");
+          console.log("Webhook failed but payment secured", wError);
         }
 
         if (invoiceId) {
@@ -104,14 +110,13 @@ function CheckoutContent() {
         
         router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
       } else {
-        throw new Error(data.error || "Erè enkoni");
+        throw new Error(data.error || "Erè nan tranzaksyon an");
       }
     } catch (err: any) {
       setStatus({ type: 'error', msg: err.message });
     } finally {
       setLoading(false);
     }
-  };
 
   return (
     <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic text-white">
