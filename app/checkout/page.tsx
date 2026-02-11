@@ -82,9 +82,8 @@ function CheckoutContent() {
       }
 
       if (data.success) {
-        // --- DEBLOKAJ WEBHOOK LA ---
+        // --- DEBLOKAJ WEBHOOK AK EMAIL ---
         try {
-          // Nou rele Edge Function 'resend-email' la dirèkteman
           const FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`;
           
           await fetch(FUNCTION_URL, {
@@ -95,12 +94,17 @@ function CheckoutContent() {
             },
             body: JSON.stringify({ 
               transaction_id: data.transaction_id,
-              business_name: businessName,
-              sdk: sdkData 
+              business_name: data.business_name || businessName,
+              // Nou pase imèl yo RPC a te jwenn yo bay fonksyon an
+              sdk: {
+                ...sdkData,
+                customer_email: data.customer_email,
+                merchant_email: data.merchant_email
+              }
             })
           });
         } catch (wError) {
-          console.error("Webhook failed:", wError);
+          console.error("Email notification failed:", wError);
         }
 
         if (invoiceId) {
