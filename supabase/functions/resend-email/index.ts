@@ -64,7 +64,7 @@ serve(async (req: Request) => {
       const merchantHtml = `
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 2px solid #dc2626; border-radius: 15px; overflow: hidden;">
           <div style="background-color: #dc2626; padding: 20px; text-align: center;">
-            <h2 style="color: #ffffff; margin: 0; text-transform: uppercase;">Nouvo Lòd Livrezon! 🚀</h2>
+            <h2 style="color: #ffffff; margin: 0; text-transform: uppercase;">Nouvo Komand Livrezon! 🚀</h2>
           </div>
           <div style="padding: 30px;">
             <p style="color: #666; font-size: 12px; text-transform: uppercase;"><strong>Sous:</strong> ${record.sdk.platform || 'SDK'}</p>
