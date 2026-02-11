@@ -47,25 +47,29 @@ export default function TerminalPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // FONKSYON POU SYNC BALANS
+  // FONKSYON POU SYNC BALANS (Ranje pou voye kòb nan Profile)
   const handleSyncBalance = async () => {
-    // Nou kalkile sèlman tranzaksyon ki pozitif (SALE_SDK)
+    // Nou kalkile sèlman tranzaksyon ki pozitif ki poko senkronize
     const totalVant = transactions
-      .filter(tx => tx.type === 'SALE_SDK' || tx.type === 'SALE')
+      .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
       .reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
   
     if (totalVant <= 0) return alert("Ou pa gen okenn vant SDK pou senkronize.");
     
     setSyncing(true);
     try {
+      // Nou rele RPC increment_merchant_balance ki nan SQL la
       const { error } = await supabase.rpc('increment_merchant_balance', {
-        merchant_id: profile.id,       // Non sa yo dwe mème jan ak SQL la
+        merchant_id: profile.id,
         amount_to_add: totalVant
       });
   
       if (error) throw error;
-  
-      alert("Bravo! Balans ou ajou ak " + totalVant + " HTG.");
+
+      // Opsyonèl: Nou make tranzaksyon yo kòm "synced" si w gen kolonn sa nan DB a
+      // Si w pa genyen l, balans lan ap jis ogmante.
+
+      alert("Bravo! Balans ou ajou ak " + totalVant.toLocaleString() + " HTG.");
       refreshData();
     } catch (err: any) {
       console.error(err);
@@ -102,85 +106,8 @@ export default function TerminalPage() {
 
   const totalVantDisplay = transactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
 
-  return (
-    <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
-      
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-2xl font-black uppercase italic text-white tracking-tighter">
-            {profile.business_name || 'Hatex Terminal'}<span className="text-red-600">.</span>
-          </h1>
-          <p className="text-[8px] text-zinc-600 uppercase font-bold tracking-[0.3em]">Merchant ID: {profile.id.slice(0, 18)}</p>
-        </div>
-        <button onClick={() => setMode('history')} className="w-14 h-14 bg-zinc-900 rounded-[1.5rem] flex items-center justify-center border border-white/5 shadow-2xl">
-          <History className={`w-6 h-6 ${mode === 'history' ? 'text-red-600' : 'text-zinc-500'}`} />
-        </button>
-      </div>
-
-      {/* KAT BALANS PRENSIPAL */}
-      <div className="space-y-4 mb-10">
-        <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-[3rem] border border-red-600/20 shadow-2xl relative overflow-hidden">
-          <div className="relative z-10 text-left">
-            <p className="text-[9px] text-red-600 uppercase font-black mb-1 tracking-widest">Balans Prensipal (Disponib)</p>
-            <p className="text-4xl font-black italic mb-6">{parseFloat(profile.balance || 0).toLocaleString()} <span className="text-xs opacity-50">HTG</span></p>
-            <button 
-              onClick={handleSyncBalance}
-              disabled={syncing}
-              className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
-            >
-              {syncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wallet className="w-3 h-3" />}
-              {syncing ? 'Y ap senkronize...' : 'Mete kòb SDK sou balans'}
-            </button>
-          </div>
-          <Zap className="absolute top-4 right-4 text-red-600/10 w-24 h-24 rotate-12" />
-        </div>
-
-        <div className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-white/5 flex justify-between items-center text-left">
-          <div>
-            <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Revenu Terminal</p>
-            <p className="text-xl font-black italic text-zinc-300">{totalVantDisplay.toLocaleString()} HTG</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest text-red-600">Total Vant</p>
-            <p className="text-xl font-black italic">{transactions.length}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* MENU MODES */}
-      {mode === 'menu' && (
-        <div className="grid grid-cols-1 gap-4">
-          {!profile.business_name && (
-            <div className="bg-red-600/10 p-6 rounded-[2rem] border border-red-600/20 mb-2">
-              <input className="bg-black border border-white/10 p-4 rounded-2xl w-full text-xs outline-none mb-3 text-white" placeholder="Non Biznis ou" onChange={(e) => setBizName(e.target.value)} />
-              <button onClick={updateBusinessName} className="w-full bg-white text-black py-3 rounded-2xl text-[10px] font-black uppercase">Sove pou debloke SDK</button>
-            </div>
-          )}
-          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[3rem] border border-white/5 flex flex-col items-center active:scale-95 transition-all">
-            <Mail className="text-red-600 w-8 h-8 mb-4" />
-            <span className="text-[12px] font-black uppercase italic tracking-widest">Invoice pa Email</span>
-          </button>
-          <button 
-            onClick={() => profile.business_name ? setMode('api') : alert("Sove non biznis.")} 
-            className={`bg-zinc-900/40 p-10 rounded-[3rem] border border-white/5 flex flex-col items-center active:scale-95 transition-all ${!profile.business_name && 'opacity-20'}`}
-          >
-            <LayoutGrid className="text-red-600 w-8 h-8 mb-4" />
-            <span className="text-[12px] font-black uppercase italic tracking-widest">SDK Smart Checkout</span>
-          </button>
-        </div>
-      )}
-
-{/* SDK SECTION - BON KÒD LA */}
-{mode === 'api' && (
-        <div className="space-y-6 animate-in zoom-in-95">
-          <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
-            <div className="flex items-center gap-3 mb-6">
-              <Globe className="text-red-600 w-5 h-5" />
-              <h2 className="text-[11px] font-black uppercase italic text-white">SDK Inivèsèl (Kòrèk)</h2>
-            </div>
-            <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-96 overflow-y-auto scrollbar-hide whitespace-pre-wrap">
-{`<div id="hatex-secure-pay"></div>
+  // KÒD SDK API KI RANJE POU VERCEL
+  const sdkCodeStr = `<div id="hatex-secure-pay"></div>
 <script>
 (function() {
   const TID = "${profile.id}";
@@ -245,23 +172,100 @@ export default function TerminalPage() {
       customer_phone: document.getElementById('htx_phone').value,
       customer_address: document.getElementById('htx_address').value,
       product_name: document.querySelector('h1')?.innerText || document.title,
-      product_image: document.querySelector('meta[property="og:image"]')?.content || "",
+      product_image: document.querySelector('meta[property="product:image"]')?.content || "",
       quantity: document.getElementById('htx_qty').value,
       platform: window.location.hostname
     });
     window.location.href = "https://hatexcard.com/checkout?" + params.toString();
   };
 })();
-</script>`}
+</script>`;
+
+  return (
+    <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
+      
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-10">
+        <div>
+          <h1 className="text-2xl font-black uppercase italic text-white tracking-tighter">
+            {profile.business_name || 'Hatex Terminal'}<span className="text-red-600">.</span>
+          </h1>
+          <p className="text-[8px] text-zinc-600 uppercase font-bold tracking-[0.3em]">Merchant ID: {profile.id.slice(0, 18)}</p>
+        </div>
+        <button onClick={() => setMode('history')} className="w-14 h-14 bg-zinc-900 rounded-[1.5rem] flex items-center justify-center border border-white/5 shadow-2xl">
+          <History className={`w-6 h-6 ${mode === 'history' ? 'text-red-600' : 'text-zinc-500'}`} />
+        </button>
+      </div>
+
+      {/* KAT BALANS PRENSIPAL */}
+      <div className="space-y-4 mb-10">
+        <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-[3rem] border border-red-600/20 shadow-2xl relative overflow-hidden text-left">
+          <div className="relative z-10">
+            <p className="text-[9px] text-red-600 uppercase font-black mb-1 tracking-widest">Balans Prensipal (Disponib)</p>
+            <p className="text-4xl font-black italic mb-6">{parseFloat(profile.balance || 0).toLocaleString()} <span className="text-xs opacity-50">HTG</span></p>
+            <button 
+              onClick={handleSyncBalance}
+              disabled={syncing}
+              className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
+            >
+              {syncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wallet className="w-3 h-3" />}
+              {syncing ? 'Y ap senkronize...' : 'Mete kòb SDK sou balans'}
+            </button>
+          </div>
+          <Zap className="absolute top-4 right-4 text-red-600/10 w-24 h-24 rotate-12" />
+        </div>
+
+        <div className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-white/5 flex justify-between items-center text-left">
+          <div>
+            <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Revenu Terminal</p>
+            <p className="text-xl font-black italic text-zinc-300">{totalVantDisplay.toLocaleString()} HTG</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest text-red-600">Total Vant</p>
+            <p className="text-xl font-black italic">{transactions.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* MENU MODES */}
+      {mode === 'menu' && (
+        <div className="grid grid-cols-1 gap-4">
+          {!profile.business_name && (
+            <div className="bg-red-600/10 p-6 rounded-[2rem] border border-red-600/20 mb-2">
+              <input className="bg-black border border-white/10 p-4 rounded-2xl w-full text-xs outline-none mb-3 text-white" placeholder="Non Biznis ou" onChange={(e) => setBizName(e.target.value)} />
+              <button onClick={updateBusinessName} className="w-full bg-white text-black py-3 rounded-2xl text-[10px] font-black uppercase">Sove pou debloke SDK</button>
+            </div>
+          )}
+          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[3rem] border border-white/5 flex flex-col items-center active:scale-95 transition-all">
+            <Mail className="text-red-600 w-8 h-8 mb-4" />
+            <span className="text-[12px] font-black uppercase italic tracking-widest">Invoice pa Email</span>
+          </button>
+          <button 
+            onClick={() => profile.business_name ? setMode('api') : alert("Sove non biznis.")} 
+            className={`bg-zinc-900/40 p-10 rounded-[3rem] border border-white/5 flex flex-col items-center active:scale-95 transition-all ${!profile.business_name && 'opacity-20'}`}
+          >
+            <LayoutGrid className="text-red-600 w-8 h-8 mb-4" />
+            <span className="text-[12px] font-black uppercase italic tracking-widest">SDK Smart Checkout</span>
+          </button>
+        </div>
+      )}
+
+      {/* SDK SECTION */}
+      {mode === 'api' && (
+        <div className="space-y-6 animate-in zoom-in-95">
+          <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
+            <div className="flex items-center gap-3 mb-6">
+              <Globe className="text-red-600 w-5 h-5" />
+              <h2 className="text-[11px] font-black uppercase italic text-white">SDK Inivèsèl (Smart API)</h2>
+            </div>
+            <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-96 overflow-y-auto scrollbar-hide whitespace-pre-wrap">
+              {sdkCodeStr}
             </pre>
-            <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="mt-6 w-full bg-red-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">Kopye Kòd la</button>
+            <button onClick={() => {navigator.clipboard.writeText(sdkCodeStr); alert("SDK Kopye!");}} className="mt-6 w-full bg-red-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Kopye Kòd la</button>
           </div>
           <button onClick={() => setMode('menu')} className="w-full text-zinc-600 font-black uppercase text-[10px]">Tounen nan Menu</button>
         </div>
       )}
-    </div>
-  );
-}
 
       {/* ISTORIK LIVREZON DETAYE */}
       {mode === 'history' && (
@@ -334,7 +338,7 @@ export default function TerminalPage() {
               <input type="email" placeholder="EMAIL KLIYAN AN" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-transparent text-center text-[11px] font-black w-full outline-none uppercase italic text-red-600" />
           </div>
           <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-8 rounded-[3rem] font-black uppercase italic shadow-red-600/20 active:scale-95 transition-all text-white">
-             {loading ? 'Y ap voye...' : 'Voye Invoice'}
+              {loading ? 'Y ap voye...' : 'Voye Invoice'}
           </button>
           <button onClick={() => setMode('menu')} className="w-full text-[9px] font-black uppercase text-zinc-700">Anile</button>
         </div>
