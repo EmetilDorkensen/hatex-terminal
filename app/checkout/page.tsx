@@ -95,7 +95,7 @@ function CheckoutContent() {
             })
           });
         } catch (wError) {
-          console.log("Webhook failed but payment secured");
+          console.log("resend-email failed but payment secured");
         }
 
         if (invoiceId) {

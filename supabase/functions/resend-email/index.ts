@@ -2,21 +2,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
-// 1. HEADERS POU DEBLOKE CORS (Sa a ap ranje erè wouj yo)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req: Request) => {
-  // Jere Preflight request
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
     const payload = await req.json()
-    // Detekte si done a soti nan Database Webhook (record) oswa dirèk nan SDK
     const record = payload.record || payload 
     const table = payload.table 
 
@@ -62,34 +57,28 @@ serve(async (req: Request) => {
           </div>
         </div>`
     }
-    // --- KA 3: NOUVO! NOTIFIKASYON SDK (Sa ki te manke a) ---
+    // --- KA 3: NOTIFIKASYON SDK (Livrezon) ---
     else if (record.transaction_id && record.sdk) {
-      emailTo = "notifikasyon@hatexcard.com" // Mete imèl kote w vle resevwa detay livrezon yo
+      emailTo = "notifikasyon@hatexcard.com" 
       emailSubject = `Livrezon nesesè: ${record.business_name}`
       emailHtml = `
         <div style="font-family: sans-serif; padding: 20px; border: 2px solid #dc2626; border-radius: 15px;">
           <h2 style="color: #dc2626; text-transform: uppercase;">Nouvo Lòd Livrezon! 🚀</h2>
           <hr>
           <p><strong>Pwodwi:</strong> ${record.sdk.product_name}</p>
-          <p><strong>Kantite:</strong> ${record.sdk.quantity}</p>
           <p><strong>Kliyan:</strong> ${record.sdk.customer_name}</p>
           <p><strong>Telefòn:</strong> ${record.sdk.customer_phone}</p>
           <p><strong>Adrès Livrezon:</strong> ${record.sdk.customer_address}</p>
           <p><strong>ID Tranzaksyon:</strong> ${record.transaction_id}</p>
-          <div style="margin-top:20px; font-size:10px; color:#999;">Sit: ${record.sdk.platform}</div>
         </div>`
-    }
-    // --- KA 4: ANSYEN LOJIK POU LÒT KALITE TRANZAKSYON (Transfè, elatriye) ---
-    else if (record.type === 'TRANSFER') {
-       emailTo = record.receiver_email;
-       emailSubject = "Ou resevwa yon transfè!";
-       emailHtml = `<h2>Kòb moute!</h2><p>Ou resevwa ${record.amount} HTG.</p>`;
     }
     else {
       return new Response(JSON.stringify({ message: "Ignore: Event not supported" }), { headers: corsHeaders, status: 200 })
     }
 
-    // RELE API RESEND
+    // RANJE ERÈ 422 A: Sa asire ke 'to' a pa janm null pou Resend pa rejte l
+    const finalEmail = emailTo || "notifikasyon@hatexcard.com"
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -98,7 +87,7 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         from: 'HatexCard <notifications@hatexcard.com>',
-        to: emailTo,
+        to: finalEmail,
         subject: emailSubject,
         html: emailHtml,
       }),
