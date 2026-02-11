@@ -82,16 +82,15 @@ function CheckoutContent() {
       }
 
       if (data.success) {
-        // --- DEBLOKAJ WEBHOOK LA (RESEND) ---
+        // --- DEBLOKAJ WEBHOOK LA ---
         try {
-          // Nou itilize URL Fonksyon an dirèkteman ak kle ANON pou sekirite
-          const FUNCTION_URL = `https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/resend-email`;
+          // Nou rele Edge Function 'resend-email' la dirèkteman
+          const FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`;
           
           await fetch(FUNCTION_URL, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
-              // SA A OBLIGATWA POU EVITE ERÈ 401
               'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
             },
             body: JSON.stringify({ 
@@ -101,7 +100,7 @@ function CheckoutContent() {
             })
           });
         } catch (wError) {
-          console.log("Webhook failed but payment secured", wError);
+          console.error("Webhook failed:", wError);
         }
 
         if (invoiceId) {
@@ -110,13 +109,14 @@ function CheckoutContent() {
         
         router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
       } else {
-        throw new Error(data.error || "Erè nan tranzaksyon an");
+        throw new Error(data.error || "Erè enkoni");
       }
     } catch (err: any) {
       setStatus({ type: 'error', msg: err.message });
     } finally {
       setLoading(false);
     }
+  };
 
   return (
     <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic text-white">
@@ -172,7 +172,7 @@ function CheckoutContent() {
             </div>
           </>
         ) : (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+          <div className="space-y-4">
             <div className="bg-red-600/5 p-4 rounded-2xl border border-red-600/10 text-center">
               <p className="text-[10px] text-red-500 font-black uppercase">Verifikasyon Sekirite</p>
               <p className="text-[9px] text-zinc-500 mt-1 uppercase">Tape kòd 6 chif ou resevwa nan imèl ou a</p>
