@@ -77,30 +77,44 @@ function CheckoutContent() {
 
       if (data.require_otp) {
         setShowOtp(true);
+        setLoading(false);
         return;
       }
 
-// Nan handlePayment, ranplase pati fetch la:
-if (data.success) {
-  try {
-    // RANPLASE 'pwoje-ou' pa ID pwojè Supabase ou a dirèkteman
-    const PROJECT_ID = "psdnklsqttyqhqhkhmgq"; 
-    await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/hatex-webhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        transaction_id: data.transaction_id,
-        business_name: businessName, // Voye non an bay webhook la
-        sdk: sdkData 
-      })
-    });
-  } catch (wError) {
-    console.log("Webhook failed but payment secured");
-  }
-  // ... rès kòd la
-}
+      if (data.success) {
+        // --- DEBLOKAJ WEBHOOK LA ---
+        try {
+          const PROJECT_ID = "psdnklsqttyqhqhkhmgq"; 
+          await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/hatex-webhook`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              transaction_id: data.transaction_id,
+              business_name: businessName,
+              sdk: sdkData 
+            })
+          });
+        } catch (wError) {
+          console.log("Webhook failed but payment secured");
+        }
+
+        if (invoiceId) {
+          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
+        }
+        
+        router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
+      } else {
+        throw new Error(data.error || "Erè enkoni");
+      }
+    } catch (err: any) {
+      setStatus({ type: 'error', msg: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic">
+    <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic text-white">
       <div className="flex justify-center mb-6">
         <div className="bg-red-600/10 p-3 rounded-2xl border border-red-600/20">
           <ShieldCheck className="text-red-600 w-6 h-6" />
@@ -112,7 +126,6 @@ if (data.success) {
       
       {sdkData.product_name && (
         <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl mb-4 border border-white/5">
-          {/* TypeScript Fix: Nou itilize || "" */}
           <img src={sdkData.product_image || ""} alt="product" className="w-10 h-10 rounded-lg object-cover" />
           <div className="text-left">
             <p className="text-[10px] font-black text-white uppercase">{sdkData.product_name}</p>
@@ -132,7 +145,7 @@ if (data.success) {
             <div className="space-y-1">
               <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Nimewo Kat Hatex</label>
               <div className="relative">
-                <input required placeholder="0000 0000 0000 0000" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all" 
+                <input required placeholder="0000 0000 0000 0000" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all text-white" 
                   onChange={e => setForm({...form, card: e.target.value})} />
                 <CreditCard className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
               </div>
@@ -141,14 +154,14 @@ if (data.success) {
               <div className="space-y-1">
                 <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Dat Expirasyon</label>
                 <div className="relative">
-                  <input required placeholder="MM/YY" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all" 
+                  <input required placeholder="MM/YY" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all text-white" 
                     onChange={e => setForm({...form, expiry: e.target.value})} />
                   <Calendar className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
                 </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">CVV</label>
-                <input required type="password" maxLength={3} placeholder="***" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none text-center focus:border-red-600/50 transition-all" 
+                <input required type="password" maxLength={3} placeholder="***" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none text-center focus:border-red-600/50 transition-all text-white" 
                   onChange={e => setForm({...form, cvv: e.target.value})} />
               </div>
             </div>
@@ -160,20 +173,20 @@ if (data.success) {
               <p className="text-[9px] text-zinc-500 mt-1 uppercase">Tape kòd 6 chif ou resevwa nan imèl ou a</p>
             </div>
             <div className="relative">
-              <input required placeholder="KÒD OTP" className="w-full bg-black border border-red-600/30 p-5 rounded-2xl text-center text-lg font-black tracking-[1em] outline-none" 
+              <input required placeholder="KÒD OTP" className="w-full bg-black border border-red-600/30 p-5 rounded-2xl text-center text-lg font-black tracking-[1em] outline-none text-white" 
                 onChange={e => setOtpCode(e.target.value)} />
               <Key className="absolute right-4 top-5 text-red-600 w-4 h-4" />
             </div>
           </div>
         )}
-        <button disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase text-[11px] mt-4 shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50">
+        <button disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase text-[11px] mt-4 shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50 text-white">
           {loading ? "TRAITEMENT..." : showOtp ? "KONFIME KÒD LA" : "PAYER MAINTENANT"}
         </button>
       </form>
       {status.msg && <p className="mt-4 text-red-500 text-[9px] text-center font-black uppercase">{status.msg}</p>}
       <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-center gap-4 opacity-30">
-        <Lock className="w-3 h-3" />
-        <span className="text-[8px] font-black uppercase tracking-widest">SSL 256-BIT ENCRYPTION</span>
+        <Lock className="w-3 h-3 text-white" />
+        <span className="text-[8px] font-black uppercase tracking-widest text-white">SSL 256-BIT ENCRYPTION</span>
       </div>
     </div>
   );
