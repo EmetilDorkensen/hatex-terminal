@@ -85,7 +85,7 @@ function CheckoutContent() {
         // --- DEBLOKAJ WEBHOOK LA ---
         try {
           const PROJECT_ID = "psdnklsqttyqhqhkhmgq"; 
-          await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/hatex-webhook`, {
+          await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/resend-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
