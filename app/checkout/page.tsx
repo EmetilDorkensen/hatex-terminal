@@ -80,33 +80,25 @@ function CheckoutContent() {
         return;
       }
 
-      if (data.success) {
-        // --- DEBLOKAJ WEBHOOK LA ---
-        try {
-          // RANPLASE URL SA A AK URL REYÈL EDGE FUNCTION OU A
-          await fetch(`https://${process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/hatex-webhook`, {
-            method: 'POST',
-            body: JSON.stringify({ transaction_id: data.transaction_id, sdk: sdkData })
-          });
-        } catch (wError) {
-          console.log("Webhook failed but payment secured");
-        }
-
-        if (invoiceId) {
-          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
-        }
-        
-        router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
-      } else {
-        throw new Error(data.error || "Erè enkoni");
-      }
-    } catch (err: any) {
-      setStatus({ type: 'error', msg: err.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+// Nan handlePayment, ranplase pati fetch la:
+if (data.success) {
+  try {
+    // RANPLASE 'pwoje-ou' pa ID pwojè Supabase ou a dirèkteman
+    const PROJECT_ID = "psdnklsqttyqhqhkhmgq"; 
+    await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/hatex-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        transaction_id: data.transaction_id,
+        business_name: businessName, // Voye non an bay webhook la
+        sdk: sdkData 
+      })
+    });
+  } catch (wError) {
+    console.log("Webhook failed but payment secured");
+  }
+  // ... rès kòd la
+}
   return (
     <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic">
       <div className="flex justify-center mb-6">
