@@ -171,57 +171,51 @@ export default function TerminalPage() {
         </div>
       )}
 
-{/* SDK SECTION - FULL UNIVERSAL CODE */}
+{/* SDK SECTION - BON KÒD LA */}
 {mode === 'api' && (
-        <div className="space-y-6 animate-in zoom-in-95 duration-300 pb-10">
+        <div className="space-y-6 animate-in zoom-in-95">
           <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
             <div className="flex items-center gap-3 mb-6">
               <Globe className="text-red-600 w-5 h-5" />
-              <h2 className="text-[11px] font-black uppercase italic text-white">SDK Smart Checkout Inivèsèl</h2>
+              <h2 className="text-[11px] font-black uppercase italic text-white">SDK Inivèsèl (Kòrèk)</h2>
             </div>
-            <div className="relative">
-              <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-96 overflow-y-auto scrollbar-hide whitespace-pre-wrap">
+            <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-96 overflow-y-auto scrollbar-hide whitespace-pre-wrap">
 {`<div id="hatex-secure-pay"></div>
 <script>
 (function() {
   const TID = "${profile.id}";
   const TAUX = 135;
   const target = document.getElementById('hatex-secure-pay');
-
   const btn = document.createElement('button');
   btn.innerHTML = "ACHETER MAINTENANT (HTG)";
-  btn.style = "background:#dc2626;color:white;width:100%;padding:20px;border-radius:15px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;box-shadow:0 10px 20px rgba(220,38,38,0.2);transition:all 0.3s;";
+  btn.style = "background:#dc2626;color:white;width:100%;padding:20px;border-radius:15px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;box-shadow:0 10px 20px rgba(220,38,38,0.2);";
   
   const formHtml = \`
-    <div id="hatex-form" style="display:none;margin-top:20px;padding:25px;background:#111;border-radius:25px;border:1px solid #333;font-family:sans-serif;color:white;box-shadow:0 20px 40px rgba(0,0,0,0.5);">
-      <p style="font-size:10px;font-weight:900;text-transform:uppercase;color:#dc2626;margin-bottom:15px;letter-spacing:1px;">Informations de Livraison</p>
-      <input id="htx_name" placeholder="Nom Complet" style="width:100%;background:#000;border:1px solid #333;padding:15px;border-radius:12px;color:white;margin-bottom:12px;font-size:13px;outline:none;">
-      <input id="htx_phone" placeholder="Téléphone" style="width:100%;background:#000;border:1px solid #333;padding:15px;border-radius:12px;color:white;margin-bottom:12px;font-size:13px;outline:none;">
-      <textarea id="htx_address" placeholder="Adresse complète pour livraison" style="width:100%;background:#000;border:1px solid #333;padding:15px;border-radius:12px;color:white;margin-bottom:12px;font-size:13px;height:80px;outline:none;resize:none;"></textarea>
-      
-      <div style="display:flex;gap:15px;align-items:center;margin-bottom:20px;background:#000;padding:12px;border-radius:12px;">
-         <label style="font-size:10px;font-weight:bold;color:#666;">QUANTITÉ:</label>
-         <input id="htx_qty" type="number" value="1" min="1" style="width:70px;background:transparent;border:none;color:white;font-weight:900;text-align:center;font-size:16px;outline:none;">
+    <div id="hatex-form" style="display:none;margin-top:20px;padding:20px;background:#1a1a1a;border-radius:20px;border:1px solid #333;font-family:sans-serif;color:white;">
+      <p style="font-size:10px;font-weight:900;text-transform:uppercase;color:#dc2626;margin-bottom:15px;">Détails de la commande</p>
+      <input id="htx_name" placeholder="Nom Complet" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;">
+      <input id="htx_phone" placeholder="Téléphone" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;">
+      <textarea id="htx_address" placeholder="Adresse de livraison" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;height:60px;"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:15px;">
+         <label style="font-size:10px;font-weight:bold;">KANTITE:</label>
+         <input id="htx_qty" type="number" value="1" min="1" style="width:60px;background:#000;border:1px solid #333;padding:8px;border-radius:8px;color:white;text-align:center;">
       </div>
-
-      <div id="htx_preview" style="background:#000; padding:20px; border-radius:15px; margin-bottom:20px; text-align:center; border:1px dashed #dc2626;">
-        <span style="font-size:9px; color:#666; display:block; margin-bottom:5px; font-weight:900;">TOTAL À PAYER</span>
-        <span id="htx_total_val" style="font-size:24px; font-weight:900; color:#fff;">CALCUL...</span>
+      <div id="htx_preview" style="background:#000; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center; border:1px dashed #dc2626;">
+        <span style="font-size:10px; color:#999; display:block;">TOTAL À PAYER</span>
+        <span id="htx_total_val" style="font-size:20px; font-weight:900; color:#fff;">CALCUL...</span>
       </div>
-
-      <button id="htx_confirm" style="width:100%;background:#dc2626;color:white;padding:18px;border-radius:12px;font-weight:900;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:1px;">Confirmer le Paiement</button>
-    </div>
-  \`;
+      <button id="htx_confirm" style="width:100%;background:#dc2626;color:white;padding:15px;border-radius:10px;font-weight:900;border:none;cursor:pointer;">PAYER MAINTENANT</button>
+    </div>\`;
   target.innerHTML = formHtml;
   target.prepend(btn);
 
   function getUniversalPrice() {
-    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details, .shopify-section, [itemtype*="Product"]') || document.body;
-    const selectors = ['meta[property="product:price:amount"]', '.price-item--sale', '.product__price .price-item', '.woocommerce-Price-amount', '.current-price', '.price', '#price', '[data-price]', '.amount'];
+    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details') || document.body;
+    const selectors = ['meta[property="product:price:amount"]', '.price-item--sale', '.product__price .price-item', '.woocommerce-Price-amount', '.current-price', '.price'];
     let foundText = ""; let foundVal = 0;
     for (let s of selectors) {
       const el = productArea.querySelector(s);
-      if (el) {
+      if (el && !el.closest('.price--compare')) {
         let txt = (el.content || el.innerText || "").toUpperCase();
         let val = parseFloat(txt.replace(/[^\\d.]/g, ''));
         if (val > 0) { foundVal = val; foundText = txt; break; }
@@ -232,24 +226,20 @@ export default function TerminalPage() {
 
   function calculateTotal() {
     const priceData = getUniversalPrice();
-    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD') || priceData.val < 1000; 
+    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD');
     const qty = parseInt(document.getElementById('htx_qty').value) || 1;
     let unitHTG = isUSD ? (Math.max(priceData.val, 0.99) * TAUX) : Math.max(priceData.val, 5);
     const total = (unitHTG * qty).toFixed(2);
-    document.getElementById('htx_total_val').innerText = new Intl.NumberFormat().format(total) + " HTG";
+    document.getElementById('htx_total_val').innerText = total + " HTG";
     return total;
   }
 
-  btn.onclick = () => { document.getElementById('hatex-form').style.display = 'block'; btn.style.display = 'none'; calculateTotal(); };
+  btn.onclick = () => { document.getElementById('hatex-form').style.display='block'; btn.style.display='none'; calculateTotal(); };
   document.getElementById('htx_qty').oninput = calculateTotal;
-
   document.getElementById('htx_confirm').onclick = () => {
-    const totalFinal = calculateTotal();
-    if (totalFinal <= 0) return alert("Prix non détecté.");
-    
     const params = new URLSearchParams({
       terminal: TID,
-      amount: totalFinal,
+      amount: calculateTotal(),
       order_id: "HTX-" + Date.now(),
       customer_name: document.getElementById('htx_name').value,
       customer_phone: document.getElementById('htx_phone').value,
@@ -263,15 +253,15 @@ export default function TerminalPage() {
   };
 })();
 </script>`}
-              </pre>
-            </div>
-            <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="mt-6 w-full bg-red-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <Copy className="w-4 h-4" /> Kopye Kòd la pou sit ou
-            </button>
+            </pre>
+            <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="mt-6 w-full bg-red-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">Kopye Kòd la</button>
           </div>
-          <button onClick={() => setMode('menu')} className="w-full text-zinc-600 font-black uppercase text-[10px] tracking-widest">Tounen nan Menu</button>
+          <button onClick={() => setMode('menu')} className="w-full text-zinc-600 font-black uppercase text-[10px]">Tounen nan Menu</button>
         </div>
       )}
+    </div>
+  );
+}
 
       {/* ISTORIK LIVREZON DETAYE */}
       {mode === 'history' && (
