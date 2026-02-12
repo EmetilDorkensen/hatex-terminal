@@ -82,22 +82,6 @@ export default function TerminalPage() {
         </button>
       </div>
 
-      {/* BALANS - Dapre baz de done w la */}
-      <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-[2.5rem] border border-red-600/20 mb-8 shadow-2xl">
-        <div className="flex justify-between items-start mb-6">
-            <div>
-                <p className="text-[9px] text-red-600 uppercase font-black mb-1">Wallet Balance</p>
-                <p className="text-3xl font-black italic">{parseFloat(profile.wallet_balance || 0).toLocaleString()} <span className="text-[10px] opacity-40">HTG</span></p>
-            </div>
-            <div className="text-right">
-                <p className="text-[9px] text-zinc-500 uppercase font-black mb-1">Card Balance</p>
-                <p className="text-xl font-black italic text-zinc-300">{parseFloat(profile.card_balance || 0).toLocaleString()} <span className="text-[8px] opacity-40">HTG</span></p>
-            </div>
-        </div>
-        <button onClick={handleSyncBalance} disabled={syncing} className="w-full bg-white text-black py-4 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
-          {syncing ? <RefreshCw className="animate-spin w-3 h-3" /> : <Wallet className="w-3 h-3" />} Senkronize Vant
-        </button>
-      </div>
 
       {/* MENU */}
       {mode === 'menu' && (

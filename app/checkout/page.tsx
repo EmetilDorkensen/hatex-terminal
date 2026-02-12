@@ -2,7 +2,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useMemo, Suspense, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { ShieldCheck, Lock, CreditCard, Calendar, Key } from 'lucide-react';
+import { ShieldCheck, Lock, CreditCard, Calendar, Key, ShoppingBag, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -13,6 +13,7 @@ function CheckoutContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
+  // Done ki soti nan SDK a
   const sdkData = useMemo(() => ({
     platform: searchParams.get('platform'),
     customer_name: searchParams.get('customer_name'),
@@ -31,25 +32,27 @@ function CheckoutContent() {
   
   const invoiceId = searchParams.get('invoice_id');
   const [loading, setLoading] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [form, setForm] = useState({ name: '', card: '', expiry: '', cvv: '' });
 
+  // Rekipere kontèks (Invoice oswa Terminal)
   useEffect(() => {
     const fetchInvoice = async () => {
       if (invoiceId) {
-        const { data } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
+        const { data } = await supabase.from('invoices').select('*, profiles(business_name)').eq('id', invoiceId).single();
         if (data) {
           setAmount(data.amount);
           setTerminalId(data.owner_id);
           setOrderId(`INV-${data.id.slice(0, 5)}`);
-          setBusinessName(data.business_name || 'Hatex Merchant');
+          setBusinessName(data.profiles?.business_name || 'Hatex Merchant');
         }
+      } else if (terminalId) {
+        const { data } = await supabase.from('profiles').select('business_name').eq('id', terminalId).single();
+        if (data) setBusinessName(data.business_name);
       }
     };
     fetchInvoice();
-  }, [invoiceId, supabase]);
+  }, [invoiceId, terminalId, supabase]);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,35 +60,28 @@ function CheckoutContent() {
     setStatus({ type: '', msg: '' });
 
     try {
-      const { data, error } = await supabase.rpc('process_sdk_payment', {
+      // 1. Rele RPC a pou validation kat, KYC, Balans, ak Transfè
+      const { data, error } = await supabase.rpc('process_secure_payment', {
         p_terminal_id: terminalId,
-        p_card_number: form.card,
+        p_card_number: form.card.replace(/\s/g, ''),
         p_amount: amount,
         p_order_id: orderId,
-        p_otp_code: showOtp ? otpCode : null,
-        p_platform: sdkData.platform,
-        p_customer_name: sdkData.customer_name,
-        p_customer_phone: sdkData.customer_phone,
-        p_customer_address: sdkData.customer_address,
-        p_product_name: sdkData.product_name,
-        p_product_image: sdkData.product_image,
-        p_product_url: sdkData.product_url,
-        p_quantity: sdkData.quantity
+        p_customer_name: sdkData.customer_name || 'Kliyan Hatex',
+        p_customer_phone: sdkData.customer_phone || 'N/A',
+        p_platform: sdkData.platform || 'Checkout Direct'
       });
 
       if (error) throw error;
 
-      if (data.require_otp) {
-        setShowOtp(true);
-        setLoading(false);
-        return;
-      }
-
       if (data.success) {
-        // --- DEBLOKAJ WEBHOOK AK EMAIL ---
+        // 2. Si se yon Invoice, make li kòm peye
+        if (invoiceId) {
+          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
+        }
+
+        // 3. Webhook pou Email (Opsyonèl si ou genyen l toujou)
         try {
           const FUNCTION_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`;
-          
           await fetch(FUNCTION_URL, {
             method: 'POST',
             headers: { 
@@ -94,26 +90,17 @@ function CheckoutContent() {
             },
             body: JSON.stringify({ 
               transaction_id: data.transaction_id,
-              business_name: data.business_name,
-              amount: amount, // Nou ajoute sa pou imèl kliyan an ka montre kòb la
-              sdk: {
-                ...sdkData,
-                customer_email: data.customer_email,
-                merchant_email: data.merchant_email
-              }
+              business_name: businessName,
+              amount: amount,
+              sdk: { ...sdkData }
             })
           });
-        } catch (wError) {
-          console.error("Email notification failed:", wError);
-        }
+        } catch (e) { console.log("Email skip"); }
 
-        if (invoiceId) {
-          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
-        }
-        
+        // 4. Redireksyon sou paj siksè
         router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
       } else {
-        throw new Error(data.error || "Erè enkoni");
+        throw new Error(data.message || "Erè nan peman an");
       }
     } catch (err: any) {
       setStatus({ type: 'error', msg: err.message });
@@ -123,79 +110,122 @@ function CheckoutContent() {
   };
 
   return (
-    <div className="w-full max-w-[450px] bg-[#0d0e1a] p-10 rounded-[3rem] border border-white/5 shadow-2xl relative italic text-white">
-      <div className="flex justify-center mb-6">
-        <div className="bg-red-600/10 p-3 rounded-2xl border border-red-600/20">
-          <ShieldCheck className="text-red-600 w-6 h-6" />
-        </div>
-      </div>
-
-      <h1 className="text-center text-white font-black uppercase text-lg mb-1">{businessName}</h1>
-      <p className="text-center text-zinc-500 text-[9px] font-bold uppercase mb-8">Peman Sekirize #{orderId}</p>
+    <div className="w-full max-w-[480px] bg-[#0d0e1a] p-8 md:p-12 rounded-[3.5rem] border border-white/5 shadow-2xl relative italic text-white overflow-hidden">
       
-      {sdkData.product_name && (
-        <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl mb-4 border border-white/5">
-          <img src={sdkData.product_image || ""} alt="product" className="w-10 h-10 rounded-lg object-cover" />
-          <div className="text-left">
-            <p className="text-[10px] font-black text-white uppercase">{sdkData.product_name}</p>
-            <p className="text-[8px] text-zinc-500 font-bold uppercase">Kantite: {sdkData.quantity}</p>
+      {/* GLOW EFFECT */}
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-red-600/10 blur-[100px] rounded-full"></div>
+      
+      <div className="relative z-10">
+        <div className="flex justify-center mb-8">
+          <div className="bg-red-600/10 p-4 rounded-3xl border border-red-600/20">
+            <ShieldCheck className="text-red-600 w-8 h-8" />
           </div>
         </div>
-      )}
 
-      <div className="bg-zinc-900/50 p-6 rounded-3xl mb-8 border border-white/5 text-center">
-        <p className="text-[9px] text-zinc-500 uppercase font-black mb-1">Montan pou Peye</p>
-        <p className="text-3xl font-black italic">{amount.toLocaleString()} <span className="text-sm text-red-600">HTG</span></p>
-      </div>
-
-      <form onSubmit={handlePayment} className="space-y-4">
-        {!showOtp ? (
-          <>
-            <div className="space-y-1">
-              <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Nimewo Kat Hatex</label>
-              <div className="relative">
-                <input required placeholder="0000 0000 0000 0000" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all text-white" 
-                  onChange={e => setForm({...form, card: e.target.value})} />
-                <CreditCard className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
-              </div>
+        <h1 className="text-center font-black uppercase text-xl mb-1 tracking-tighter">{businessName}</h1>
+        <p className="text-center text-zinc-500 text-[9px] font-bold uppercase mb-10 tracking-[0.3em] opacity-50">Secure Gateway</p>
+        
+        {/* PRODUCT CARD */}
+        {sdkData.product_name && (
+          <div className="flex items-center gap-4 bg-white/5 p-4 rounded-[2rem] mb-6 border border-white/5">
+            <div className="w-14 h-14 bg-black rounded-2xl overflow-hidden border border-white/10 shrink-0">
+              <img src={sdkData.product_image || "/api/placeholder/100/100"} alt="product" className="w-full h-full object-cover" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">Dat Expirasyon</label>
-                <div className="relative">
-                  <input required placeholder="MM/YY" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none focus:border-red-600/50 transition-all text-white" 
-                    onChange={e => setForm({...form, expiry: e.target.value})} />
-                  <Calendar className="absolute right-4 top-4 text-zinc-700 w-4 h-4" />
-                </div>
+            <div className="text-left overflow-hidden">
+              <p className="text-[11px] font-black text-white uppercase truncate">{sdkData.product_name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <ShoppingBag className="w-3 h-3 text-red-600" />
+                <p className="text-[9px] text-zinc-500 font-bold uppercase">QTY: {sdkData.quantity}</p>
               </div>
-              <div className="space-y-1">
-                <label className="text-[8px] text-zinc-500 font-black uppercase ml-4">CVV</label>
-                <input required type="password" maxLength={3} placeholder="***" className="w-full bg-black border border-white/5 p-4 rounded-2xl text-[11px] outline-none text-center focus:border-red-600/50 transition-all text-white" 
-                  onChange={e => setForm({...form, cvv: e.target.value})} />
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-red-600/5 p-4 rounded-2xl border border-red-600/10 text-center">
-              <p className="text-[10px] text-red-500 font-black uppercase">Verifikasyon Sekirite</p>
-              <p className="text-[9px] text-zinc-500 mt-1 uppercase">Tape kòd 6 chif ou resevwa nan imèl ou a</p>
-            </div>
-            <div className="relative">
-              <input required placeholder="KÒD OTP" className="w-full bg-black border border-red-600/30 p-5 rounded-2xl text-center text-lg font-black tracking-[1em] outline-none text-white" 
-                onChange={e => setOtpCode(e.target.value)} />
-              <Key className="absolute right-4 top-5 text-red-600 w-4 h-4" />
             </div>
           </div>
         )}
-        <button disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase text-[11px] mt-4 shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50 text-white">
-          {loading ? "TRAITEMENT..." : showOtp ? "KONFIME KÒD LA" : "PAYER MAINTENANT"}
-        </button>
-      </form>
-      {status.msg && <p className="mt-4 text-red-500 text-[9px] text-center font-black uppercase">{status.msg}</p>}
-      <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-center gap-4 opacity-30">
-        <Lock className="w-3 h-3 text-white" />
-        <span className="text-[8px] font-black uppercase tracking-widest text-white">SSL 256-BIT ENCRYPTION</span>
+
+        {/* AMOUNT DISPLAY */}
+        <div className="bg-zinc-900/40 p-8 rounded-[2.5rem] mb-8 border border-white/5 text-center relative">
+          <p className="text-[10px] text-zinc-500 uppercase font-black mb-2">Total à régler</p>
+          <div className="flex justify-center items-baseline gap-2">
+            <p className="text-5xl font-black italic tracking-tighter">{amount.toLocaleString()}</p>
+            <p className="text-sm font-black text-red-600">HTG</p>
+          </div>
+        </div>
+
+        {/* FORM */}
+        <form onSubmit={handlePayment} className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-[9px] text-zinc-500 font-black uppercase ml-5">Numéro de Carte Hatex</label>
+            <div className="relative">
+              <input 
+                required 
+                placeholder="0000 0000 0000 0000" 
+                className="w-full bg-black border border-white/10 p-5 rounded-[1.5rem] text-[13px] font-mono outline-none focus:border-red-600/50 transition-all text-white placeholder:opacity-20" 
+                onChange={e => setForm({...form, card: e.target.value})} 
+              />
+              <CreditCard className="absolute right-6 top-5 text-zinc-700 w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[9px] text-zinc-500 font-black uppercase ml-5">Expiration</label>
+              <div className="relative">
+                <input 
+                  required 
+                  placeholder="MM/YY" 
+                  className="w-full bg-black border border-white/10 p-5 rounded-[1.5rem] text-[12px] outline-none focus:border-red-600/50 text-white" 
+                  onChange={e => setForm({...form, expiry: e.target.value})} 
+                />
+                <Calendar className="absolute right-6 top-5 text-zinc-700 w-4 h-4" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] text-zinc-500 font-black uppercase ml-5">CVV</label>
+              <input 
+                required 
+                type="password" 
+                maxLength={3} 
+                placeholder="***" 
+                className="w-full bg-black border border-white/10 p-5 rounded-[1.5rem] text-[12px] outline-none text-center focus:border-red-600/50 text-white" 
+                onChange={e => setForm({...form, cvv: e.target.value})} 
+              />
+            </div>
+          </div>
+
+          <button 
+            disabled={loading} 
+            className="w-full bg-red-600 py-6 rounded-[1.5rem] font-black uppercase text-[12px] mt-6 shadow-2xl shadow-red-600/20 active:scale-[0.98] transition-all disabled:opacity-50 text-white flex items-center justify-center gap-3"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                VÉRIFICATION...
+              </>
+            ) : (
+              "PAYER MAINTENANT"
+            )}
+          </button>
+        </form>
+
+        {/* STATUS MESSAGE */}
+        {status.msg && (
+          <div className="mt-8 p-5 bg-red-600/10 border border-red-600/20 rounded-[1.5rem] flex items-center gap-4 animate-in slide-in-from-bottom-2">
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+            <p className="text-red-500 text-[10px] font-black uppercase leading-tight tracking-tight">{status.msg}</p>
+          </div>
+        )}
+
+        {/* FOOTER */}
+        <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center gap-4 opacity-40">
+          <div className="flex items-center gap-3">
+             <Lock className="w-3 h-3" />
+             <span className="text-[8px] font-black uppercase tracking-[0.2em]">SSL Secured Payment</span>
+          </div>
+          <div className="flex gap-4">
+             <div className="h-[1px] w-10 bg-white/20"></div>
+             <p className="text-[7px] font-black uppercase">Powered by HatexCard</p>
+             <div className="h-[1px] w-10 bg-white/20"></div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -203,8 +233,8 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center p-6 italic font-sans">
-      <Suspense fallback={<div className="font-black uppercase italic animate-pulse">Chargement...</div>}>
+    <div className="min-h-screen bg-[#06070d] text-white flex items-center justify-center p-6 italic font-sans selection:bg-red-600">
+      <Suspense fallback={<div className="font-black uppercase italic animate-pulse text-red-600">Initialisation...</div>}>
         <CheckoutContent />
       </Suspense>
     </div>
