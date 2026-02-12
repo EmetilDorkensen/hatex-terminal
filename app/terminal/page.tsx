@@ -6,7 +6,8 @@ import {
   Package, MapPin, Phone, History, 
   Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, ShoppingCart, Globe, ExternalLink,
-  Wallet, RefreshCw, ArrowDownCircle
+  Wallet, RefreshCw, ArrowDownCircle, ShieldCheck,
+  User, Tag, Calendar, ChevronRight
 } from 'lucide-react';
 
 export default function TerminalPage() {
@@ -18,7 +19,9 @@ export default function TerminalPage() {
   const [syncing, setSyncing] = useState(false);
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
-  const [bizName, setBizName] = useState('');
+  
+  // Korije erè varyab ki te manke yo
+  const [businessName, setBusinessName] = useState('');
 
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,15 +34,40 @@ export default function TerminalPage() {
       if (!user) return router.push('/login');
 
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (prof) setProfile(prof);
+      if (prof) {
+        setProfile(prof);
+        setBusinessName(prof.business_name || '');
+      }
 
-      const { data: tx } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      // Istorik ak plis detay (Kliyan, Tip)
+      const { data: tx } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
       setTransactions(tx || []);
     };
     initTerminal();
   }, [supabase, router]);
 
-  // Fonksyon pou de kalite balans yo (Wallet & Card)
+  // Fonksyon pou sove Branding la
+  const updateBusinessName = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ business_name: businessName })
+        .eq('id', profile.id);
+      if (error) throw error;
+      alert("Branding anrejistre!");
+      setProfile({...profile, business_name: businessName});
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSyncBalance = async () => {
     const totalVant = transactions
       .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
@@ -69,7 +97,7 @@ export default function TerminalPage() {
     setLoading(false);
   };
 
-  if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic">HATEX...</div>;
+  if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic animate-pulse">HATEX ENCRYPTING...</div>;
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
@@ -77,66 +105,71 @@ export default function TerminalPage() {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-2xl font-black uppercase italic tracking-tighter">{profile.business_name || 'Terminal'}<span className="text-red-600">.</span></h1>
-        <button onClick={() => setMode('history')} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/5">
-          <History className={mode === 'history' ? 'text-red-600' : 'text-zinc-500'} />
-        </button>
+        <div className="flex gap-3">
+            <button onClick={() => setMode('menu')} className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/5 transition-all ${mode === 'menu' ? 'bg-red-600 border-red-600' : 'bg-zinc-900'}`}>
+                <LayoutGrid size={20} />
+            </button>
+            <button onClick={() => setMode('history')} className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/5 transition-all ${mode === 'history' ? 'bg-red-600 border-red-600' : 'bg-zinc-900'}`}>
+                <History size={20} />
+            </button>
+        </div>
       </div>
 
+      {/* BRANDING SECTION */}
+      {mode === 'menu' && (
+        <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="bg-red-600/10 p-2 rounded-xl">
+                    <ShieldCheck className="text-red-600 w-5 h-5" />
+                </div>
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Identité de l'Entreprise</h3>
+            </div>
+            <div className="space-y-4">
+                <div className="space-y-2 text-left">
+                    <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">Nom du Business (Branding)</label>
+                    <input 
+                        type="text" 
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        placeholder="Ex: Hatex Store"
+                        className="w-full bg-black border border-white/10 p-5 rounded-2xl text-[12px] outline-none focus:border-red-600/50 transition-all text-white italic" 
+                    />
+                </div>
+                <button 
+                    onClick={updateBusinessName}
+                    disabled={loading}
+                    className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] hover:scale-[0.98] transition-all"
+                >
+                    {loading ? 'Sincronisation...' : 'Enregistrer le Branding'}
+                </button>
+            </div>
+        </div>
+      )}
 
-      <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic">
-  <div className="flex items-center gap-3 mb-4">
-    <div className="bg-red-600/10 p-2 rounded-xl">
-      <ShieldCheck className="text-red-600 w-5 h-5" />
-    </div>
-    <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Identité de l'Entreprise</h3>
-  </div>
-  
-  <div className="space-y-4">
-    <div className="space-y-2 text-left">
-      <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">Non Biznis (Obligatwa)</label>
-      <input 
-        type="text" 
-        value={businessName}
-        onChange={(e) => setBusinessName(e.target.value)}
-        placeholder="Ex: Hatex Store"
-        className="w-full bg-black border border-white/10 p-4 rounded-2xl text-[12px] outline-none focus:border-red-600/50 transition-all text-white" 
-      />
-    </div>
-    <button 
-      onClick={updateBusinessName}
-      className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase text-[10px] hover:bg-zinc-200 transition-all"
-    >
-      Enregistrer le Branding
-    </button>
-  </div>
-</div>
-
-
-
-      {/* MENU */}
+      {/* MENU OPTIONS */}
       {mode === 'menu' && (
         <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3">
-            <LayoutGrid className="text-red-600" />
-            <span className="text-[10px] font-black uppercase italic">SDK API</span>
+          <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 hover:bg-zinc-900 transition-all">
+            <div className="bg-red-600/20 p-4 rounded-2xl"><Globe className="text-red-600" /></div>
+            <span className="text-[10px] font-black uppercase italic tracking-widest">SDK API Gateway</span>
           </button>
-          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3">
-            <Mail className="text-red-600" />
-            <span className="text-[10px] font-black uppercase italic">Invoice</span>
+          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 hover:bg-zinc-900 transition-all">
+            <div className="bg-red-600/20 p-4 rounded-2xl"><Mail className="text-red-600" /></div>
+            <span className="text-[10px] font-black uppercase italic tracking-widest">Générer Invoice</span>
           </button>
         </div>
       )}
 
-      {/* SDK SECTION - KÒD OU AN EGZAKTEMAN */}
+      {/* SDK SECTION */}
       {mode === 'api' && profile.business_name && (
         <div className="space-y-6 animate-in zoom-in-95 duration-300">
           <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
             <div className="flex items-center gap-3 mb-6">
               <Globe className="text-red-600 w-5 h-5" />
-              <h2 className="text-[11px] font-black uppercase italic">SDK Inivèsèl (Shopify/Woo)</h2>
+              <h2 className="text-[11px] font-black uppercase italic">SDK Inivèsèl (Shopify/Woo/Custom)</h2>
             </div>
             <div className="relative">
-              <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-96 overflow-y-auto scrollbar-hide whitespace-pre-wrap">
+              <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-[500px] overflow-y-auto scrollbar-hide whitespace-pre-wrap">
 {`<div id="hatex-secure-pay"></div>
 <script>
 (function() {
@@ -168,14 +201,25 @@ export default function TerminalPage() {
   target.innerHTML = formHtml;
   target.prepend(btn);
 
+  // FONKSYON SYNC PRI OTOMATIK SOU NENPÒT SIT
   function getUniversalPrice() {
-    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details') || document.body;
-    const selectors = ['meta[property="product:price:amount"]', '.price-item--sale', '.product__price .price-item', '.woocommerce-Price-amount', '.current-price', '.price'];
+    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details, [itemtype*="Product"]') || document.body;
+    const selectors = [
+        'meta[property="product:price:amount"]', 
+        '[data-price]', 
+        '.price-item--sale', 
+        '.product__price .price-item', 
+        '.woocommerce-Price-amount', 
+        '.current-price', 
+        '.price',
+        '#priceblock_ourprice',
+        '.a-price-whole'
+    ];
     let foundText = ""; let foundVal = 0;
     for (let s of selectors) {
       const el = productArea.querySelector(s);
       if (el && !el.closest('.price--compare')) {
-        let txt = (el.content || el.innerText || "").toUpperCase();
+        let txt = (el.content || el.innerText || el.getAttribute('data-price') || "").toUpperCase();
         let val = parseFloat(txt.replace(/[^\\d.]/g, ''));
         if (val > 0) { foundVal = val; foundText = txt; break; }
       }
@@ -185,7 +229,7 @@ export default function TerminalPage() {
 
   function calculateTotal() {
     const priceData = getUniversalPrice();
-    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD');
+    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD') || priceData.val < 1000; 
     const qty = parseInt(document.getElementById('htx_qty').value) || 1;
     let unitHTG = isUSD ? (Math.max(priceData.val, 0.99) * TAUX) : Math.max(priceData.val, 5);
     const total = (unitHTG * qty).toFixed(2);
@@ -204,8 +248,8 @@ export default function TerminalPage() {
       customer_name: document.getElementById('htx_name').value,
       customer_phone: document.getElementById('htx_phone').value,
       customer_address: document.getElementById('htx_address').value,
-      product_name: document.querySelector('h1')?.innerText || document.title,
-      product_image: document.querySelector('meta[property="og:image"]')?.content || "",
+      product_name: document.querySelector('h1, .product_title')?.innerText || document.title,
+      product_image: document.querySelector('meta[property="og:image"], .wp-post-image, .product-featured-img')?.content || document.querySelector('img')?.src || "",
       quantity: document.getElementById('htx_qty').value,
       platform: window.location.hostname
     });
@@ -214,101 +258,132 @@ export default function TerminalPage() {
 })();
 </script>`}
               </pre>
-              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase">KOPYE</button>
+              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase shadow-lg">KOPYE KÒD</button>
             </div>
           </div>
-          <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600">Tounen</button>
+          <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all italic">Tounen nan Dashboard</button>
         </div>
       )}
 
-      {/* HISTORY */}
+      {/* PROFESSIONAL HISTORY SECTION */}
       {mode === 'history' && (
-        <div className="space-y-4 text-left">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-[11px] font-black uppercase text-zinc-500 italic">Tranzaksyon</h2>
-            <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase underline">Dashboard</button>
+        <div className="space-y-4 text-left animate-in slide-in-from-bottom-5 duration-500">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+                <h2 className="text-xl font-black uppercase italic text-white tracking-tighter">Flux des Transactions</h2>
+                <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Suivi en temps réel de vos ventes</p>
+            </div>
+            <button onClick={handleSyncBalance} disabled={syncing} className="bg-white text-black px-4 py-2 rounded-xl text-[9px] font-black uppercase flex items-center gap-2">
+                <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} /> Sync Balans
+            </button>
           </div>
-          {transactions.map((tx) => (
-            <div key={tx.id} className="bg-zinc-900/60 p-6 rounded-[2rem] border border-white/5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center">
-                    <ShoppingCart className="w-5 h-5 text-red-600" />
+
+          <div className="space-y-3">
+            {transactions.length > 0 ? transactions.map((tx) => (
+              <div key={tx.id} className="bg-zinc-900/40 p-5 rounded-[2rem] border border-white/5 hover:border-red-600/20 transition-all group relative overflow-hidden">
+                <div className="flex justify-between items-center relative z-10">
+                  <div className="flex gap-4 items-center">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${tx.type?.includes('SDK') ? 'bg-red-600/10' : 'bg-blue-600/10'}`}>
+                      {tx.type?.includes('SDK') ? <Globe className="text-red-600 w-5 h-5" /> : <Mail className="text-blue-600 w-5 h-5" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] font-black uppercase tracking-tight text-white italic">
+                            {tx.customer_name || 'Client Anonyme'}
+                        </p>
+                        <span className="text-[7px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-500 font-black uppercase italic border border-white/5">
+                            {tx.type === 'SALE_SDK' ? 'TERMINAL' : 'INVOICE'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-zinc-500 font-bold italic">
+                         <span className="text-[8px] uppercase flex items-center gap-1"><Calendar size={10}/> {new Date(tx.created_at).toLocaleDateString()}</span>
+                         <span className="text-[8px] uppercase flex items-center gap-1"><ExternalLink size={10}/> {tx.platform || 'Direct'}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase">{tx.platform || 'Vant SDK'}</p>
-                    <p className="text-[7px] text-zinc-600 font-black uppercase">{new Date(tx.created_at).toLocaleDateString()}</p>
+                  <div className="text-right">
+                    <p className="text-lg font-black italic text-green-500">+{tx.amount?.toLocaleString()} <span className="text-[10px]">HTG</span></p>
+                    <p className={`text-[7px] font-black uppercase tracking-widest ${tx.status === 'success' ? 'text-green-500/50' : 'text-yellow-500/50'}`}>
+                        {tx.status === 'success' ? 'Confirmé' : 'En attente'}
+                    </p>
                   </div>
                 </div>
-                <p className="text-sm font-black italic text-green-500">+{tx.amount} HTG</p>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* INVOICE */}
-      {mode === 'request' && (
-        <div className="space-y-4 text-left">
-          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><ArrowLeft className="w-4 h-4" /> Tounen</button>
-          <div className="bg-zinc-900/60 p-8 rounded-[2.5rem] border border-white/5">
-              <input type="number" placeholder="MONTAN" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-4xl font-black w-full outline-none italic mb-6" />
-              <input type="email" placeholder="EMAIL KLIYAN" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/50 border border-white/5 p-4 rounded-xl w-full text-xs font-bold outline-none mb-6" />
-              <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-5 rounded-xl font-black uppercase italic">Voye Invoice</button>
+            )) : (
+                <div className="py-20 text-center bg-zinc-900/20 rounded-[3rem] border border-dashed border-white/5">
+                    <History className="mx-auto text-zinc-800 mb-4" size={40} />
+                    <p className="text-[10px] font-black uppercase text-zinc-600 italic">Aucune transaction trouvée</p>
+                </div>
+            )}
           </div>
         </div>
-
-
-<div className="mt-12 space-y-6 italic">
-  <div className="flex items-center gap-4">
-    <div className="h-[1px] flex-1 bg-white/5"></div>
-    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Guide d'Intégration</h2>
-    <div className="h-[1px] flex-1 bg-white/5"></div>
-  </div>
-
-  <div className="grid md:grid-cols-2 gap-8 items-center bg-zinc-900/20 p-8 rounded-[3rem] border border-white/5">
-    {/* VIDEO YOUTUBE */}
-    <div className="aspect-video w-full rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl relative group">
-      <iframe 
-        className="w-full h-full"
-        src="https://www.youtube.com/embed/YOUR_VIDEO_ID" 
-        title="Comment intégrer Hatex SDK"
-        frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-      ></iframe>
-    </div>
-
-    {/* EXPLICATION TEXTE */}
-    <div className="text-left space-y-4">
-      <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">
-        Comment intégrer le terminal <span className="text-red-600">Hatex</span> sur votre site ?
-      </h3>
-      <p className="text-zinc-500 text-[11px] leading-relaxed font-medium">
-        Suivez ce tutoriel vidéo pour apprendre à connecter votre site web à notre passerelle de paiement sécurisée. 
-        Copiez simplement votre <span className="text-white">ID Terminal</span> et injectez-le dans votre code pour commencer à accepter des paiements en quelques minutes.
-      </p>
-      
-      <div className="flex flex-wrap gap-3 pt-2">
-        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[9px] font-black uppercase text-zinc-400">
-          React / Next.js
-        </div>
-        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[9px] font-black uppercase text-zinc-400">
-          PHP / Laravel
-        </div>
-        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[9px] font-black uppercase text-zinc-400">
-          WordPress
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-
       )}
 
-      <p className="mt-20 text-center text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em]">Hatex Secure Terminal v4.0</p>
+      {/* INVOICE SECTION */}
+      {mode === 'request' && (
+        <div className="space-y-4 text-left animate-in fade-in duration-300">
+          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600 mb-4"><ArrowLeft className="w-4 h-4" /> Retour au Menu</button>
+          <div className="bg-zinc-900/60 p-10 rounded-[3rem] border border-white/5 shadow-2xl">
+              <div className="mb-8">
+                <label className="text-[9px] text-zinc-500 font-black uppercase ml-2 italic">Montant à facturer (HTG)</label>
+                <div className="flex items-baseline gap-2">
+                    <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-6xl font-black w-full outline-none italic text-white placeholder:text-zinc-800" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
+                    <input type="email" placeholder="EMAIL DU CLIENT" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/50 border border-white/5 p-5 pl-12 rounded-2xl w-full text-[11px] font-bold outline-none italic text-white focus:border-red-600/30" />
+                  </div>
+                  <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase italic text-sm hover:bg-red-700 transition-all shadow-xl shadow-red-600/10">
+                    {loading ? 'Génération...' : 'Envoyer la Facture'}
+                  </button>
+              </div>
+          </div>
+        </div>
+      )}
+
+      {/* GUIDE SECTION */}
+      {mode === 'api' && (
+        <div className="mt-12 space-y-6 italic animate-in fade-in-50 duration-700">
+            <div className="flex items-center gap-4">
+                <div className="h-[1px] flex-1 bg-white/5"></div>
+                <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Documentation Technique</h2>
+                <div className="h-[1px] flex-1 bg-white/5"></div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 items-center bg-zinc-900/20 p-8 rounded-[3rem] border border-white/5">
+                <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl relative group">
+                    <iframe 
+                        className="w-full h-full"
+                        src="https://www.youtube.com/embed/YOUR_VIDEO_ID" 
+                        title="Comment intégrer Hatex SDK"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    ></iframe>
+                </div>
+
+                <div className="text-left space-y-4">
+                    <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
+                        Intégrez <span className="text-red-600">Hatex API</span> <br/> sur votre store.
+                    </h3>
+                    <p className="text-zinc-500 text-[11px] leading-relaxed font-medium">
+                        Suivez ce tutoriel pour apprendre à connecter votre boutique au réseau Hatex. 
+                        Le script détecte automatiquement les prix de vos produits et gère la conversion monétaire.
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-3 pt-2">
+                        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[8px] font-black uppercase text-zinc-400">Shopify</div>
+                        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[8px] font-black uppercase text-zinc-400">WooCommerce</div>
+                        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[8px] font-black uppercase text-zinc-400">React/PHP</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      <p className="mt-20 text-center text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em]">Hatex Secure Terminal v4.0 • E2E Encrypted</p>
     </div>
   );
 }
