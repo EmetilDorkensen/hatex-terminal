@@ -1,95 +1,78 @@
 "use client";
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, Suspense, useMemo } from 'react';
-import { CheckCircle2, ShoppingBag, ArrowRight, Hash, ShieldCheck } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { Suspense } from 'react';
+import { CheckCircle2, ShoppingBag, ShieldCheck, Hash, ArrowRight } from 'lucide-react';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  const amount = searchParams.get('amount') || "0.00";
-  const transactionId = searchParams.get('id') || "TX-UNKNOWN";
+  const amount = searchParams.get('amount') || "0";
+  const transactionId = searchParams.get('id') || "TXN-000000";
   const orderId = searchParams.get('order_id') || "N/A";
-  const invoiceId = searchParams.get('invoice_id');
-
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
-
-  useEffect(() => {
-    const finalizeStatus = async () => {
-      if (invoiceId && transactionId !== "TX-UNKNOWN") {
-        await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
-      }
-    };
-    finalizeStatus();
-  }, [transactionId, invoiceId, supabase]);
 
   return (
-    <div className="w-full max-w-[480px] bg-[#0d0e1a] p-10 md:p-12 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden font-sans italic text-white">
+    <div className="w-full max-w-[500px] bg-[#0d0e1a] p-10 md:p-14 rounded-[4rem] border border-white/5 shadow-2xl relative overflow-hidden italic text-white">
       
-      {/* GLOW EFFECT (VÈ POU SIKSÈ) */}
-      <div className="absolute -top-24 -left-24 w-48 h-48 bg-green-600/10 blur-[100px] rounded-full"></div>
+      {/* GLOW EFFECT */}
+      <div className="absolute -top-24 -right-24 w-64 h-64 bg-green-600/10 blur-[100px] rounded-full"></div>
       
       <div className="relative z-10 text-center">
-        {/* TI KROCHET VÈ A */}
         <div className="flex justify-center mb-8">
-          <div className="bg-green-500/10 p-5 rounded-[2rem] border border-green-500/20 animate-in zoom-in duration-500">
-            <CheckCircle2 className="text-green-500 w-12 h-12 stroke-[1.5px]" />
+          <div className="bg-green-500/10 p-6 rounded-[2.5rem] border border-green-500/20 animate-in zoom-in duration-500">
+            <CheckCircle2 className="text-green-500 w-16 h-16 stroke-[1.5px]" />
           </div>
         </div>
 
-        <h1 className="text-3xl font-black uppercase tracking-tighter mb-2 italic">Paiement Réussi<span className="text-green-500">.</span></h1>
-        <p className="text-zinc-500 text-[10px] font-bold uppercase mb-10 tracking-[0.2em] opacity-60">Transaction confirmée avec succès</p>
+        <h1 className="text-4xl font-black uppercase tracking-tighter mb-2 italic">Merci ! ✅</h1>
+        <p className="text-zinc-500 text-[10px] font-bold uppercase mb-12 tracking-[0.4em] opacity-60">Transaction complétée avec succès</p>
 
-        {/* BOX REÇU (STYLE DARK) */}
-        <div className="bg-zinc-900/40 p-8 rounded-[2.5rem] mb-8 border border-white/5 relative">
-          <div className="flex justify-between items-center mb-6 pb-6 border-b border-white/5">
-            <span className="text-[10px] font-black text-zinc-500 uppercase">Montant Transféré</span>
+        {/* RECU BOX */}
+        <div className="bg-zinc-900/40 p-10 rounded-[3rem] mb-10 border border-white/5 relative">
+          <div className="flex justify-between items-center mb-8 pb-8 border-b border-white/5">
+            <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">Montant Payé</span>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-white italic">{parseFloat(amount).toLocaleString()}</span>
-              <span className="text-xs font-black text-green-500">HTG</span>
+              <span className="text-4xl font-black text-white italic">{parseFloat(amount).toLocaleString()}</span>
+              <span className="text-xs font-black text-green-500 uppercase">HTG</span>
             </div>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={12} className="text-zinc-600" />
-                <span className="text-[9px] font-black text-zinc-500 uppercase">ID Transaction</span>
+              <div className="flex items-center gap-2 text-zinc-500">
+                <ShieldCheck size={14} />
+                <span className="text-[10px] font-black uppercase">Transaction ID</span>
               </div>
-              <span className="text-[9px] font-mono text-white opacity-40">{transactionId.slice(0, 18)}</span>
+              <span className="text-[10px] font-mono text-white opacity-40">{transactionId}</span>
             </div>
+            
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Hash size={12} className="text-zinc-600" />
-                <span className="text-[9px] font-black text-zinc-500 uppercase">{invoiceId ? "Référence Invoice" : "Référence Commande"}</span>
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Hash size={14} />
+                <span className="text-[10px] font-black uppercase">Référence lòd</span>
               </div>
-              <span className="text-[9px] font-black text-white">{invoiceId ? `#${invoiceId.slice(0,8)}` : `#${orderId}`}</span>
+              <span className="text-[10px] font-black text-white">{orderId}</span>
             </div>
           </div>
         </div>
 
-        {/* ACTIONS */}
-        <div className="space-y-4">
-          <button 
-            onClick={() => router.push('/dashboard')}
-            className="w-full bg-white text-black py-6 rounded-[1.5rem] font-black text-[11px] uppercase flex items-center justify-center gap-3 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-xl"
-          >
-            <ShoppingBag size={14} /> Retour au Dashboard
-          </button>
-          
-          <div className="bg-green-500/5 p-4 rounded-2xl border border-green-500/10">
-             <p className="text-[9px] text-green-500 font-black uppercase leading-relaxed">
-               Un reçu électronique a été envoyé à votre adresse email. Gardez-le comme preuve de paiement.
-            </p>
-          </div>
+        {/* FOOTER MESSAGE */}
+        <div className="bg-green-500/5 p-6 rounded-3xl border border-green-500/10 mb-10">
+          <p className="text-[10px] text-green-500 font-bold uppercase leading-relaxed tracking-tight">
+            Votre paiement a été vérifié. Les détails ont été enregistrés dans votre historique et celui du marchand. Un reçu électronique est en route.
+          </p>
         </div>
 
-        {/* FOOTER */}
-        <p className="mt-12 text-[7px] text-zinc-800 font-black uppercase tracking-[0.5em]">Hatex Secure Network © 2026</p>
+        <button 
+          onClick={() => router.push('/')}
+          className="w-full bg-white text-black py-7 rounded-[2.2rem] font-black text-[12px] uppercase flex items-center justify-center gap-4 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-2xl"
+        >
+          <ShoppingBag size={18} /> Retour au Portail
+        </button>
+
+        <p className="mt-14 text-[8px] text-zinc-800 font-black uppercase tracking-[0.6em] opacity-50">
+          HatexCard Secure Gateway © 2026
+        </p>
       </div>
     </div>
   );
@@ -98,12 +81,7 @@ function SuccessContent() {
 export default function SuccessPage() {
   return (
     <div className="min-h-screen bg-[#06070d] flex items-center justify-center p-6 selection:bg-green-500/30">
-      <Suspense fallback={
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-white/5 border-t-green-500 rounded-full animate-spin" />
-          <p className="text-[9px] font-black text-zinc-500 uppercase italic tracking-widest">Finalisation...</p>
-        </div>
-      }>
+      <Suspense fallback={<div className="text-green-500 font-black animate-pulse">FINALISATION...</div>}>
         <SuccessContent />
       </Suspense>
     </div>
