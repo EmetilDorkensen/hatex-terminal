@@ -244,44 +244,78 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {/* HISTORY MODE */}
-      {mode === 'history' && (
-        <div className="space-y-4 animate-in slide-in-from-bottom-5 duration-500">
-          <div className="flex justify-between px-2">
-            <h2 className="text-[10px] font-black uppercase text-zinc-500 italic">Istorik Peman & Livrezon</h2>
-            <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase">Fèmen</button>
+{/* HISTORY VIEW - DETAYE */}
+{mode === 'history' && (
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-500 text-left">
+          <div className="flex justify-between items-center px-2">
+            <h2 className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.3em] italic">Istorik Tranzaksyon</h2>
+            <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase underline">Dashboard</button>
           </div>
-          {transactions.length === 0 ? (
-            <div className="p-10 text-center text-zinc-800 uppercase font-black italic">Okenn vant poko fèt</div>
-          ) : (
-            transactions.map((tx) => (
-              <div key={tx.id} className="bg-zinc-900/60 p-5 rounded-[2rem] border border-white/5 space-y-4 text-left">
-                <div className="flex justify-between items-start">
-                  <div className="flex gap-3">
-                    <div className="w-10 h-10 bg-red-600/10 rounded-xl flex items-center justify-center">
-                      <ShoppingCart className="text-red-600 w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-white">{tx.platform || 'Direct'}</p>
-                      <p className="text-[7px] text-zinc-600 font-bold uppercase">{new Date(tx.created_at).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm font-black italic text-green-500">+{tx.amount} HTG</p>
-                </div>
-                {tx.customer_name && (
-                  <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-2">
-                    <p className="text-[9px] font-black text-white uppercase">{tx.customer_name}</p>
-                    <div className="flex items-center gap-2 text-red-500 text-[8px] font-bold">
-                       <Phone size={10} /> {tx.customer_phone}
-                    </div>
-                    <div className="flex items-start gap-2 text-zinc-500 text-[8px] font-bold uppercase italic">
-                       <MapPin size={10} className="shrink-0" /> {tx.customer_address}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
+          
+          {transactions.length === 0 && (
+            <div className="py-20 text-center opacity-20 italic uppercase font-black text-xs">Okenn aktivite ankò</div>
           )}
+
+          {transactions.map((tx) => (
+            <div key={tx.id} className="bg-gradient-to-br from-zinc-900/80 to-black p-6 rounded-[2.5rem] border border-white/5 space-y-5 shadow-2xl">
+              <div className="flex justify-between items-start">
+                <div className="flex gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${tx.amount > 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                    {tx.type === 'WITHDRAWAL' ? <ArrowDownCircle className="text-red-500" /> : <ShoppingCart className="text-green-500" />}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-white tracking-tighter">
+                      {tx.type === 'WITHDRAWAL' ? 'Retrè Fon' : (tx.platform || 'Vant SDK')}
+                    </p>
+                    <p className="text-[7px] text-zinc-600 font-black uppercase mt-1">
+                      {new Date(tx.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`text-sm font-black italic ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {tx.amount > 0 ? `+${tx.amount}` : tx.amount} HTG
+                  </p>
+                  <p className="text-[6px] font-black uppercase text-zinc-700 mt-1 italic">{tx.status}</p>
+                </div>
+              </div>
+
+              {/* PWODWI INFO NAN ISTORIK */}
+              {(tx.product_name || tx.product_image) && (
+                <div className="flex gap-4 items-center bg-black/60 p-4 rounded-[2rem] border border-white/5">
+                  <img 
+                    src={tx.product_image || "https://placehold.co/200x200?text=HATEX"} 
+                    className="w-14 h-14 rounded-2xl object-cover border border-white/10" 
+                    alt="prod" 
+                  />
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-[9px] font-black uppercase text-zinc-200 truncate italic">{tx.product_name}</p>
+                    <div className="flex justify-between mt-1">
+                       <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest">Qty: {tx.quantity || 1}</p>
+                       <ExternalLink className="w-2 h-2 text-zinc-700" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+{/* KLIYAN INFO */}
+{tx.customer_name && (
+                <div className="pl-4 py-2 border-l-2 border-red-600/30 bg-white/5 rounded-r-2xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="w-2 h-2 text-red-600" />
+                    <p className="text-[9px] font-black uppercase text-white tracking-tighter">{tx.customer_name}</p>
+                  </div>
+                  <p className="text-[8px] font-bold text-zinc-500 uppercase flex items-center gap-2">
+                    <Phone className="w-2 h-2" /> {tx.customer_phone}
+                  </p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase leading-relaxed mt-1 flex items-start gap-2">
+                    <MapPin className="w-2 h-2 mt-0.5 text-red-600" /> {tx.customer_address}
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
