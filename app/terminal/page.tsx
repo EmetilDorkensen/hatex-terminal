@@ -83,6 +83,36 @@ export default function TerminalPage() {
       </div>
 
 
+      <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic">
+  <div className="flex items-center gap-3 mb-4">
+    <div className="bg-red-600/10 p-2 rounded-xl">
+      <ShieldCheck className="text-red-600 w-5 h-5" />
+    </div>
+    <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Identité de l'Entreprise</h3>
+  </div>
+  
+  <div className="space-y-4">
+    <div className="space-y-2 text-left">
+      <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">Non Biznis (Obligatwa)</label>
+      <input 
+        type="text" 
+        value={businessName}
+        onChange={(e) => setBusinessName(e.target.value)}
+        placeholder="Ex: Hatex Store"
+        className="w-full bg-black border border-white/10 p-4 rounded-2xl text-[12px] outline-none focus:border-red-600/50 transition-all text-white" 
+      />
+    </div>
+    <button 
+      onClick={updateBusinessName}
+      className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase text-[10px] hover:bg-zinc-200 transition-all"
+    >
+      Enregistrer le Branding
+    </button>
+  </div>
+</div>
+
+
+
       {/* MENU */}
       {mode === 'menu' && (
         <div className="grid grid-cols-2 gap-4">
@@ -227,6 +257,55 @@ export default function TerminalPage() {
               <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-5 rounded-xl font-black uppercase italic">Voye Invoice</button>
           </div>
         </div>
+
+
+<div className="mt-12 space-y-6 italic">
+  <div className="flex items-center gap-4">
+    <div className="h-[1px] flex-1 bg-white/5"></div>
+    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Guide d'Intégration</h2>
+    <div className="h-[1px] flex-1 bg-white/5"></div>
+  </div>
+
+  <div className="grid md:grid-cols-2 gap-8 items-center bg-zinc-900/20 p-8 rounded-[3rem] border border-white/5">
+    {/* VIDEO YOUTUBE */}
+    <div className="aspect-video w-full rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl relative group">
+      <iframe 
+        className="w-full h-full"
+        src="https://www.youtube.com/embed/YOUR_VIDEO_ID" 
+        title="Comment intégrer Hatex SDK"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      ></iframe>
+    </div>
+
+    {/* EXPLICATION TEXTE */}
+    <div className="text-left space-y-4">
+      <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">
+        Comment intégrer le terminal <span className="text-red-600">Hatex</span> sur votre site ?
+      </h3>
+      <p className="text-zinc-500 text-[11px] leading-relaxed font-medium">
+        Suivez ce tutoriel vidéo pour apprendre à connecter votre site web à notre passerelle de paiement sécurisée. 
+        Copiez simplement votre <span className="text-white">ID Terminal</span> et injectez-le dans votre code pour commencer à accepter des paiements en quelques minutes.
+      </p>
+      
+      <div className="flex flex-wrap gap-3 pt-2">
+        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[9px] font-black uppercase text-zinc-400">
+          React / Next.js
+        </div>
+        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[9px] font-black uppercase text-zinc-400">
+          PHP / Laravel
+        </div>
+        <div className="bg-white/5 px-4 py-2 rounded-full border border-white/5 text-[9px] font-black uppercase text-zinc-400">
+          WordPress
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
       )}
 
       <p className="mt-20 text-center text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em]">Hatex Secure Terminal v4.0</p>
