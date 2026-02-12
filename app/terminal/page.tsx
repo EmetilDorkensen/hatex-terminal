@@ -47,8 +47,26 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
+  // RANJE ERÈ BUILD: Fonksyon sa a te manke nan kòd ou te voye a
+  const updateBusinessName = async () => {
+    if (!businessName) return alert("Tanpri antre yon non biznis.");
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ business_name: businessName })
+        .eq('id', profile.id);
+      if (error) throw error;
+      alert("Branding anrejistre ak siksè!");
+      setProfile({ ...profile, business_name: businessName });
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateInvoice = async () => {
-    // 1. Validasyon fòm debaz
     if (!amount || parseFloat(amount) <= 0 || !email) {
       alert("Tanpri mete yon montan ak yon email valid.");
       return;
@@ -56,11 +74,10 @@ export default function TerminalPage() {
   
     setLoading(true);
     try {
-      // 2. Toujou verifye itilizatè a konekte
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Ou dwe konekte pou w fè operasyon sa a.");
+      if (!user) throw new Error("Ou dwe konekte");
   
-      // 3. SEKIRITE: Enspeksyon an dirèk nan BAZ DONE a
+      // Verifikasyon an dirèk pou 'approved' (jan nou wè nan baz done a)
       const { data: freshProfile, error: profileError } = await supabase
         .from('profiles')
         .select('kyc_status, business_name')
@@ -69,34 +86,29 @@ export default function TerminalPage() {
 
       if (profileError || !freshProfile) throw new Error("Echèk nan verifikasyon pwofil.");
 
-      // RANJE: Nou tcheke pou 'approved' (valè ki nan baz done w la)
-      // Nou itilize .toLowerCase() pou sekirite si janm yon moun ekri 'Approved'
       const status = freshProfile.kyc_status?.toLowerCase();
       
       if (status !== 'approved') {
-        alert(`Echèk: Kont ou dwe 'approved' pou voye invoice. Estati aktyèl: ${freshProfile.kyc_status}`);
+        alert(`Echèk: Kont ou dwe 'approved'. Estati aktyèl: ${freshProfile.kyc_status}`);
         setMode('menu'); 
         return;
       }
   
-      // 4. BLOKIS: Anpeche voye bay tèt ou
       if (user.email?.toLowerCase() === email.toLowerCase().trim()) {
-        alert("Operasyon entèdi: Ou pa kapab voye yon invoice bay pwòp tèt ou.");
+        alert("Ou pa kapab voye yon invoice bay tèt ou.");
         return;
       }
   
-      // 5. KREYE INVOICE LA
       const { data: inv, error: invError } = await supabase.from('invoices').insert({
         owner_id: user.id,
         amount: parseFloat(amount),
         client_email: email.toLowerCase().trim(),
-        business_name: freshProfile.business_name || "Merchant Hatex",
+        business_name: freshProfile.business_name || businessName || "Merchant Hatex",
         status: 'pending'
       }).select().single();
   
       if (invError) throw invError;
   
-      // 6. DEKLANCHE EDGE FUNCTION POU EMAIL
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
         headers: { 
@@ -109,19 +121,18 @@ export default function TerminalPage() {
             id: inv.id,
             amount: inv.amount,
             client_email: inv.client_email,
-            business_name: freshProfile.business_name || "Merchant Hatex"
+            business_name: freshProfile.business_name || businessName
           }
         })
       });
   
-      alert("Siksè! Faktire a voye bay kliyan an.");
+      alert("Siksè! Faktire a voye.");
       setAmount('');
       setEmail('');
       setMode('menu');
       
     } catch (err: any) {
-      console.error("Erreur Invoice:", err);
-      alert(err.message || "Yon erè rive.");
+      alert(err.message);
     } finally {
       setLoading(false);
     }
