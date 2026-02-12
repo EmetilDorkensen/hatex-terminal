@@ -50,6 +50,80 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
+
+
+  const handleCreateInvoice = async () => {
+    if (!amount || parseFloat(amount) <= 0 || !email) {
+      alert("Tanpri mete yon montan ak yon email valid.");
+      return;
+    }
+  
+    setLoading(true);
+    try {
+      // 1. Jwenn enfòmasyon moun k ap voye a (Machann nan)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Ou dwe konekte");
+  
+      // 2. BLOKIS: Anpeche moun nan voye invoice bay pwòp tèt li
+      if (user.email === email) {
+        alert("Ou pa kapab voye yon invoice bay tèt ou.");
+        setLoading(false);
+        return;
+      }
+  
+      // 3. TCHEKE KYC: Verifye si machann nan gen dwa resevwa kòb
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('kyc_status, business_name')
+        .eq('id', user.id)
+        .single();
+  
+      if (profile?.kyc_status !== 'verified') {
+        alert("Kont ou dwe verifye (KYC) anvan ou voye yon invoice.");
+        setLoading(false);
+        return;
+      }
+  
+      // 4. KREYE INVOICE LA
+      const { data: inv, error } = await supabase.from('invoices').insert({
+        owner_id: user.id,
+        amount: parseFloat(amount),
+        client_email: email,
+        business_name: profile.business_name,
+        status: 'pending'
+      }).select().single();
+  
+      if (error) throw error;
+  
+      // 5. VOYE EMAIL VIA EDGE FUNCTION (Sa ap deklanche KA 1 nan index.ts ou a)
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          table: 'invoices',
+          record: {
+            id: inv.id,
+            amount: inv.amount,
+            client_email: inv.client_email,
+            business_name: profile.business_name
+          }
+        })
+      });
+  
+      alert("Invoice voye bay kliyan an ak siksè!");
+      setMode('menu');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
   // Fonksyon pou sove Branding la
   const updateBusinessName = async () => {
     setLoading(true);
