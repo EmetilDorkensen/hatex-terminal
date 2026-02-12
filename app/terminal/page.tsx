@@ -3,9 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
-  Package, MapPin, Phone, History, 
-  Mail, LayoutGrid, Copy, CheckCircle2, 
-  ArrowLeft, ShoppingCart, Globe, ExternalLink 
+  History, Mail, LayoutGrid, Copy, CheckCircle2, 
+  ArrowLeft, ShoppingCart, MapPin, Phone, 
+  ExternalLink, Wallet, RefreshCw, ArrowDownCircle 
 } from 'lucide-react';
 
 export default function TerminalPage() {
@@ -14,6 +14,7 @@ export default function TerminalPage() {
   const [mode, setMode] = useState<'menu' | 'request' | 'api' | 'history'>('menu');
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
   const [bizName, setBizName] = useState('');
@@ -23,129 +24,88 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
+  // --- ESPAS POU SDK KI BON AN ---
+  const sdkCodeStr = `
+  // PASTE SDK KI BON AN LA...
+  // PA MANYEN LÒT PATI YO.
+  `;
+  // -------------------------------
+
   useEffect(() => {
     const initTerminal = async () => {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) return router.push('/login');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.push('/login');
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (prof) setProfile(prof);
 
-      if (!prof) return;
-      setProfile(prof);
-
-      // Rale tranzaksyon yo
-      const { data: tx } = await supabase
-        .from('transactions')
-        .select(`*`)
-        .eq('user_id', user.id)
-        .in('type', ['PAYMENT', 'SALE', 'SALE_SDK', 'INVOICE_PAYMENT'])
-        .order('created_at', { ascending: false });
-
+      const { data: tx } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
       setTransactions(tx || []);
-
-      // Realtime listener pou nouvo vant
-      const channel = supabase
-        .channel('peman-live')
-        .on('postgres_changes', { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'transactions',
-            filter: `user_id=eq.${user.id}` 
-        }, (payload) => {
-            setTransactions(prev => [payload.new, ...prev]);
-        })
-        .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
     };
-
     initTerminal();
   }, [supabase, router]);
 
+  const handleSyncBalance = async () => {
+    const totalVant = transactions
+      .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
+      .reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
+    
+    if (totalVant <= 0) return alert("Pa gen vant ki disponib pou senkronize.");
+    
+    setSyncing(true);
+    try {
+      const { error } = await supabase.rpc('increment_merchant_balance', { 
+        merchant_id: profile.id, 
+        amount_to_add: totalVant 
+      });
+      if (error) throw error;
+      alert("Balans Wallet ou ajou!");
+      window.location.reload();
+    } catch (err: any) { alert(err.message); } finally { setSyncing(false); }
+  };
+
   const handleCreateInvoice = async () => {
-    if (!amount || !email) return alert("Ranpli tout detay yo");
+    if (!amount || !email) return alert("Ranpli detay yo");
     setLoading(true);
     const { error } = await supabase.from('invoices').insert([{ 
-      owner_id: profile.id, 
-      client_email: email.toLowerCase().trim(), 
-      amount: parseFloat(amount), 
-      status: 'pending',
-      business_name: profile.business_name 
+      owner_id: profile.id, client_email: email.toLowerCase().trim(), amount: parseFloat(amount), status: 'pending' 
     }]);
-
-    if (!error) { 
-        alert("Invoice voye bay " + email); 
-        setMode('menu'); setAmount(''); setEmail('');
-    } else { alert("Erè: " + error.message); }
+    if (!error) { alert("Invoice voye!"); setMode('menu'); }
     setLoading(false);
   };
 
-  const updateBusinessName = async () => {
-    if (!bizName) return alert("Ekri non biznis la");
-    const { error } = await supabase.from('profiles').update({ business_name: bizName }).eq('id', profile.id);
-    if (!error) { alert("Biznis anrejistre!"); setProfile({...profile, business_name: bizName}); }
-  };
-
-  if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic animate-pulse uppercase">Hatex Terminal ap chaje...</div>;
-
-  const totalVant = transactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
+  if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic">HATEX LOADING...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
+    <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans">
       
-      {/* HEADER BIZNIS */}
-      {!profile.business_name && (
-        <div className="bg-red-600/10 p-6 rounded-[2rem] border border-red-600/20 mb-6 animate-pulse">
-          <p className="text-[10px] font-black uppercase mb-3 text-red-500 tracking-tighter">Konfigire non biznis ou pou debloke SDK a</p>
-          <div className="flex gap-2">
-            <input className="bg-black border border-white/10 p-4 rounded-2xl flex-1 text-xs outline-none" placeholder="Egz: Hatex Shop" onChange={(e) => setBizName(e.target.value)} />
-            <button onClick={updateBusinessName} className="bg-white text-black px-6 rounded-2xl text-[10px] font-black uppercase">Sove</button>
-          </div>
-        </div>
-      )}
-
+      {/* TOP BAR */}
       <div className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-2xl font-black uppercase italic text-white tracking-tighter">
-            {profile.business_name || 'Hatex Terminal'}<span className="text-red-600">.</span>
-          </h1>
-          <p className="text-[8px] text-zinc-600 uppercase font-bold tracking-[0.3em]">ID: {profile.id.slice(0, 18)}...</p>
-        </div>
-        <button onClick={() => setMode('history')} className="w-14 h-14 bg-zinc-900 rounded-[1.5rem] flex items-center justify-center border border-white/5 shadow-2xl active:scale-90 transition-all">
-          <History className={`w-6 h-6 ${mode === 'history' ? 'text-red-600' : 'text-zinc-500'}`} />
+        <h1 className="text-2xl font-black uppercase italic">{profile.business_name || 'Terminal'}<span className="text-red-600">.</span></h1>
+        <button onClick={() => setMode('history')} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/5">
+          <History className={mode === 'history' ? 'text-red-600' : 'text-zinc-500'} />
         </button>
       </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-2 gap-4 mb-10">
-        <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-white/5">
-          <p className="text-[8px] text-zinc-500 uppercase font-black mb-1 tracking-widest text-red-600">Revenu</p>
-          <p className="text-2xl font-black italic">{totalVant.toLocaleString()} <span className="text-[10px] opacity-50">HTG</span></p>
-        </div>
-        <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-white/5">
-          <p className="text-[8px] text-zinc-500 uppercase font-black mb-1 tracking-widest">Ventes</p>
-          <p className="text-2xl font-black italic">{transactions.length}</p>
-        </div>
+      {/* WALLET SECTION */}
+      <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-[2.5rem] border border-red-600/20 mb-8 shadow-2xl">
+        <p className="text-[9px] text-red-600 uppercase font-black mb-1">Wallet Balance</p>
+        <p className="text-4xl font-black italic mb-6">{parseFloat(profile.wallet_balance || 0).toLocaleString()} <span className="text-xs opacity-40">HTG</span></p>
+        <button onClick={handleSyncBalance} disabled={syncing} className="w-full bg-white text-black py-4 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
+          {syncing ? <RefreshCw className="animate-spin w-3 h-3" /> : <Wallet className="w-3 h-3" />} Senkronize Vant
+        </button>
       </div>
 
       {/* MODES */}
       {mode === 'menu' && (
-        <div className="grid grid-cols-1 gap-4">
-          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[3rem] border border-white/5 flex flex-col items-center active:scale-95 transition-all">
-            <Mail className="text-red-600 w-8 h-8 mb-4" />
-            <span className="text-[12px] font-black uppercase italic">Invoice pa Email</span>
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 active:scale-95 transition-all">
+            <LayoutGrid className="text-red-600" />
+            <span className="text-[10px] font-black uppercase italic">SDK API</span>
           </button>
-          
-          <button 
-            onClick={() => profile.business_name ? setMode('api') : alert("Sove non biznis ou anvan.")} 
-            className={`bg-zinc-900/40 p-10 rounded-[3rem] border border-white/5 flex flex-col items-center active:scale-95 transition-all ${!profile.business_name && 'opacity-20'}`}
-          >
-            <LayoutGrid className="text-red-600 w-8 h-8 mb-4" />
-            <span className="text-[12px] font-black uppercase italic">SDK Smart Checkout</span>
+          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 active:scale-95 transition-all">
+            <Mail className="text-red-600" />
+            <span className="text-[10px] font-black uppercase italic">Invoice</span>
           </button>
         </div>
       )}
@@ -244,74 +204,31 @@ export default function TerminalPage() {
         </div>
       )}
 
-{/* HISTORY VIEW - DETAYE */}
-{mode === 'history' && (
-        <div className="space-y-6 animate-in slide-in-from-right-4 duration-500 text-left">
-          <div className="flex justify-between items-center px-2">
-            <h2 className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.3em] italic">Istorik Tranzaksyon</h2>
+      {/* HISTORY VIEW */}
+      {mode === 'history' && (
+        <div className="space-y-4 text-left">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-[11px] font-black uppercase text-zinc-500 italic">Tranzaksyon Detaye</h2>
             <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase underline">Dashboard</button>
           </div>
-          
-          {transactions.length === 0 && (
-            <div className="py-20 text-center opacity-20 italic uppercase font-black text-xs">Okenn aktivite ankò</div>
-          )}
-
           {transactions.map((tx) => (
-            <div key={tx.id} className="bg-gradient-to-br from-zinc-900/80 to-black p-6 rounded-[2.5rem] border border-white/5 space-y-5 shadow-2xl">
+            <div key={tx.id} className="bg-zinc-900/60 p-6 rounded-[2rem] border border-white/5 space-y-4">
               <div className="flex justify-between items-start">
                 <div className="flex gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${tx.amount > 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-                    {tx.type === 'WITHDRAWAL' ? <ArrowDownCircle className="text-red-500" /> : <ShoppingCart className="text-green-500" />}
+                  <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center">
+                    <ShoppingCart className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase text-white tracking-tighter">
-                      {tx.type === 'WITHDRAWAL' ? 'Retrè Fon' : (tx.platform || 'Vant SDK')}
-                    </p>
-                    <p className="text-[7px] text-zinc-600 font-black uppercase mt-1">
-                      {new Date(tx.created_at).toLocaleString()}
-                    </p>
+                    <p className="text-[10px] font-black uppercase">{tx.platform || 'SDK Payment'}</p>
+                    <p className="text-[7px] text-zinc-600 font-black uppercase">{new Date(tx.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-sm font-black italic ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {tx.amount > 0 ? `+${tx.amount}` : tx.amount} HTG
-                  </p>
-                  <p className="text-[6px] font-black uppercase text-zinc-700 mt-1 italic">{tx.status}</p>
-                </div>
+                <p className="text-sm font-black italic text-green-500">+{tx.amount} HTG</p>
               </div>
-
-              {/* PWODWI INFO NAN ISTORIK */}
-              {(tx.product_name || tx.product_image) && (
-                <div className="flex gap-4 items-center bg-black/60 p-4 rounded-[2rem] border border-white/5">
-                  <img 
-                    src={tx.product_image || "https://placehold.co/200x200?text=HATEX"} 
-                    className="w-14 h-14 rounded-2xl object-cover border border-white/10" 
-                    alt="prod" 
-                  />
-                  <div className="flex-1 overflow-hidden">
-                    <p className="text-[9px] font-black uppercase text-zinc-200 truncate italic">{tx.product_name}</p>
-                    <div className="flex justify-between mt-1">
-                       <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest">Qty: {tx.quantity || 1}</p>
-                       <ExternalLink className="w-2 h-2 text-zinc-700" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-{/* KLIYAN INFO */}
-{tx.customer_name && (
-                <div className="pl-4 py-2 border-l-2 border-red-600/30 bg-white/5 rounded-r-2xl">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle2 className="w-2 h-2 text-red-600" />
-                    <p className="text-[9px] font-black uppercase text-white tracking-tighter">{tx.customer_name}</p>
-                  </div>
-                  <p className="text-[8px] font-bold text-zinc-500 uppercase flex items-center gap-2">
-                    <Phone className="w-2 h-2" /> {tx.customer_phone}
-                  </p>
-                  <p className="text-[8px] font-bold text-zinc-400 uppercase leading-relaxed mt-1 flex items-start gap-2">
-                    <MapPin className="w-2 h-2 mt-0.5 text-red-600" /> {tx.customer_address}
-                  </p>
+              {tx.customer_name && (
+                <div className="pl-4 border-l border-red-600/30">
+                  <p className="text-[9px] font-black uppercase text-zinc-300">{tx.customer_name}</p>
+                  <p className="text-[8px] text-zinc-500">{tx.customer_phone}</p>
                 </div>
               )}
             </div>
@@ -319,24 +236,21 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {/* INVOICE MODE */}
+      {/* INVOICE VIEW */}
       {mode === 'request' && (
-        <div className="space-y-4 animate-in zoom-in-95">
-          <div className="bg-zinc-900/60 p-10 rounded-[3rem] border border-white/5 text-center shadow-2xl">
-              <span className="text-[8px] font-black text-red-600 uppercase italic">Montan HTG</span>
-              <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-5xl font-black text-center w-full outline-none placeholder:text-zinc-800 italic" />
+        <div className="space-y-4 text-left">
+          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><ArrowLeft className="w-4 h-4" /> Dashboard</button>
+          <div className="bg-zinc-900/60 p-8 rounded-[2.5rem] border border-white/5">
+              <p className="text-[8px] font-black uppercase text-zinc-500 mb-2">Montan (HTG)</p>
+              <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-4xl font-black w-full outline-none italic mb-6" />
+              <p className="text-[8px] font-black uppercase text-zinc-500 mb-2">Email Kliyan</p>
+              <input type="email" placeholder="egz: kliyan@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/50 border border-white/5 p-4 rounded-xl w-full text-xs font-bold outline-none mb-6" />
+              <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-5 rounded-xl font-black uppercase italic">Voye Invoice</button>
           </div>
-          <div className="bg-zinc-900/60 p-6 rounded-[2.5rem] border border-white/5">
-              <input type="email" placeholder="EMAIL KLIYAN AN" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-transparent text-center text-[11px] font-black w-full outline-none uppercase italic text-red-600" />
-          </div>
-          <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-8 rounded-[3rem] font-black uppercase italic shadow-red-600/20 active:scale-95 transition-all">
-             {loading ? 'Y ap voye...' : 'Voye Invoice'}
-          </button>
-          <button onClick={() => setMode('menu')} className="w-full text-[9px] font-black uppercase text-zinc-700">Anile</button>
         </div>
       )}
 
-      <p className="mt-20 text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em]">Hatex Secure Terminal v4.0</p>
+      <p className="mt-20 text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em] text-center">Hatex Terminal v4.0</p>
     </div>
   );
 }
