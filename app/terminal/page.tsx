@@ -19,8 +19,6 @@ export default function TerminalPage() {
   const [syncing, setSyncing] = useState(false);
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
-  
-  // Korije erè varyab ki te manke yo
   const [businessName, setBusinessName] = useState('');
 
   const supabase = useMemo(() => createBrowserClient(
@@ -39,7 +37,6 @@ export default function TerminalPage() {
         setBusinessName(prof.business_name || '');
       }
 
-      // Istorik ak plis detay (Kliyan, Tip)
       const { data: tx } = await supabase
         .from('transactions')
         .select('*')
@@ -50,8 +47,7 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
-
-
+  // SÈL FONKSYON POU KREYE INVOICE (Netwaye)
   const handleCreateInvoice = async () => {
     if (!amount || parseFloat(amount) <= 0 || !email) {
       alert("Tanpri mete yon montan ak yon email valid.");
@@ -60,42 +56,33 @@ export default function TerminalPage() {
   
     setLoading(true);
     try {
-      // 1. Jwenn enfòmasyon moun k ap voye a (Machann nan)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
   
-      // 2. BLOKIS: Anpeche moun nan voye invoice bay pwòp tèt li
       if (user.email === email) {
         alert("Ou pa kapab voye yon invoice bay tèt ou.");
         setLoading(false);
         return;
       }
   
-      // 3. TCHEKE KYC: Verifye si machann nan gen dwa resevwa kòb
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('kyc_status, business_name')
-        .eq('id', user.id)
-        .single();
-  
+      // Verifye KYC nan profile ki egziste deja a
       if (profile?.kyc_status !== 'verified') {
         alert("Kont ou dwe verifye (KYC) anvan ou voye yon invoice.");
         setLoading(false);
         return;
       }
   
-      // 4. KREYE INVOICE LA
       const { data: inv, error } = await supabase.from('invoices').insert({
         owner_id: user.id,
         amount: parseFloat(amount),
-        client_email: email,
-        business_name: profile.business_name,
+        client_email: email.toLowerCase().trim(),
+        business_name: businessName || profile.business_name,
         status: 'pending'
       }).select().single();
   
       if (error) throw error;
   
-      // 5. VOYE EMAIL VIA EDGE FUNCTION (Sa ap deklanche KA 1 nan index.ts ou a)
+      // VOYE EMAIL
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
         headers: { 
@@ -108,12 +95,14 @@ export default function TerminalPage() {
             id: inv.id,
             amount: inv.amount,
             client_email: inv.client_email,
-            business_name: profile.business_name
+            business_name: businessName || profile.business_name
           }
         })
       });
   
       alert("Invoice voye bay kliyan an ak siksè!");
+      setAmount('');
+      setEmail('');
       setMode('menu');
     } catch (err: any) {
       alert(err.message);
@@ -122,9 +111,6 @@ export default function TerminalPage() {
     }
   };
 
-
-
-  // Fonksyon pou sove Branding la
   const updateBusinessName = async () => {
     setLoading(true);
     try {
@@ -161,21 +147,12 @@ export default function TerminalPage() {
     } catch (err: any) { alert(err.message); } finally { setSyncing(false); }
   };
 
-  const handleCreateInvoice = async () => {
-    if (!amount || !email) return alert("Ranpli tout detay yo");
-    setLoading(true);
-    const { error } = await supabase.from('invoices').insert([{ 
-      owner_id: profile.id, client_email: email.toLowerCase().trim(), amount: parseFloat(amount), status: 'pending' 
-    }]);
-    if (!error) { alert("Invoice voye!"); setMode('menu'); }
-    setLoading(false);
-  };
-
   if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic animate-pulse">HATEX ENCRYPTING...</div>;
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
-      
+
+
       {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-2xl font-black uppercase italic tracking-tighter">{profile.business_name || 'Terminal'}<span className="text-red-600">.</span></h1>
