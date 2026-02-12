@@ -115,36 +115,54 @@ export default function TerminalPage() {
         </div>
       </div>
 
-      {/* BRANDING SECTION */}
-      {mode === 'menu' && (
-        <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="bg-red-600/10 p-2 rounded-xl">
-                    <ShieldCheck className="text-red-600 w-5 h-5" />
-                </div>
-                <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Identité de l'Entreprise</h3>
+{/* BRANDING SECTION */}
+{mode === 'menu' && (
+  <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic shadow-2xl">
+      <div className="flex items-center gap-3 mb-4">
+          <div className="bg-red-600/10 p-2 rounded-xl">
+              <ShieldCheck className="text-red-600 w-5 h-5" />
+          </div>
+          <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Identité de l'Entreprise</h3>
+      </div>
+      <div className="space-y-4">
+          <div className="space-y-2 text-left">
+              <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">
+                {profile?.business_name ? "Nom du Business (Vérifié)" : "Nom du Business (Branding)"}
+              </label>
+              <input 
+                  type="text" 
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  // Si profile.business_name pa NULL, li paka ekri anyen ankò
+                  readOnly={!!profile?.business_name}
+                  placeholder="Ex: Hatex Store"
+                  className={`w-full bg-black border border-white/10 p-5 rounded-2xl text-[12px] outline-none transition-all text-white italic ${
+                    profile?.business_name ? "opacity-60 cursor-not-allowed border-green-600/30 text-green-500" : "focus:border-red-600/50"
+                  }`} 
+              />
+          </div>
+
+          {/* Bouton an ap parèt SÈLMAN si profile.business_name vid nan baz de done a */}
+          {!profile?.business_name && (
+            <button 
+                onClick={updateBusinessName}
+                disabled={loading}
+                className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] hover:scale-[0.98] transition-all"
+            >
+                {loading ? 'Sincronisation...' : 'Enregistrer le Branding'}
+            </button>
+          )}
+
+          {/* Ti mesaj konfimasyon si non an deja anrejistre */}
+          {profile?.business_name && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                <p className="text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Votre identité est verrouillée et sécurisée</p>
             </div>
-            <div className="space-y-4">
-                <div className="space-y-2 text-left">
-                    <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">Nom du Business (Branding)</label>
-                    <input 
-                        type="text" 
-                        value={businessName}
-                        onChange={(e) => setBusinessName(e.target.value)}
-                        placeholder="Ex: Hatex Store"
-                        className="w-full bg-black border border-white/10 p-5 rounded-2xl text-[12px] outline-none focus:border-red-600/50 transition-all text-white italic" 
-                    />
-                </div>
-                <button 
-                    onClick={updateBusinessName}
-                    disabled={loading}
-                    className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] hover:scale-[0.98] transition-all"
-                >
-                    {loading ? 'Sincronisation...' : 'Enregistrer le Branding'}
-                </button>
-            </div>
-        </div>
-      )}
+          )}
+      </div>
+  </div>
+)}
 
       {/* MENU OPTIONS */}
       {mode === 'menu' && (
