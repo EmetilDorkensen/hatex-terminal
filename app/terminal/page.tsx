@@ -3,9 +3,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
-  History, Mail, LayoutGrid, Copy, CheckCircle2, 
-  ArrowLeft, ShoppingCart, MapPin, Phone, 
-  ExternalLink, Wallet, RefreshCw, ArrowDownCircle 
+  Package, MapPin, Phone, History, 
+  Mail, LayoutGrid, Copy, CheckCircle2, 
+  ArrowLeft, ShoppingCart, Globe, ExternalLink,
+  Wallet, RefreshCw, ArrowDownCircle
 } from 'lucide-react';
 
 export default function TerminalPage() {
@@ -24,13 +25,6 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
-  // --- ESPAS POU SDK KI BON AN ---
-  const sdkCodeStr = `
-  // PASTE SDK KI BON AN LA...
-  // PA MANYEN LÒT PATI YO.
-  `;
-  // -------------------------------
-
   useEffect(() => {
     const initTerminal = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -45,12 +39,13 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
+  // Fonksyon pou de kalite balans yo (Wallet & Card)
   const handleSyncBalance = async () => {
     const totalVant = transactions
       .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
       .reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
     
-    if (totalVant <= 0) return alert("Pa gen vant ki disponib pou senkronize.");
+    if (totalVant <= 0) return alert("Pa gen okenn vant pou senkronize.");
     
     setSyncing(true);
     try {
@@ -59,13 +54,13 @@ export default function TerminalPage() {
         amount_to_add: totalVant 
       });
       if (error) throw error;
-      alert("Balans Wallet ou ajou!");
+      alert("Balans Wallet ou moute avèk siksè!");
       window.location.reload();
     } catch (err: any) { alert(err.message); } finally { setSyncing(false); }
   };
 
   const handleCreateInvoice = async () => {
-    if (!amount || !email) return alert("Ranpli detay yo");
+    if (!amount || !email) return alert("Ranpli tout detay yo");
     setLoading(true);
     const { error } = await supabase.from('invoices').insert([{ 
       owner_id: profile.id, client_email: email.toLowerCase().trim(), amount: parseFloat(amount), status: 'pending' 
@@ -74,43 +69,51 @@ export default function TerminalPage() {
     setLoading(false);
   };
 
-  if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic">HATEX LOADING...</div>;
+  if (!profile) return <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center text-red-600 font-black italic">HATEX...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans">
+    <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
       
-      {/* TOP BAR */}
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
-        <h1 className="text-2xl font-black uppercase italic">{profile.business_name || 'Terminal'}<span className="text-red-600">.</span></h1>
+        <h1 className="text-2xl font-black uppercase italic tracking-tighter">{profile.business_name || 'Terminal'}<span className="text-red-600">.</span></h1>
         <button onClick={() => setMode('history')} className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/5">
           <History className={mode === 'history' ? 'text-red-600' : 'text-zinc-500'} />
         </button>
       </div>
 
-      {/* WALLET SECTION */}
+      {/* BALANS - Dapre baz de done w la */}
       <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-[2.5rem] border border-red-600/20 mb-8 shadow-2xl">
-        <p className="text-[9px] text-red-600 uppercase font-black mb-1">Wallet Balance</p>
-        <p className="text-4xl font-black italic mb-6">{parseFloat(profile.wallet_balance || 0).toLocaleString()} <span className="text-xs opacity-40">HTG</span></p>
+        <div className="flex justify-between items-start mb-6">
+            <div>
+                <p className="text-[9px] text-red-600 uppercase font-black mb-1">Wallet Balance</p>
+                <p className="text-3xl font-black italic">{parseFloat(profile.wallet_balance || 0).toLocaleString()} <span className="text-[10px] opacity-40">HTG</span></p>
+            </div>
+            <div className="text-right">
+                <p className="text-[9px] text-zinc-500 uppercase font-black mb-1">Card Balance</p>
+                <p className="text-xl font-black italic text-zinc-300">{parseFloat(profile.card_balance || 0).toLocaleString()} <span className="text-[8px] opacity-40">HTG</span></p>
+            </div>
+        </div>
         <button onClick={handleSyncBalance} disabled={syncing} className="w-full bg-white text-black py-4 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
           {syncing ? <RefreshCw className="animate-spin w-3 h-3" /> : <Wallet className="w-3 h-3" />} Senkronize Vant
         </button>
       </div>
 
-      {/* MODES */}
+      {/* MENU */}
       {mode === 'menu' && (
         <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 active:scale-95 transition-all">
+          <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3">
             <LayoutGrid className="text-red-600" />
             <span className="text-[10px] font-black uppercase italic">SDK API</span>
           </button>
-          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 active:scale-95 transition-all">
+          <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3">
             <Mail className="text-red-600" />
             <span className="text-[10px] font-black uppercase italic">Invoice</span>
           </button>
         </div>
       )}
 
-      {/* SDK SECTION (YOUR UNIVERSAL CODE) */}
+      {/* SDK SECTION - KÒD OU AN EGZAKTEMAN */}
       {mode === 'api' && profile.business_name && (
         <div className="space-y-6 animate-in zoom-in-95 duration-300">
           <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
@@ -197,18 +200,18 @@ export default function TerminalPage() {
 })();
 </script>`}
               </pre>
-              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase">KOPYE KÒD LA</button>
+              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase">KOPYE</button>
             </div>
           </div>
           <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600">Tounen</button>
         </div>
       )}
 
-      {/* HISTORY VIEW */}
+      {/* HISTORY */}
       {mode === 'history' && (
         <div className="space-y-4 text-left">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-[11px] font-black uppercase text-zinc-500 italic">Tranzaksyon Detaye</h2>
+            <h2 className="text-[11px] font-black uppercase text-zinc-500 italic">Tranzaksyon</h2>
             <button onClick={() => setMode('menu')} className="text-red-600 text-[10px] font-black uppercase underline">Dashboard</button>
           </div>
           {transactions.map((tx) => (
@@ -219,38 +222,30 @@ export default function TerminalPage() {
                     <ShoppingCart className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase">{tx.platform || 'SDK Payment'}</p>
+                    <p className="text-[10px] font-black uppercase">{tx.platform || 'Vant SDK'}</p>
                     <p className="text-[7px] text-zinc-600 font-black uppercase">{new Date(tx.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
                 <p className="text-sm font-black italic text-green-500">+{tx.amount} HTG</p>
               </div>
-              {tx.customer_name && (
-                <div className="pl-4 border-l border-red-600/30">
-                  <p className="text-[9px] font-black uppercase text-zinc-300">{tx.customer_name}</p>
-                  <p className="text-[8px] text-zinc-500">{tx.customer_phone}</p>
-                </div>
-              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* INVOICE VIEW */}
+      {/* INVOICE */}
       {mode === 'request' && (
         <div className="space-y-4 text-left">
-          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><ArrowLeft className="w-4 h-4" /> Dashboard</button>
+          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><ArrowLeft className="w-4 h-4" /> Tounen</button>
           <div className="bg-zinc-900/60 p-8 rounded-[2.5rem] border border-white/5">
-              <p className="text-[8px] font-black uppercase text-zinc-500 mb-2">Montan (HTG)</p>
-              <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-4xl font-black w-full outline-none italic mb-6" />
-              <p className="text-[8px] font-black uppercase text-zinc-500 mb-2">Email Kliyan</p>
-              <input type="email" placeholder="egz: kliyan@mail.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/50 border border-white/5 p-4 rounded-xl w-full text-xs font-bold outline-none mb-6" />
+              <input type="number" placeholder="MONTAN" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-4xl font-black w-full outline-none italic mb-6" />
+              <input type="email" placeholder="EMAIL KLIYAN" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/50 border border-white/5 p-4 rounded-xl w-full text-xs font-bold outline-none mb-6" />
               <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-5 rounded-xl font-black uppercase italic">Voye Invoice</button>
           </div>
         </div>
       )}
 
-      <p className="mt-20 text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em] text-center">Hatex Terminal v4.0</p>
+      <p className="mt-20 text-center text-[7px] text-zinc-800 font-black uppercase tracking-[0.4em]">Hatex Secure Terminal v4.0</p>
     </div>
   );
 }
