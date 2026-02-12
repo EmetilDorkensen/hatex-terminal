@@ -47,8 +47,8 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
-  // SÈL FONKSYON POU KREYE INVOICE (Netwaye)
   const handleCreateInvoice = async () => {
+    // 1. Validasyon fòm debaz
     if (!amount || parseFloat(amount) <= 0 || !email) {
       alert("Tanpri mete yon montan ak yon email valid.");
       return;
@@ -56,33 +56,44 @@ export default function TerminalPage() {
   
     setLoading(true);
     try {
+      // 2. Toujou verifye itilizatè a konekte
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
   
-      if (user.email === email) {
-        alert("Ou pa kapab voye yon invoice bay tèt ou.");
-        setLoading(false);
+      // 3. SEKIRITE: Verifikasyon KYC dirèkteman nan BAZ DONE a (Enspeksyon an dirèk)
+      const { data: freshProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('kyc_status, business_name')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !freshProfile) throw new Error("Echèk nan verifikasyon pwofil.");
+
+      // Si estati a pa 'verified', nou bloke aksyon an imedyatman
+      if (freshProfile.kyc_status !== 'verified') {
+        alert("Echèk: Kont ou dwe 'verified' nan sistèm nan pou fonksyon sa a aktive.");
+        setMode('menu'); // Nou mete l deyò nan paj invoice la
         return;
       }
   
-      // Verifye KYC nan profile ki egziste deja a
-      if (profile?.kyc_status !== 'verified') {
-        alert("Kont ou dwe verifye (KYC) anvan ou voye yon invoice.");
-        setLoading(false);
+      // 4. BLOKIS: Anpeche voye bay tèt ou
+      if (user.email?.toLowerCase() === email.toLowerCase().trim()) {
+        alert("Operasyon entèdi: Ou pa kapab voye yon invoice bay pwòp tèt ou.");
         return;
       }
   
-      const { data: inv, error } = await supabase.from('invoices').insert({
+      // 5. KREYE INVOICE LA
+      const { data: inv, error: invError } = await supabase.from('invoices').insert({
         owner_id: user.id,
         amount: parseFloat(amount),
         client_email: email.toLowerCase().trim(),
-        business_name: businessName || profile.business_name,
+        business_name: freshProfile.business_name || "Merchant Hatex",
         status: 'pending'
       }).select().single();
   
-      if (error) throw error;
+      if (invError) throw invError;
   
-      // VOYE EMAIL
+      // 6. DEKLANCHE EDGE FUNCTION POU EMAIL
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
         headers: { 
@@ -95,17 +106,19 @@ export default function TerminalPage() {
             id: inv.id,
             amount: inv.amount,
             client_email: inv.client_email,
-            business_name: businessName || profile.business_name
+            business_name: freshProfile.business_name
           }
         })
       });
   
-      alert("Invoice voye bay kliyan an ak siksè!");
+      alert("Siksè! Faktire a voye bay kliyan an.");
       setAmount('');
       setEmail('');
       setMode('menu');
+      
     } catch (err: any) {
-      alert(err.message);
+      console.error("Erreur Invoice:", err);
+      alert(err.message || "Yon erè rive.");
     } finally {
       setLoading(false);
     }
