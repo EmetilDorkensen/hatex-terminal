@@ -58,9 +58,9 @@ export default function TerminalPage() {
     try {
       // 2. Toujou verifye itilizatè a konekte
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Ou dwe konekte");
+      if (!user) throw new Error("Ou dwe konekte pou w fè operasyon sa a.");
   
-      // 3. SEKIRITE: Verifikasyon KYC dirèkteman nan BAZ DONE a (Enspeksyon an dirèk)
+      // 3. SEKIRITE: Enspeksyon an dirèk nan BAZ DONE a
       const { data: freshProfile, error: profileError } = await supabase
         .from('profiles')
         .select('kyc_status, business_name')
@@ -69,10 +69,13 @@ export default function TerminalPage() {
 
       if (profileError || !freshProfile) throw new Error("Echèk nan verifikasyon pwofil.");
 
-      // Si estati a pa 'verified', nou bloke aksyon an imedyatman
-      if (freshProfile.kyc_status !== 'verified') {
-        alert("Echèk: Kont ou dwe 'verified' nan sistèm nan pou fonksyon sa a aktive.");
-        setMode('menu'); // Nou mete l deyò nan paj invoice la
+      // RANJE: Nou tcheke pou 'approved' (valè ki nan baz done w la)
+      // Nou itilize .toLowerCase() pou sekirite si janm yon moun ekri 'Approved'
+      const status = freshProfile.kyc_status?.toLowerCase();
+      
+      if (status !== 'approved') {
+        alert(`Echèk: Kont ou dwe 'approved' pou voye invoice. Estati aktyèl: ${freshProfile.kyc_status}`);
+        setMode('menu'); 
         return;
       }
   
@@ -106,7 +109,7 @@ export default function TerminalPage() {
             id: inv.id,
             amount: inv.amount,
             client_email: inv.client_email,
-            business_name: freshProfile.business_name
+            business_name: freshProfile.business_name || "Merchant Hatex"
           }
         })
       });
@@ -119,23 +122,6 @@ export default function TerminalPage() {
     } catch (err: any) {
       console.error("Erreur Invoice:", err);
       alert(err.message || "Yon erè rive.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateBusinessName = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ business_name: businessName })
-        .eq('id', profile.id);
-      if (error) throw error;
-      alert("Branding anrejistre!");
-      setProfile({...profile, business_name: businessName});
-    } catch (err: any) {
-      alert(err.message);
     } finally {
       setLoading(false);
     }
