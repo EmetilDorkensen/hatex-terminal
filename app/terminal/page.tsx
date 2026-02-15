@@ -26,6 +26,7 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
+  // --- INITIALIZASYON ---
   useEffect(() => {
     const initTerminal = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -47,7 +48,7 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
-  // RANJE ERÈ BUILD: Fonksyon sa a te manke nan kòd ou te voye a
+  // --- RANJE ERÈ BUILD: Fonksyon Branding la ---
   const updateBusinessName = async () => {
     if (!businessName) return alert("Tanpri antre yon non biznis.");
     setLoading(true);
@@ -66,6 +67,7 @@ export default function TerminalPage() {
     }
   };
 
+  // --- KREYASYON INVOICE (Sekirize) ---
   const handleCreateInvoice = async () => {
     if (!amount || parseFloat(amount) <= 0 || !email) {
       alert("Tanpri mete yon montan ak yon email valid.");
@@ -77,38 +79,30 @@ export default function TerminalPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
   
-      // Verifikasyon an dirèk pou 'approved' (jan nou wè nan baz done a)
-      const { data: freshProfile, error: profileError } = await supabase
+      // Verifikasyon KYC (Nou asire nou tcheke profil la ankò)
+      const { data: freshProfile } = await supabase
         .from('profiles')
         .select('kyc_status, business_name')
         .eq('id', user.id)
         .single();
 
-      if (profileError || !freshProfile) throw new Error("Echèk nan verifikasyon pwofil.");
-
-      const status = freshProfile.kyc_status?.toLowerCase();
-      
-      if (status !== 'approved') {
-        alert(`Echèk: Kont ou dwe 'approved'. Estati aktyèl: ${freshProfile.kyc_status}`);
+      if (freshProfile?.kyc_status !== 'approved') {
+        alert(`Echèk: Kont ou dwe 'approved'.`);
         setMode('menu'); 
         return;
       }
   
-      if (user.email?.toLowerCase() === email.toLowerCase().trim()) {
-        alert("Ou pa kapab voye yon invoice bay tèt ou.");
-        return;
-      }
-  
+      // Antre invoice la nan DB
       const { data: inv, error: invError } = await supabase.from('invoices').insert({
         owner_id: user.id,
-        amount: parseFloat(amount),
+        amount: parseFloat(amount), // Sa a enpòtan pou pa gen "0 HTG"
         client_email: email.toLowerCase().trim(),
-        business_name: freshProfile.business_name || businessName || "Merchant Hatex",
         status: 'pending'
       }).select().single();
   
       if (invError) throw invError;
   
+      // Rele Edge Function pou voye imel la
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
         headers: { 
@@ -121,7 +115,7 @@ export default function TerminalPage() {
             id: inv.id,
             amount: inv.amount,
             client_email: inv.client_email,
-            business_name: freshProfile.business_name || businessName
+            business_name: freshProfile.business_name || "Merchant Hatex"
           }
         })
       });
@@ -138,6 +132,7 @@ export default function TerminalPage() {
     }
   };
 
+  // --- SENKRONIZASYON BALANS ---
   const handleSyncBalance = async () => {
     const totalVant = transactions
       .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
@@ -161,6 +156,7 @@ export default function TerminalPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
+    {/* Rès kòd JSX ou a kontinye isit la... */}
 
 
       {/* HEADER */}
