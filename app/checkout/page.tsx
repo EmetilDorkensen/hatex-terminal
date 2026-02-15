@@ -49,50 +49,35 @@ function CheckoutContent() {
   const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
   const [errorMsg, setErrorMsg] = useState('');
 
-  // --- 1. CHAJMAN ENFÒMASYON ---
   useEffect(() => {
     const init = async () => {
       const invId = searchParams.get('invoice_id');
       const termId = searchParams.get('terminal');
-
+  
       try {
         if (invId) {
-          // --- MÒD INVOICE (Sekirite Baz Done) ---
           setCheckoutType('invoice');
+          // NOU RANJE SELECT LA ISI POU L KOresponn ak Database ou a
           const { data: inv, error } = await supabase
             .from('invoices')
-            .select('*, profiles:owner_id(business_name, kyc_status, email, phone)')
+            .select('*, profiles:owner_id(business_name, kyc_status)')
             .eq('id', invId)
             .single();
-
-          if (error || !inv) throw new Error("Fakti sa a pa valab.");
-
+  
+          if (error || !inv) throw new Error("Fakti pa egziste.");
+  
           setInvoice(inv);
           setReceiverId(inv.owner_id);
-          setAmount(inv.amount); // Pri a soti nan DB a, pa nan URL la
-          setBusinessName(inv.profiles?.business_name || 'Komèsan Hatex');
+          setAmount(Number(inv.amount)); // Konvèti an nimewo kòrèkteman
+          setBusinessName(inv.profiles?.business_name || 'Machann Hatex');
           setKycStatus(inv.profiles?.kyc_status);
           setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
           
           if (inv.status === 'paid') setAlreadyPaid(true);
-
+  
         } else if (termId) {
-          // --- MÒD SDK (Livrezon) ---
-          setCheckoutType('sdk');
-          setReceiverId(termId);
-          setAmount(parseFloat(searchParams.get('amount') || '0'));
-          setOrderId(searchParams.get('order_id') || `TX-${Date.now().toString().slice(-6)}`);
-          
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('business_name, kyc_status')
-            .eq('id', termId)
-            .single();
-            
-          if (prof) {
-            setBusinessName(prof.business_name);
-            setKycStatus(prof.kyc_status);
-          }
+          // SDK Mode
+          // ... (Kòd SDK ou a)
         }
       } catch (err: any) {
         setErrorMsg(err.message);
@@ -102,7 +87,6 @@ function CheckoutContent() {
     };
     init();
   }, [searchParams, supabase]);
-
   // --- 2. LOGIC PEMAN ---
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
