@@ -49,7 +49,7 @@ export default function LandingPage() {
               
               {/* HEADER DASHBOARD */}
               <div className="flex justify-between items-center mb-8">
-                  <div className="text-red-600 font-black italic text-sm">HATEXCARD</div>
+                  <div className="text-red-600 font-black italic text-sm">HatexCard</div>
                   <div className="w-8 h-8 bg-zinc-900 rounded-full border border-white/10 flex items-center justify-center text-[10px]">🔔</div>
               </div>
 
@@ -141,7 +141,7 @@ export default function LandingPage() {
               <h3 className="text-xl font-black italic mb-6">KIJAN POU RECHADE?</h3>
               <ul className="space-y-4 text-[11px] font-bold text-zinc-400 italic normal-case">
                 <li className="flex gap-3"> <span className="text-red-600">●</span>  (MonCash, NatCash oswa Bank) .</li>
-                <li className="flex gap-3"> <span className="text-red-600">●</span> Admin yo ap verifye epi kredite balans ou nan mwens pase 5 minit.</li>
+                <li className="flex gap-3"> <span className="text-red-600">●</span> Retire otomatikman sou balans Hatex ou a.</li>
                 <li className="flex gap-3"> <span className="text-red-600">●</span> Resevwa notifikasyon pa imèl .</li>
               </ul>
             </div>

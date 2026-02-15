@@ -183,7 +183,7 @@ export default function TerminalPage() {
           <div className="bg-red-600/10 p-2 rounded-xl">
               <ShieldCheck className="text-red-600 w-5 h-5" />
           </div>
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Identité de l'Entreprise</h3>
+          <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Idantite Biznis ou</h3>
       </div>
       <div className="space-y-4">
           <div className="space-y-2 text-left">
@@ -234,7 +234,7 @@ export default function TerminalPage() {
           </button>
           <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-3 hover:bg-zinc-900 transition-all">
             <div className="bg-red-600/20 p-4 rounded-2xl"><Mail className="text-red-600" /></div>
-            <span className="text-[10px] font-black uppercase italic tracking-widest">Générer Invoice</span>
+            <span className="text-[10px] font-black uppercase italic tracking-widest">Voye Invoice</span>
           </button>
         </div>
       )}
@@ -391,7 +391,7 @@ export default function TerminalPage() {
             )) : (
                 <div className="py-20 text-center bg-zinc-900/20 rounded-[3rem] border border-dashed border-white/5">
                     <History className="mx-auto text-zinc-800 mb-4" size={40} />
-                    <p className="text-[10px] font-black uppercase text-zinc-600 italic">Aucune transaction trouvée</p>
+                    <p className="text-[10px] font-black uppercase text-zinc-600 italic">Pagen Tranzaksyon</p>
                 </div>
             )}
           </div>
@@ -448,8 +448,8 @@ export default function TerminalPage() {
                         Intégrez <span className="text-red-600">Hatex API</span> <br/> sur votre store.
                     </h3>
                     <p className="text-zinc-500 text-[11px] leading-relaxed font-medium">
-                        Suivez ce tutoriel pour apprendre à connecter votre boutique au réseau Hatex. 
-                        Le script détecte automatiquement les prix de vos produits et gère la conversion monétaire.
+                        Gade videyo a pouw ka konnen kijan pouw konekte Hatex sou sit Biznis ou. 
+                        Script la detekte pri pwodwi yo ak jere konvesyon yo an HTG nan TO 136.
                     </p>
                     
                     <div className="flex flex-wrap gap-3 pt-2">
