@@ -67,71 +67,78 @@ export default function TerminalPage() {
     }
   };
 
-  // --- KREYASYON INVOICE (Sekirize) ---
-  const handleCreateInvoice = async () => {
-    if (!amount || parseFloat(amount) <= 0 || !email) {
-      alert("Tanpri mete yon montan ak yon email valid.");
+// --- KREYASYON INVOICE (Sekirize ak Lyen /pay) ---
+const handleCreateInvoice = async () => {
+  if (!amount || parseFloat(amount) <= 0 || !email) {
+    alert("Tanpri mete yon montan ak yon email valid.");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Ou dwe konekte");
+
+    // 1. Konsève Verifikasyon KYC ak Info Biznis (Pa retire)
+    const { data: freshProfile } = await supabase
+      .from('profiles')
+      .select('kyc_status, business_name')
+      .eq('id', user.id)
+      .single();
+
+    if (freshProfile?.kyc_status !== 'approved') {
+      alert(`Echèk: Kont ou dwe 'approved' pou voye invoice.`);
+      setMode('menu'); 
       return;
     }
-  
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Ou dwe konekte");
-  
-      // Verifikasyon KYC (Nou asire nou tcheke profil la ankò)
-      const { data: freshProfile } = await supabase
-        .from('profiles')
-        .select('kyc_status, business_name')
-        .eq('id', user.id)
-        .single();
 
-      if (freshProfile?.kyc_status !== 'approved') {
-        alert(`Echèk: Kont ou dwe 'approved'.`);
-        setMode('menu'); 
-        return;
-      }
-  
-      // Antre invoice la nan DB
-      const { data: inv, error: invError } = await supabase.from('invoices').insert({
-        owner_id: user.id,
-        amount: parseFloat(amount), // Sa a enpòtan pou pa gen "0 HTG"
-        client_email: email.toLowerCase().trim(),
-        status: 'pending'
-      }).select().single();
-  
-      if (invError) throw invError;
-  
-      // Rele Edge Function pou voye imel la
-      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          table: 'invoices',
-          record: {
-            id: inv.id,
-            amount: inv.amount,
-            client_email: inv.client_email,
-            business_name: freshProfile.business_name || "Merchant Hatex"
-          }
-        })
-      });
-  
-      alert("Siksè! Faktire a voye.");
-      setAmount('');
-      setEmail('');
-      setMode('menu');
-      
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // 2. Antre invoice la nan DB (Nou pran ID a pou n fè lyen an)
+    const { data: inv, error: invError } = await supabase.from('invoices').insert({
+      owner_id: user.id,
+      amount: parseFloat(amount),
+      client_email: email.toLowerCase().trim(),
+      status: 'pending'
+    }).select().single();
 
+    if (invError) throw invError;
+
+    // 3. JENERE LYEN SEKIRIZE A (Olye de /checkout, nou itilize /pay)
+    const securePayLink = `${window.location.origin}/pay/${inv.id}`;
+
+    // 4. Rele Edge Function pou voye imel la ak nouvo lyen an
+    await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        table: 'invoices',
+        record: {
+          id: inv.id,
+          amount: inv.amount,
+          client_email: inv.client_email,
+          business_name: freshProfile.business_name || "Merchant Hatex",
+          pay_url: securePayLink // Nou voye nouvo lyen an bay imel la
+        }
+      })
+    });
+
+    // Kopye lyen an nan clipboard pou machann nan ka voye l sou WhatsApp/SMS
+    await navigator.clipboard.writeText(securePayLink);
+    
+    alert(`Siksè! Faktire a voye bay ${inv.client_email}.\n\nLyen peman an kopye otomatikman: ${securePayLink}`);
+    
+    setAmount('');
+    setEmail('');
+    setMode('menu');
+    
+  } catch (err: any) {
+    alert(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   // --- SENKRONIZASYON BALANS ---
   const handleSyncBalance = async () => {
     const totalVant = transactions
