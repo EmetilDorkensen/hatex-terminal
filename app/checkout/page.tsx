@@ -58,56 +58,46 @@ useEffect(() => {
          // --- MÒD INVOICE (FAKTI) ---
          setCheckoutType('invoice');
          
-         // NOUVO: Nou rale invoice la ansanm ak pwofil mèt la (owner_id)
+         // Nou rale invoice la ak JOIN sou pwofil la pou jwenn non biznis la
          const { data: inv, error } = await supabase
            .from('invoices')
            .select(`
              *,
              profiles:owner_id (
                business_name,
-               full_name
+               full_name,
+               kyc_status
              )
            `)
            .eq('id', invId)
            .single();
 
-         if (error || !inv) throw new Error("Fakti sa a pa valid oswa li pa egziste.");
+         if (error || !inv) throw new Error("Fakti sa a pa valid.");
 
          setInvoice(inv);
          setReceiverId(inv.owner_id);
-         setAmount(Number(inv.amount)); 
+         setAmount(Number(inv.amount));
          
-         // DINAMIK: Priyorite non biznis la soti nan Profile la
-         const bizName = inv.profiles?.business_name || inv.profiles?.full_name || inv.business_name || 'Hatex Merchant';
+         // Rale non biznis la nan Profile la (sa ki nan baz done a)
+         const bizName = inv.profiles?.business_name || inv.profiles?.full_name || 'Hatex Merchant';
          setBusinessName(bizName);
          
          setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
-         
          if (inv.status === 'paid') setAlreadyPaid(true);
-         
-         // Mete kyc_status a depi nan done nou rale anwo a pou optimize
          if (inv.profiles) setKycStatus(inv.profiles.kyc_status);
+
        } else if (termId) {
-          // --- MÒD SDK (TERMINAL) ---
-          setCheckoutType('sdk');
-          setReceiverId(termId);
-          setAmount(Number(searchParams.get('amount')) || 0);
-          setOrderId(searchParams.get('order_id') || `SDK-${Math.random().toString(36).slice(2, 9)}`);
-          
-          // Chache info machann nan
-          const { data: prof } = await supabase.from('profiles').select('business_name, kyc_status').eq('id', termId).single();
-          if (prof) {
-            setBusinessName(prof.business_name || 'Hatex Merchant');
-            setKycStatus(prof.kyc_status);
-          }
-        }
-      } catch (err: any) {
-        console.error("Erè:", err);
-        setErrorMsg("Enposib pou chaje tranzaksyon an.");
-      } finally {
-        setLoading(false);
-      }
-    };
+         // --- MÒD SDK (TERMINAL) ---
+         setCheckoutType('sdk');
+         // (Kite rès lojik SDK ou a isit la si w genyen l)
+       }
+     } catch (err: any) {
+       console.error("Erè Init:", err.message);
+       setErrorMsg(err.message);
+     } finally {
+       setLoading(false);
+     }
+   };
     init();
   }, [searchParams, supabase]);
 
