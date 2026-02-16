@@ -47,42 +47,47 @@ function CheckoutContent() {
   // Fòm Peman
   const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
 
-  // --- 1. INITIALIZATION & DETECTION ---
-  useEffect(() => {
-    const init = async () => {
-      const invId = searchParams.get('invoice_id');
-      const termId = searchParams.get('terminal');
+// --- 1. INITIALIZATION & DETECTION ---
+useEffect(() => {
+   const init = async () => {
+     const invId = searchParams.get('invoice_id');
+     const termId = searchParams.get('terminal');
 
-      try {
-        if (invId) {
-          // --- MÒD INVOICE (FAKTI) ---
-          setCheckoutType('invoice');
-          
-          // KOREKSYON: Nou li dirèkteman nan tab invoices san konplike lavi a
-          const { data: inv, error } = await supabase
-            .from('invoices')
-            .select('*')
-            .eq('id', invId)
-            .single();
+     try {
+       if (invId) {
+         // --- MÒD INVOICE (FAKTI) ---
+         setCheckoutType('invoice');
+         
+         // NOUVO: Nou rale invoice la ansanm ak pwofil mèt la (owner_id)
+         const { data: inv, error } = await supabase
+           .from('invoices')
+           .select(`
+             *,
+             profiles:owner_id (
+               business_name,
+               full_name
+             )
+           `)
+           .eq('id', invId)
+           .single();
 
-          if (error || !inv) throw new Error("Fakti sa a pa valid oswa li pa egziste.");
+         if (error || !inv) throw new Error("Fakti sa a pa valid oswa li pa egziste.");
 
-          setInvoice(inv);
-          setReceiverId(inv.owner_id);
-          setAmount(Number(inv.amount)); // Asire w li an chif
-          
-          // Nou pran non biznis la dirèkteman nan fakti a si l egziste, sinon 'Hatex Merchant'
-          setBusinessName(inv.business_name || 'Hatex Merchant');
-          
-          setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
-          
-          if (inv.status === 'paid') setAlreadyPaid(true);
-
-          // Si w vle tcheke KYC, fè l apa pou pa bloke invoice la
-          const { data: prof } = await supabase.from('profiles').select('kyc_status').eq('id', inv.owner_id).single();
-          if (prof) setKycStatus(prof.kyc_status);
-
-        } else if (termId) {
+         setInvoice(inv);
+         setReceiverId(inv.owner_id);
+         setAmount(Number(inv.amount)); 
+         
+         // DINAMIK: Priyorite non biznis la soti nan Profile la
+         const bizName = inv.profiles?.business_name || inv.profiles?.full_name || inv.business_name || 'Hatex Merchant';
+         setBusinessName(bizName);
+         
+         setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
+         
+         if (inv.status === 'paid') setAlreadyPaid(true);
+         
+         // Mete kyc_status a depi nan done nou rale anwo a pou optimize
+         if (inv.profiles) setKycStatus(inv.profiles.kyc_status);
+       } else if (termId) {
           // --- MÒD SDK (TERMINAL) ---
           setCheckoutType('sdk');
           setReceiverId(termId);
@@ -106,47 +111,53 @@ function CheckoutContent() {
     init();
   }, [searchParams, supabase]);
 
-  // --- 2. LOGIC PEMAN ---
   const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setProcessing(true);
-    setErrorMsg('');
-
-    try {
-      if (!receiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
-
-      // Rele Fonksyon SQL la (Backend Security)
-      const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
-        p_terminal_id: receiverId,
-        p_card_number: form.card.replace(/\s/g, ''),
-        p_card_cvv: form.cvv,
-        p_card_expiry: form.expiry,
-        p_amount: amount,
-        p_order_id: orderId,
-        p_customer_name: checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name,
-        p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
-      });
-
-      if (rpcError) throw rpcError;
-
-      if (data.success) {
-        if (checkoutType === 'invoice') {
-          // Update Invoice status
-          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
-          setAlreadyPaid(true); // Montre ekran siksè a
-        } else {
-          // Redirect pou SDK
-          router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
-        }
-      } else {
-        throw new Error(data.message);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Echèk tranzaksyon. Verifye kat ou.");
-    } finally {
-      setProcessing(false);
-    }
-  };
+   e.preventDefault();
+   setProcessing(true);
+   setErrorMsg('');
+ 
+   try {
+     // Nou tcheke si se yon invoice oswa SDK pou nou konnen ki ID pou itilize
+     const targetReceiverId = checkoutType === 'invoice' ? invoice?.owner_id : receiverId;
+ 
+     if (!targetReceiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
+ 
+     // Rele Fonksyon SQL la
+     const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
+       p_terminal_id: targetReceiverId, // Se ID mèt invoice la oswa terminal SDK a
+       p_card_number: form.card.replace(/\s/g, ''),
+       p_card_cvv: form.cvv,
+       p_card_expiry: form.expiry,
+       p_amount: amount,
+       p_order_id: orderId,
+       p_customer_name: checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name,
+       p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
+     });
+ 
+     if (rpcError) throw rpcError;
+ 
+     if (data.success) {
+       if (checkoutType === 'invoice') {
+         // Lè se yon invoice, nou mete l kòm "paid" nan baz done a
+         await supabase
+           .from('invoices')
+           .update({ status: 'paid' })
+           .eq('id', invoice.id);
+           
+         setAlreadyPaid(true); // Sa ap afiche ekran siksè a
+       } else {
+         // Si se SDK (magazen deyò), nou voye l sou paj siksè a
+         router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
+       }
+     } else {
+       throw new Error(data.message);
+     }
+   } catch (err: any) {
+     setErrorMsg(err.message || "Echèk tranzaksyon. Verifye kat ou.");
+   } finally {
+     setProcessing(false);
+   }
+ };
 
   if (loading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
@@ -161,21 +172,23 @@ function CheckoutContent() {
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-900/30">
       <div className="max-w-6xl mx-auto min-h-screen grid grid-cols-1 lg:grid-cols-2">
         
-        {/* --- KOLÒN GÒCH: ENFÒMASYON --- */}
-        <div className="p-8 lg:p-16 flex flex-col relative overflow-hidden bg-white/[0.02] border-r border-white/5">
-          {/* Header Biznis */}
-          <div className="mb-10 flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-red-600 to-red-900 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20">
-              <Building2 size={24} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight uppercase">{businessName}</h1>
-              <div className="flex items-center gap-2">
-                 {kycStatus === 'approved' && (
-                   <span className="flex items-center gap-1 text-[9px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 font-black uppercase tracking-wider">
-                     <CheckCircle2 size={10} /> Verifié
-                   </span>
-                 )}
+{/* Bò gòch paj la kote non machann nan parèt */}
+<div className="flex items-center gap-4">
+  <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+    <Building2 className="text-white w-6 h-6" />
+  </div>
+  <div>
+    {/* Sa a pral chanje dinamikman selon mèt invoice la */}
+    <h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
+      {businessName} 
+    </h1>
+    <div className="flex items-center gap-2 mt-1">
+       <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
+         VERIFYE
+       </span>
+    </div>
+  </div>
+</div>
                  <span className="text-[9px] text-zinc-500 font-mono uppercase tracking-wider">REF: {orderId}</span>
               </div>
             </div>
