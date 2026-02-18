@@ -230,35 +230,21 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {/* SDK SECTION (UPGRADED) */}
-      {mode === 'api' && profile.business_name && (
-        <div className="space-y-6 animate-in zoom-in-95 duration-300">
-          <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
-            <div className="flex items-center gap-3 mb-6">
-              <Globe className="text-red-600 w-5 h-5" />
-              <div>
-                <h2 className="text-[11px] font-black uppercase italic">SDK Hatex Entelijan</h2>
-                <p className="text-[8px] text-zinc-500">Auto-Detect Pri (HTG/USD), Opsyon, Cart & Checkout</p>
-              </div>
-            </div>
-            <div className="relative">
-              <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-[500px] overflow-y-auto scrollbar-hide whitespace-pre-wrap">
-{`<div id="hatex-secure-pay-wrapper"></div>
+<div id="hatex-secure-pay-wrapper"></div>
 <style>
-  /* Style Pwofesyonel Enspire de Temu/AliExpress */
-  .htx-btn { background: #dc2626; color: white; width: 100%; padding: 18px; border-radius: 12px; font-weight: 900; border: none; cursor: pointer; font-family: sans-serif; box-shadow: 0 8px 20px rgba(220,38,38,0.25); transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
-  .htx-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(220,38,38,0.35); }
-  .htx-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 999999; display: none; align-items: flex-end; justify-content: center; }
-  .htx-modal { background: #111; width: 100%; max-width: 500px; border-radius: 24px 24px 0 0; padding: 25px; box-sizing: border-box; color: white; font-family: sans-serif; animation: htxSlideUp 0.4s ease-out; max-height: 90vh; overflow-y: auto; border-top: 1px solid #333; }
+  /* Style Pwofesyonèl Hatex - Enspire de Temu/AliExpress */
+  .htx-btn { background: #dc2626; color: white; width: 100%; padding: 18px; border-radius: 12px; font-weight: 900; border: none; cursor: pointer; font-family: sans-serif; box-shadow: 0 8px 20px rgba(220,38,38,0.25); transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; }
+  .htx-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999999; display: none; align-items: flex-end; justify-content: center; }
+  .htx-modal { background: #0a0a0a; width: 100%; max-width: 500px; border-radius: 32px 32px 0 0; padding: 30px; box-sizing: border-box; color: white; font-family: sans-serif; animation: htxSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); max-height: 95vh; overflow-y: auto; border-top: 2px solid #dc2626; }
   @keyframes htxSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .htx-input { width: 100%; background: #000; border: 1px solid #333; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px; font-size: 14px; box-sizing: border-box; outline: none; transition: border 0.3s; }
-  .htx-input:focus { border-color: #dc2626; }
+  .htx-input { width: 100%; background: #161616; border: 1px solid #333; padding: 16px; border-radius: 14px; color: white; margin-bottom: 12px; font-size: 14px; box-sizing: border-box; outline: none; }
+  .htx-input:focus { border-color: #dc2626; background: #000; }
   .htx-row { display: flex; gap: 10px; }
-  .htx-item-card { background: #1a1a1a; padding: 12px; border-radius: 12px; display: flex; gap: 12px; margin-bottom: 10px; border: 1px solid #222; }
-  .htx-item-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; background: #000; }
-  .htx-badge { background: #333; font-size: 10px; padding: 3px 8px; border-radius: 4px; color: #aaa; }
-  .htx-total-box { background: linear-gradient(45deg, #1a0000, #000); padding: 20px; border-radius: 16px; text-align: center; border: 1px dashed #dc2626; margin: 20px 0; }
-  .htx-close { float: right; cursor: pointer; font-size: 24px; color: #666; line-height: 1; }
+  .htx-item-card { background: #161616; padding: 15px; border-radius: 18px; display: flex; gap: 15px; margin-bottom: 12px; border: 1px solid #262626; position: relative; }
+  .htx-item-img { width: 70px; height: 70px; object-fit: cover; border-radius: 12px; background: #000; border: 1px solid #333; }
+  .htx-badge { background: #dc2626; font-size: 10px; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; }
+  .htx-total-box { background: linear-gradient(135deg, #220000, #0a0a0a); padding: 25px; border-radius: 20px; text-align: center; border: 1px solid #dc2626; margin: 20px 0; }
+  .htx-close { float: right; cursor: pointer; font-size: 28px; color: #999; line-height: 1; }
 </style>
 
 <script>
@@ -268,16 +254,13 @@ export default function TerminalPage() {
   let cartData = [];
   let isSubmitting = false;
 
-  // 1. MOTÈ SCRAPING ENTELIJAN (Inivèsèl)
   function findVariations() {
     let variants = [];
-    // Chèche tout dropdowns/selects
     document.querySelectorAll('select').forEach(sel => {
       if(sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text !== sel.options[0].text) {
         variants.push(sel.options[sel.selectedIndex].text);
       }
     });
-    // Chèche koulè/size an bouton radio oswa swatch
     document.querySelectorAll('input[type="radio"]:checked, .swatch.selected, .variant-active').forEach(el => {
       variants.push(el.value || el.innerText || el.getAttribute('data-value'));
     });
@@ -286,160 +269,104 @@ export default function TerminalPage() {
 
   function extractPriceDetails(text) {
     if(!text) return { val: 0, isUSD: false };
-    const upperText = text.toUpperCase();
-    // N.B: Nou itilize [^0-9.] olye de \d pou evite erè compilation regex
     const val = parseFloat(text.replace(/[^0-9.]/g, '')); 
-    const isExplicitHTG = upperText.includes('HTG') || upperText.includes('G') || upperText.includes('GOUD');
-    const isExplicitUSD = upperText.includes('$') || upperText.includes('USD');
-    
-    // Si l pa klè, nou devine selon kantite a (mwens ke 1000 = pwobableman USD)
-    const isUSD = isExplicitUSD ? true : (isExplicitHTG ? false : (val < 1000));
+    const isUSD = text.includes('$') || text.toUpperCase().includes('USD') || val < 1000;
     return { val, isUSD };
   }
 
-  // Fonksyon pou paj pwodwi
   function scrapeProductPage() {
     const title = document.querySelector('h1')?.innerText || document.title;
-    const img = document.querySelector('meta[property="og:image"]')?.content || document.querySelector('.product-gallery img, .woocommerce-product-gallery img')?.src || '';
-    
-    // Chèche pri a sou paj la
-    const priceSelectors = ['.price', '.woocommerce-Price-amount', '.product__price', '[data-price]', '#priceblock_ourprice'];
-    let priceText = '';
-    for(let s of priceSelectors) {
-      let el = document.querySelector(s);
-      if(el && !el.closest('del') && !el.closest('.price--compare')) {
-        priceText = el.innerText || el.getAttribute('data-price');
-        break;
-      }
-    }
-    
+    const img = document.querySelector('meta[property="og:image"]')?.content || document.querySelector('img[class*="product"], .wp-post-image')?.src || '';
+    const priceText = document.querySelector('.price, .amount, [class*="price"]')?.innerText;
     const pDetails = extractPriceDetails(priceText);
     const qty = parseInt(document.querySelector('input[name="quantity"], .qty')?.value) || 1;
     const vars = findVariations();
 
-    return [{ name: title, img: img, qty: qty, priceRaw: pDetails.val, isUSD: pDetails.isUSD, variants: vars }];
+    return { 
+      name: title, 
+      img: img, 
+      qty: qty, 
+      priceRaw: pDetails.val, 
+      isUSD: pDetails.isUSD, 
+      variants: vars,
+      url: window.location.href // Rale URL prodwi a
+    };
   }
 
-  // Fonksyon pou paj Cart/Checkout
-  function scrapeCartPage() {
-    let items = [];
-    // Gade fòm panyen yo jeneralman
-    const cartRows = document.querySelectorAll('.cart-item, .woocommerce-cart-form__cart-item, .order-item');
-    if(cartRows.length > 0) {
-      cartRows.forEach(row => {
-        const name = row.querySelector('.product-name, .cart-item__name, a')?.innerText || 'Produit';
-        const img = row.querySelector('img')?.src || '';
-        const qty = parseInt(row.querySelector('.qty, input[type="number"]')?.value) || 1;
-        const pDetails = extractPriceDetails(row.querySelector('.product-price, .amount')?.innerText);
-        const vars = row.querySelector('.variation, .item-options')?.innerText || '';
-        items.push({ name, img, qty, priceRaw: pDetails.val, isUSD: pDetails.isUSD, variants: vars });
-      });
-    }
-    return items;
-  }
-
-  // 2. KALKIL AK KONVÈSYON (Otomatik HTG/Goud)
-  function processCart() {
-    // Tcheke si nou nan yon panyen/checkout oubyen yon sèl pwodwi
-    let rawItems = document.querySelector('.cart-form, .checkout-order-review') ? scrapeCartPage() : scrapeProductPage();
-    if(rawItems.length === 0) rawItems = scrapeProductPage(); // Fallback
-    
-    let totalHTG = 0;
-    cartData = rawItems.map(item => {
-      let unitHTG = item.isUSD ? (item.priceRaw * TAUX) : item.priceRaw;
-      if(unitHTG <= 0) unitHTG = 500; // Pri defo si echèk scraping
-      let lineTotal = unitHTG * item.qty;
-      totalHTG += lineTotal;
-      return { ...item, finalUnitHtg: unitHTG, lineTotalHtg: lineTotal };
-    });
-    
-    return totalHTG;
-  }
-
-  // 3. KREYASYON UI (Bouton & Modal)
   const target = document.getElementById('hatex-secure-pay-wrapper');
   if(!target) return;
 
   const btn = document.createElement('button');
   btn.className = 'htx-btn';
-  btn.innerHTML = '🔒 Payer via Hatex (HTG)';
+  btn.innerHTML = '🔒 PEYE AK HATEX CARD (HTG)';
   target.appendChild(btn);
 
-  const modalHtml = \`
+  const modalHtml = `
     <div class="htx-modal-overlay" id="htx-modal">
       <div class="htx-modal">
         <span class="htx-close" id="htx-close">&times;</span>
-        <h3 style="margin-top:0; color:#fff; font-size:18px; font-weight:900;">FINALISATION COMMANDE</h3>
+        <h3 style="margin:0 0 20px 0; font-size:20px; font-weight:900; letter-spacing:-1px;">PANYEN HATEX</h3>
         
-        <div id="htx-items-container" style="margin: 20px 0; max-height:150px; overflow-y:auto; border-bottom:1px solid #333; padding-bottom:10px;"></div>
+        <div id="htx-items-container" style="margin-bottom:20px;"></div>
 
         <div class="htx-total-box">
-          <span style="font-size:11px; color:#aaa; display:block; margin-bottom:5px;">TOTAL À PAYER (Taxes inc.)</span>
-          <span id="htx-total-display" style="font-size:28px; font-weight:900; color:#10b981;">CALCUL...</span>
+          <span style="font-size:10px; color:#888; display:block; margin-bottom:5px; font-weight:bold; letter-spacing:1px;">TOTAL KOMANN</span>
+          <span id="htx-total-display" style="font-size:32px; font-weight:900; color:#fff;">...</span>
         </div>
 
         <form id="htx-checkout-form">
-          <input required id="h_name" class="htx-input" placeholder="Nom Complet (ex: Jean Dupont)">
+          <input required id="h_name" class="htx-input" placeholder="Non ak Siyati">
           <div class="htx-row">
-            <input required id="h_phone" type="tel" class="htx-input" placeholder="Téléphone WhatsApp">
-            <input required id="h_email" type="email" class="htx-input" placeholder="Email pour reçu">
+            <input required id="h_phone" type="tel" class="htx-input" placeholder="WhatsApp">
+            <input required id="h_email" type="email" class="htx-input" placeholder="Email">
           </div>
-          <input required id="h_address" class="htx-input" placeholder="Adresse complète de livraison">
-          <input id="h_notes" class="htx-input" placeholder="Notes (ex: Proche de l'église...)">
-          
-          <button type="submit" class="htx-btn" id="htx-submit-btn" style="margin-top:10px;">VALIDER ET PAYER</button>
+          <input required id="h_address" class="htx-input" placeholder="Adrès Livraison">
+          <textarea id="h_notes" class="htx-input" style="height:80px; padding:12px;" placeholder="Nòt siplemantè (Koulè, Size, etc.)"></textarea>
+          <button type="submit" class="htx-btn" id="htx-submit-btn">KONFIME AK PEYE</button>
         </form>
-        <div style="text-align:center; margin-top:15px; font-size:10px; color:#666;">
-          🔒 Sécurisé par HatexCard Gateway - Chiffrement de bout en bout
-        </div>
       </div>
     </div>
-  \`;
+  `;
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-  // 4. AKSYON AK SEKIRITE
-  const modal = document.getElementById('htx-modal');
-  
   btn.onclick = (e) => {
     e.preventDefault();
-    const finalTotal = processCart();
-    document.getElementById('htx-total-display').innerText = finalTotal.toLocaleString() + ' HTG';
+    const item = scrapeProductPage();
+    if(!cartData.find(i => i.name === item.name)) cartData.push(item);
     
-    // Rann lis pwodwi yo nan modal la
     const container = document.getElementById('htx-items-container');
     container.innerHTML = '';
-    cartData.forEach(item => {
-      container.innerHTML += \`
+    let totalHTG = 0;
+
+    cartData.forEach(i => {
+      let price = i.isUSD ? (i.priceRaw * TAUX) : i.priceRaw;
+      totalHTG += (price * i.qty);
+      container.innerHTML += `
         <div class="htx-item-card">
-          \${item.img ? \`<img src="\${item.img}" class="htx-item-img">\` : ''}
+          <img src="\${i.img}" class="htx-item-img">
           <div style="flex:1;">
-            <div style="font-size:12px; font-weight:bold; color:#fff;">\${item.name}</div>
-            \${item.variants ? \`<div style="font-size:10px; color:#888; margin:4px 0;">Options: \${item.variants}</div>\` : ''}
-            <div style="display:flex; justify-content:space-between; margin-top:5px;">
-              <span class="htx-badge">Qté: \${item.qty}</span>
-              <span style="font-size:12px; font-weight:bold; color:#10b981;">\${item.lineTotalHtg.toLocaleString()} HTG</span>
-            </div>
+            <div style="font-size:13px; font-weight:bold;">\${i.name}</div>
+            <div style="font-size:10px; color:#666; margin:4px 0;">\${i.variants}</div>
+            <span class="htx-badge">\${i.qty}x</span>
           </div>
-        </div>
-      \`;
+        </div>`;
     });
-    
-    modal.style.display = 'flex';
+
+    document.getElementById('htx-total-display').innerText = totalHTG.toLocaleString() + ' HTG';
+    document.getElementById('htx-modal').style.display = 'flex';
   };
 
-  document.getElementById('htx-close').onclick = () => { modal.style.display = 'none'; };
+  document.getElementById('htx-close').onclick = () => { document.getElementById('htx-modal').style.display = 'none'; };
 
   document.getElementById('htx-checkout-form').onsubmit = (e) => {
     e.preventDefault();
-    if(isSubmitting) return; // Anti Brute-force
+    if(isSubmitting) return;
     isSubmitting = true;
     document.getElementById('htx-submit-btn').innerText = 'TRAITEMENT...';
 
-    // Konstwi Kago a (Payload) pou voye bay Machann nan
     const payload = {
-      merchant_id: TID,
-      order_id: "HTX-" + Math.floor(Math.random() * 1000000),
-      total_htg: document.getElementById('htx-total-display').innerText.replace(/[^0-9]/g, ''),
+      terminal: TID,
+      amount: document.getElementById('htx-total-display').innerText.replace(/[^0-9]/g, ''),
       customer: {
         name: document.getElementById('h_name').value,
         phone: document.getElementById('h_phone').value,
@@ -447,27 +374,16 @@ export default function TerminalPage() {
         address: document.getElementById('h_address').value,
         notes: document.getElementById('h_notes').value
       },
-      cart_items: cartData,
-      platform_url: window.location.href
+      items: cartData,
+      shop_name: document.title,
+      platform: window.location.hostname
     };
 
-    // KRIPTAJ FRONTEND (Base64) - Pou pri a pa parèt klè nan URL la
-    // N.B: Nan yon vrè pwodiksyon, fòk backend ou a verifye pri yo.
-    const secureToken = btoa(encodeURIComponent(JSON.stringify(payload)));
-    
-    // Voye sou paj checkout sekirize w la
-    window.location.href = "https://hatexcard.com/secure-checkout?token=" + secureToken;
+    const token = btoa(encodeURIComponent(JSON.stringify(payload)));
+    window.location.href = "https://hatexcard.com/checkout?token=" + token;
   };
-
 })();
-</script>`}
-              </pre>
-              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Entelijan an Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase shadow-lg hover:scale-105 transition-all">KOPYE KÒD SEKIRIZE A</button>
-            </div>
-          </div>
-          <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all italic">Tounen nan Dashboard</button>
-        </div>
-      )}
+</script>
 
       {/* RÈS KÒD LA (HISTORY, REQUEST, VIDEO) RETE EGZAKTEMAN MENM JAN AN... */}
       {/* PROFESSIONAL HISTORY SECTION */}
