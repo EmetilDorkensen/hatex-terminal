@@ -56,7 +56,7 @@ function CheckoutContent() {
        if (invId) {
          setCheckoutType('invoice');
          
-         // Nou fè yon sèl requete ki rale Invoice ak Profile ansanm
+         // Nou rale Invoice la ansanm ak Profile mèt la
          const { data: inv, error } = await supabase
            .from('invoices')
            .select(`
@@ -76,7 +76,7 @@ function CheckoutContent() {
          setReceiverId(inv.owner_id);
          setAmount(Number(inv.amount));
          
-         // DINAMIK: Nou pran non an nan baz done a
+         // Nou mete non biznis la (Dinamik)
          const bizName = inv.profiles?.business_name || inv.profiles?.full_name || 'Hatex Merchant';
          setBusinessName(bizName);
          
@@ -86,7 +86,7 @@ function CheckoutContent() {
 
        } else if (termId) {
          setCheckoutType('sdk');
-         // Isit la ou ka mete lojik SDK ou a si w bezwen l
+         // Mete lojik SDK ou isit la si w bezwen l
        }
      } catch (err: any) {
        console.error("Erè:", err.message);
