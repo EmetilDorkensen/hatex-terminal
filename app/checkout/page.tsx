@@ -174,9 +174,6 @@ function CheckoutContent() {
        <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
          VERIFYE
        </span>
-    </div>
-  </div>
-</div>
                  <span className="text-[9px] text-zinc-500 font-mono uppercase tracking-wider">REF: {orderId}</span>
               </div>
             </div>
