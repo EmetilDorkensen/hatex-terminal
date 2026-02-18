@@ -29,12 +29,12 @@ function CheckoutContent() {
   const [businessName, setBusinessName] = useState('Hatex Merchant');
   const [kycStatus, setKycStatus] = useState<string>('');
   
-  // Done Invoice (Si se yon fakti)
+  // Done Invoice
   const [invoice, setInvoice] = useState<any>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Done SDK (Si se yon livrezon)
+  // Done SDK (Sekirize nan useMemo)
   const sdkData = useMemo(() => ({
     product_name: searchParams.get('product_name') || 'Sèvis Digital',
     product_image: searchParams.get('product_image'),
@@ -58,7 +58,6 @@ function CheckoutContent() {
           // --- MÒD INVOICE (FAKTI) ---
           setCheckoutType('invoice');
           
-          // KOREKSYON: Nou li dirèkteman nan tab invoices san konplike lavi a
           const { data: inv, error } = await supabase
             .from('invoices')
             .select('*')
@@ -69,18 +68,22 @@ function CheckoutContent() {
 
           setInvoice(inv);
           setReceiverId(inv.owner_id);
-          setAmount(Number(inv.amount)); // Asire w li an chif
+          setAmount(Number(inv.amount));
           
-          // Nou pran non biznis la dirèkteman nan fakti a si l egziste, sinon 'Hatex Merchant'
-          setBusinessName(inv.business_name || 'Hatex Merchant');
+          // Chache non machann nan pwofil la pou asire sekirite
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('business_name, kyc_status')
+            .eq('id', inv.owner_id)
+            .single();
+            
+          if (prof) {
+            setBusinessName(prof.business_name || 'Hatex Merchant');
+            setKycStatus(prof.kyc_status);
+          }
           
           setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
-          
           if (inv.status === 'paid') setAlreadyPaid(true);
-
-          // Si w vle tcheke KYC, fè l apa pou pa bloke invoice la
-          const { data: prof } = await supabase.from('profiles').select('kyc_status').eq('id', inv.owner_id).single();
-          if (prof) setKycStatus(prof.kyc_status);
 
         } else if (termId) {
           // --- MÒD SDK (TERMINAL) ---
@@ -89,8 +92,12 @@ function CheckoutContent() {
           setAmount(Number(searchParams.get('amount')) || 0);
           setOrderId(searchParams.get('order_id') || `SDK-${Math.random().toString(36).slice(2, 9)}`);
           
-          // Chache info machann nan
-          const { data: prof } = await supabase.from('profiles').select('business_name, kyc_status').eq('id', termId).single();
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('business_name, kyc_status')
+            .eq('id', termId)
+            .single();
+
           if (prof) {
             setBusinessName(prof.business_name || 'Hatex Merchant');
             setKycStatus(prof.kyc_status);
@@ -115,7 +122,6 @@ function CheckoutContent() {
     try {
       if (!receiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
 
-      // Rele Fonksyon SQL la (Backend Security)
       const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
         p_terminal_id: receiverId,
         p_card_number: form.card.replace(/\s/g, ''),
@@ -131,11 +137,9 @@ function CheckoutContent() {
 
       if (data.success) {
         if (checkoutType === 'invoice') {
-          // Update Invoice status
           await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
-          setAlreadyPaid(true); // Montre ekran siksè a
+          setAlreadyPaid(true);
         } else {
-          // Redirect pou SDK
           router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
         }
       } else {
@@ -163,7 +167,7 @@ function CheckoutContent() {
         
         {/* --- KOLÒN GÒCH: ENFÒMASYON --- */}
         <div className="p-8 lg:p-16 flex flex-col relative overflow-hidden bg-white/[0.02] border-r border-white/5">
-          {/* Header Biznis */}
+          {/* Header Biznis - Non Machann nan parèt isit la */}
           <div className="mb-10 flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-red-600 to-red-900 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20">
               <Building2 size={24} className="text-white" />
@@ -181,15 +185,14 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* KONTN DYNAMIK */}
           <div className="flex-1 space-y-8">
             
-            {/* 1. MÒD SDK (LIVREZON) */}
+            {/* 1. MÒD SDK (LIVREZON) - Tout detay yo la */}
             {checkoutType === 'sdk' && (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                  <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6">
                     <div className="w-16 h-16 bg-black rounded-xl border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                       {sdkData.product_image ? <img src={sdkData.product_image} className="w-full h-full object-cover" /> : <Package size={24} className="text-zinc-700"/>}
+                       {sdkData.product_image ? <img src={sdkData.product_image} className="w-full h-full object-cover" alt="product" /> : <Package size={24} className="text-zinc-700"/>}
                     </div>
                     <div>
                        <h3 className="font-bold text-sm uppercase">{sdkData.product_name}</h3>
@@ -217,7 +220,7 @@ function CheckoutContent() {
               </div>
             )}
 
-            {/* 2. MÒD INVOICE (DOKIMAN) */}
+            {/* 2. MÒD INVOICE */}
             {checkoutType === 'invoice' && (
                <div className="bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl p-8 space-y-6 animate-in zoom-in-95 duration-500">
                   <div className="flex items-center gap-3 mb-4">
@@ -229,6 +232,10 @@ function CheckoutContent() {
                     <div className="flex justify-between border-b border-white/5 pb-4">
                        <span className="text-zinc-500 text-sm">Client</span>
                        <span className="font-bold text-sm text-white">{invoice?.client_email}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-4">
+                       <span className="text-zinc-500 text-sm">Montant</span>
+                       <span className="font-bold text-sm text-red-500">{amount.toLocaleString()} HTG</span>
                     </div>
                     <div className="flex justify-between border-b border-white/5 pb-4">
                        <span className="text-zinc-500 text-sm">Date</span>
@@ -246,7 +253,7 @@ function CheckoutContent() {
                </div>
             )}
 
-            {/* TOTAL */}
+            {/* TOTAL KI TOUJOU LA */}
             <div className="pt-8 mt-auto">
                <div className="flex justify-between items-end">
                   <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Total à payer</span>
@@ -263,7 +270,6 @@ function CheckoutContent() {
         <div className="bg-[#0a0b12] p-8 lg:p-20 flex flex-col justify-center">
           
           {alreadyPaid ? (
-             // EKRAN SIKSÈ (INVOICE)
              <div className="text-center space-y-8 animate-in zoom-in-50 duration-500">
                 <div className="w-24 h-24 bg-green-500 rounded-full mx-auto flex items-center justify-center shadow-[0_0_40px_-10px_rgba(34,197,94,0.6)]">
                    <CheckCircle2 size={40} className="text-black" />
@@ -281,7 +287,6 @@ function CheckoutContent() {
                 </button>
              </div>
           ) : (
-             // FÒM PEMAN
              <div className="space-y-8">
                <div>
                   <h2 className="text-2xl font-bold mb-2">Paiement Sécurisé</h2>
