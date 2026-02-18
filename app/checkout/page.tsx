@@ -6,7 +6,7 @@ import {
   Lock, CreditCard, CheckCircle2, 
   MapPin, Phone, FileText, Download,
   AlertTriangle, Building2, Truck, Package,
-  ArrowRight, ShieldCheck
+  ArrowRight, ShieldCheck, Images, ShoppingCart, User
 } from 'lucide-react';
 
 function CheckoutContent() {
@@ -32,22 +32,50 @@ function CheckoutContent() {
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // --- NOUVO SDK DATA ---
+  // Nou ajoute tout nouvo paramèt yo (shop_name, quantity, color, size, vs)
   const sdkData = useMemo(() => ({
+    shop_name: searchParams.get('shop_name') || searchParams.get('platform') || 'Hatex Gateway',
     product_name: searchParams.get('product_name') || 'Sèvis Digital',
     product_image: searchParams.get('product_image'),
+    quantity: searchParams.get('quantity') || '1',
+    color: searchParams.get('color'),
+    size: searchParams.get('size'),
     customer_name: searchParams.get('customer_name') || 'Kliyan',
     customer_address: searchParams.get('customer_address') || 'N/A',
     customer_phone: searchParams.get('customer_phone') || 'N/A',
     platform: searchParams.get('platform') || 'Hatex Gateway'
   }), [searchParams]);
 
-  const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
+  // Ajoute First Name ak Last Name nan fòm nan pou verifikasyon
+  const [form, setForm] = useState({ firstName: '', lastName: '', card: '', expiry: '', cvv: '' });
 
   // --- FONKSYON POU BOUCHE NON AN (Eme...) ---
   const maskName = (name: string) => {
     if (!name) return "Kli...";
-    const base = name.split('@')[0]; // Retire @ si se yon email
+    const base = name.includes('@') ? name.split('@')[0] : name;
     return base.substring(0, 3) + "...";
+  };
+
+  // --- VERIFIKASYON KAT (FRONTEND) ---
+  const validateForm = () => {
+    const cardNumber = form.card.replace(/\s/g, '');
+    if (cardNumber.length < 15 || cardNumber.length > 19) return "Nimewo kat la pa gen bon longè.";
+    
+    if (form.cvv.length < 3 || form.cvv.length > 4) return "Kòd CVV/CVC a dwe gen 3 oswa 4 chif.";
+    
+    if (!form.firstName.trim() || !form.lastName.trim()) return "Tanpri mete non ak siyati egzakteman jan li sou kat la.";
+    
+    const [month, year] = form.expiry.split('/');
+    if (!month || !year || month.length !== 2 || year.length !== 2) return "Fòma dat la dwe MM/YY.";
+    
+    const currentYear = new Date().getFullYear() % 100;
+    const currentMonth = new Date().getMonth() + 1;
+    if (Number(year) < currentYear || (Number(year) === currentYear && Number(month) < currentMonth)) {
+      return "Kat sa a sanble li espire deja.";
+    }
+    
+    return null; // Pa gen erè
   };
 
   // --- 1. INITIALIZATION & DETECTION ---
@@ -58,6 +86,7 @@ function CheckoutContent() {
 
       try {
         if (invId) {
+          // --- PATI INVOICE LA PA CHANJE ---
           setCheckoutType('invoice');
           const { data: inv, error } = await supabase
             .from('invoices')
@@ -86,9 +115,18 @@ function CheckoutContent() {
           if (inv.status === 'paid') setAlreadyPaid(true);
 
         } else if (termId) {
+          // --- PATI SDK LA ---
           setCheckoutType('sdk');
           setReceiverId(termId);
-          setAmount(Number(searchParams.get('amount')) || 0);
+          
+          // Nou asire nou pri a miltipliye pa kantite a si SDK a pa t gentan fè sa
+          const unitPrice = Number(searchParams.get('amount')) || 0;
+          const qty = Number(searchParams.get('quantity')) || 1;
+          // Si ou vle pou total la se unitPrice * qty, ou ka dekomante liy anba a:
+          // setAmount(unitPrice * qty); 
+          // Pou kounye a nou kenbe pri ki vini nan URL la kòm total la:
+          setAmount(unitPrice); 
+
           setOrderId(searchParams.get('order_id') || `SDK-${Math.random().toString(36).slice(2, 9)}`);
           
           const { data: prof } = await supabase
@@ -98,6 +136,7 @@ function CheckoutContent() {
             .single();
 
           if (prof) {
+            // Machann lan dwe apwouve (KYC)
             setBusinessName(prof.business_name || 'Hatex Merchant');
             setKycStatus(prof.kyc_status);
           }
@@ -117,13 +156,32 @@ function CheckoutContent() {
     setProcessing(true);
     setErrorMsg('');
 
+    // Verifikasyon entèlijan fwonnyè an
+    const validationError = validateForm();
+    if (validationError) {
+      setErrorMsg(validationError);
+      setProcessing(false);
+      return;
+    }
+
     try {
       if (!receiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
 
-      // N ap prepare non ki maske a (Eme...) pou voye bay machann nan
-      const rawName = checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name;
-      const maskedName = maskName(rawName);
+      const rawCustomerName = checkoutType === 'invoice' ? (invoice?.client_email || 'Kliyan Invoice') : sdkData.customer_name;
+      const maskedName = maskName(rawCustomerName);
 
+      // Nou prepare yon objè METADATA pou voye tout enfòmasyon yo bay backend la.
+      // C'est nan backend la y'ap itilize metadata sa pou voye email bay machann nan.
+      const transactionMetadata = {
+        shop_name: sdkData.shop_name,
+        product_name: sdkData.product_name,
+        quantity: sdkData.quantity,
+        color: sdkData.color,
+        size: sdkData.size,
+        card_holder_name: `${form.firstName} ${form.lastName}`
+      };
+
+      // Nou voye done yo nan RPC a
       const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
         p_terminal_id: receiverId,
         p_card_number: form.card.replace(/\s/g, ''),
@@ -131,8 +189,10 @@ function CheckoutContent() {
         p_card_expiry: form.expiry,
         p_amount: amount,
         p_order_id: orderId,
-        p_customer_name: maskedName, // ISIT LA NOU METE NON KI MASKÉ A
-        p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
+        p_customer_name: maskedName, 
+        p_platform: checkoutType === 'invoice' ? `Invoice: ${businessName}` : sdkData.platform,
+        // Ou DWE ajoute p_metadata nan fonksyon RPC ou a sou Supabase poul ka resevwa sa:
+        p_metadata: transactionMetadata 
       });
 
       if (rpcError) throw rpcError;
@@ -142,10 +202,11 @@ function CheckoutContent() {
           await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
           setAlreadyPaid(true);
         } else {
-          router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
+          setAlreadyPaid(true); // Olye nou fè redirect, nou ka montre resi a la tou pou kliyan an wè notifikasyon an
+          // router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}&merchant=${businessName}`);
         }
       } else {
-        throw new Error(data.message);
+        throw new Error(data.message || "Fonds insuffisants ou kat pa pase.");
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Echèk tranzaksyon. Verifye kat ou.");
@@ -174,7 +235,9 @@ function CheckoutContent() {
               <Building2 size={24} className="text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight uppercase">{businessName}</h1>
+              <h1 className="text-2xl font-black tracking-tight uppercase">
+                {checkoutType === 'sdk' ? sdkData.shop_name : businessName}
+              </h1>
               <div className="flex items-center gap-2">
                  {kycStatus === 'approved' && (
                    <span className="flex items-center gap-1 text-[9px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 font-black uppercase tracking-wider">
@@ -189,13 +252,34 @@ function CheckoutContent() {
           <div className="flex-1 space-y-8">
             {checkoutType === 'sdk' && (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                 <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6">
-                    <div className="w-16 h-16 bg-black rounded-xl border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                 {/* PWODWI DETAILS */}
+                 <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6 relative">
+                    <div className="w-20 h-20 bg-black rounded-xl border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
                        {sdkData.product_image ? <img src={sdkData.product_image} className="w-full h-full object-cover" alt="product" /> : <Package size={24} className="text-zinc-700"/>}
                     </div>
-                    <div>
-                       <h3 className="font-bold text-sm uppercase">{sdkData.product_name}</h3>
-                       <p className="text-[10px] text-zinc-500 font-black uppercase tracking-wider mt-1">Platform: {sdkData.platform}</p>
+                    <div className="flex-1">
+                       <h3 className="font-bold text-sm uppercase text-white mb-2">{sdkData.product_name}</h3>
+                       
+                       <div className="flex flex-wrap gap-2 mb-2">
+                          {/* KANTITE */}
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-white/10 px-2 py-1 rounded text-zinc-300 font-bold tracking-wider">
+                            <ShoppingCart size={10} /> QTY: {sdkData.quantity}
+                          </span>
+                          {/* KOULÈ */}
+                          {sdkData.color && (
+                            <span className="inline-flex items-center text-[10px] bg-white/10 px-2 py-1 rounded text-zinc-300 font-bold tracking-wider">
+                              Koulè: <span className="w-2 h-2 rounded-full ml-1 border border-white/30" style={{backgroundColor: sdkData.color}}></span> {sdkData.color}
+                            </span>
+                          )}
+                          {/* SIZE */}
+                          {sdkData.size && (
+                            <span className="inline-flex items-center text-[10px] bg-white/10 px-2 py-1 rounded text-zinc-300 font-bold tracking-wider">
+                              Size: {sdkData.size}
+                            </span>
+                          )}
+                       </div>
+
+                       <p className="text-[9px] text-zinc-500 font-black uppercase tracking-wider">Platform: {sdkData.platform}</p>
                     </div>
                  </div>
                  
@@ -260,10 +344,15 @@ function CheckoutContent() {
                 </div>
                 <div>
                    <h2 className="text-3xl font-black uppercase tracking-tight italic">Paiement Reçu</h2>
-                   {/* MESAJ PÈSONALIZE OU A ISIT LA */}
-                   <p className="text-green-400 mt-4 text-sm font-bold bg-green-500/10 p-4 rounded-xl border border-green-500/20">
-                     Ou peye {businessName} {amount.toLocaleString()} HTG nan dat {new Date().toLocaleDateString()}
-                   </p>
+                   
+                   {/* MESAJ DETAYE POU KLIYAN AN JAN OU TE MANDE A */}
+                   <div className="mt-4 p-5 rounded-2xl bg-green-500/10 border border-green-500/20 text-left">
+                      <p className="text-green-500 text-xs font-black uppercase mb-2 tracking-widest">Istorik Tranzaksyon</p>
+                      <p className="text-white text-sm leading-relaxed">
+                        Felisitasyon! Ou achte pou <span className="font-bold text-green-400">{amount.toLocaleString()} HTG</span> nan biznis <span className="font-bold">"{checkoutType === 'sdk' ? sdkData.shop_name : businessName}"</span> jodi a ({new Date().toLocaleDateString()}). 
+                        {checkoutType === 'sdk' && ` Ou sot achte: ${sdkData.quantity}x ${sdkData.product_name}.`}
+                      </p>
+                   </div>
                 </div>
                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 text-left space-y-3">
                    <div className="flex justify-between text-sm"><span className="text-zinc-500">Ref ID</span> <span className="text-white font-mono">{orderId}</span></div>
@@ -277,10 +366,38 @@ function CheckoutContent() {
              <div className="space-y-8">
                <div>
                   <h2 className="text-2xl font-bold mb-2">Paiement Sécurisé</h2>
-                  <p className="text-zinc-500 text-sm">Antre enfòmasyon kat Hatex ou.</p>
+                  <p className="text-zinc-500 text-sm">Antre enfòmasyon kat Hatex ou pou peye.</p>
                </div>
 
                <form onSubmit={handlePayment} className="space-y-6">
+                  
+                  {/* NOUVO: Non ak Siyati sou Kat la */}
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-600 tracking-widest ml-1">Prénom (First Name)</label>
+                        <div className="relative group">
+                           <input 
+                              required 
+                              placeholder="John"
+                              className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-red-600 transition-all text-sm placeholder:text-zinc-800 text-white"
+                              onChange={e => setForm({...form, firstName: e.target.value})}
+                           />
+                           <User className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-500 transition-colors" size={16}/>
+                        </div>
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-600 tracking-widest ml-1">Nom (Last Name)</label>
+                        <div className="relative group">
+                           <input 
+                              required 
+                              placeholder="Doe"
+                              className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-red-600 transition-all text-sm placeholder:text-zinc-800 text-white"
+                              onChange={e => setForm({...form, lastName: e.target.value})}
+                           />
+                        </div>
+                     </div>
+                  </div>
+
                   <div className="space-y-2">
                      <label className="text-[10px] font-black uppercase text-zinc-600 tracking-widest ml-1">Numéro de Carte</label>
                      <div className="relative group">
@@ -313,7 +430,7 @@ function CheckoutContent() {
                         <label className="text-[10px] font-black uppercase text-zinc-600 tracking-widest ml-1">CVC</label>
                         <div className="relative group">
                            <input 
-                              required type="password" maxLength={3} placeholder="***"
+                              required type="password" maxLength={4} placeholder="***"
                               className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-red-600 transition-all text-center text-lg placeholder:text-zinc-800 font-mono text-white"
                               onChange={e => setForm({...form, cvv: e.target.value})}
                            />
@@ -336,14 +453,14 @@ function CheckoutContent() {
 
                {errorMsg && (
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500 animate-in slide-in-from-bottom-2">
-                     <AlertTriangle size={18} />
+                     <AlertTriangle size={18} className="shrink-0" />
                      <p className="text-xs font-bold uppercase">{errorMsg}</p>
                   </div>
                )}
 
                <div className="flex items-center justify-center gap-2 opacity-30 pt-4">
                   <ShieldCheck size={12} className="text-white" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Secured by Hatex Gateway</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Secured by Hatex Gateway & KYC Verified</span>
                </div>
              </div>
           )}

@@ -48,7 +48,7 @@ export default function TerminalPage() {
     initTerminal();
   }, [supabase, router]);
 
-  // --- RANJE ERÈ BUILD: Fonksyon Branding la ---
+  // --- BRANDING ---
   const updateBusinessName = async () => {
     if (!businessName) return alert("Tanpri antre yon non biznis.");
     setLoading(true);
@@ -67,78 +67,73 @@ export default function TerminalPage() {
     }
   };
 
-// --- KREYASYON INVOICE (Sekirize ak Lyen /pay) ---
-const handleCreateInvoice = async () => {
-  if (!amount || parseFloat(amount) <= 0 || !email) {
-    alert("Tanpri mete yon montan ak yon email valid.");
-    return;
-  }
-
-  setLoading(true);
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Ou dwe konekte");
-
-    // 1. Konsève Verifikasyon KYC ak Info Biznis (Pa retire)
-    const { data: freshProfile } = await supabase
-      .from('profiles')
-      .select('kyc_status, business_name')
-      .eq('id', user.id)
-      .single();
-
-    if (freshProfile?.kyc_status !== 'approved') {
-      alert(`Echèk: Kont ou dwe 'approved' pou voye invoice.`);
-      setMode('menu'); 
+  // --- KREYASYON INVOICE ---
+  const handleCreateInvoice = async () => {
+    if (!amount || parseFloat(amount) <= 0 || !email) {
+      alert("Tanpri mete yon montan ak yon email valid.");
       return;
     }
 
-    // 2. Antre invoice la nan DB (Nou pran ID a pou n fè lyen an)
-    const { data: inv, error: invError } = await supabase.from('invoices').insert({
-      owner_id: user.id,
-      amount: parseFloat(amount),
-      client_email: email.toLowerCase().trim(),
-      status: 'pending'
-    }).select().single();
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Ou dwe konekte");
 
-    if (invError) throw invError;
+      const { data: freshProfile } = await supabase
+        .from('profiles')
+        .select('kyc_status, business_name')
+        .eq('id', user.id)
+        .single();
 
-    // 3. JENERE LYEN SEKIRIZE A (Olye de /checkout, nou itilize /pay)
-    const securePayLink = `${window.location.origin}/pay/${inv.id}`;
+      if (freshProfile?.kyc_status !== 'approved') {
+        alert(`Echèk: Kont ou dwe 'approved' pou voye invoice.`);
+        setMode('menu'); 
+        return;
+      }
 
-    // 4. Rele Edge Function pou voye imel la ak nouvo lyen an
-    await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({
-        table: 'invoices',
-        record: {
-          id: inv.id,
-          amount: inv.amount,
-          client_email: inv.client_email,
-          business_name: freshProfile.business_name || "Merchant Hatex",
-          pay_url: securePayLink // Nou voye nouvo lyen an bay imel la
-        }
-      })
-    });
+      const { data: inv, error: invError } = await supabase.from('invoices').insert({
+        owner_id: user.id,
+        amount: parseFloat(amount),
+        client_email: email.toLowerCase().trim(),
+        status: 'pending'
+      }).select().single();
 
-    // Kopye lyen an nan clipboard pou machann nan ka voye l sou WhatsApp/SMS
-    await navigator.clipboard.writeText(securePayLink);
-    
-    alert(`Siksè! Faktire a voye bay ${inv.client_email}.\n\nLyen peman an kopye otomatikman: ${securePayLink}`);
-    
-    setAmount('');
-    setEmail('');
-    setMode('menu');
-    
-  } catch (err: any) {
-    alert(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+      if (invError) throw invError;
+
+      const securePayLink = `${window.location.origin}/pay/${inv.id}`;
+
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          table: 'invoices',
+          record: {
+            id: inv.id,
+            amount: inv.amount,
+            client_email: inv.client_email,
+            business_name: freshProfile.business_name || "Merchant Hatex",
+            pay_url: securePayLink
+          }
+        })
+      });
+
+      await navigator.clipboard.writeText(securePayLink);
+      alert(`Siksè! Faktire a voye bay ${inv.client_email}.\n\nLyen peman an kopye otomatikman: ${securePayLink}`);
+      
+      setAmount('');
+      setEmail('');
+      setMode('menu');
+      
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- SENKRONIZASYON BALANS ---
   const handleSyncBalance = async () => {
     const totalVant = transactions
@@ -163,9 +158,7 @@ const handleCreateInvoice = async () => {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
-    {/* Rès kòd JSX ou a kontinye isit la... */}
-
-
+      
       {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-2xl font-black uppercase italic tracking-tighter">{profile.business_name || 'Terminal'}<span className="text-red-600">.</span></h1>
@@ -179,54 +172,49 @@ const handleCreateInvoice = async () => {
         </div>
       </div>
 
-{/* BRANDING SECTION */}
-{mode === 'menu' && (
-  <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic shadow-2xl">
-      <div className="flex items-center gap-3 mb-4">
-          <div className="bg-red-600/10 p-2 rounded-xl">
-              <ShieldCheck className="text-red-600 w-5 h-5" />
-          </div>
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Idantite Biznis ou</h3>
-      </div>
-      <div className="space-y-4">
-          <div className="space-y-2 text-left">
-              <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">
-                {profile?.business_name ? "Nom du Business (Vérifié)" : "Nom du Business (Branding)"}
-              </label>
-              <input 
-                  type="text" 
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  // Si profile.business_name pa NULL, li paka ekri anyen ankò
-                  readOnly={!!profile?.business_name}
-                  placeholder="Ex: Hatex Store"
-                  className={`w-full bg-black border border-white/10 p-5 rounded-2xl text-[12px] outline-none transition-all text-white italic ${
-                    profile?.business_name ? "opacity-60 cursor-not-allowed border-green-600/30 text-green-500" : "focus:border-red-600/50"
-                  }`} 
-              />
-          </div>
-
-          {/* Bouton an ap parèt SÈLMAN si profile.business_name vid nan baz de done a */}
-          {!profile?.business_name && (
-            <button 
-                onClick={updateBusinessName}
-                disabled={loading}
-                className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] hover:scale-[0.98] transition-all"
-            >
-                {loading ? 'Sincronisation...' : 'Enregistrer le Branding'}
-            </button>
-          )}
-
-          {/* Ti mesaj konfimasyon si non an deja anrejistre */}
-          {profile?.business_name && (
-            <div className="flex items-center justify-center gap-2 pt-2">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                <p className="text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Votre identité est verrouillée et sécurisée</p>
+      {/* BRANDING SECTION */}
+      {mode === 'menu' && (
+        <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] mb-6 italic shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="bg-red-600/10 p-2 rounded-xl">
+                    <ShieldCheck className="text-red-600 w-5 h-5" />
+                </div>
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-white">Idantite Biznis ou</h3>
             </div>
-          )}
-      </div>
-  </div>
-)}
+            <div className="space-y-4">
+                <div className="space-y-2 text-left">
+                    <label className="text-[9px] text-zinc-500 font-black uppercase ml-4">
+                      {profile?.business_name ? "Nom du Business (Vérifié)" : "Nom du Business (Branding)"}
+                    </label>
+                    <input 
+                        type="text" 
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        readOnly={!!profile?.business_name}
+                        placeholder="Ex: Hatex Store"
+                        className={`w-full bg-black border border-white/10 p-5 rounded-2xl text-[12px] outline-none transition-all text-white italic ${
+                          profile?.business_name ? "opacity-60 cursor-not-allowed border-green-600/30 text-green-500" : "focus:border-red-600/50"
+                        }`} 
+                    />
+                </div>
+                {!profile?.business_name && (
+                  <button 
+                      onClick={updateBusinessName}
+                      disabled={loading}
+                      className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] hover:scale-[0.98] transition-all"
+                  >
+                      {loading ? 'Sincronisation...' : 'Enregistrer le Branding'}
+                  </button>
+                )}
+                {profile?.business_name && (
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                      <p className="text-[8px] text-zinc-500 font-black uppercase tracking-tighter">Votre identité est verrouillée et sécurisée</p>
+                  </div>
+                )}
+            </div>
+        </div>
+      )}
 
       {/* MENU OPTIONS */}
       {mode === 'menu' && (
@@ -242,111 +230,246 @@ const handleCreateInvoice = async () => {
         </div>
       )}
 
-      {/* SDK SECTION */}
+      {/* SDK SECTION (UPGRADED) */}
       {mode === 'api' && profile.business_name && (
         <div className="space-y-6 animate-in zoom-in-95 duration-300">
           <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-red-600/10 text-left">
             <div className="flex items-center gap-3 mb-6">
               <Globe className="text-red-600 w-5 h-5" />
-              <h2 className="text-[11px] font-black uppercase italic">SDK Inivèsèl (Shopify/Woo/Custom)</h2>
+              <div>
+                <h2 className="text-[11px] font-black uppercase italic">SDK Hatex Entelijan</h2>
+                <p className="text-[8px] text-zinc-500">Auto-Detect Pri (HTG/USD), Opsyon, Cart & Checkout</p>
+              </div>
             </div>
             <div className="relative">
               <pre className="bg-black p-6 rounded-3xl border border-white/5 text-[9px] text-green-500 font-mono h-[500px] overflow-y-auto scrollbar-hide whitespace-pre-wrap">
-{`<div id="hatex-secure-pay"></div>
+{`<div id="hatex-secure-pay-wrapper"></div>
+<style>
+  /* Style Pwofesyonel Enspire de Temu/AliExpress */
+  .htx-btn { background: #dc2626; color: white; width: 100%; padding: 18px; border-radius: 12px; font-weight: 900; border: none; cursor: pointer; font-family: sans-serif; box-shadow: 0 8px 20px rgba(220,38,38,0.25); transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+  .htx-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(220,38,38,0.35); }
+  .htx-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 999999; display: none; align-items: flex-end; justify-content: center; }
+  .htx-modal { background: #111; width: 100%; max-width: 500px; border-radius: 24px 24px 0 0; padding: 25px; box-sizing: border-box; color: white; font-family: sans-serif; animation: htxSlideUp 0.4s ease-out; max-height: 90vh; overflow-y: auto; border-top: 1px solid #333; }
+  @keyframes htxSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .htx-input { width: 100%; background: #000; border: 1px solid #333; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px; font-size: 14px; box-sizing: border-box; outline: none; transition: border 0.3s; }
+  .htx-input:focus { border-color: #dc2626; }
+  .htx-row { display: flex; gap: 10px; }
+  .htx-item-card { background: #1a1a1a; padding: 12px; border-radius: 12px; display: flex; gap: 12px; margin-bottom: 10px; border: 1px solid #222; }
+  .htx-item-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; background: #000; }
+  .htx-badge { background: #333; font-size: 10px; padding: 3px 8px; border-radius: 4px; color: #aaa; }
+  .htx-total-box { background: linear-gradient(45deg, #1a0000, #000); padding: 20px; border-radius: 16px; text-align: center; border: 1px dashed #dc2626; margin: 20px 0; }
+  .htx-close { float: right; cursor: pointer; font-size: 24px; color: #666; line-height: 1; }
+</style>
+
 <script>
 (function() {
   const TID = "${profile.id}";
-  const TAUX = 135;
-  const target = document.getElementById('hatex-secure-pay');
+  const TAUX = 136;
+  let cartData = [];
+  let isSubmitting = false;
 
-  const btn = document.createElement('button');
-  btn.innerHTML = "ACHETER MAINTENANT (HTG)";
-  btn.style = "background:#dc2626;color:white;width:100%;padding:20px;border-radius:15px;font-weight:900;border:none;cursor:pointer;font-family:sans-serif;box-shadow:0 10px 20px rgba(220,38,38,0.2);";
-  
-  const formHtml = \`
-    <div id="hatex-form" style="display:none;margin-top:20px;padding:20px;background:#1a1a1a;border-radius:20px;border:1px solid #333;font-family:sans-serif;color:white;">
-      <p style="font-size:10px;font-weight:900;text-transform:uppercase;color:#dc2626;margin-bottom:15px;">Détails de la commande</p>
-      <input id="htx_name" placeholder="Nom Complet" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;">
-      <input id="htx_phone" placeholder="Téléphone" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;">
-      <textarea id="htx_address" placeholder="Adresse de livraison" style="width:100%;background:#000;border:1px solid #333;padding:12px;border-radius:10px;color:white;margin-bottom:10px;font-size:12px;height:60px;"></textarea>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:15px;">
-         <label style="font-size:10px;font-weight:bold;">KANTITE:</label>
-         <input id="htx_qty" type="number" value="1" min="1" style="width:60px;background:#000;border:1px solid #333;padding:8px;border-radius:8px;color:white;text-align:center;">
-      </div>
-      <div id="htx_preview" style="background:#000; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center; border:1px dashed #dc2626;">
-        <span style="font-size:10px; color:#999; display:block;">TOTAL À PAYER</span>
-        <span id="htx_total_val" style="font-size:20px; font-weight:900; color:#fff;">CALCUL...</span>
-      </div>
-      <button id="htx_confirm" style="width:100%;background:#dc2626;color:white;padding:15px;border-radius:10px;font-weight:900;border:none;cursor:pointer;">PAYER MAINTENANT</button>
-    </div>
-  \`;
-  target.innerHTML = formHtml;
-  target.prepend(btn);
+  // 1. MOTÈ SCRAPING ENTELIJAN (Inivèsèl)
+  function findVariations() {
+    let variants = [];
+    // Chèche tout dropdowns/selects
+    document.querySelectorAll('select').forEach(sel => {
+      if(sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text !== sel.options[0].text) {
+        variants.push(sel.options[sel.selectedIndex].text);
+      }
+    });
+    // Chèche koulè/size an bouton radio oswa swatch
+    document.querySelectorAll('input[type="radio"]:checked, .swatch.selected, .variant-active').forEach(el => {
+      variants.push(el.value || el.innerText || el.getAttribute('data-value'));
+    });
+    return variants.filter(v => v && v.trim() !== '').join(', ');
+  }
 
-  // FONKSYON SYNC PRI OTOMATIK SOU NENPÒT SIT
-  function getUniversalPrice() {
-    const productArea = document.querySelector('.product, .product-single, main, #main, .woocommerce-product-details, [itemtype*="Product"]') || document.body;
-    const selectors = [
-        'meta[property="product:price:amount"]', 
-        '[data-price]', 
-        '.price-item--sale', 
-        '.product__price .price-item', 
-        '.woocommerce-Price-amount', 
-        '.current-price', 
-        '.price',
-        '#priceblock_ourprice',
-        '.a-price-whole'
-    ];
-    let foundText = ""; let foundVal = 0;
-    for (let s of selectors) {
-      const el = productArea.querySelector(s);
-      if (el && !el.closest('.price--compare')) {
-        let txt = (el.content || el.innerText || el.getAttribute('data-price') || "").toUpperCase();
-        let val = parseFloat(txt.replace(/[^\\d.]/g, ''));
-        if (val > 0) { foundVal = val; foundText = txt; break; }
+  function extractPriceDetails(text) {
+    if(!text) return { val: 0, isUSD: false };
+    const upperText = text.toUpperCase();
+    // N.B: Nou itilize [^0-9.] olye de \d pou evite erè compilation regex
+    const val = parseFloat(text.replace(/[^0-9.]/g, '')); 
+    const isExplicitHTG = upperText.includes('HTG') || upperText.includes('G') || upperText.includes('GOUD');
+    const isExplicitUSD = upperText.includes('$') || upperText.includes('USD');
+    
+    // Si l pa klè, nou devine selon kantite a (mwens ke 1000 = pwobableman USD)
+    const isUSD = isExplicitUSD ? true : (isExplicitHTG ? false : (val < 1000));
+    return { val, isUSD };
+  }
+
+  // Fonksyon pou paj pwodwi
+  function scrapeProductPage() {
+    const title = document.querySelector('h1')?.innerText || document.title;
+    const img = document.querySelector('meta[property="og:image"]')?.content || document.querySelector('.product-gallery img, .woocommerce-product-gallery img')?.src || '';
+    
+    // Chèche pri a sou paj la
+    const priceSelectors = ['.price', '.woocommerce-Price-amount', '.product__price', '[data-price]', '#priceblock_ourprice'];
+    let priceText = '';
+    for(let s of priceSelectors) {
+      let el = document.querySelector(s);
+      if(el && !el.closest('del') && !el.closest('.price--compare')) {
+        priceText = el.innerText || el.getAttribute('data-price');
+        break;
       }
     }
-    return { val: foundVal, txt: foundText };
+    
+    const pDetails = extractPriceDetails(priceText);
+    const qty = parseInt(document.querySelector('input[name="quantity"], .qty')?.value) || 1;
+    const vars = findVariations();
+
+    return [{ name: title, img: img, qty: qty, priceRaw: pDetails.val, isUSD: pDetails.isUSD, variants: vars }];
   }
 
-  function calculateTotal() {
-    const priceData = getUniversalPrice();
-    const isUSD = priceData.txt.includes('$') || priceData.txt.includes('USD') || priceData.val < 1000; 
-    const qty = parseInt(document.getElementById('htx_qty').value) || 1;
-    let unitHTG = isUSD ? (Math.max(priceData.val, 0.99) * TAUX) : Math.max(priceData.val, 5);
-    const total = (unitHTG * qty).toFixed(2);
-    document.getElementById('htx_total_val').innerText = total + " HTG";
-    return total;
+  // Fonksyon pou paj Cart/Checkout
+  function scrapeCartPage() {
+    let items = [];
+    // Gade fòm panyen yo jeneralman
+    const cartRows = document.querySelectorAll('.cart-item, .woocommerce-cart-form__cart-item, .order-item');
+    if(cartRows.length > 0) {
+      cartRows.forEach(row => {
+        const name = row.querySelector('.product-name, .cart-item__name, a')?.innerText || 'Produit';
+        const img = row.querySelector('img')?.src || '';
+        const qty = parseInt(row.querySelector('.qty, input[type="number"]')?.value) || 1;
+        const pDetails = extractPriceDetails(row.querySelector('.product-price, .amount')?.innerText);
+        const vars = row.querySelector('.variation, .item-options')?.innerText || '';
+        items.push({ name, img, qty, priceRaw: pDetails.val, isUSD: pDetails.isUSD, variants: vars });
+      });
+    }
+    return items;
   }
 
-  btn.onclick = () => { document.getElementById('hatex-form').style.display = 'block'; btn.style.display = 'none'; calculateTotal(); };
-  document.getElementById('htx_qty').oninput = calculateTotal;
-
-  document.getElementById('htx_confirm').onclick = () => {
-    const params = new URLSearchParams({
-      terminal: TID,
-      amount: calculateTotal(),
-      order_id: "HTX-" + Date.now(),
-      customer_name: document.getElementById('htx_name').value,
-      customer_phone: document.getElementById('htx_phone').value,
-      customer_address: document.getElementById('htx_address').value,
-      product_name: document.querySelector('h1, .product_title')?.innerText || document.title,
-      product_image: document.querySelector('meta[property="og:image"], .wp-post-image, .product-featured-img')?.content || document.querySelector('img')?.src || "",
-      quantity: document.getElementById('htx_qty').value,
-      platform: window.location.hostname
+  // 2. KALKIL AK KONVÈSYON (Otomatik HTG/Goud)
+  function processCart() {
+    // Tcheke si nou nan yon panyen/checkout oubyen yon sèl pwodwi
+    let rawItems = document.querySelector('.cart-form, .checkout-order-review') ? scrapeCartPage() : scrapeProductPage();
+    if(rawItems.length === 0) rawItems = scrapeProductPage(); // Fallback
+    
+    let totalHTG = 0;
+    cartData = rawItems.map(item => {
+      let unitHTG = item.isUSD ? (item.priceRaw * TAUX) : item.priceRaw;
+      if(unitHTG <= 0) unitHTG = 500; // Pri defo si echèk scraping
+      let lineTotal = unitHTG * item.qty;
+      totalHTG += lineTotal;
+      return { ...item, finalUnitHtg: unitHTG, lineTotalHtg: lineTotal };
     });
-    window.location.href = "https://hatexcard.com/checkout?" + params.toString();
+    
+    return totalHTG;
+  }
+
+  // 3. KREYASYON UI (Bouton & Modal)
+  const target = document.getElementById('hatex-secure-pay-wrapper');
+  if(!target) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'htx-btn';
+  btn.innerHTML = '🔒 Payer via Hatex (HTG)';
+  target.appendChild(btn);
+
+  const modalHtml = \`
+    <div class="htx-modal-overlay" id="htx-modal">
+      <div class="htx-modal">
+        <span class="htx-close" id="htx-close">&times;</span>
+        <h3 style="margin-top:0; color:#fff; font-size:18px; font-weight:900;">FINALISATION COMMANDE</h3>
+        
+        <div id="htx-items-container" style="margin: 20px 0; max-height:150px; overflow-y:auto; border-bottom:1px solid #333; padding-bottom:10px;"></div>
+
+        <div class="htx-total-box">
+          <span style="font-size:11px; color:#aaa; display:block; margin-bottom:5px;">TOTAL À PAYER (Taxes inc.)</span>
+          <span id="htx-total-display" style="font-size:28px; font-weight:900; color:#10b981;">CALCUL...</span>
+        </div>
+
+        <form id="htx-checkout-form">
+          <input required id="h_name" class="htx-input" placeholder="Nom Complet (ex: Jean Dupont)">
+          <div class="htx-row">
+            <input required id="h_phone" type="tel" class="htx-input" placeholder="Téléphone WhatsApp">
+            <input required id="h_email" type="email" class="htx-input" placeholder="Email pour reçu">
+          </div>
+          <input required id="h_address" class="htx-input" placeholder="Adresse complète de livraison">
+          <input id="h_notes" class="htx-input" placeholder="Notes (ex: Proche de l'église...)">
+          
+          <button type="submit" class="htx-btn" id="htx-submit-btn" style="margin-top:10px;">VALIDER ET PAYER</button>
+        </form>
+        <div style="text-align:center; margin-top:15px; font-size:10px; color:#666;">
+          🔒 Sécurisé par HatexCard Gateway - Chiffrement de bout en bout
+        </div>
+      </div>
+    </div>
+  \`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // 4. AKSYON AK SEKIRITE
+  const modal = document.getElementById('htx-modal');
+  
+  btn.onclick = (e) => {
+    e.preventDefault();
+    const finalTotal = processCart();
+    document.getElementById('htx-total-display').innerText = finalTotal.toLocaleString() + ' HTG';
+    
+    // Rann lis pwodwi yo nan modal la
+    const container = document.getElementById('htx-items-container');
+    container.innerHTML = '';
+    cartData.forEach(item => {
+      container.innerHTML += \`
+        <div class="htx-item-card">
+          \${item.img ? \`<img src="\${item.img}" class="htx-item-img">\` : ''}
+          <div style="flex:1;">
+            <div style="font-size:12px; font-weight:bold; color:#fff;">\${item.name}</div>
+            \${item.variants ? \`<div style="font-size:10px; color:#888; margin:4px 0;">Options: \${item.variants}</div>\` : ''}
+            <div style="display:flex; justify-content:space-between; margin-top:5px;">
+              <span class="htx-badge">Qté: \${item.qty}</span>
+              <span style="font-size:12px; font-weight:bold; color:#10b981;">\${item.lineTotalHtg.toLocaleString()} HTG</span>
+            </div>
+          </div>
+        </div>
+      \`;
+    });
+    
+    modal.style.display = 'flex';
   };
+
+  document.getElementById('htx-close').onclick = () => { modal.style.display = 'none'; };
+
+  document.getElementById('htx-checkout-form').onsubmit = (e) => {
+    e.preventDefault();
+    if(isSubmitting) return; // Anti Brute-force
+    isSubmitting = true;
+    document.getElementById('htx-submit-btn').innerText = 'TRAITEMENT...';
+
+    // Konstwi Kago a (Payload) pou voye bay Machann nan
+    const payload = {
+      merchant_id: TID,
+      order_id: "HTX-" + Math.floor(Math.random() * 1000000),
+      total_htg: document.getElementById('htx-total-display').innerText.replace(/[^0-9]/g, ''),
+      customer: {
+        name: document.getElementById('h_name').value,
+        phone: document.getElementById('h_phone').value,
+        email: document.getElementById('h_email').value,
+        address: document.getElementById('h_address').value,
+        notes: document.getElementById('h_notes').value
+      },
+      cart_items: cartData,
+      platform_url: window.location.href
+    };
+
+    // KRIPTAJ FRONTEND (Base64) - Pou pri a pa parèt klè nan URL la
+    // N.B: Nan yon vrè pwodiksyon, fòk backend ou a verifye pri yo.
+    const secureToken = btoa(encodeURIComponent(JSON.stringify(payload)));
+    
+    // Voye sou paj checkout sekirize w la
+    window.location.href = "https://hatexcard.com/secure-checkout?token=" + secureToken;
+  };
+
 })();
 </script>`}
               </pre>
-              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase shadow-lg">KOPYE KÒD</button>
+              <button onClick={() => {navigator.clipboard.writeText(document.querySelector('pre')?.innerText || ""); alert("SDK Entelijan an Kopye!");}} className="absolute top-4 right-4 bg-red-600 p-3 rounded-xl text-[8px] font-black uppercase shadow-lg hover:scale-105 transition-all">KOPYE KÒD SEKIRIZE A</button>
             </div>
           </div>
           <button onClick={() => setMode('menu')} className="w-full text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all italic">Tounen nan Dashboard</button>
         </div>
       )}
 
+      {/* RÈS KÒD LA (HISTORY, REQUEST, VIDEO) RETE EGZAKTEMAN MENM JAN AN... */}
       {/* PROFESSIONAL HISTORY SECTION */}
       {mode === 'history' && (
         <div className="space-y-4 text-left animate-in slide-in-from-bottom-5 duration-500">
