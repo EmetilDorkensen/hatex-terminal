@@ -52,7 +52,6 @@ function CheckoutContent() {
       try {
         if (invId) {
           setCheckoutType('invoice');
-          
           const { data: inv, error } = await supabase
             .from('invoices')
             .select(`
@@ -83,7 +82,9 @@ function CheckoutContent() {
           setCheckoutType('sdk');
           setReceiverId(termId);
           const amt = searchParams.get('amount');
+          const order = searchParams.get('order_id');
           if (amt) setAmount(Number(amt));
+          if (order) setOrderId(order);
         }
       } catch (err: any) {
         setErrorMsg(err.message);
@@ -91,7 +92,6 @@ function CheckoutContent() {
         setLoading(false);
       }
     };
-
     init();
   }, [searchParams, supabase]);
 
@@ -100,12 +100,10 @@ function CheckoutContent() {
     e.preventDefault();
     setProcessing(true);
     setErrorMsg('');
-  
     try {
       const targetReceiverId = checkoutType === 'invoice' ? invoice?.owner_id : receiverId;
-  
-      if (!targetReceiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
-  
+      if (!targetReceiverId || amount <= 0) throw new Error("Erè konfigirasyon.");
+
       const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
         p_terminal_id: targetReceiverId,
         p_card_number: form.card.replace(/\s/g, ''),
@@ -116,9 +114,9 @@ function CheckoutContent() {
         p_customer_name: checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name,
         p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
       });
-  
+
       if (rpcError) throw rpcError;
-  
+
       if (data.success) {
         if (checkoutType === 'invoice') {
           await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
@@ -149,105 +147,114 @@ function CheckoutContent() {
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-900/30">
       <div className="max-w-6xl mx-auto min-h-screen grid grid-cols-1 lg:grid-cols-2">
         
-        {/* KOLÒN GÒCH: ENFÒMASYON */}
-        <div className="p-8 lg:p-20 flex flex-col bg-[#050505] border-r border-white/5">
+        {/* KOLÒN GÒCH: RECHÈCH & DONE */}
+        <div className="p-8 lg:p-20 flex flex-col justify-between bg-[#050505] border-r border-white/5">
           
-          {/* Header Machann */}
-          <div className="flex items-center gap-4 mb-12">
-            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Building2 className="text-white w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
-                {businessName} 
-              </h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
-                   VERIFYE
-                </span>
+          <div className="space-y-12">
+            {/* Header Machann */}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Building2 className="text-white w-6 h-6" />
               </div>
+              <div>
+                <h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
+                  {businessName} 
+                </h1>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
+                     VERIFYE
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              {/* SDK MODE - Tout detay ou te mande yo */}
+              {checkoutType === 'sdk' && (
+                <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                   <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6">
+                      <div className="w-16 h-16 bg-black rounded-xl border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                         {sdkData.product_image ? (
+                           <img src={sdkData.product_image} className="w-full h-full object-cover" alt="product" />
+                         ) : (
+                           <Package size={24} className="text-zinc-700"/>
+                         )}
+                      </div>
+                      <div>
+                         <h3 className="font-bold text-sm uppercase">{sdkData.product_name}</h3>
+                         <p className="text-[10px] text-zinc-500 font-black uppercase tracking-wider mt-1">Platform: {sdkData.platform}</p>
+                      </div>
+                   </div>
+                   
+                   <div className="space-y-3">
+                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest pl-1">Livraison</p>
+                      <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                         <MapPin className="text-red-500" size={18} />
+                         <div>
+                            <p className="text-[9px] text-zinc-500 uppercase font-bold">Adresse</p>
+                            <p className="text-sm font-medium">{sdkData.customer_address}</p>
+                         </div>
+                      </div>
+                      <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                         <Phone className="text-red-500" size={18} />
+                         <div>
+                            <p className="text-[9px] text-zinc-500 uppercase font-bold">Contact</p>
+                            <p className="text-sm font-medium">{sdkData.customer_phone}</p>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+              )}
+
+              {/* INVOICE MODE - Montan an parèt isit la tou */}
+              {checkoutType === 'invoice' && (
+                 <div className="bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl p-8 space-y-6 animate-in zoom-in-95 duration-500">
+                    <div className="flex items-center gap-3 mb-4">
+                       <FileText className="text-zinc-400" size={20} />
+                       <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Facture Hatex</span>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex justify-between border-b border-white/5 pb-4">
+                         <span className="text-zinc-500 text-sm">Client</span>
+                         <span className="font-bold text-sm text-white">{invoice?.client_email}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-4">
+                         <span className="text-zinc-500 text-sm">Montant</span>
+                         <span className="font-bold text-sm text-red-500">{amount.toLocaleString()} HTG</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-4">
+                         <span className="text-zinc-500 text-sm">Date</span>
+                         <span className="font-mono text-sm text-zinc-300">
+                           {invoice?.created_at ? new Date(invoice.created_at).toLocaleDateString() : '...'}
+                         </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2">
+                         <span className="text-zinc-500 text-sm">Statut</span>
+                         <span className={`text-[10px] font-black uppercase px-2 py-1 rounded border ${alreadyPaid ? 'border-green-500/30 text-green-500 bg-green-500/10' : 'border-orange-500/30 text-orange-500 bg-orange-500/10'}`}>
+                            {alreadyPaid ? 'PAYÉ' : 'EN ATTENTE'}
+                         </span>
+                      </div>
+                    </div>
+                 </div>
+              )}
             </div>
           </div>
 
-          <div className="flex-1 space-y-8">
-            {/* MÒD SDK */}
-            {checkoutType === 'sdk' && (
-              <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                 <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6">
-                    <div className="w-16 h-16 bg-black rounded-xl border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                       {sdkData.product_image ? <img src={sdkData.product_image} className="w-full h-full object-cover" alt="product" /> : <Package size={24} className="text-zinc-700"/>}
-                    </div>
-                    <div>
-                       <h3 className="font-bold text-sm uppercase">{sdkData.product_name}</h3>
-                       <p className="text-[10px] text-zinc-500 font-black uppercase tracking-wider mt-1">Platform: {sdkData.platform}</p>
-                    </div>
-                 </div>
-                 
-                 <div className="space-y-3">
-                    <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest pl-1">Livraison</p>
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                       <MapPin className="text-red-500" size={18} />
-                       <div>
-                          <p className="text-[9px] text-zinc-500 uppercase font-bold">Adresse</p>
-                          <p className="text-sm font-medium">{sdkData.customer_address}</p>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                       <Phone className="text-red-500" size={18} />
-                       <div>
-                          <p className="text-[9px] text-zinc-500 uppercase font-bold">Contact</p>
-                          <p className="text-sm font-medium">{sdkData.customer_phone}</p>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-            )}
-
-            {/* MÒD INVOICE */}
-            {checkoutType === 'invoice' && (
-               <div className="bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl p-8 space-y-6 animate-in zoom-in-95 duration-500">
-                  <div className="flex items-center gap-3 mb-4">
-                     <FileText className="text-zinc-400" size={20} />
-                     <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Facture Hatex</span>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between border-b border-white/5 pb-4">
-                       <span className="text-zinc-500 text-sm">Client</span>
-                       <span className="font-bold text-sm text-white">{invoice?.client_email}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/5 pb-4">
-                       <span className="text-zinc-500 text-sm">Date</span>
-                       <span className="font-mono text-sm text-zinc-300">
-                         {invoice?.created_at ? new Date(invoice.created_at).toLocaleDateString() : '...'}
-                       </span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2">
-                       <span className="text-zinc-500 text-sm">Statut</span>
-                       <span className={`text-[10px] font-black uppercase px-2 py-1 rounded border ${alreadyPaid ? 'border-green-500/30 text-green-500 bg-green-500/10' : 'border-orange-500/30 text-orange-500 bg-orange-500/10'}`}>
-                          {alreadyPaid ? 'PAYÉ' : 'EN ATTENTE'}
-                       </span>
-                    </div>
-                  </div>
-               </div>
-            )}
-
-            {/* TOTAL */}
-            <div className="pt-8 mt-auto border-t border-white/5">
-               <div className="flex justify-between items-end">
-                  <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Total à payer</span>
-                  <div className="flex items-baseline gap-2">
-                     <span className="text-5xl lg:text-6xl font-black tracking-tighter text-white">{amount.toLocaleString()}</span>
-                     <span className="text-xl font-bold text-red-600">HTG</span>
-                  </div>
-               </div>
-            </div>
+          {/* TOTAL ANBA NET */}
+          <div className="pt-8 border-t border-white/5 mt-8">
+             <div className="flex justify-between items-end">
+                <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Total à payer</span>
+                <div className="flex items-baseline gap-2">
+                   <span className="text-5xl lg:text-6xl font-black tracking-tighter text-white">{amount.toLocaleString()}</span>
+                   <span className="text-xl font-bold text-red-600">HTG</span>
+                </div>
+             </div>
           </div>
         </div>
 
         {/* KOLÒN DWAT: PEMAN */}
         <div className="bg-[#0a0b12] p-8 lg:p-20 flex flex-col justify-center">
-          
           {alreadyPaid ? (
              <div className="text-center space-y-8 animate-in zoom-in-50 duration-500">
                 <div className="w-24 h-24 bg-green-500 rounded-full mx-auto flex items-center justify-center shadow-[0_0_40px_-10px_rgba(34,197,94,0.6)]">
@@ -268,7 +275,7 @@ function CheckoutContent() {
           ) : (
              <div className="space-y-8">
                <div>
-                  <h2 className="text-2xl font-bold mb-2">Paiement Sécurisé</h2>
+                  <h2 className="text-2xl font-bold mb-2 text-white">Paiement Sécurisé</h2>
                   <p className="text-zinc-500 text-sm">Antre enfòmasyon kat Hatex ou.</p>
                </div>
 
