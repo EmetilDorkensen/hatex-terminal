@@ -22,19 +22,16 @@ function CheckoutContent() {
   const [processing, setProcessing] = useState(false);
   const [checkoutType, setCheckoutType] = useState<'invoice' | 'sdk'>('sdk');
   
-  // Done Tranzaksyon
   const [amount, setAmount] = useState<number>(0);
   const [receiverId, setReceiverId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState('');
   const [businessName, setBusinessName] = useState('Hatex Merchant');
   const [kycStatus, setKycStatus] = useState<string>('');
   
-  // Done Invoice (Si se yon fakti)
   const [invoice, setInvoice] = useState<any>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Done SDK (Si se yon livrezon)
   const sdkData = useMemo(() => ({
     product_name: searchParams.get('product_name') || 'Sèvis Digital',
     product_image: searchParams.get('product_image'),
@@ -44,108 +41,100 @@ function CheckoutContent() {
     platform: searchParams.get('platform') || 'Hatex Gateway'
   }), [searchParams]);
 
-  // Fòm Peman
   const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
 
+  // --- 1. INITIALIZATION ---
   useEffect(() => {
-   const init = async () => {
-     const invId = searchParams.get('invoice_id');
-     const termId = searchParams.get('terminal');
+    const init = async () => {
+      const invId = searchParams.get('invoice_id');
+      const termId = searchParams.get('terminal');
 
-     try {
-       if (invId) {
-         setCheckoutType('invoice');
-         
-         // Nou rale Invoice la ansanm ak Profile mèt la
-         const { data: inv, error } = await supabase
-           .from('invoices')
-           .select(`
-             *,
-             profiles:owner_id (
-               business_name,
-               full_name,
-               kyc_status
-             )
-           `)
-           .eq('id', invId)
-           .single();
+      try {
+        if (invId) {
+          setCheckoutType('invoice');
+          
+          const { data: inv, error } = await supabase
+            .from('invoices')
+            .select(`
+              *,
+              profiles:owner_id (
+                business_name,
+                full_name,
+                kyc_status
+              )
+            `)
+            .eq('id', invId)
+            .single();
 
-         if (error || !inv) throw new Error("Fakti sa a pa egziste.");
+          if (error || !inv) throw new Error("Fakti sa a pa egziste.");
 
-         setInvoice(inv);
-         setReceiverId(inv.owner_id);
-         setAmount(Number(inv.amount));
-         
-         // Nou mete non biznis la (Dinamik)
-         const bizName = inv.profiles?.business_name || inv.profiles?.full_name || 'Hatex Merchant';
-         setBusinessName(bizName);
-         
-         setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
-         if (inv.status === 'paid') setAlreadyPaid(true);
-         if (inv.profiles) setKycStatus(inv.profiles.kyc_status);
+          setInvoice(inv);
+          setReceiverId(inv.owner_id);
+          setAmount(Number(inv.amount));
+          
+          const bizName = inv.profiles?.business_name || inv.profiles?.full_name || 'Hatex Merchant';
+          setBusinessName(bizName);
+          
+          setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
+          if (inv.status === 'paid') setAlreadyPaid(true);
+          if (inv.profiles) setKycStatus(inv.profiles.kyc_status);
 
-       } else if (termId) {
-         setCheckoutType('sdk');
-         // Mete lojik SDK ou isit la si w bezwen l
-       }
-     } catch (err: any) {
-       console.error("Erè:", err.message);
-       setErrorMsg(err.message);
-     } finally {
-       setLoading(false);
-     }
-   };
+        } else if (termId) {
+          setCheckoutType('sdk');
+          setReceiverId(termId);
+          const amt = searchParams.get('amount');
+          if (amt) setAmount(Number(amt));
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-   init();
- }, [searchParams]);
+    init();
+  }, [searchParams, supabase]);
 
+  // --- 2. LOGIC PEMAN ---
   const handlePayment = async (e: React.FormEvent) => {
-   e.preventDefault();
-   setProcessing(true);
-   setErrorMsg('');
- 
-   try {
-     // Nou tcheke si se yon invoice oswa SDK pou nou konnen ki ID pou itilize
-     const targetReceiverId = checkoutType === 'invoice' ? invoice?.owner_id : receiverId;
- 
-     if (!targetReceiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
- 
-     // Rele Fonksyon SQL la
-     const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
-       p_terminal_id: targetReceiverId, // Se ID mèt invoice la oswa terminal SDK a
-       p_card_number: form.card.replace(/\s/g, ''),
-       p_card_cvv: form.cvv,
-       p_card_expiry: form.expiry,
-       p_amount: amount,
-       p_order_id: orderId,
-       p_customer_name: checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name,
-       p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
-     });
- 
-     if (rpcError) throw rpcError;
- 
-     if (data.success) {
-       if (checkoutType === 'invoice') {
-         // Lè se yon invoice, nou mete l kòm "paid" nan baz done a
-         await supabase
-           .from('invoices')
-           .update({ status: 'paid' })
-           .eq('id', invoice.id);
-           
-         setAlreadyPaid(true); // Sa ap afiche ekran siksè a
-       } else {
-         // Si se SDK (magazen deyò), nou voye l sou paj siksè a
-         router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
-       }
-     } else {
-       throw new Error(data.message);
-     }
-   } catch (err: any) {
-     setErrorMsg(err.message || "Echèk tranzaksyon. Verifye kat ou.");
-   } finally {
-     setProcessing(false);
-   }
- };
+    e.preventDefault();
+    setProcessing(true);
+    setErrorMsg('');
+  
+    try {
+      const targetReceiverId = checkoutType === 'invoice' ? invoice?.owner_id : receiverId;
+  
+      if (!targetReceiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
+  
+      const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
+        p_terminal_id: targetReceiverId,
+        p_card_number: form.card.replace(/\s/g, ''),
+        p_card_cvv: form.cvv,
+        p_card_expiry: form.expiry,
+        p_amount: amount,
+        p_order_id: orderId,
+        p_customer_name: checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name,
+        p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
+      });
+  
+      if (rpcError) throw rpcError;
+  
+      if (data.success) {
+        if (checkoutType === 'invoice') {
+          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
+          setAlreadyPaid(true);
+        } else {
+          router.push(`/checkout/success?amount=${amount}&id=${data.transaction_id}&order_id=${orderId}`);
+        }
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Echèk tranzaksyon.");
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   if (loading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
@@ -160,30 +149,33 @@ function CheckoutContent() {
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-900/30">
       <div className="max-w-6xl mx-auto min-h-screen grid grid-cols-1 lg:grid-cols-2">
         
-{/* Bò gòch paj la kote non machann nan parèt */}
-<div className="flex items-center gap-4">
-  <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-    <Building2 className="text-white w-6 h-6" />
-  </div>
-  <div>
-{/* Sa a pral chanje dinamikman selon mèt invoice la */}
-<h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
-      {businessName} 
-    </h1>
-    <div className="flex items-center gap-2 mt-1">
-       <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
-          VERIFYE
-       </span> {/* Ou te bliye fèmen span sa a */}
-    </div> {/* Fèmen div gap-2 a */}
-          {/* KONTN DYNAMIK */}
+        {/* KOLÒN GÒCH: ENFÒMASYON */}
+        <div className="p-8 lg:p-20 flex flex-col bg-[#050505] border-r border-white/5">
+          
+          {/* Header Machann */}
+          <div className="flex items-center gap-4 mb-12">
+            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Building2 className="text-white w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
+                {businessName} 
+              </h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
+                   VERIFYE
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="flex-1 space-y-8">
-            
-            {/* 1. MÒD SDK (LIVREZON) */}
+            {/* MÒD SDK */}
             {checkoutType === 'sdk' && (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                  <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6">
                     <div className="w-16 h-16 bg-black rounded-xl border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                       {sdkData.product_image ? <img src={sdkData.product_image} className="w-full h-full object-cover" /> : <Package size={24} className="text-zinc-700"/>}
+                       {sdkData.product_image ? <img src={sdkData.product_image} className="w-full h-full object-cover" alt="product" /> : <Package size={24} className="text-zinc-700"/>}
                     </div>
                     <div>
                        <h3 className="font-bold text-sm uppercase">{sdkData.product_name}</h3>
@@ -211,7 +203,7 @@ function CheckoutContent() {
               </div>
             )}
 
-            {/* 2. MÒD INVOICE (DOKIMAN) */}
+            {/* MÒD INVOICE */}
             {checkoutType === 'invoice' && (
                <div className="bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl p-8 space-y-6 animate-in zoom-in-95 duration-500">
                   <div className="flex items-center gap-3 mb-4">
@@ -241,7 +233,7 @@ function CheckoutContent() {
             )}
 
             {/* TOTAL */}
-            <div className="pt-8 mt-auto">
+            <div className="pt-8 mt-auto border-t border-white/5">
                <div className="flex justify-between items-end">
                   <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Total à payer</span>
                   <div className="flex items-baseline gap-2">
@@ -253,11 +245,10 @@ function CheckoutContent() {
           </div>
         </div>
 
-        {/* --- KOLÒN DWAT: PEMAN --- */}
+        {/* KOLÒN DWAT: PEMAN */}
         <div className="bg-[#0a0b12] p-8 lg:p-20 flex flex-col justify-center">
           
           {alreadyPaid ? (
-             // EKRAN SIKSÈ (INVOICE)
              <div className="text-center space-y-8 animate-in zoom-in-50 duration-500">
                 <div className="w-24 h-24 bg-green-500 rounded-full mx-auto flex items-center justify-center shadow-[0_0_40px_-10px_rgba(34,197,94,0.6)]">
                    <CheckCircle2 size={40} className="text-black" />
@@ -275,7 +266,6 @@ function CheckoutContent() {
                 </button>
              </div>
           ) : (
-             // FÒM PEMAN
              <div className="space-y-8">
                <div>
                   <h2 className="text-2xl font-bold mb-2">Paiement Sécurisé</h2>
