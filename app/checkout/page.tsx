@@ -166,18 +166,15 @@ function CheckoutContent() {
     <Building2 className="text-white w-6 h-6" />
   </div>
   <div>
-    {/* Sa a pral chanje dinamikman selon mèt invoice la */}
-    <h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
+{/* Sa a pral chanje dinamikman selon mèt invoice la */}
+<h1 className="text-2xl font-black uppercase italic tracking-tighter text-white">
       {businessName} 
     </h1>
     <div className="flex items-center gap-2 mt-1">
        <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded border border-green-500/20">
-         VERIFYE
-        <span className="text-[9px] text-zinc-500 font-mono uppercase tracking-wider">REF: {orderId}</span>
-              </div>
-            </div>
-          </div>
-
+          VERIFYE
+       </span> {/* Ou te bliye fèmen span sa a */}
+    </div> {/* Fèmen div gap-2 a */}
           {/* KONTN DYNAMIK */}
           <div className="flex-1 space-y-8">
             
