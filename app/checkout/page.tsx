@@ -47,18 +47,16 @@ function CheckoutContent() {
   // Fòm Peman
   const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
 
-// --- 1. INITIALIZATION & DETECTION ---
-useEffect(() => {
+  useEffect(() => {
    const init = async () => {
      const invId = searchParams.get('invoice_id');
      const termId = searchParams.get('terminal');
 
      try {
        if (invId) {
-         // --- MÒD INVOICE (FAKTI) ---
          setCheckoutType('invoice');
          
-         // Nou rale invoice la ak JOIN sou pwofil la pou jwenn non biznis la
+         // Nou fè yon sèl requete ki rale Invoice ak Profile ansanm
          const { data: inv, error } = await supabase
            .from('invoices')
            .select(`
@@ -72,13 +70,13 @@ useEffect(() => {
            .eq('id', invId)
            .single();
 
-         if (error || !inv) throw new Error("Fakti sa a pa valid.");
+         if (error || !inv) throw new Error("Fakti sa a pa egziste.");
 
          setInvoice(inv);
          setReceiverId(inv.owner_id);
          setAmount(Number(inv.amount));
          
-         // Rale non biznis la nan Profile la (sa ki nan baz done a)
+         // DINAMIK: Nou pran non an nan baz done a
          const bizName = inv.profiles?.business_name || inv.profiles?.full_name || 'Hatex Merchant';
          setBusinessName(bizName);
          
@@ -87,19 +85,19 @@ useEffect(() => {
          if (inv.profiles) setKycStatus(inv.profiles.kyc_status);
 
        } else if (termId) {
-         // --- MÒD SDK (TERMINAL) ---
          setCheckoutType('sdk');
-         // (Kite rès lojik SDK ou a isit la si w genyen l)
+         // Isit la ou ka mete lojik SDK ou a si w bezwen l
        }
      } catch (err: any) {
-       console.error("Erè Init:", err.message);
+       console.error("Erè:", err.message);
        setErrorMsg(err.message);
      } finally {
        setLoading(false);
      }
    };
-    init();
-  }, [searchParams, supabase]);
+
+   init();
+ }, [searchParams]);
 
   const handlePayment = async (e: React.FormEvent) => {
    e.preventDefault();
