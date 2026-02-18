@@ -22,19 +22,16 @@ function CheckoutContent() {
   const [processing, setProcessing] = useState(false);
   const [checkoutType, setCheckoutType] = useState<'invoice' | 'sdk'>('sdk');
   
-  // Done Tranzaksyon
   const [amount, setAmount] = useState<number>(0);
   const [receiverId, setReceiverId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState('');
   const [businessName, setBusinessName] = useState('Hatex Merchant');
   const [kycStatus, setKycStatus] = useState<string>('');
   
-  // Done Invoice
   const [invoice, setInvoice] = useState<any>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Done SDK (Sekirize nan useMemo)
   const sdkData = useMemo(() => ({
     product_name: searchParams.get('product_name') || 'Sèvis Digital',
     product_image: searchParams.get('product_image'),
@@ -44,8 +41,14 @@ function CheckoutContent() {
     platform: searchParams.get('platform') || 'Hatex Gateway'
   }), [searchParams]);
 
-  // Fòm Peman
   const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
+
+  // --- FONKSYON POU BOUCHE NON AN (Eme...) ---
+  const maskName = (name: string) => {
+    if (!name) return "Kli...";
+    const base = name.split('@')[0]; // Retire @ si se yon email
+    return base.substring(0, 3) + "...";
+  };
 
   // --- 1. INITIALIZATION & DETECTION ---
   useEffect(() => {
@@ -55,9 +58,7 @@ function CheckoutContent() {
 
       try {
         if (invId) {
-          // --- MÒD INVOICE (FAKTI) ---
           setCheckoutType('invoice');
-          
           const { data: inv, error } = await supabase
             .from('invoices')
             .select('*')
@@ -70,7 +71,6 @@ function CheckoutContent() {
           setReceiverId(inv.owner_id);
           setAmount(Number(inv.amount));
           
-          // Chache non machann nan pwofil la pou asire sekirite
           const { data: prof } = await supabase
             .from('profiles')
             .select('business_name, kyc_status')
@@ -86,7 +86,6 @@ function CheckoutContent() {
           if (inv.status === 'paid') setAlreadyPaid(true);
 
         } else if (termId) {
-          // --- MÒD SDK (TERMINAL) ---
           setCheckoutType('sdk');
           setReceiverId(termId);
           setAmount(Number(searchParams.get('amount')) || 0);
@@ -104,7 +103,6 @@ function CheckoutContent() {
           }
         }
       } catch (err: any) {
-        console.error("Erè:", err);
         setErrorMsg("Enposib pou chaje tranzaksyon an.");
       } finally {
         setLoading(false);
@@ -122,6 +120,10 @@ function CheckoutContent() {
     try {
       if (!receiverId || amount <= 0) throw new Error("Erè konfigirasyon: Montan envalid.");
 
+      // N ap prepare non ki maske a (Eme...) pou voye bay machann nan
+      const rawName = checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name;
+      const maskedName = maskName(rawName);
+
       const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
         p_terminal_id: receiverId,
         p_card_number: form.card.replace(/\s/g, ''),
@@ -129,7 +131,7 @@ function CheckoutContent() {
         p_card_expiry: form.expiry,
         p_amount: amount,
         p_order_id: orderId,
-        p_customer_name: checkoutType === 'invoice' ? invoice?.client_email : sdkData.customer_name,
+        p_customer_name: maskedName, // ISIT LA NOU METE NON KI MASKÉ A
         p_platform: checkoutType === 'invoice' ? 'Hatex Invoice' : sdkData.platform
       });
 
@@ -167,7 +169,6 @@ function CheckoutContent() {
         
         {/* --- KOLÒN GÒCH: ENFÒMASYON --- */}
         <div className="p-8 lg:p-16 flex flex-col relative overflow-hidden bg-white/[0.02] border-r border-white/5">
-          {/* Header Biznis - Non Machann nan parèt isit la */}
           <div className="mb-10 flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-red-600 to-red-900 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20">
               <Building2 size={24} className="text-white" />
@@ -186,8 +187,6 @@ function CheckoutContent() {
           </div>
 
           <div className="flex-1 space-y-8">
-            
-            {/* 1. MÒD SDK (LIVREZON) - Tout detay yo la */}
             {checkoutType === 'sdk' && (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                  <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 mb-6">
@@ -220,14 +219,12 @@ function CheckoutContent() {
               </div>
             )}
 
-            {/* 2. MÒD INVOICE */}
             {checkoutType === 'invoice' && (
                <div className="bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl p-8 space-y-6 animate-in zoom-in-95 duration-500">
                   <div className="flex items-center gap-3 mb-4">
                      <FileText className="text-zinc-400" size={20} />
                      <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Facture Hatex</span>
                   </div>
-                  
                   <div className="space-y-4">
                     <div className="flex justify-between border-b border-white/5 pb-4">
                        <span className="text-zinc-500 text-sm">Client</span>
@@ -237,23 +234,10 @@ function CheckoutContent() {
                        <span className="text-zinc-500 text-sm">Montant</span>
                        <span className="font-bold text-sm text-red-500">{amount.toLocaleString()} HTG</span>
                     </div>
-                    <div className="flex justify-between border-b border-white/5 pb-4">
-                       <span className="text-zinc-500 text-sm">Date</span>
-                       <span className="font-mono text-sm text-zinc-300">
-                         {invoice?.created_at ? new Date(invoice.created_at).toLocaleDateString() : '...'}
-                       </span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2">
-                       <span className="text-zinc-500 text-sm">Statut</span>
-                       <span className={`text-[10px] font-black uppercase px-2 py-1 rounded border ${alreadyPaid ? 'border-green-500/30 text-green-500 bg-green-500/10' : 'border-orange-500/30 text-orange-500 bg-orange-500/10'}`}>
-                          {alreadyPaid ? 'PAYÉ' : 'EN ATTENTE'}
-                       </span>
-                    </div>
                   </div>
                </div>
             )}
 
-            {/* TOTAL KI TOUJOU LA */}
             <div className="pt-8 mt-auto">
                <div className="flex justify-between items-end">
                   <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Total à payer</span>
@@ -276,7 +260,10 @@ function CheckoutContent() {
                 </div>
                 <div>
                    <h2 className="text-3xl font-black uppercase tracking-tight italic">Paiement Reçu</h2>
-                   <p className="text-zinc-400 mt-2 text-sm">Transkasyon an verifye e li anrejistre.</p>
+                   {/* MESAJ PÈSONALIZE OU A ISIT LA */}
+                   <p className="text-green-400 mt-4 text-sm font-bold bg-green-500/10 p-4 rounded-xl border border-green-500/20">
+                     Ou peye {businessName} {amount.toLocaleString()} HTG nan dat {new Date().toLocaleDateString()}
+                   </p>
                 </div>
                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 text-left space-y-3">
                    <div className="flex justify-between text-sm"><span className="text-zinc-500">Ref ID</span> <span className="text-white font-mono">{orderId}</span></div>
