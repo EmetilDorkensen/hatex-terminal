@@ -21,6 +21,7 @@ export default function TerminalPage() {
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -127,6 +128,205 @@ export default function TerminalPage() {
     }
   };
 
+  // --- KÒD SDK A NAN YON TEXT STRING POU L PA KRAZE NEXT.JS EPI POU W KA KOPYE L ---
+  const fullSDKCode = `
+<style>
+  /* Bouton Ajoute nan Panyen an */
+  .htx-add-cart-btn { 
+    background: #dc2626; color: white; width: 100%; padding: 18px; 
+    border-radius: 12px; font-weight: 900; border: none; cursor: pointer; 
+    text-transform: uppercase; font-size: 12px; letter-spacing: 1px;
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .htx-add-cart-btn:hover { background: #b91c1c; transform: scale(1.02); }
+
+  /* Modal Prensipal */
+  .htx-overlay { 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); 
+    z-index: 999999; display: none; align-items: flex-end; justify-content: center; 
+  }
+  
+  .htx-cart-container { 
+    background: #0f0f0f; width: 100%; max-width: 500px; border-radius: 35px 35px 0 0; 
+    padding: 30px; box-sizing: border-box; color: white; font-family: sans-serif; 
+    animation: htxUp 0.4s ease-out; max-height: 95vh; overflow-y: auto;
+    border-top: 5px solid #dc2626;
+  }
+  @keyframes htxUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  /* Header Panyen */
+  .htx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+  .htx-step-indicator { font-size: 10px; font-weight: 900; color: #dc2626; text-transform: uppercase; }
+
+  /* Item nan Panyen an (Foto & Enfò) */
+  .htx-product-card { 
+    background: #181818; border-radius: 20px; padding: 15px; 
+    display: flex; gap: 15px; margin-bottom: 25px; border: 1px solid #252525;
+  }
+  .htx-img { width: 90px; height: 90px; object-fit: cover; border-radius: 12px; background: #000; }
+  .htx-details { flex: 1; }
+  .htx-name { font-size: 14px; font-weight: 700; margin-bottom: 5px; color: #efefef; }
+  .htx-price { color: #dc2626; font-size: 20px; font-weight: 900; }
+
+  /* Fòm Adrès */
+  .htx-section-title { font-size: 11px; font-weight: 900; color: #555; text-transform: uppercase; margin: 20px 0 10px 5px; display: block; }
+  .htx-input { 
+    width: 100%; background: #1a1a1a; border: 1px solid #222; padding: 15px 20px; 
+    border-radius: 15px; color: white; font-size: 14px; margin-bottom: 10px; outline: none; box-sizing: border-box;
+  }
+  .htx-input:focus { border-color: #dc2626; }
+
+  /* Rezime (Step 2) */
+  .htx-summary-box { background: #1a1a1a; padding: 20px; border-radius: 20px; margin-bottom: 20px; border-left: 4px solid #dc2626; }
+  .htx-summary-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #aaa; }
+  .htx-total-line { border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; color: white; font-weight: 900; font-size: 18px; }
+</style>
+
+<div id="hatex-sdk-inject-point">
+  <button class="htx-add-cart-btn" id="htx-add-to-cart">🛒 AJOUTER AU PANIER HATEX</button>
+</div>
+
+<script>
+  (function() {
+    const MERCHANT_ID = "${profile?.id || 'YOUR_MERCHANT_ID'}";
+    const RATE_HTG = 136;
+
+    // --- SCRAPER ---
+    function getProductData() {
+      const title = document.querySelector('h1')?.innerText || document.title;
+      const image = document.querySelector('meta[property="og:image"]')?.content || 
+                    document.querySelector('.product-main-image, .wp-post-image, [class*="MainImage"]')?.src || 
+                    document.querySelector('img')?.src;
+      
+      let rawPrice = "0";
+      const selectors = ['.price', '.amount', '[class*="current-price"]', '.product-price'];
+      for(let s of selectors) {
+        let el = document.querySelector(s);
+        if(el) { rawPrice = el.innerText; break; }
+      }
+      
+      const val = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
+      const isUSD = rawPrice.includes('$') || val < 1000;
+      return {
+        name: title,
+        img: image,
+        price_htg: isUSD ? (val * RATE_HTG) : val,
+        original: rawPrice
+      };
+    }
+
+    // Modal HTML Structure
+    const modal = document.createElement('div');
+    modal.className = 'htx-overlay';
+    modal.id = 'htx-main-modal';
+    document.body.appendChild(modal);
+
+    // --- STEP 1: CART & ADDRESS ---
+    function showStep1() {
+      const data = getProductData();
+      modal.innerHTML = \`
+        <div class="htx-cart-container">
+          <div class="htx-header">
+            <span class="htx-step-indicator">Étape 1: Panier & Livraison</span>
+            <span style="cursor:pointer; font-size:24px;" onclick="document.getElementById('htx-main-modal').style.display='none'">&times;</span>
+          </div>
+
+          <div class="htx-product-card">
+            <img src="\${data.img}" class="htx-img">
+            <div class="htx-details">
+              <div class="htx-name">\${data.name}</div>
+              <div class="htx-price">\${data.price_htg.toLocaleString()} HTG</div>
+              <div style="font-size:9px; color:#555;">Basé sur: \${data.original}</div>
+            </div>
+          </div>
+
+          <span class="htx-section-title">Informations de Livraison</span>
+          <form id="htx-cart-form">
+            <input required id="htx_name" class="htx-input" placeholder="Nom et Prénom">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+              <input required id="htx_phone" type="tel" class="htx-input" placeholder="WhatsApp">
+              <input required id="htx_email" type="email" class="htx-input" placeholder="Email">
+            </div>
+            <input required id="htx_address" class="htx-input" placeholder="Adresse complète (No, Rue, Ville)">
+            
+            <button type="submit" class="htx-add-cart-btn" style="margin-top:20px;">CONTINUER VERS RÉSUMÉ</button>
+          </form>
+        </div>
+      \`;
+      
+      document.getElementById('htx-cart-form').onsubmit = (e) => {
+        e.preventDefault();
+        const customer = {
+          name: document.getElementById('htx_name').value,
+          phone: document.getElementById('htx_phone').value,
+          email: document.getElementById('htx_email').value,
+          address: document.getElementById('htx_address').value
+        };
+        showStep2(data, customer);
+      };
+    }
+
+    // --- STEP 2: SUMMARY & FINAL PAY ---
+    function showStep2(product, customer) {
+      modal.innerHTML = \`
+        <div class="htx-cart-container">
+          <div class="htx-header">
+            <span class="htx-step-indicator">Étape 2: Résumé de la Commande</span>
+            <span style="cursor:pointer; font-size:24px;" onclick="showStep1()">&larr;</span>
+          </div>
+
+          <div class="htx-summary-box">
+            <p style="font-size:10px; font-weight:900; color:#dc2626; margin-bottom:10px;">LIVRÉ À:</p>
+            <div style="font-size:13px; font-weight:bold;">\${customer.name}</div>
+            <div style="font-size:12px; color:#777;">\${customer.address}</div>
+            <div style="font-size:12px; color:#777;">\${customer.phone}</div>
+          </div>
+
+          <div class="htx-summary-box">
+             <div class="htx-summary-line"><span>Produit:</span> <span style="color:white; font-weight:bold;">\${product.name.substring(0,25)}...</span></div>
+             <div class="htx-summary-line"><span>Frais de livraison:</span> <span style="color:#00ff00;">GRATUIT</span></div>
+             <div class="htx-total-line"><span>TOTAL:</span> <span>\${product.price_htg.toLocaleString()} HTG</span></div>
+          </div>
+
+          <button id="htx-final-pay" class="htx-add-cart-btn" style="background:#000; border:1px solid #dc2626; box-shadow: 0 10px 30px rgba(220,38,38,0.2);">
+            🔒 CONFIRMER ET PAYER
+          </button>
+          <p style="text-align:center; font-size:9px; color:#444; margin-top:15px; text-transform:uppercase; font-weight:900;">Cryptage SSL 256-bit par Hatex</p>
+        </div>
+      \`;
+
+      document.getElementById('htx-final-pay').onclick = () => {
+        const payload = {
+          terminal: MERCHANT_ID,
+          amount: product.price_htg,
+          product: product.name,
+          customer: customer
+        };
+        const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        window.location.href = "https://hatexcard.com/checkout?token=" + token;
+      };
+    }
+
+    // Evènman sou bouton an
+    const cartBtn = document.getElementById('htx-add-to-cart');
+    if(cartBtn) {
+      cartBtn.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        showStep1();
+      });
+    }
+
+  })();
+</script>
+`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(fullSDKCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
       
@@ -173,215 +373,57 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {/* --- SDK API SECTION (Hatex Cart & Checkout System) --- */}
+      {/* --- SDK API SECTION (KOTE POU KOPYE KÒD LA) --- */}
       {mode === 'api' && (
         <div className="animate-in fade-in duration-500">
           <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600 mb-8 hover:tracking-widest transition-all">
             <ArrowLeft size={14} /> Back to Terminal
           </button>
 
-          <div className="bg-zinc-900/20 p-8 rounded-[3rem] border border-white/5 mb-10 text-center">
-            <div className="mb-6"><ShoppingCart className="mx-auto text-red-600/40" size={40} /></div>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase mb-4">Preview: Hatex Smart Cart SDK</p>
-            <div id="hatex-sdk-inject-point" className="max-w-xs mx-auto"></div>
-          </div>
-
-          {/* CSS AVANSE POU PANYEN AK REZIME (ALIEXPRESS STYLE) */}
-          <style dangerouslySetInnerHTML={{ __html: `
-            /* Bouton Ajoute nan Panyen an */
-            .htx-add-cart-btn { 
-              background: #dc2626; color: white; width: 100%; padding: 18px; 
-              border-radius: 12px; font-weight: 900; border: none; cursor: pointer; 
-              text-transform: uppercase; font-size: 12px; letter-spacing: 1px;
-              transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            .htx-add-cart-btn:hover { background: #b91c1c; transform: scale(1.02); }
-
-            /* Modal Prensipal */
-            .htx-overlay { 
-              position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-              background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); 
-              z-index: 999999; display: none; align-items: flex-end; justify-content: center; 
-            }
+          <div className="grid lg:grid-cols-2 gap-8">
             
-            .htx-cart-container { 
-              background: #0f0f0f; width: 100%; max-width: 500px; border-radius: 35px 35px 0 0; 
-              padding: 30px; box-sizing: border-box; color: white; font-family: sans-serif; 
-              animation: htxUp 0.4s ease-out; max-height: 95vh; overflow-y: auto;
-              border-top: 5px solid #dc2626;
-            }
-            @keyframes htxUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+            {/* Bwat Preview */}
+            <div className="bg-zinc-900/20 p-8 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center">
+              <ShoppingCart className="text-red-600/40 mb-4" size={40} />
+              <p className="text-[10px] font-bold text-zinc-400 uppercase mb-4">Preview Bouton SDK a</p>
+              
+              {/* Sa se jis yon fo bouton pou l wè sa l sanble, paske reyèl bouton an ap nan kòd la */}
+              <button className="bg-[#dc2626] text-white w-full max-w-xs p-[18px] rounded-xl font-black uppercase text-[12px] tracking-widest pointer-events-none opacity-50">
+                🛒 AJOUTER AU PANIER HATEX
+              </button>
+              
+              <p className="text-[9px] text-zinc-600 mt-6 uppercase">Bouton sa ap parèt sou sit kliyan ou yo.</p>
+            </div>
 
-            /* Header Panyen */
-            .htx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-            .htx-step-indicator { font-size: 10px; font-weight: 900; color: #dc2626; text-transform: uppercase; }
-
-            /* Item nan Panyen an (Foto & Enfò) */
-            .htx-product-card { 
-              background: #181818; border-radius: 20px; padding: 15px; 
-              display: flex; gap: 15px; margin-bottom: 25px; border: 1px solid #252525;
-            }
-            .htx-img { width: 90px; height: 90px; object-fit: cover; border-radius: 12px; background: #000; }
-            .htx-details { flex: 1; }
-            .htx-name { font-size: 14px; font-weight: 700; margin-bottom: 5px; color: #efefef; }
-            .htx-price { color: #dc2626; font-size: 20px; font-weight: 900; }
-
-            /* Fòm Adrès */
-            .htx-section-title { font-size: 11px; font-weight: 900; color: #555; text-transform: uppercase; margin: 20px 0 10px 5px; display: block; }
-            .htx-input { 
-              width: 100%; background: #1a1a1a; border: 1px solid #222; padding: 15px 20px; 
-              border-radius: 15px; color: white; font-size: 14px; margin-bottom: 10px; outline: none; box-sizing: border-box;
-            }
-            .htx-input:focus { border-color: #dc2626; }
-
-            /* Rezime (Step 2) */
-            .htx-summary-box { background: #1a1a1a; padding: 20px; border-radius: 20px; margin-bottom: 20px; border-left: 4px solid #dc2626; }
-            .htx-summary-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #aaa; }
-            .htx-total-line { border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; color: white; font-weight: 900; font-size: 18px; }
-          ` }} />
-
-          {/* PART 1 & 2 SCRIPT: CART & CHECKOUT LOGIC */}
-          <script dangerouslySetInnerHTML={{ __html: `
-            (function() {
-              const MERCHANT_ID = "${profile?.id || ''}";
-              const RATE_HTG = 136;
-
-              // --- SCRAPER ---
-              function getProductData() {
-                const title = document.querySelector('h1')?.innerText || document.title;
-                const image = document.querySelector('meta[property="og:image"]')?.content || 
-                              document.querySelector('.product-main-image, .wp-post-image, [class*="MainImage"]')?.src || 
-                              document.querySelector('img')?.src;
-                
-                let rawPrice = "0";
-                const selectors = ['.price', '.amount', '[class*="current-price"]', '.product-price'];
-                for(let s of selectors) {
-                  let el = document.querySelector(s);
-                  if(el) { rawPrice = el.innerText; break; }
-                }
-                
-                const val = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
-                const isUSD = rawPrice.includes('$') || val < 1000;
-                return {
-                  name: title,
-                  img: image,
-                  price_htg: isUSD ? (val * RATE_HTG) : val,
-                  original: rawPrice
-                };
-              }
-
-              // --- UI INJECTION ---
-              const wrapper = document.getElementById('hatex-sdk-inject-point');
-              if(!wrapper) return;
-              wrapper.innerHTML = '<button class="htx-add-cart-btn" id="htx-add-to-cart">🛒 AJOUTER AU PANIER HATEX</button>';
-
-              // Modal HTML Structure
-              const modal = document.createElement('div');
-              modal.className = 'htx-overlay';
-              modal.id = 'htx-main-modal';
-              document.body.appendChild(modal);
-
-              // --- STEP 1: CART & ADDRESS ---
-              function showStep1() {
-                const data = getProductData();
-                modal.innerHTML = \`
-                  <div class="htx-cart-container">
-                    <div class="htx-header">
-                      <span class="htx-step-indicator">Étape 1: Panier & Livraison</span>
-                      <span style="cursor:pointer; font-size:24px;" onclick="document.getElementById('htx-main-modal').style.display='none'">&times;</span>
-                    </div>
-
-                    <div class="htx-product-card">
-                      <img src="\${data.img}" class="htx-img">
-                      <div class="htx-details">
-                        <div class="htx-name">\${data.name}</div>
-                        <div class="htx-price">\${data.price_htg.toLocaleString()} HTG</div>
-                        <div style="font-size:9px; color:#555;">Basé sur: \${data.original}</div>
-                      </div>
-                    </div>
-
-                    <span class="htx-section-title">Informations de Livraison</span>
-                    <form id="htx-cart-form">
-                      <input required id="htx_name" class="htx-input" placeholder="Nom et Prénom">
-                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                        <input required id="htx_phone" type="tel" class="htx-input" placeholder="WhatsApp">
-                        <input required id="htx_email" type="email" class="htx-input" placeholder="Email">
-                      </div>
-                      <input required id="htx_address" class="htx-input" placeholder="Adresse complète (No, Rue, Ville)">
-                      
-                      <button type="submit" class="htx-add-cart-btn" style="margin-top:20px;">CONTINUER VERS RÉSUMÉ</button>
-                    </form>
-                  </div>
-                \`;
-                
-                document.getElementById('htx-cart-form').onsubmit = (e) => {
-                  e.preventDefault();
-                  const customer = {
-                    name: document.getElementById('htx_name').value,
-                    phone: document.getElementById('htx_phone').value,
-                    email: document.getElementById('htx_email').value,
-                    address: document.getElementById('htx_address').value
-                  };
-                  showStep2(data, customer);
-                };
-              }
-
-              // --- STEP 2: SUMMARY & FINAL PAY ---
-              function showStep2(product, customer) {
-                modal.innerHTML = \`
-                  <div class="htx-cart-container">
-                    <div class="htx-header">
-                      <span class="htx-step-indicator">Étape 2: Résumé de la Commande</span>
-                      <span style="cursor:pointer; font-size:24px;" onclick="showStep1()">&larr;</span>
-                    </div>
-
-                    <div class="htx-summary-box">
-                      <p style="font-size:10px; font-weight:900; color:#dc2626; margin-bottom:10px;">LIVRÉ À:</p>
-                      <div style="font-size:13px; font-weight:bold;">\${customer.name}</div>
-                      <div style="font-size:12px; color:#777;">\${customer.address}</div>
-                      <div style="font-size:12px; color:#777;">\${customer.phone}</div>
-                    </div>
-
-                    <div class="htx-summary-box">
-                       <div class="htx-summary-line"><span>Produit:</span> <span style="color:white; font-weight:bold;">\${product.name.substring(0,25)}...</span></div>
-                       <div class="htx-summary-line"><span>Frais de livraison:</span> <span style="color:#00ff00;">GRATUIT</span></div>
-                       <div class="htx-total-line"><span>TOTAL:</span> <span>\${product.price_htg.toLocaleString()} HTG</span></div>
-                    </div>
-
-                    <button id="htx-final-pay" class="htx-add-cart-btn" style="background:#000; border:1px solid #dc2626; box-shadow: 0 10px 30px rgba(220,38,38,0.2);">
-                      🔒 CONFIRMER ET PAYER
-                    </button>
-                    <p style="text-align:center; font-size:9px; color:#444; margin-top:15px; text-transform:uppercase; font-weight:900;">Cryptage SSL 256-bit par Hatex</p>
-                  </div>
-                \`;
-
-                document.getElementById('htx-final-pay').onclick = () => {
-                  const payload = {
-                    terminal: MERCHANT_ID,
-                    amount: product.price_htg,
-                    product: product.name,
-                    customer: customer
-                  };
-                  const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-                  window.location.href = "https://hatexcard.com/checkout?token=" + token;
-                };
-              }
-
-              document.getElementById('htx-add-to-cart').onclick = () => {
-                modal.style.display = 'flex';
-                showStep1();
-              };
-
-            })();
-          ` }} />
+            {/* Bwat pou Kopye Kòd la */}
+            <div className="bg-black/80 border border-white/5 rounded-[2.5rem] p-6 relative group">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[10px] font-black uppercase text-zinc-500 italic">Integration Code</span>
+                <button 
+                  onClick={copyToClipboard}
+                  className="bg-red-600 p-2 px-4 rounded-xl text-[10px] font-black flex items-center gap-2 hover:bg-red-700 transition-colors"
+                >
+                  {copied ? <CheckCircle2 size={12}/> : <Copy size={12}/>} {copied ? 'COPIÉ !' : 'COPY'}
+                </button>
+              </div>
+              
+              <pre className="text-[9px] text-zinc-500 h-[300px] overflow-auto bg-black/50 p-4 rounded-xl font-mono leading-relaxed scrollbar-thin scrollbar-thumb-red-600/30">
+                {fullSDKCode}
+              </pre>
+            </div>
+            
+          </div>
 
           {/* DOCUMENTATION */}
           <div className="mt-16 border-t border-white/5 pt-10">
-            <div className="bg-red-600/5 p-6 rounded-3xl border border-red-600/10">
-              <h4 className="text-[10px] font-black uppercase text-red-600 mb-2">Note d'intégration</h4>
-              <p className="text-[11px] text-zinc-500 italic leading-relaxed">
-                Sistèm sa a ap rale enfòmasyon pwodwi a otomatikman. Lè kliyan an klike "Confirmer", tout done yo (Pwodwi, Pri HTG, Adrès) ap ankode nan yon jeton (Token) pou ale nan paj chèkout la. Done yo ap parèt nan istwa tranzaksyon ou tou.
-              </p>
+            <div className="bg-red-600/5 p-6 rounded-3xl border border-red-600/10 flex items-start gap-4">
+              <Info className="text-red-600 mt-1 flex-shrink-0" size={20} />
+              <div>
+                <h4 className="text-[10px] font-black uppercase text-red-600 mb-2">Note d'intégration</h4>
+                <p className="text-[11px] text-zinc-500 italic leading-relaxed">
+                  Sistèm sa a ap rale enfòmasyon pwodwi a otomatikman. Lè kliyan an klike "Confirmer", tout done yo (Pwodwi, Pri HTG, Adrès) ap ankode nan yon jeton (Token) pou ale nan paj chèkout la. Done yo ap parèt nan istwa tranzaksyon ou tou. Kopye kòd ki anlè a epi mete l nan paj html sit ou a.
+                </p>
+              </div>
             </div>
           </div>
         </div>
