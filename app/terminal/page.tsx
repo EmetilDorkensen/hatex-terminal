@@ -8,7 +8,7 @@ import {
   ArrowLeft, ShoppingCart, Globe, ExternalLink,
   Wallet, RefreshCw, ArrowDownCircle, ShieldCheck,
   User, Tag, Calendar, ChevronRight, Info, AlertTriangle,
-  Lock, CreditCard, Box, Truck
+  Lock, CreditCard, Box, Truck, FileText, Upload
 } from 'lucide-react';
 
 export default function TerminalPage() {
@@ -18,8 +18,13 @@ export default function TerminalPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  
+  // Invoice states
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
+  
+  // Branding states
   const [businessName, setBusinessName] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -128,196 +133,343 @@ export default function TerminalPage() {
     }
   };
 
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') return alert('Tanpri chwazi yon dosye PDF.');
+    
+    setUploadingPdf(true);
+    try {
+      // Mete lojik Supabase Storage ou a la. Ex: supabase.storage.from('documents').upload(...)
+      // Pou kounya nap jis simule yon delay:
+      await new Promise(res => setTimeout(res, 1500));
+      alert("PDF eksplakasyon upload ak siksè!");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
   // --- KÒD SDK A NAN YON TEXT STRING POU L PA KRAZE NEXT.JS EPI POU W KA KOPYE L ---
+  // Mwen konekte 'profile?.id' la dirèkteman anndan JS la
   const fullSDKCode = `
 <style>
-  /* Bouton Ajoute nan Panyen an */
-  .htx-add-cart-btn { 
-    background: #dc2626; color: white; width: 100%; padding: 18px; 
-    border-radius: 12px; font-weight: 900; border: none; cursor: pointer; 
-    text-transform: uppercase; font-size: 12px; letter-spacing: 1px;
-    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .htx-add-cart-btn:hover { background: #b91c1c; transform: scale(1.02); }
+    /* --- MASTER STYLES --- */
+    :root { 
+        --htx-primary: #e62e04; 
+        --htx-secondary: #8a1c02;
+        --htx-bg-dark: #0a0a0a;
+        --htx-glass: rgba(255, 255, 255, 0.08);
+        --htx-glass-dark: rgba(0, 0, 0, 0.90);
+    }
 
-  /* Modal Prensipal */
-  .htx-overlay { 
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); 
-    z-index: 999999; display: none; align-items: flex-end; justify-content: center; 
-  }
-  
-  .htx-cart-container { 
-    background: #0f0f0f; width: 100%; max-width: 500px; border-radius: 35px 35px 0 0; 
-    padding: 30px; box-sizing: border-box; color: white; font-family: sans-serif; 
-    animation: htxUp 0.4s ease-out; max-height: 95vh; overflow-y: auto;
-    border-top: 5px solid #dc2626;
-  }
-  @keyframes htxUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .htx-app-wrapper * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; transition: all 0.3s ease; }
 
-  /* Header Panyen */
-  .htx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-  .htx-step-indicator { font-size: 10px; font-weight: 900; color: #dc2626; text-transform: uppercase; }
+    /* FAB - BOUTON FLOTAN */
+    #htx-master-fab {
+        position: fixed !important; bottom: 30px !important; right: 30px !important; 
+        width: 80px !important; height: 80px !important; background: var(--htx-bg-dark) !important; 
+        border-radius: 50% !important; display: flex !important; align-items: center !important; 
+        justify-content: center !important; cursor: pointer !important; z-index: 2147483645 !important; 
+        box-shadow: 0 15px 45px rgba(0,0,0,0.8) !important; border: 2.5px solid var(--htx-primary) !important; 
+    }
+    #htx-master-fab:hover { transform: scale(1.1) rotate(8deg) !important; box-shadow: 0 20px 50px var(--htx-primary) !important; }
+    
+    #htx-fab-count {
+        position: absolute !important; top: -5px !important; right: -5px !important; 
+        background: var(--htx-primary) !important; color: #fff !important; border-radius: 50% !important; 
+        width: 32px !important; height: 32px !important; font-size: 15px !important; font-weight: 900 !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        border: 3px solid var(--htx-bg-dark) !important;
+    }
 
-  /* Item nan Panyen an (Foto & Enfò) */
-  .htx-product-card { 
-    background: #181818; border-radius: 20px; padding: 15px; 
-    display: flex; gap: 15px; margin-bottom: 25px; border: 1px solid #252525;
-  }
-  .htx-img { width: 90px; height: 90px; object-fit: cover; border-radius: 12px; background: #000; }
-  .htx-details { flex: 1; }
-  .htx-name { font-size: 14px; font-weight: 700; margin-bottom: 5px; color: #efefef; }
-  .htx-price { color: #dc2626; font-size: 20px; font-weight: 900; }
+    /* FULL MODAL OVERLAY */
+    #htx-main-overlay {
+        position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; 
+        background: radial-gradient(circle at top left, #1d0505, #000) !important;
+        z-index: 2147483646 !important; display: none; flex-direction: column !important;
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    }
 
-  /* Fòm Adrès */
-  .htx-section-title { font-size: 11px; font-weight: 900; color: #555; text-transform: uppercase; margin: 20px 0 10px 5px; display: block; }
-  .htx-input { 
-    width: 100%; background: #1a1a1a; border: 1px solid #222; padding: 15px 20px; 
-    border-radius: 15px; color: white; font-size: 14px; margin-bottom: 10px; outline: none; box-sizing: border-box;
-  }
-  .htx-input:focus { border-color: #dc2626; }
+    .htx-header {
+        padding: 30px !important; display: flex !important; align-items: center !important; justify-content: space-between !important;
+        background: var(--htx-glass-dark) !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    }
+    .htx-header h2 { margin: 0; font-size: 24px; color: #fff; font-weight: 900; letter-spacing: 1px; }
 
-  /* Rezime (Step 2) */
-  .htx-summary-box { background: #1a1a1a; padding: 20px; border-radius: 20px; margin-bottom: 20px; border-left: 4px solid #dc2626; }
-  .htx-summary-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #aaa; }
-  .htx-total-line { border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; color: white; font-weight: 900; font-size: 18px; }
+    .htx-body { flex: 1 !important; overflow-y: auto !important; padding: 25px !important; }
+    .htx-max-container { max-width: 600px !important; margin: 0 auto !important; width: 100% !important; }
+
+    /* CARDS PWODWI */
+    .htx-item-card {
+        background: #fff !important; border-radius: 25px !important; padding: 20px !important; margin-bottom: 20px !important;
+        display: flex !important; gap: 18px !important; position: relative !important; animation: htxFadeIn 0.5s ease;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.4) !important;
+    }
+    @keyframes htxFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .htx-item-img { width: 100px !important; height: 100px !important; border-radius: 18px !important; object-fit: cover !important; border: 1px solid #eee !important; }
+    .htx-item-details { flex: 1 !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; }
+    .htx-item-name { font-weight: 800 !important; font-size: 17px !important; color: #111 !important; line-height: 1.2 !important; }
+    .htx-item-meta { font-size: 12px !important; color: var(--htx-primary) !important; font-weight: 700 !important; text-transform: uppercase; margin-top: 4px; }
+    
+    .htx-qty-wrapper { display: flex !important; align-items: center !important; background: #f0f2f5 !important; border-radius: 12px !important; padding: 5px !important; width: fit-content !important; }
+    .htx-qty-btn { width: 35px !important; height: 35px !important; border: none !important; background: #fff !important; border-radius: 8px !important; cursor: pointer !important; font-weight: 900 !important; color: #000; }
+    .htx-qty-val { width: 45px !important; text-align: center !important; font-weight: 800 !important; color: #000 !important; font-size: 16px; }
+
+    /* FORM FIELDS */
+    .htx-section-title { font-size: 14px !important; font-weight: 900 !important; color: #ff9d8a !important; text-transform: uppercase !important; margin: 35px 0 15px 10px !important; display: block; letter-spacing: 2px; }
+    .htx-form-box { background: var(--htx-glass) !important; border-radius: 30px !important; padding: 30px !important; border: 1px solid rgba(255,255,255,0.1) !important; margin-bottom: 20px; }
+    .htx-input { 
+        width: 100% !important; padding: 20px !important; border-radius: 18px !important; border: 2px solid transparent !important; 
+        background: #fff !important; color: #000 !important; font-size: 16px !important; margin-bottom: 15px !important; outline: none !important;
+    }
+    .htx-input:focus { border-color: var(--htx-primary) !important; box-shadow: 0 0 20px rgba(230,46,4,0.4) !important; }
+
+    /* FOOTER */
+    .htx-footer { background: #fff !important; color: #000 !important; padding: 40px !important; border-radius: 45px 45px 0 0 !important; box-shadow: 0 -20px 60px rgba(0,0,0,0.6) !important; }
+    .htx-line { display: flex !important; justify-content: space-between !important; margin-bottom: 10px !important; font-weight: 600 !important; color: #555 !important; }
+    .htx-total-line { display: flex !important; justify-content: space-between !important; font-size: 30px !important; font-weight: 900 !important; margin-top: 20px !important; border-top: 3px dashed #eee !important; padding-top: 25px !important; }
+
+    .htx-pay-button { 
+        background: linear-gradient(135deg, var(--htx-primary), var(--htx-secondary)) !important; 
+        color: #fff !important; width: 100% !important; padding: 25px !important; border-radius: 22px !important; 
+        border: none !important; font-weight: 900 !important; font-size: 22px !important; cursor: pointer !important; 
+        margin-top: 30px !important; box-shadow: 0 15px 35px rgba(230, 46, 4, 0.5) !important;
+    }
+
+    /* INJECTED BUTTON */
+    .htx-btn-injected {
+        background: var(--htx-primary) !important; color: #fff !important; width: 100% !important; 
+        padding: 22px !important; border-radius: 18px !important; border: none !important; 
+        font-weight: 900 !important; font-size: 18px !important; cursor: pointer !important; 
+        margin-top: 15px !important; display: block !important; text-align: center !important;
+        box-shadow: 0 10px 25px rgba(230, 46, 4, 0.25) !important;
+    }
 </style>
 
-<div id="hatex-sdk-inject-point">
-  <button class="htx-add-cart-btn" id="htx-add-to-cart">🛒 AJOUTER AU PANIER HATEX</button>
+<div class="htx-app-wrapper">
+    <div id="htx-master-fab" onclick="window.htx_toggle()">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        <div id="htx-fab-count" style="display:none;">0</div>
+    </div>
+
+    <div id="htx-main-overlay">
+        <div class="htx-header">
+            <h2>🛒 HATEX MASTER CHECKOUT</h2>
+            <div onclick="window.htx_toggle()" style="cursor:pointer; font-weight:900; color:white; font-size:14px; opacity:0.7;">[ FÈMEN ]</div>
+        </div>
+        <div class="htx-body">
+            <div id="htx-render-list" class="htx-max-container"></div>
+            <div id="htx-render-form" class="htx-max-container"></div>
+        </div>
+        <div id="htx-render-footer"></div>
+    </div>
 </div>
 
 <script>
-  (function() {
-    const MERCHANT_ID = "${profile?.id || 'YOUR_MERCHANT_ID'}";
-    const RATE_HTG = 136;
+(function() {
+    "use strict";
 
-    // --- SCRAPER ---
-    function getProductData() {
-      const title = document.querySelector('h1')?.innerText || document.title;
-      const image = document.querySelector('meta[property="og:image"]')?.content || 
-                    document.querySelector('.product-main-image, .wp-post-image, [class*="MainImage"]')?.src || 
-                    document.querySelector('img')?.src;
-      
-      let rawPrice = "0";
-      const selectors = ['.price', '.amount', '[class*="current-price"]', '.product-price'];
-      for(let s of selectors) {
-        let el = document.querySelector(s);
-        if(el) { rawPrice = el.innerText; break; }
-      }
-      
-      const val = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
-      const isUSD = rawPrice.includes('$') || val < 1000;
-      return {
-        name: title,
-        img: image,
-        price_htg: isUSD ? (val * RATE_HTG) : val,
-        original: rawPrice
-      };
-    }
+    // 1. KONFIGIRASYON PWOFIL
+    window.HTX_CORE = {
+        config: {
+            mid: "3fb21333-1b91-458d-a63b-002b344076fb", // Terminal ID ou
+            rate: 136, // To echanj USD -> HTG
+            shipping: {
+                "Port-au-Prince": 250, "Pétion-Ville": 350, "Delmas": 250, "Tabarre": 300, 
+                "Carrefour": 400, "Cap-Haïtien": 850, "Cayes": 950, "Gonaïves": 650, "Jacmel": 700
+            }
+        },
+        cart: JSON.parse(localStorage.getItem('htx_v6_cart')) || [],
+        shipCost: 0
+    };
 
-    // Modal HTML Structure
-    const modal = document.createElement('div');
-    modal.className = 'htx-overlay';
-    modal.id = 'htx-main-modal';
-    document.body.appendChild(modal);
+    // 2. SCANNER ENTELIJAN (Detekte pri ak varyasyon)
+    window.htx_getPrice = function() {
+        // Detekte WooCommerce Variations
+        let vInput = document.querySelector('input.variation_id, .variation_id');
+        if (vInput && vInput.value > 0) {
+            let form = document.querySelector('.variations_form');
+            if (form && form.dataset.product_variations) {
+                let data = JSON.parse(form.dataset.product_variations);
+                let match = data.find(v => v.variation_id == vInput.value);
+                if (match) return parseFloat(match.display_price);
+            }
+        }
 
-    // --- STEP 1: CART & ADDRESS ---
-    function showStep1() {
-      const data = getProductData();
-      modal.innerHTML = \`
-        <div class="htx-cart-container">
-          <div class="htx-header">
-            <span class="htx-step-indicator">Étape 1: Panier & Livraison</span>
-            <span style="cursor:pointer; font-size:24px;" onclick="document.getElementById('htx-main-modal').style.display='none'">&times;</span>
-          </div>
+        // Shopify Scanner
+        if (window.Shopify && window.meta?.product) {
+            return window.meta.product.variants[0].price / 100;
+        }
 
-          <div class="htx-product-card">
-            <img src="\${data.img}" class="htx-img">
-            <div class="htx-details">
-              <div class="htx-name">\${data.name}</div>
-              <div class="htx-price">\${data.price_htg.toLocaleString()} HTG</div>
-              <div style="font-size:9px; color:#555;">Basé sur: \${data.original}</div>
+        // Pri Creole/Standard
+        let pEl = document.querySelector('.summary .price .amount bdi, .summary .price .amount, .product-price, .price, [class*="price"]');
+        if (pEl) {
+            let val = parseFloat(pEl.innerText.replace(/[^0-9.]/g, ''));
+            if (val > 0) return val;
+        }
+
+        return null;
+    };
+
+    // 3. AJOUTE NAN PANYEN
+    window.htx_add = function() {
+        let price = window.htx_getPrice();
+        if (!price) return alert("❌ Tanpri chwazi opsyon pwodwi a (gwosè/koulè) anvan.");
+
+        // Konvèti si se dola
+        let htgPrice = (price < 3500) ? Math.round(price * window.HTX_CORE.config.rate) : Math.round(price);
+        
+        let name = document.querySelector('h1')?.innerText || document.title;
+        let img = document.querySelector('meta[property="og:image"]')?.content || document.querySelector('.wp-post-image')?.src || document.querySelector('img')?.src;
+        let variant = Array.from(document.querySelectorAll('select')).map(s => s.options[s.selectedIndex]?.text).filter(t => t && !t.includes('---')).join(' / ') || "Inite";
+        let qty = parseInt(document.querySelector('input.qty, .quantity input')?.value || 1);
+
+        window.HTX_CORE.cart.push({ id: Date.now(), name, price: htgPrice, qty, img, variant });
+        window.htx_sync();
+        window.htx_toggle(true);
+    };
+
+    // 4. SYNC AK STORAGE
+    window.htx_sync = function() {
+        localStorage.setItem('htx_v6_cart', JSON.stringify(window.HTX_CORE.cart));
+        let badge = document.getElementById('htx-fab-count');
+        badge.innerText = window.HTX_CORE.cart.length;
+        badge.style.display = window.HTX_CORE.cart.length > 0 ? 'flex' : 'none';
+        window.htx_render();
+    };
+
+    // 5. TOKLE MODAL
+    window.htx_toggle = function(force) {
+        let overlay = document.getElementById('htx-main-overlay');
+        overlay.style.display = (force || overlay.style.display !== 'flex') ? 'flex' : 'none';
+        if (overlay.style.display === 'flex') window.htx_render();
+    };
+
+    // 6. KANTITE (QTY)
+    window.htx_qty = function(id, delta) {
+        let item = window.HTX_CORE.cart.find(x => x.id === id);
+        if (item) {
+            item.qty += delta;
+            if (item.qty < 1) window.HTX_CORE.cart = window.HTX_CORE.cart.filter(x => x.id !== id);
+            window.htx_sync();
+        }
+    };
+
+    // 7. RENDER (BUILD UI)
+    window.htx_render = function() {
+        const listEl = document.getElementById('htx-render-list');
+        const formEl = document.getElementById('htx-render-form');
+        const footEl = document.getElementById('htx-render-footer');
+        
+        if (window.HTX_CORE.cart.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center; padding:100px 0; color:#888;"><h3>Panyen ou vid...</h3></div>';
+            formEl.innerHTML = ""; footEl.innerHTML = ""; return;
+        }
+
+        let subtotal = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0);
+
+        listEl.innerHTML = window.HTX_CORE.cart.map(item => `
+            <div class="htx-item-card">
+                <img src="${item.img}" class="htx-item-img">
+                <div class="htx-item-details">
+                    <div class="htx-item-name">${item.name}</div>
+                    <div class="htx-item-meta">${item.variant}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <b style="font-size:18px; color:var(--htx-primary);">${(item.price * item.qty).toLocaleString()} HTG</b>
+                        <div class="htx-qty-wrapper">
+                            <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, -1)">-</button>
+                            <div class="htx-qty-val">${item.qty}</div>
+                            <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, 1)">+</button>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
+        `).join('');
 
-          <span class="htx-section-title">Informations de Livraison</span>
-          <form id="htx-cart-form">
-            <input required id="htx_name" class="htx-input" placeholder="Nom et Prénom">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-              <input required id="htx_phone" type="tel" class="htx-input" placeholder="WhatsApp">
-              <input required id="htx_email" type="email" class="htx-input" placeholder="Email">
+        formEl.innerHTML = `
+            <span class="htx-section-title">LIVREZON</span>
+            <div class="htx-form-box">
+                <select class="htx-input" onchange="window.HTX_CORE.shipCost=parseInt(this.value); window.htx_render()">
+                    <option value="0">--- Chwazi Zòn Ou ---</option>
+                    ${Object.entries(window.HTX_CORE.config.shipping).map(([z, p]) => `<option value="${p}" ${window.HTX_CORE.shipCost==p?'selected':''}>${z} (+${p} HTG)</option>`).join('')}
+                </select>
             </div>
-            <input required id="htx_address" class="htx-input" placeholder="Adresse complète (No, Rue, Ville)">
-            
-            <button type="submit" class="htx-add-cart-btn" style="margin-top:20px;">CONTINUER VERS RÉSUMÉ</button>
-          </form>
-        </div>
-      \`;
-      
-      document.getElementById('htx-cart-form').onsubmit = (e) => {
-        e.preventDefault();
-        const customer = {
-          name: document.getElementById('htx_name').value,
-          phone: document.getElementById('htx_phone').value,
-          email: document.getElementById('htx_email').value,
-          address: document.getElementById('htx_address').value
-        };
-        showStep2(data, customer);
-      };
-    }
+            <span class="htx-section-title">ENFÒMASYON</span>
+            <div class="htx-form-box">
+                <input id="htx_f_n" class="htx-input" placeholder="Non konplè" value="${localStorage.getItem('htx_n')||''}">
+                <input id="htx_f_p" class="htx-input" placeholder="WhatsApp / Telefòn" value="${localStorage.getItem('htx_p')||''}">
+                <textarea id="htx_f_a" class="htx-input" placeholder="Adrès Rezidans" style="height:80px;">${localStorage.getItem('htx_a')||''}</textarea>
+            </div>
+        `;
 
-    // --- STEP 2: SUMMARY & FINAL PAY ---
-    function showStep2(product, customer) {
-      modal.innerHTML = \`
-        <div class="htx-cart-container">
-          <div class="htx-header">
-            <span class="htx-step-indicator">Étape 2: Résumé de la Commande</span>
-            <span style="cursor:pointer; font-size:24px;" onclick="showStep1()">&larr;</span>
-          </div>
+        footEl.innerHTML = `
+            <div class="htx-footer">
+                <div class="htx-max-container">
+                    <div class="htx-line"><span>Sous-Total</span><span>${subtotal.toLocaleString()} HTG</span></div>
+                    <div class="htx-line"><span>Livrezon</span><span>${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
+                    <div class="htx-total-line">
+                        <span>TOTAL</span>
+                        <span style="color:var(--htx-primary);">${(subtotal + window.HTX_CORE.shipCost).toLocaleString()} HTG</span>
+                    </div>
+                    <button class="htx-pay-button" onclick="window.htx_pay()">PEYE SEKIRIZE ➔</button>
+                </div>
+            </div>
+        `;
+    };
 
-          <div class="htx-summary-box">
-            <p style="font-size:10px; font-weight:900; color:#dc2626; margin-bottom:10px;">LIVRÉ À:</p>
-            <div style="font-size:13px; font-weight:bold;">\${customer.name}</div>
-            <div style="font-size:12px; color:#777;">\${customer.address}</div>
-            <div style="font-size:12px; color:#777;">\${customer.phone}</div>
-          </div>
+    // 8. FINAL PAY (HATEX GATEWAY)
+    window.htx_pay = function() {
+        const n = document.getElementById('htx_f_n').value.trim();
+        const p = document.getElementById('htx_f_p').value.trim();
+        const a = document.getElementById('htx_f_a').value.trim();
 
-          <div class="htx-summary-box">
-             <div class="htx-summary-line"><span>Produit:</span> <span style="color:white; font-weight:bold;">\${product.name.substring(0,25)}...</span></div>
-             <div class="htx-summary-line"><span>Frais de livraison:</span> <span style="color:#00ff00;">GRATUIT</span></div>
-             <div class="htx-total-line"><span>TOTAL:</span> <span>\${product.price_htg.toLocaleString()} HTG</span></div>
-          </div>
+        if (!n || !p || window.HTX_CORE.shipCost === 0) return alert("⚠️ Ranpli tout enfòmasyon yo!");
 
-          <button id="htx-final-pay" class="htx-add-cart-btn" style="background:#000; border:1px solid #dc2626; box-shadow: 0 10px 30px rgba(220,38,38,0.2);">
-            🔒 CONFIRMER ET PAYER
-          </button>
-          <p style="text-align:center; font-size:9px; color:#444; margin-top:15px; text-transform:uppercase; font-weight:900;">Cryptage SSL 256-bit par Hatex</p>
-        </div>
-      \`;
+        localStorage.setItem('htx_n', n); localStorage.setItem('htx_p', p); localStorage.setItem('htx_a', a);
 
-      document.getElementById('htx-final-pay').onclick = () => {
+        let total = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0) + window.HTX_CORE.shipCost;
+        let products = window.HTX_CORE.cart.map(i => `${i.qty}x ${i.name} (${i.variant})`).join(' | ');
+
         const payload = {
-          terminal: MERCHANT_ID,
-          amount: product.price_htg,
-          product: product.name,
-          customer: customer
+            terminal: window.HTX_CORE.config.mid,
+            amount: total,
+            product: products,
+            customer: { n, p, a }
         };
-        const token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+
+        // Encode Base64 UTF-8 Sekirize
+        let token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
         window.location.href = "https://hatexcard.com/checkout?token=" + token;
-      };
+    };
+
+    // 9. AUTO-INJECTOR & OBSERVER
+    function htx_inject() {
+        const targets = ['.single_add_to_cart_button', 'button[name="add-to-cart"]', '.add_to_cart_button', '#add-to-cart', '.elementor-button-add-to-cart'];
+        targets.forEach(sel => {
+            document.querySelectorAll(sel).forEach(btn => {
+                if (!btn.dataset.htxInjected) {
+                    const myBtn = document.createElement('button');
+                    myBtn.className = 'htx-btn-injected';
+                    myBtn.innerHTML = '💳 ACHETER EN GOURDES (HATEX)';
+                    myBtn.type = "button";
+                    myBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.htx_add(); };
+                    btn.parentNode.insertBefore(myBtn, btn.nextSibling);
+                    btn.dataset.htxInjected = "true";
+                }
+            });
+        });
     }
 
-    // Evènman sou bouton an
-    const cartBtn = document.getElementById('htx-add-to-cart');
-    if(cartBtn) {
-      cartBtn.addEventListener('click', () => {
-        modal.style.display = 'flex';
-        showStep1();
-      });
-    }
+    // Swiv si paj la chanje (pou tèm ki chaje pwodwi ak AJAX)
+    const observer = new MutationObserver(htx_inject);
+    observer.observe(document.body, { childList: true, subtree: true });
 
-  })();
+    htx_inject();
+    window.htx_sync();
+})();
 </script>
 `;
 
@@ -347,34 +499,66 @@ export default function TerminalPage() {
       {/* MENU */}
       {mode === 'menu' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+          
+          {/* SECTION: BRANDING & PDF UPLOAD */}
           <div className="bg-[#0d0e1a] border border-white/5 p-8 rounded-[3rem] mb-8 relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-6 opacity-10"><ShieldCheck size={80} className="text-red-600" /></div>
             <div className="flex items-center gap-3 mb-6">
                 <div className="bg-red-600/10 p-3 rounded-2xl"><Lock className="text-red-600 w-5 h-5" /></div>
                 <div><h3 className="text-[12px] font-black uppercase tracking-widest">Security Branding</h3></div>
             </div>
+            
             <div className="space-y-4">
-                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} readOnly={!!profile?.business_name} className="w-full bg-black/50 border border-white/10 p-6 rounded-3xl text-[13px] outline-none text-white italic" />
+                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} readOnly={!!profile?.business_name} placeholder="Non Biznis ou..." className="w-full bg-black/50 border border-white/10 p-6 rounded-3xl text-[13px] outline-none text-white italic" />
                 {!profile?.business_name && (
                   <button onClick={updateBusinessName} disabled={loading} className="w-full bg-white text-black py-6 rounded-3xl font-black uppercase text-[11px]">{loading ? 'Processing...' : 'Link Business Account'}</button>
                 )}
             </div>
+
+            {/* UPLOAD PDF SECTION */}
+            <div className="mt-6 border-t border-white/5 pt-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-zinc-900 p-3 rounded-2xl"><FileText className="text-zinc-400 w-4 h-4" /></div>
+                <div>
+                  <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">PDF Eksplikasyon</h4>
+                  <p className="text-[9px] text-zinc-500">Ajoute yon manyèl pou kliyan ou yo</p>
+                </div>
+              </div>
+              <label className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 px-5 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 transition-all">
+                {uploadingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+                <span>Upload</span>
+                <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} disabled={uploadingPdf} />
+              </label>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-12 rounded-[3rem] border border-white/5 flex flex-col items-center gap-4 hover:bg-zinc-900/80 transition-all group">
-              <Globe className="text-red-600 group-hover:scale-110 transition-transform" size={28} />
-              <span className="text-[10px] font-black uppercase italic">SDK Gateway</span>
-            </button>
-            <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-12 rounded-[3rem] border border-white/5 flex flex-col items-center gap-4 hover:bg-zinc-900/80 transition-all group">
-              <Mail className="text-red-600 group-hover:scale-110 transition-transform" size={28} />
-              <span className="text-[10px] font-black uppercase italic">Invoice Pay</span>
-            </button>
-          </div>
+
+          {/* SECTION: ACTIONS (Kache si pa gen non biznis) */}
+          {profile?.business_name ? (
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-12 rounded-[3rem] border border-white/5 flex flex-col items-center gap-4 hover:bg-zinc-900/80 transition-all group">
+                <Globe className="text-red-600 group-hover:scale-110 transition-transform" size={28} />
+                <span className="text-[10px] font-black uppercase italic">SDK Gateway</span>
+              </button>
+              <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-12 rounded-[3rem] border border-white/5 flex flex-col items-center gap-4 hover:bg-zinc-900/80 transition-all group">
+                <Mail className="text-red-600 group-hover:scale-110 transition-transform" size={28} />
+                <span className="text-[10px] font-black uppercase italic">Invoice Pay</span>
+              </button>
+            </div>
+          ) : (
+             <div className="bg-red-600/10 border border-red-600/20 p-8 rounded-[3rem] text-center flex flex-col items-center justify-center">
+                <AlertTriangle className="text-red-500 w-10 h-10 mb-4" />
+                <h4 className="text-[12px] font-black uppercase text-red-500 mb-2">Aksyon bloke</h4>
+                <p className="text-[10px] text-red-500/70 max-w-xs mx-auto">
+                  Tanpri anrejistre "Security Branding" ou a (Non Biznis) anvan ou ka jwenn aksè ak kòd SDK a ak sistèm Invoice la.
+                </p>
+             </div>
+          )}
+
         </div>
       )}
 
       {/* --- SDK API SECTION (KOTE POU KOPYE KÒD LA) --- */}
-      {mode === 'api' && (
+      {mode === 'api' && profile?.business_name && (
         <div className="animate-in fade-in duration-500">
           <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600 mb-8 hover:tracking-widest transition-all">
             <ArrowLeft size={14} /> Back to Terminal
@@ -387,12 +571,11 @@ export default function TerminalPage() {
               <ShoppingCart className="text-red-600/40 mb-4" size={40} />
               <p className="text-[10px] font-bold text-zinc-400 uppercase mb-4">Preview Bouton SDK a</p>
               
-              {/* Sa se jis yon fo bouton pou l wè sa l sanble, paske reyèl bouton an ap nan kòd la */}
               <button className="bg-[#dc2626] text-white w-full max-w-xs p-[18px] rounded-xl font-black uppercase text-[12px] tracking-widest pointer-events-none opacity-50">
                 🛒 AJOUTER AU PANIER HATEX
               </button>
               
-              <p className="text-[9px] text-zinc-600 mt-6 uppercase">Bouton sa ap parèt sou sit kliyan ou yo.</p>
+              <p className="text-[9px] text-zinc-600 mt-6 uppercase">Bouton flotan sa ap parèt nan kwen sit kliyan ou yo.</p>
             </div>
 
             {/* Bwat pou Kopye Kòd la */}
@@ -421,7 +604,7 @@ export default function TerminalPage() {
               <div>
                 <h4 className="text-[10px] font-black uppercase text-red-600 mb-2">Note d'intégration</h4>
                 <p className="text-[11px] text-zinc-500 italic leading-relaxed">
-                  Sistèm sa a ap rale enfòmasyon pwodwi a otomatikman. Lè kliyan an klike "Confirmer", tout done yo (Pwodwi, Pri HTG, Adrès) ap ankode nan yon jeton (Token) pou ale nan paj chèkout la. Done yo ap parèt nan istwa tranzaksyon ou tou. Kopye kòd ki anlè a epi mete l nan paj html sit ou a.
+                  Sistèm sa a ap rale enfòmasyon pwodwi a otomatikman. Lè kliyan an klike "Payer", tout done yo (Pwodwi, Pri HTG, Adrès) ap ankode nan yon jeton (Token) pou ale nan paj chèkout la. Done yo ap parèt nan istwa tranzaksyon ou tou. Kopye kòd ki anlè a epi mete l nan paj html sit ou a.
                 </p>
               </div>
             </div>
@@ -461,7 +644,7 @@ export default function TerminalPage() {
       )}
 
       {/* REQUEST INVOICE */}
-      {mode === 'request' && (
+      {mode === 'request' && profile?.business_name && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
           <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600 mb-4"><ArrowLeft size={16} /> Retour</button>
           <div className="bg-[#0d0e1a] p-12 rounded-[4rem] border border-white/5">
