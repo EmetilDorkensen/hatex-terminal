@@ -8,7 +8,8 @@ import {
   ArrowLeft, ShoppingCart, Globe, ExternalLink,
   Wallet, RefreshCw, ArrowDownCircle, ShieldCheck,
   User, Tag, Calendar, ChevronRight, Info, AlertTriangle,
-  Lock, CreditCard, Box, Truck, FileText, Upload
+  Lock, CreditCard, Box, Truck, FileText, Upload, 
+  Search, Filter, Download, MoreVertical, Eye
 } from 'lucide-react';
 
 export default function TerminalPage() {
@@ -23,6 +24,7 @@ export default function TerminalPage() {
   // Invoice states
   const [amount, setAmount] = useState('');
   const [email, setEmail] = useState('');
+  const [description, setDescription] = useState('');
   
   // Branding states
   const [businessName, setBusinessName] = useState('');
@@ -35,6 +37,7 @@ export default function TerminalPage() {
 
   useEffect(() => {
     const initTerminal = async () => {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return router.push('/login');
 
@@ -50,6 +53,7 @@ export default function TerminalPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       setTransactions(tx || []);
+      setLoading(false);
     };
     initTerminal();
   }, [supabase, router]);
@@ -90,7 +94,11 @@ export default function TerminalPage() {
       }
 
       const { data: inv, error: invError } = await supabase.from('invoices').insert({
-        owner_id: user.id, amount: parseFloat(amount), client_email: email.toLowerCase().trim(), status: 'pending'
+        owner_id: user.id, 
+        amount: parseFloat(amount), 
+        client_email: email.toLowerCase().trim(), 
+        status: 'pending',
+        description: description
       }).select().single();
       
       if (invError) throw invError;
@@ -100,12 +108,21 @@ export default function TerminalPage() {
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ table: 'invoices', record: { id: inv.id, amount: inv.amount, client_email: inv.client_email, business_name: freshProfile.business_name || "Merchant Hatex", pay_url: securePayLink } })
+        body: JSON.stringify({ 
+          table: 'invoices', 
+          record: { 
+            id: inv.id, 
+            amount: inv.amount, 
+            client_email: inv.client_email, 
+            business_name: freshProfile.business_name || "Merchant Hatex", 
+            pay_url: securePayLink 
+          } 
+        })
       });
       
       await navigator.clipboard.writeText(securePayLink);
       alert(`Siksè! Faktire a voye bay ${inv.client_email}.\n\nLyen an kopye.`);
-      setAmount(''); setEmail(''); setMode('menu');
+      setAmount(''); setEmail(''); setDescription(''); setMode('menu');
     } catch (err: any) { 
       alert(err.message); 
     } finally { 
@@ -122,7 +139,10 @@ export default function TerminalPage() {
     
     setSyncing(true);
     try {
-      const { error } = await supabase.rpc('increment_merchant_balance', { merchant_id: profile?.id, amount_to_add: totalVant });
+      const { error } = await supabase.rpc('increment_merchant_balance', { 
+        merchant_id: profile?.id, 
+        amount_to_add: totalVant 
+      });
       if (error) throw error;
       alert("Balans Wallet ou moute avèk siksè!");
       window.location.reload();
@@ -140,10 +160,9 @@ export default function TerminalPage() {
     
     setUploadingPdf(true);
     try {
-      // Mete lojik Supabase Storage ou a la. Ex: supabase.storage.from('documents').upload(...)
-      // Pou kounya nap jis simule yon delay:
-      await new Promise(res => setTimeout(res, 1500));
-      alert("PDF eksplakasyon upload ak siksè!");
+      // Similasyon Upload
+      await new Promise(res => setTimeout(res, 2000));
+      alert("PDF manyèl la sove sou sèvè Hatex la.");
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -151,8 +170,6 @@ export default function TerminalPage() {
     }
   };
 
-  // --- KÒD SDK A NAN YON TEXT STRING POU L PA KRAZE NEXT.JS EPI POU W KA KOPYE L ---
-  // Mwen konekte 'profile?.id' la dirèkteman anndan JS la
   const fullSDKCode = `
 <style>
     /* --- MASTER STYLES --- */
@@ -272,11 +289,10 @@ export default function TerminalPage() {
 (function() {
     "use strict";
 
-    // 1. KONFIGIRASYON PWOFIL
     window.HTX_CORE = {
         config: {
-            mid: "3fb21333-1b91-458d-a63b-002b344076fb", // Terminal ID ou
-            rate: 136, // To echanj USD -> HTG
+            mid: "${profile?.id || '3fb21333-1b91-458d-a63b-002b344076fb'}", 
+            rate: 136,
             shipping: {
                 "Port-au-Prince": 250, "Pétion-Ville": 350, "Delmas": 250, "Tabarre": 300, 
                 "Carrefour": 400, "Cap-Haïtien": 850, "Cayes": 950, "Gonaïves": 650, "Jacmel": 700
@@ -286,9 +302,7 @@ export default function TerminalPage() {
         shipCost: 0
     };
 
-    // 2. SCANNER ENTELIJAN (Detekte pri ak varyasyon)
     window.htx_getPrice = function() {
-        // Detekte WooCommerce Variations
         let vInput = document.querySelector('input.variation_id, .variation_id');
         if (vInput && vInput.value > 0) {
             let form = document.querySelector('.variations_form');
@@ -298,41 +312,30 @@ export default function TerminalPage() {
                 if (match) return parseFloat(match.display_price);
             }
         }
-
-        // Shopify Scanner
         if (window.Shopify && window.meta?.product) {
             return window.meta.product.variants[0].price / 100;
         }
-
-        // Pri Creole/Standard
         let pEl = document.querySelector('.summary .price .amount bdi, .summary .price .amount, .product-price, .price, [class*="price"]');
         if (pEl) {
             let val = parseFloat(pEl.innerText.replace(/[^0-9.]/g, ''));
             if (val > 0) return val;
         }
-
         return null;
     };
 
-    // 3. AJOUTE NAN PANYEN
     window.htx_add = function() {
         let price = window.htx_getPrice();
         if (!price) return alert("❌ Tanpri chwazi opsyon pwodwi a (gwosè/koulè) anvan.");
-
-        // Konvèti si se dola
         let htgPrice = (price < 3500) ? Math.round(price * window.HTX_CORE.config.rate) : Math.round(price);
-        
         let name = document.querySelector('h1')?.innerText || document.title;
         let img = document.querySelector('meta[property="og:image"]')?.content || document.querySelector('.wp-post-image')?.src || document.querySelector('img')?.src;
         let variant = Array.from(document.querySelectorAll('select')).map(s => s.options[s.selectedIndex]?.text).filter(t => t && !t.includes('---')).join(' / ') || "Inite";
         let qty = parseInt(document.querySelector('input.qty, .quantity input')?.value || 1);
-
         window.HTX_CORE.cart.push({ id: Date.now(), name, price: htgPrice, qty, img, variant });
         window.htx_sync();
         window.htx_toggle(true);
     };
 
-    // 4. SYNC AK STORAGE
     window.htx_sync = function() {
         localStorage.setItem('htx_v6_cart', JSON.stringify(window.HTX_CORE.cart));
         let badge = document.getElementById('htx-fab-count');
@@ -341,14 +344,12 @@ export default function TerminalPage() {
         window.htx_render();
     };
 
-    // 5. TOKLE MODAL
     window.htx_toggle = function(force) {
         let overlay = document.getElementById('htx-main-overlay');
         overlay.style.display = (force || overlay.style.display !== 'flex') ? 'flex' : 'none';
         if (overlay.style.display === 'flex') window.htx_render();
     };
 
-    // 6. KANTITE (QTY)
     window.htx_qty = function(id, delta) {
         let item = window.HTX_CORE.cart.find(x => x.id === id);
         if (item) {
@@ -358,94 +359,77 @@ export default function TerminalPage() {
         }
     };
 
-    // 7. RENDER (BUILD UI)
     window.htx_render = function() {
         const listEl = document.getElementById('htx-render-list');
         const formEl = document.getElementById('htx-render-form');
         const footEl = document.getElementById('htx-render-footer');
-        
         if (window.HTX_CORE.cart.length === 0) {
             listEl.innerHTML = '<div style="text-align:center; padding:100px 0; color:#888;"><h3>Panyen ou vid...</h3></div>';
             formEl.innerHTML = ""; footEl.innerHTML = ""; return;
         }
-
         let subtotal = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-
-        listEl.innerHTML = window.HTX_CORE.cart.map(item => `
+        listEl.innerHTML = window.HTX_CORE.cart.map(item => \`
             <div class="htx-item-card">
-                <img src="${item.img}" class="htx-item-img">
+                <img src="\${item.img}" class="htx-item-img">
                 <div class="htx-item-details">
-                    <div class="htx-item-name">${item.name}</div>
-                    <div class="htx-item-meta">${item.variant}</div>
+                    <div class="htx-item-name">\${item.name}</div>
+                    <div class="htx-item-meta">\${item.variant}</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <b style="font-size:18px; color:var(--htx-primary);">${(item.price * item.qty).toLocaleString()} HTG</b>
+                        <b style="font-size:18px; color:var(--htx-primary);">\${(item.price * item.qty).toLocaleString()} HTG</b>
                         <div class="htx-qty-wrapper">
-                            <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, -1)">-</button>
-                            <div class="htx-qty-val">${item.qty}</div>
-                            <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, 1)">+</button>
+                            <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, -1)">-</button>
+                            <div class="htx-qty-val">\${item.qty}</div>
+                            <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, 1)">+</button>
                         </div>
                     </div>
                 </div>
             </div>
-        `).join('');
+        \`).join('');
 
-        formEl.innerHTML = `
+        formEl.innerHTML = \`
             <span class="htx-section-title">LIVREZON</span>
             <div class="htx-form-box">
                 <select class="htx-input" onchange="window.HTX_CORE.shipCost=parseInt(this.value); window.htx_render()">
                     <option value="0">--- Chwazi Zòn Ou ---</option>
-                    ${Object.entries(window.HTX_CORE.config.shipping).map(([z, p]) => `<option value="${p}" ${window.HTX_CORE.shipCost==p?'selected':''}>${z} (+${p} HTG)</option>`).join('')}
+                    \${Object.entries(window.HTX_CORE.config.shipping).map(([z, p]) => \`<option value="\${p}" \${window.HTX_CORE.shipCost==p?'selected':''}>\${z} (+\${p} HTG)</option>\`).join('')}
                 </select>
             </div>
             <span class="htx-section-title">ENFÒMASYON</span>
             <div class="htx-form-box">
-                <input id="htx_f_n" class="htx-input" placeholder="Non konplè" value="${localStorage.getItem('htx_n')||''}">
-                <input id="htx_f_p" class="htx-input" placeholder="WhatsApp / Telefòn" value="${localStorage.getItem('htx_p')||''}">
-                <textarea id="htx_f_a" class="htx-input" placeholder="Adrès Rezidans" style="height:80px;">${localStorage.getItem('htx_a')||''}</textarea>
+                <input id="htx_f_n" class="htx-input" placeholder="Non konplè" value="\${localStorage.getItem('htx_n')||''}">
+                <input id="htx_f_p" class="htx-input" placeholder="WhatsApp / Telefòn" value="\${localStorage.getItem('htx_p')||''}">
+                <textarea id="htx_f_a" class="htx-input" placeholder="Adrès Rezidans" style="height:80px;">\${localStorage.getItem('htx_a')||''}</textarea>
             </div>
-        `;
+        \`;
 
-        footEl.innerHTML = `
+        footEl.innerHTML = \`
             <div class="htx-footer">
                 <div class="htx-max-container">
-                    <div class="htx-line"><span>Sous-Total</span><span>${subtotal.toLocaleString()} HTG</span></div>
-                    <div class="htx-line"><span>Livrezon</span><span>${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
+                    <div class="htx-line"><span>Sous-Total</span><span>\${subtotal.toLocaleString()} HTG</span></div>
+                    <div class="htx-line"><span>Livrezon</span><span>\${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
                     <div class="htx-total-line">
                         <span>TOTAL</span>
-                        <span style="color:var(--htx-primary);">${(subtotal + window.HTX_CORE.shipCost).toLocaleString()} HTG</span>
+                        <span style="color:var(--htx-primary);">\${(subtotal + window.HTX_CORE.shipCost).toLocaleString()} HTG</span>
                     </div>
                     <button class="htx-pay-button" onclick="window.htx_pay()">PEYE SEKIRIZE ➔</button>
                 </div>
             </div>
-        `;
+        \`;
     };
 
-    // 8. FINAL PAY (HATEX GATEWAY)
     window.htx_pay = function() {
         const n = document.getElementById('htx_f_n').value.trim();
         const p = document.getElementById('htx_f_p').value.trim();
         const a = document.getElementById('htx_f_a').value.trim();
-
         if (!n || !p || window.HTX_CORE.shipCost === 0) return alert("⚠️ Ranpli tout enfòmasyon yo!");
-
         localStorage.setItem('htx_n', n); localStorage.setItem('htx_p', p); localStorage.setItem('htx_a', a);
-
         let total = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0) + window.HTX_CORE.shipCost;
-        let products = window.HTX_CORE.cart.map(i => `${i.qty}x ${i.name} (${i.variant})`).join(' | ');
-
-        const payload = {
-            terminal: window.HTX_CORE.config.mid,
-            amount: total,
-            product: products,
-            customer: { n, p, a }
-        };
-
-        // Encode Base64 UTF-8 Sekirize
+        let products = window.HTX_CORE.cart.map(i => \`\${i.qty}x \${i.name} (\${i.variant})\`).join(' | ');
+        const payload = { terminal: window.HTX_CORE.config.mid, amount: total, product: products, customer: { n, p, a } };
         let token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
         window.location.href = "https://hatexcard.com/checkout?token=" + token;
     };
 
-    // 9. AUTO-INJECTOR & OBSERVER
     function htx_inject() {
         const targets = ['.single_add_to_cart_button', 'button[name="add-to-cart"]', '.add_to_cart_button', '#add-to-cart', '.elementor-button-add-to-cart'];
         targets.forEach(sel => {
@@ -462,11 +446,8 @@ export default function TerminalPage() {
             });
         });
     }
-
-    // Swiv si paj la chanje (pou tèm ki chaje pwodwi ak AJAX)
     const observer = new MutationObserver(htx_inject);
     observer.observe(document.body, { childList: true, subtree: true });
-
     htx_inject();
     window.htx_sync();
 })();
@@ -482,192 +463,401 @@ export default function TerminalPage() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans selection:bg-red-600/30">
       
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-10">
+      {/* HEADER SECTION */}
+      <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
         <div className="flex flex-col">
-          <h1 className="text-2xl font-black uppercase italic tracking-tighter">
-            {profile?.business_name || 'Terminal'}<span className="text-red-600">.</span>
+          <h1 className="text-3xl font-black uppercase italic tracking-tighter">
+            {profile?.business_name || 'Hatex Terminal'}<span className="text-red-600">.</span>
           </h1>
-          <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-[0.3em]">Hatex Secure Interface</span>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Secure Node Connected</span>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => setMode('menu')} className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/5 transition-all ${mode === 'menu' ? 'bg-red-600 shadow-lg' : 'bg-zinc-900'}`}><LayoutGrid size={20} /></button>
-          <button onClick={() => setMode('history')} className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/5 transition-all ${mode === 'history' ? 'bg-red-600 shadow-lg' : 'bg-zinc-900'}`}><History size={20} /></button>
+        <div className="flex gap-4">
+          <button onClick={() => setMode('menu')} className={`px-6 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${mode === 'menu' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'}`}><LayoutGrid size={16} /> Dashboard</button>
+          <button onClick={() => setMode('history')} className={`px-6 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${mode === 'history' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'}`}><History size={16} /> Logs</button>
         </div>
       </div>
 
-      {/* MENU */}
-      {mode === 'menu' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-          
-          {/* SECTION: BRANDING & PDF UPLOAD */}
-          <div className="bg-[#0d0e1a] border border-white/5 p-8 rounded-[3rem] mb-8 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-6 opacity-10"><ShieldCheck size={80} className="text-red-600" /></div>
-            <div className="flex items-center gap-3 mb-6">
-                <div className="bg-red-600/10 p-3 rounded-2xl"><Lock className="text-red-600 w-5 h-5" /></div>
-                <div><h3 className="text-[12px] font-black uppercase tracking-widest">Security Branding</h3></div>
-            </div>
-            
-            <div className="space-y-4">
-                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} readOnly={!!profile?.business_name} placeholder="Non Biznis ou..." className="w-full bg-black/50 border border-white/10 p-6 rounded-3xl text-[13px] outline-none text-white italic" />
-                {!profile?.business_name && (
-                  <button onClick={updateBusinessName} disabled={loading} className="w-full bg-white text-black py-6 rounded-3xl font-black uppercase text-[11px]">{loading ? 'Processing...' : 'Link Business Account'}</button>
-                )}
-            </div>
-
-            {/* UPLOAD PDF SECTION */}
-            <div className="mt-6 border-t border-white/5 pt-6 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-zinc-900 p-3 rounded-2xl"><FileText className="text-zinc-400 w-4 h-4" /></div>
-                <div>
-                  <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">PDF Eksplikasyon</h4>
-                  <p className="text-[9px] text-zinc-500">Ajoute yon manyèl pou kliyan ou yo</p>
-                </div>
-              </div>
-              <label className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 px-5 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 transition-all">
-                {uploadingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
-                <span>Upload</span>
-                <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} disabled={uploadingPdf} />
-              </label>
-            </div>
-          </div>
-
-          {/* SECTION: ACTIONS (Kache si pa gen non biznis) */}
-          {profile?.business_name ? (
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => setMode('api')} className="bg-zinc-900/40 p-12 rounded-[3rem] border border-white/5 flex flex-col items-center gap-4 hover:bg-zinc-900/80 transition-all group">
-                <Globe className="text-red-600 group-hover:scale-110 transition-transform" size={28} />
-                <span className="text-[10px] font-black uppercase italic">SDK Gateway</span>
-              </button>
-              <button onClick={() => setMode('request')} className="bg-zinc-900/40 p-12 rounded-[3rem] border border-white/5 flex flex-col items-center gap-4 hover:bg-zinc-900/80 transition-all group">
-                <Mail className="text-red-600 group-hover:scale-110 transition-transform" size={28} />
-                <span className="text-[10px] font-black uppercase italic">Invoice Pay</span>
-              </button>
-            </div>
-          ) : (
-             <div className="bg-red-600/10 border border-red-600/20 p-8 rounded-[3rem] text-center flex flex-col items-center justify-center">
-                <AlertTriangle className="text-red-500 w-10 h-10 mb-4" />
-                <h4 className="text-[12px] font-black uppercase text-red-500 mb-2">Aksyon bloke</h4>
-                <p className="text-[10px] text-red-500/70 max-w-xs mx-auto">
-                  Tanpri anrejistre "Security Branding" ou a (Non Biznis) anvan ou ka jwenn aksè ak kòd SDK a ak sistèm Invoice la.
-                </p>
-             </div>
-          )}
-
+      {/* LOADING OVERLAY */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+          <RefreshCw size={40} className="text-red-600 animate-spin" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading Terminal Data...</p>
         </div>
       )}
 
-      {/* --- SDK API SECTION (KOTE POU KOPYE KÒD LA) --- */}
-      {mode === 'api' && profile?.business_name && (
-        <div className="animate-in fade-in duration-500">
-          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600 mb-8 hover:tracking-widest transition-all">
-            <ArrowLeft size={14} /> Back to Terminal
-          </button>
+      {/* DASHBOARD MENU */}
+      {mode === 'menu' && (
+        <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          
+          <div className="lg:col-span-8 space-y-8">
+            {/* BRANDING CARD */}
+            <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem] relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-20 transition-opacity"><ShieldCheck size={120} className="text-red-600" /></div>
+              <div className="flex items-center gap-4 mb-8">
+                  <div className="bg-red-600/10 p-4 rounded-3xl"><Lock className="text-red-600 w-6 h-6" /></div>
+                  <div>
+                    <h3 className="text-lg font-black uppercase tracking-widest">Merchant Identity</h3>
+                    <p className="text-[10px] text-zinc-500 font-bold">Configure your public business profile</p>
+                  </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <User className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                    <input 
+                      type="text" 
+                      value={businessName} 
+                      onChange={(e) => setBusinessName(e.target.value)} 
+                      readOnly={!!profile?.business_name} 
+                      placeholder="Business Legal Name" 
+                      className="w-full bg-black/40 border border-white/10 py-6 pl-16 pr-6 rounded-3xl text-[14px] outline-none text-white italic focus:border-red-600/50 transition-all" 
+                    />
+                  </div>
+                  {!profile?.business_name && (
+                    <button 
+                      onClick={updateBusinessName} 
+                      disabled={loading} 
+                      className="bg-white text-black px-10 py-6 rounded-3xl font-black uppercase text-[12px] hover:bg-red-600 hover:text-white transition-all active:scale-95 shadow-2xl"
+                    >
+                      {loading ? 'Processing...' : 'Verify Identity'}
+                    </button>
+                  )}
+              </div>
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            
-            {/* Bwat Preview */}
-            <div className="bg-zinc-900/20 p-8 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center">
-              <ShoppingCart className="text-red-600/40 mb-4" size={40} />
-              <p className="text-[10px] font-bold text-zinc-400 uppercase mb-4">Preview Bouton SDK a</p>
-              
-              <button className="bg-[#dc2626] text-white w-full max-w-xs p-[18px] rounded-xl font-black uppercase text-[12px] tracking-widest pointer-events-none opacity-50">
-                🛒 AJOUTER AU PANIER HATEX
-              </button>
-              
-              <p className="text-[9px] text-zinc-600 mt-6 uppercase">Bouton flotan sa ap parèt nan kwen sit kliyan ou yo.</p>
+              <div className="mt-10 pt-10 border-t border-white/5 grid grid-cols-2 gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-zinc-900 p-4 rounded-2xl"><FileText className="text-zinc-500 w-5 h-5" /></div>
+                  <div>
+                    <h4 className="text-[11px] font-black text-white uppercase tracking-wider">KYC Manual</h4>
+                    <p className="text-[9px] text-zinc-500 uppercase italic">PDF Documentation</p>
+                  </div>
+                  <label className="ml-auto cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 p-4 rounded-2xl transition-all">
+                    {uploadingPdf ? <RefreshCw size={16} className="animate-spin text-red-600" /> : <Upload size={16} />}
+                    <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} disabled={uploadingPdf} />
+                  </label>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-zinc-900 p-4 rounded-2xl"><Globe className="text-zinc-500 w-5 h-5" /></div>
+                  <div>
+                    <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Gateway Status</h4>
+                    <span className="text-[9px] text-green-500 font-black uppercase">Active & Online</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Bwat pou Kopye Kòd la */}
-            <div className="bg-black/80 border border-white/5 rounded-[2.5rem] p-6 relative group">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-[10px] font-black uppercase text-zinc-500 italic">Integration Code</span>
+            {/* QUICK ACTIONS */}
+            {profile?.business_name ? (
+              <div className="grid grid-cols-2 gap-8">
+                <button 
+                  onClick={() => setMode('api')} 
+                  className="bg-zinc-900/30 p-16 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-6 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform"><Globe className="text-red-600" size={32} /></div>
+                  <div className="text-center">
+                    <span className="text-[12px] font-black uppercase italic block">SDK Deployment</span>
+                    <span className="text-[8px] text-zinc-500 uppercase font-bold tracking-tighter mt-1 block">Connect your web store</span>
+                  </div>
+                </button>
+                <button 
+                  onClick={() => setMode('request')} 
+                  className="bg-zinc-900/30 p-16 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-6 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform"><Mail className="text-red-600" size={32} /></div>
+                  <div className="text-center">
+                    <span className="text-[12px] font-black uppercase italic block">Smart Invoice</span>
+                    <span className="text-[8px] text-zinc-500 uppercase font-bold tracking-tighter mt-1 block">Direct payment links</span>
+                  </div>
+                </button>
+              </div>
+            ) : (
+               <div className="bg-red-600/5 border border-red-600/20 p-12 rounded-[4rem] text-center">
+                  <AlertTriangle className="text-red-600 w-12 h-12 mx-auto mb-6" />
+                  <h4 className="text-sm font-black uppercase text-red-500 mb-2 italic">Aksyon limite pou kounya</h4>
+                  <p className="text-[11px] text-red-500/60 max-w-sm mx-auto leading-relaxed">
+                    Ou dwe lye biznis ou ak yon non legal pou nou ka aktive sètifika sekirite SDK a sou kont ou.
+                  </p>
+               </div>
+            )}
+          </div>
+
+          {/* SIDEBAR - WALLET INFO */}
+          <div className="lg:col-span-4 space-y-8">
+            <div className="bg-white text-black p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 rotate-12 opacity-10"><Wallet size={100} /></div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest mb-10 border-b border-black/10 pb-4 italic">Merchant Balance</h3>
+              <div className="flex flex-col gap-1">
+                <span className="text-5xl font-black tracking-tighter italic">{(profile?.balance || 0).toLocaleString()}</span>
+                <span className="text-[14px] font-black uppercase opacity-60">Gourdes (HTG)</span>
+              </div>
+              <button 
+                onClick={handleSyncBalance} 
+                disabled={syncing} 
+                className="mt-12 w-full bg-black text-white py-6 rounded-[2rem] font-black uppercase text-[11px] flex items-center justify-center gap-3 hover:bg-red-600 transition-colors shadow-xl"
+              >
+                {syncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Sync Ledger
+              </button>
+            </div>
+
+            <div className="bg-zinc-900/40 border border-white/5 p-8 rounded-[3rem]">
+              <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 italic text-zinc-400">Terminal Info</h4>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Terminal ID</span>
+                  <span className="text-[10px] font-mono text-zinc-400">{profile?.id?.slice(0, 12)}...</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">KYC Status</span>
+                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${profile?.kyc_status === 'approved' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    {profile?.kyc_status || 'Pending'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Commission</span>
+                  <span className="text-[10px] font-black text-zinc-400">2.5% per Tx</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INVOICE PAY INTERFACE */}
+      {mode === 'request' && (
+        <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <button onClick={() => setMode('menu')} className="flex items-center gap-3 text-[11px] font-black uppercase text-red-600 mb-10 hover:tracking-[0.2em] transition-all group">
+            <div className="bg-red-600/10 p-3 rounded-xl group-hover:bg-red-600 group-hover:text-white transition-colors"><ArrowLeft size={16} /></div> 
+            Retounen nan Meni
+          </button>
+
+          <div className="grid md:grid-cols-2 gap-10">
+            <div className="space-y-8">
+              <div className="bg-zinc-900/30 border border-white/5 p-10 rounded-[3.5rem] space-y-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="bg-red-600/10 p-4 rounded-3xl"><CreditCard className="text-red-600" /></div>
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter">New Payment Link</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-4 italic">Montan (HTG)</label>
+                  <input 
+                    type="number" 
+                    value={amount} 
+                    onChange={(e) => setAmount(e.target.value)} 
+                    placeholder="E.g. 2500" 
+                    className="w-full bg-black/50 border border-white/10 p-6 rounded-3xl outline-none italic text-white focus:border-red-600 transition-all text-lg" 
+                  />
+                  
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-4 italic">Email Kliyan</label>
+                  <input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    placeholder="customer@email.com" 
+                    className="w-full bg-black/50 border border-white/10 p-6 rounded-3xl outline-none italic text-white focus:border-red-600 transition-all" 
+                  />
+
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-4 italic">Deskripsyon (Opsyonèl)</label>
+                  <textarea 
+                    value={description} 
+                    onChange={(e) => setDescription(e.target.value)} 
+                    placeholder="Kisa kliyan an ap peye?" 
+                    className="w-full bg-black/50 border border-white/10 p-6 rounded-3xl outline-none italic text-white focus:border-red-600 transition-all h-32 resize-none" 
+                  />
+                </div>
+
+                <button 
+                  onClick={handleCreateInvoice} 
+                  disabled={loading} 
+                  className="w-full bg-red-600 text-white p-7 rounded-[2.5rem] font-black uppercase text-sm hover:bg-red-700 transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95"
+                >
+                  {loading ? <RefreshCw size={20} className="animate-spin" /> : <Mail size={20} />}
+                  Generate Secure Link
+                </button>
+              </div>
+            </div>
+
+            <div className="hidden md:block">
+              <div className="bg-white/5 border border-dashed border-white/10 p-10 rounded-[3.5rem] h-full flex flex-col items-center justify-center text-center">
+                <Box className="text-red-600/20 mb-6" size={80} />
+                <h4 className="text-sm font-black uppercase mb-4 italic text-zinc-400">Peman Direk</h4>
+                <p className="text-[12px] text-zinc-500 italic leading-relaxed max-w-xs">
+                  Sèvi ak Invoice Hatex la pou voye bòdwo bay kliyan pa imel oswa pataje lyen an sou WhatsApp. Kliyan an ka peye ak Kat Kredi oswa Balans Hatex li.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SDK API INTERFACE */}
+      {mode === 'api' && profile?.business_name && (
+        <div className="animate-in fade-in duration-700 max-w-6xl mx-auto">
+          <button onClick={() => setMode('menu')} className="flex items-center gap-3 text-[11px] font-black uppercase text-red-600 mb-10 hover:tracking-[0.2em] transition-all group">
+            <div className="bg-red-600/10 p-3 rounded-xl group-hover:bg-red-600 group-hover:text-white transition-colors"><ArrowLeft size={16} /></div> 
+            Back to Terminal
+          </button>
+
+          <div className="grid lg:grid-cols-2 gap-12">
+            <div className="space-y-8">
+              <div className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center text-center group">
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 bg-red-600 blur-[80px] opacity-10 group-hover:opacity-30 transition-opacity"></div>
+                  <ShoppingCart className="text-red-600 relative" size={60} />
+                </div>
+                <p className="text-[12px] font-black text-zinc-400 uppercase tracking-[0.3em] mb-8">SDK Interface Preview</p>
+                
+                <button className="bg-red-600 text-white w-full max-w-sm p-8 rounded-3xl font-black uppercase text-[14px] tracking-widest pointer-events-none opacity-80 shadow-2xl border-b-4 border-red-900">
+                  🛒 ACHETER EN GOURDES (HATEX)
+                </button>
+                
+                <p className="text-[10px] text-zinc-600 mt-10 uppercase font-bold italic max-w-xs leading-relaxed">
+                  Lè w entegre kòd la, bouton sa a ap parèt otomatikman sou paj pwodwi ou yo.
+                </p>
+              </div>
+
+              <div className="bg-red-600/5 p-10 rounded-[3rem] border border-red-600/10 flex items-start gap-6">
+                <Info className="text-red-600 flex-shrink-0" size={24} />
+                <div className="space-y-4">
+                  <h4 className="text-[12px] font-black uppercase text-red-600">Teknoloji Entegrasyon</h4>
+                  <p className="text-[12px] text-zinc-400 italic leading-relaxed">
+                    Sistèm nan itilize yon "MutationObserver" pou jwenn bouton "Add to Cart" ou yo epi enjekte opsyon Hatex la. Li konpatib ak WooCommerce, Shopify (via custom liquid), ak paj HTML koutim.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-black/90 border border-white/5 rounded-[3.5rem] p-10 relative group flex flex-col shadow-2xl">
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-red-600 rounded-full"></div>
+                  <span className="text-[11px] font-black uppercase text-zinc-400 italic">Production SDK Script</span>
+                </div>
                 <button 
                   onClick={copyToClipboard}
-                  className="bg-red-600 p-2 px-4 rounded-xl text-[10px] font-black flex items-center gap-2 hover:bg-red-700 transition-colors"
+                  className="bg-red-600 p-4 px-8 rounded-2xl text-[11px] font-black flex items-center gap-3 hover:bg-red-700 transition-all active:scale-95 shadow-lg"
                 >
-                  {copied ? <CheckCircle2 size={12}/> : <Copy size={12}/>} {copied ? 'COPIÉ !' : 'COPY'}
+                  {copied ? <CheckCircle2 size={16}/> : <Copy size={16}/>} {copied ? 'COPIED TO CLIPBOARD' : 'COPY CODE'}
                 </button>
               </div>
               
-              <pre className="text-[9px] text-zinc-500 h-[300px] overflow-auto bg-black/50 p-4 rounded-xl font-mono leading-relaxed scrollbar-thin scrollbar-thumb-red-600/30">
-                {fullSDKCode}
-              </pre>
-            </div>
-            
-          </div>
-
-          {/* DOCUMENTATION */}
-          <div className="mt-16 border-t border-white/5 pt-10">
-            <div className="bg-red-600/5 p-6 rounded-3xl border border-red-600/10 flex items-start gap-4">
-              <Info className="text-red-600 mt-1 flex-shrink-0" size={20} />
-              <div>
-                <h4 className="text-[10px] font-black uppercase text-red-600 mb-2">Note d'intégration</h4>
-                <p className="text-[11px] text-zinc-500 italic leading-relaxed">
-                  Sistèm sa a ap rale enfòmasyon pwodwi a otomatikman. Lè kliyan an klike "Payer", tout done yo (Pwodwi, Pri HTG, Adrès) ap ankode nan yon jeton (Token) pou ale nan paj chèkout la. Done yo ap parèt nan istwa tranzaksyon ou tou. Kopye kòd ki anlè a epi mete l nan paj html sit ou a.
-                </p>
+              <div className="relative flex-1">
+                <pre className="text-[10px] text-zinc-500 h-[500px] overflow-auto bg-black/40 p-8 rounded-3xl font-mono leading-relaxed scrollbar-thin scrollbar-thumb-red-600/20 selection:bg-red-600/30 border border-white/5">
+                  {fullSDKCode}
+                </pre>
+                <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-40 rounded-3xl"></div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* HISTORY */}
+      {/* TRANSACTION HISTORY LOGS */}
       {mode === 'history' && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-700">
-          <div className="flex justify-between items-end mb-8">
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Live Transactions</h2>
-            <button onClick={handleSyncBalance} disabled={syncing} className="bg-white text-black px-6 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2">
-                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> Sync Wallet
-            </button>
-          </div>
-          <div className="space-y-4">
-            {transactions.length > 0 ? transactions.map((tx) => (
-              <div key={tx.id} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-white/5 flex justify-between items-center">
-                <div className="flex gap-5 items-center">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${tx.type?.includes('SDK') ? 'bg-red-600/10' : 'bg-blue-600/10'}`}>
-                    {tx.type?.includes('SDK') ? <Globe className="text-red-600 w-6 h-6" /> : <Mail className="text-blue-600 w-6 h-6" />}
-                  </div>
-                  <div>
-                    <p className="text-[12px] font-black uppercase italic">{tx.customer_name || 'Hatex User'}</p>
-                    <span className="text-[9px] text-zinc-600 uppercase flex items-center gap-1"><Calendar size={11}/> {new Date(tx.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-black italic text-green-500">+{tx.amount?.toLocaleString()} HTG</p>
-                  <p className="text-[8px] font-black uppercase text-green-500/50">{tx.status}</p>
-                </div>
-              </div>
-            )) : <div className="py-24 text-center border border-dashed border-white/5 rounded-[4rem] text-zinc-700 font-black uppercase">Aucune donnée</div>}
-          </div>
+        <div className="max-w-6xl mx-auto space-y-10 animate-in slide-in-from-bottom-10 duration-700">
+           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+             <div>
+               <h3 className="text-3xl font-black uppercase italic tracking-tighter">Terminal Logs</h3>
+               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Real-time transaction monitoring</p>
+             </div>
+             
+             <div className="flex gap-4 w-full md:w-auto">
+               <div className="relative flex-1 md:w-64">
+                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
+                 <input type="text" placeholder="Search TxID..." className="w-full bg-zinc-900/50 border border-white/5 py-4 pl-12 pr-4 rounded-xl text-[12px] outline-none italic focus:border-red-600/50" />
+               </div>
+               <button className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-zinc-500 hover:text-white transition-colors"><Filter size={18} /></button>
+               <button onClick={handleSyncBalance} disabled={syncing} className="bg-white text-black px-8 py-4 rounded-xl font-black text-[11px] uppercase flex items-center gap-3 shadow-xl hover:bg-red-600 hover:text-white transition-all">
+                 {syncing ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                 <span>Export CSV</span>
+               </button>
+             </div>
+           </div>
+
+           <div className="bg-zinc-900/20 border border-white/5 rounded-[3.5rem] overflow-hidden">
+             <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse">
+                 <thead>
+                   <tr className="bg-zinc-950/50 border-b border-white/5">
+                     <th className="p-8 text-[10px] font-black uppercase text-zinc-500 italic tracking-widest">Transaction Details</th>
+                     <th className="p-8 text-[10px] font-black uppercase text-zinc-500 italic tracking-widest">Customer / Email</th>
+                     <th className="p-8 text-[10px] font-black uppercase text-zinc-500 italic tracking-widest">Method</th>
+                     <th className="p-8 text-[10px] font-black uppercase text-zinc-500 italic tracking-widest">Amount</th>
+                     <th className="p-8 text-[10px] font-black uppercase text-zinc-500 italic tracking-widest text-right">Status</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-white/5">
+                   {transactions.length > 0 ? transactions.map((tx) => (
+                     <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors group">
+                       <td className="p-8">
+                         <div className="flex items-center gap-4">
+                           <div className="bg-zinc-950 p-4 rounded-2xl group-hover:scale-110 transition-transform shadow-lg"><Box className="text-red-600" size={20} /></div>
+                           <div className="flex flex-col">
+                             <span className="text-[12px] font-black uppercase italic text-white">{tx.product || 'Standard Sale'}</span>
+                             <span className="text-[10px] font-mono text-zinc-600 uppercase mt-1">Tx: {tx.id.slice(0, 14)}</span>
+                           </div>
+                         </div>
+                       </td>
+                       <td className="p-8">
+                         <div className="flex flex-col">
+                           <span className="text-[11px] font-bold text-zinc-300 italic">{tx.customer?.n || 'Guest User'}</span>
+                           <span className="text-[10px] text-zinc-600 font-mono italic">{tx.customer?.email || 'N/A'}</span>
+                         </div>
+                       </td>
+                       <td className="p-8">
+                         <div className="flex items-center gap-2">
+                           <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+                           <span className="text-[10px] font-black uppercase text-zinc-400 italic">{tx.type === 'SALE_SDK' ? 'SDK Gateway' : 'Invoice Pay'}</span>
+                         </div>
+                       </td>
+                       <td className="p-8">
+                         <div className="flex flex-col">
+                           <span className="text-lg font-black italic text-red-600">+{parseFloat(tx.amount).toLocaleString()} HTG</span>
+                           <span className="text-[9px] text-zinc-600 font-bold uppercase">{new Date(tx.created_at).toLocaleDateString()} • {new Date(tx.created_at).toLocaleTimeString()}</span>
+                         </div>
+                       </td>
+                       <td className="p-8 text-right">
+                         <div className="flex items-center justify-end gap-3">
+                           <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-full border ${tx.status === 'success' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                             {tx.status}
+                           </span>
+                           <button className="text-zinc-700 hover:text-white transition-colors"><MoreVertical size={18} /></button>
+                         </div>
+                       </td>
+                     </tr>
+                   )) : (
+                     <tr>
+                       <td colSpan={5} className="p-32 text-center">
+                         <div className="flex flex-col items-center gap-4 opacity-20">
+                           <Search size={60} />
+                           <p className="text-sm font-black uppercase italic tracking-widest">No logs detected on terminal</p>
+                         </div>
+                       </td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
+             
+             {/* PAGINATION SIMULATION */}
+             {transactions.length > 0 && (
+               <div className="bg-zinc-950/50 p-6 flex justify-between items-center border-t border-white/5">
+                 <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Showing {transactions.length} entries</span>
+                 <div className="flex gap-2">
+                   <button className="px-4 py-2 bg-zinc-900 border border-white/5 rounded-lg text-[10px] font-black uppercase opacity-50 cursor-not-allowed">Prev</button>
+                   <button className="px-4 py-2 bg-zinc-800 border border-white/10 rounded-lg text-[10px] font-black uppercase text-white hover:bg-zinc-700 transition-colors">Next</button>
+                 </div>
+               </div>
+             )}
+           </div>
         </div>
       )}
-
-      {/* REQUEST INVOICE */}
-      {mode === 'request' && profile?.business_name && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-          <button onClick={() => setMode('menu')} className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600 mb-4"><ArrowLeft size={16} /> Retour</button>
-          <div className="bg-[#0d0e1a] p-12 rounded-[4rem] border border-white/5">
-              <div className="mb-12">
-                <label className="text-[10px] text-zinc-600 font-black uppercase block mb-4">Amount to Receive (HTG)</label>
-                <div className="flex items-center border-b-2 border-zinc-900 pb-4">
-                    <span className="text-2xl font-black text-red-600 mr-4">HTG</span>
-                    <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-transparent text-7xl font-black w-full outline-none italic" />
-                </div>
-              </div>
-              <div className="space-y-5">
-                  <input type="email" placeholder="CUSTOMER EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border border-white/5 p-6 rounded-[2rem] w-full text-[12px] font-bold outline-none italic" />
-                  <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 py-7 rounded-[2rem] font-black uppercase italic text-[12px] shadow-2xl shadow-red-600/20">
-                    {loading ? 'Processing...' : 'ENVOUYER LA FACTURE'}
-                  </button>
-              </div>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-24 text-center opacity-30">
-        <p className="text-[7px] font-black uppercase tracking-[0.5em]">Hatex Secure Terminal v4.0.2</p>
-      </div>
     </div>
   );
 }
