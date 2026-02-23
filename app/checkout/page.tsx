@@ -309,70 +309,70 @@ function CheckoutContent() {
             {checkoutType === 'sdk' ? (
               <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-200">
                 
-                {/* --- LIS PWODWI YO (DESIGN RE-TRAVAILLÉ) --- */}
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                    <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.3em] flex items-center gap-3">
-                      <ShoppingCart size={14} className="text-red-600"/> Votre Panier
-                    </p>
-                    <div className="px-3 py-1 bg-white/5 rounded-lg border border-white/10 text-[10px] font-bold text-zinc-400">
-                      {sdkData.products.length} {sdkData.products.length > 1 ? 'Articles' : 'Article'}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {sdkData.products.map((item, idx) => (
-                      <div key={idx} className="group relative">
-                        <div className="absolute -inset-2 bg-gradient-to-r from-red-600/0 to-red-600/5 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-all"></div>
-                        <div className="relative bg-zinc-900/40 border border-white/5 p-5 rounded-[2rem] flex items-center gap-5 backdrop-blur-sm">
-                          
-                          {/* Photo Pwodwi */}
-                          <div className="w-24 h-24 bg-black rounded-2xl border border-white/10 overflow-hidden flex-shrink-0 shadow-2xl relative">
-                            {item.img || item.image ? (
-                              <img 
-                                src={item.img || item.image} 
-                                alt={item.name} 
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                                <Package size={32} className="text-zinc-800" />
-                              </div>
-                            )}
-                            <div className="absolute top-1 right-1 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-black text-white border border-white/10">
-                              x{item.qty || item.quantity || 1}
-                            </div>
-                          </div>
+{/* --- LIS PWODWI YO (DESIGN RE-TRAVAILLÉ) --- */}
+<div className="space-y-5">
+  <div className="flex items-center justify-between border-b border-white/5 pb-4">
+    <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.3em] flex items-center gap-3">
+      <ShoppingCart size={14} className="text-red-600"/> Votre Panier
+    </p>
+    <div className="px-3 py-1 bg-white/5 rounded-lg border border-white/10 text-[10px] font-bold text-zinc-400">
+      {sdkData.products.length} {sdkData.products.length > 1 ? 'Items' : 'Item'}
+    </div>
+  </div>
+  
+  <div className="space-y-4">
+    {sdkData.products.map((item, idx) => (
+      <div key={idx} className="bg-white rounded-[2.5rem] p-4 flex items-center gap-4 shadow-sm">
+        
+        {/* Photo Pwodwi */}
+        <div className="w-20 h-20 bg-zinc-100 rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+          {item.img || item.image ? (
+            <img 
+              src={item.img || item.image} 
+              alt={item.name} 
+              className="w-full h-full object-cover" 
+            />
+          ) : (
+            <Package size={24} className="text-zinc-400" />
+          )}
+        </div>
 
-                          {/* Non ak Detay */}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-black text-[14px] uppercase text-white tracking-tight leading-tight group-hover:text-red-500 transition-colors truncate mb-2">
-                              {item.name || item.product_name || 'Produit'}
-                            </h3>
-                            <div className="flex flex-wrap gap-2">
-                               {item.variant && (
-                                 <span className="text-[9px] bg-red-600/10 text-red-500 px-2.5 py-1 rounded-md border border-red-600/20 font-black uppercase italic">
-                                   {item.variant}
-                                 </span>
-                               )}
-                               <span className="text-[9px] bg-zinc-800 text-zinc-400 px-2.5 py-1 rounded-md font-bold uppercase tracking-tighter">
-                                 Unité: {Number(item.price).toLocaleString()} HTG
-                               </span>
-                            </div>
-                          </div>
+        {/* Non ak Detay */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-black text-[16px] text-zinc-900 leading-tight truncate">
+            {item.name || item.product_name || 'Site Title'}
+          </h3>
+          <p className="text-[11px] font-bold text-orange-600 uppercase mt-0.5">
+            {item.variant || 'INITE'}
+          </p>
+          <p className="text-[16px] font-black text-orange-600 mt-2">
+            {(Number(item.price)).toLocaleString()} HTG
+          </p>
+        </div>
 
-                          {/* Pri Total Atik */}
-                          <div className="text-right flex flex-col items-end">
-                            <p className="text-lg font-black text-white italic tracking-tighter">
-                              {(Number(item.price) * (item.qty || item.quantity || 1)).toLocaleString()}
-                            </p>
-                            <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Gourdes</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+        {/* Kontwòl Kantite (Bouton +/-) */}
+        <div className="flex items-center bg-zinc-100 rounded-xl p-1 border border-zinc-200">
+          <button 
+            className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors font-bold"
+            onClick={() => {/* Fonksyon pou diminye */}}
+          >
+            -
+          </button>
+          <span className="w-8 text-center text-[13px] font-black text-zinc-900">
+            {item.qty || item.quantity || 1}
+          </span>
+          <button 
+            className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors font-bold"
+            onClick={() => {/* Fonksyon pou ogmante */}}
+          >
+            +
+          </button>
+        </div>
+
+      </div>
+    ))}
+  </div>
+</div>
 
                 {/* --- SEKSYON LIVREZON --- */}
                 <div className="bg-gradient-to-br from-zinc-900/50 to-black border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
