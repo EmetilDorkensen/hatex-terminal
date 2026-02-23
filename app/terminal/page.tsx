@@ -587,24 +587,6 @@ export default function TerminalPage() {
           </div>
 
           {/* SIDEBAR - WALLET INFO */}
-          <div className="lg:col-span-4 space-y-8">
-            <div className="bg-white text-black p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 rotate-12 opacity-10"><Wallet size={100} /></div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest mb-10 border-b border-black/10 pb-4 italic">Merchant Balance</h3>
-              <div className="flex flex-col gap-1">
-                <span className="text-5xl font-black tracking-tighter italic">{(profile?.balance || 0).toLocaleString()}</span>
-                <span className="text-[14px] font-black uppercase opacity-60">Gourdes (HTG)</span>
-              </div>
-              <button 
-                onClick={handleSyncBalance} 
-                disabled={syncing} 
-                className="mt-12 w-full bg-black text-white py-6 rounded-[2rem] font-black uppercase text-[11px] flex items-center justify-center gap-3 hover:bg-red-600 transition-colors shadow-xl"
-              >
-                {syncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                Sync Ledger
-              </button>
-            </div>
-
             <div className="bg-zinc-900/40 border border-white/5 p-8 rounded-[3rem]">
               <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 italic text-zinc-400">Terminal Info</h4>
               <div className="space-y-4">

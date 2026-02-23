@@ -7,7 +7,7 @@ import {
   MapPin, Phone, FileText, Download,
   AlertTriangle, Building2, Package,
   ArrowRight, ShieldCheck, ShoppingCart, User,
-  ChevronRight, Globe, Info, Mail
+  Globe, Info, Mail
 } from 'lucide-react';
 
 // Konpozan Loading pou Suspense
@@ -53,7 +53,6 @@ function CheckoutContent() {
 
   // SDK Metadata - DEKODE TOUT ENFÒMASYON BATO A
   const sdkData = useMemo(() => {
-    // Tcheke si done yo vini an base64 via "token"
     const token = searchParams.get('token');
     let decodedData: any = {};
     
@@ -65,26 +64,42 @@ function CheckoutContent() {
         }
     }
 
+    // Gestion de plusieurs produits (si envoye sous forme de tableau "cart" ou "products")
+    let productList = [];
+    if (Array.isArray(decodedData.cart)) {
+        productList = decodedData.cart;
+    } else if (Array.isArray(decodedData.products)) {
+        productList = decodedData.products;
+    } else if (decodedData.product_name || searchParams.get('product_name')) {
+        // Fallback si c'est un seul produit envoyé avec l'ancien format
+        productList = [{
+            name: decodedData.product_name || decodedData.product || searchParams.get('product_name') || 'Achat Boutique',
+            image: decodedData.image || searchParams.get('product_image') || null,
+            quantity: decodedData.quantity || searchParams.get('quantity') || '1',
+            price: decodedData.price || null,
+            color: decodedData.color || searchParams.get('color') || '',
+            size: decodedData.size || searchParams.get('size') || '',
+            variant: decodedData.variant || searchParams.get('variant') || ''
+        }];
+    }
+
+    // Créer une chaine avec tous les noms pour la BDD
+    const allProductNames = productList.map(p => `${p.quantity || 1}x ${p.name || p.product_name}`).join(', ');
+
     return {
       shop_name: decodedData.shop_name || searchParams.get('shop_name') || searchParams.get('platform') || 'Hatex Gateway',
-      product_name: decodedData.product || searchParams.get('product_name') || 'Achat Boutique',
-      product_image: decodedData.image || searchParams.get('product_image') || null,
-      quantity: decodedData.quantity || searchParams.get('quantity') || '1',
-      color: decodedData.color || searchParams.get('color') || '',
-      size: decodedData.size || searchParams.get('size') || '',
-      variant: decodedData.variant || searchParams.get('variant') || '',
+      products: productList,
+      all_product_names_string: allProductNames || 'Achat Multiple',
       
       // Enfòmasyon Kliyan
       customer_name: decodedData.customer?.n || searchParams.get('customer_name') || 'Kliyan Anonyme',
+      customer_email: decodedData.customer?.e || searchParams.get('customer_email') || `${decodedData.customer?.n?.replace(/\s/g, '').toLowerCase() || 'client'}@hatexcard.com`, // Email default si pa genyen
       customer_address: decodedData.customer?.a || searchParams.get('customer_address') || 'Non spécifiée',
       customer_phone: decodedData.customer?.p || searchParams.get('customer_phone') || 'Non spécifié',
       
       platform: searchParams.get('platform') || 'Hatex Gateway',
       terminal: decodedData.terminal || searchParams.get('terminal'),
       total_amount: decodedData.amount || Number(searchParams.get('amount')) || 0,
-      
-      // Detay konplè (si machann nan voye yon lise pwodwi)
-      cart_details: decodedData.product || searchParams.get('product_name') || 'Détails non disponibles'
     };
   }, [searchParams]);
 
@@ -153,7 +168,8 @@ function CheckoutContent() {
 
       const rawCustomerName = checkoutType === 'invoice' ? (invoice?.client_email || 'Kliyan') : sdkData.customer_name;
 
-      const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
+      // NOUVO KÒD POU VOYE BON DONE YO NAN BAZ DE DONE A (Pou evite erè 400 epi mete lajan sou wallet)
+      const paymentPayload = {
         p_terminal_id: receiverId,
         p_card_number: form.card.replace(/\s/g, ''),
         p_card_cvv: form.cvv,
@@ -162,19 +178,61 @@ function CheckoutContent() {
         p_order_id: orderId,
         p_customer_name: maskName(rawCustomerName), 
         p_platform: checkoutType === 'invoice' ? `Invoice: ${businessName}` : sdkData.platform,
+        // Nou ajoute done espesifik pou tablo transactions lan anndan metadata a tou (RPC a ap okipe l)
         p_metadata: { 
-            ...sdkData, // Mete TOUT enfo SDK a isit la
+            ...sdkData,
             card_holder: `${form.firstName} ${form.lastName}`,
-            checkout_type: checkoutType
+            checkout_type: checkoutType,
+            // Done sa yo ap ede dev backend la si l bezwen track detay yo
+            full_customer_name: rawCustomerName,
+            customer_email: sdkData.customer_email,
+            customer_phone: sdkData.customer_phone,
+            customer_address: sdkData.customer_address,
+            product_list: sdkData.all_product_names_string
         }
-      });
+      };
+
+      const { data, error: rpcError } = await supabase.rpc('process_secure_payment', paymentPayload);
 
       if (rpcError) throw rpcError;
 
       if (data.success) {
         if (checkoutType === 'invoice') {
           await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
+        } else {
+            // SI SE SDK, NOU UPDATE TABLO TRANSACTIONS LA DIREKTEMAN POU NOU ASIRE NOU METE BON KOLON YO
+            // (RPC a petèt pa mete tout, donk nou fè yon update rapid pou ranpli kolon ki vid yo)
+            if (data.transaction_id) {
+               await supabase.from('transactions').update({
+                   customer_name: rawCustomerName,
+                   customer_email: sdkData.customer_email,
+                   customer_phone: sdkData.customer_phone,
+                   customer_address: sdkData.customer_address,
+                   product_name: sdkData.all_product_names_string,
+                   type: 'SALE_SDK' // Asire n type la se SALE_SDK
+               }).eq('id', data.transaction_id);
+            }
         }
+        
+        // VOYE EMAIL BAY MACHANN NAN (Rele Edge Function ou a si w genyen l)
+        try {
+             await fetch('/api/send-merchant-receipt', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     merchantId: receiverId,
+                     amount: amount,
+                     orderId: orderId,
+                     customerName: rawCustomerName,
+                     products: sdkData.products,
+                     shippingInfo: {
+                         address: sdkData.customer_address,
+                         phone: sdkData.customer_phone
+                     }
+                 })
+             });
+        } catch(e) { console.log("Mail non envoyé, mais paiement ok", e) }
+
         setAlreadyPaid(true);
       } else {
         throw new Error(data.message || "Tranzaksyon an echwe.");
@@ -195,9 +253,9 @@ function CheckoutContent() {
         {/* ========================================================= */}
         {/* SIDEBAR ENFÒMASYON (RESUME LÒD LA) */}
         {/* ========================================================= */}
-        <div className="lg:col-span-5 p-6 lg:p-12 bg-white/[0.01] border-r border-white/5 flex flex-col">
+        <div className="lg:col-span-5 p-6 lg:p-12 bg-white/[0.01] border-r border-white/5 flex flex-col h-full max-h-screen overflow-y-auto custom-scrollbar">
           
-          <div className="flex items-center gap-4 mb-10">
+          <div className="flex items-center gap-4 mb-10 sticky top-0 bg-[#050505] z-10 py-4">
             <div className="w-14 h-14 bg-red-600 rounded-xl flex items-center justify-center shadow-2xl shadow-red-600/20">
               <Building2 size={26} />
             </div>
@@ -221,30 +279,38 @@ function CheckoutContent() {
               // --- PATI SDK RESUME KONPLÈ ---
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 
-                {/* Product Card */}
-                <div className="group relative bg-white/5 border border-white/10 p-5 rounded-3xl flex gap-5 hover:border-red-600/30 transition-all">
-                  <div className="w-24 h-24 bg-black rounded-2xl border border-white/10 overflow-hidden flex-shrink-0 shadow-inner">
-                    {sdkData.product_image && sdkData.product_image !== 'null' ? (
-                      <img src={sdkData.product_image} alt="product" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-700 bg-zinc-900/50"><ShoppingCart size={32}/></div>
-                    )}
-                  </div>
-                  <div className="flex flex-col justify-center flex-1">
-                    <h3 className="font-bold text-sm uppercase text-white leading-tight mb-2">
-                        {sdkData.product_name.length > 50 ? sdkData.product_name.substring(0, 47) + '...' : sdkData.product_name}
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {sdkData.quantity !== '1' && <span className="text-[10px] bg-zinc-800/80 px-2.5 py-1 rounded-md text-zinc-300 font-bold">QTÉ: {sdkData.quantity}</span>}
-                      {sdkData.variant && <span className="text-[10px] bg-zinc-800/80 px-2.5 py-1 rounded-md text-zinc-300 font-bold">{sdkData.variant}</span>}
-                      {sdkData.color && <span className="text-[10px] bg-zinc-800/80 px-2.5 py-1 rounded-md text-zinc-300 font-bold">COULEUR: {sdkData.color}</span>}
-                      {sdkData.size && <span className="text-[10px] bg-zinc-800/80 px-2.5 py-1 rounded-md text-zinc-300 font-bold">TAILLE: {sdkData.size}</span>}
-                    </div>
-                  </div>
+                {/* Product List - BOUK POU TOUT PWODWI YO */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest flex items-center gap-2 mb-4">
+                        <Package size={12}/> {sdkData.products.length} Article(s) dans la commande
+                    </p>
+                    
+                    {sdkData.products.map((item: any, index: number) => (
+                        <div key={index} className="group relative bg-white/5 border border-white/10 p-4 rounded-3xl flex gap-4 hover:border-red-600/30 transition-all">
+                        <div className="w-20 h-20 bg-black rounded-2xl border border-white/10 overflow-hidden flex-shrink-0 shadow-inner">
+                            {item.image && item.image !== 'null' ? (
+                            <img src={item.image} alt={item.name || item.product_name} className="w-full h-full object-cover" />
+                            ) : (
+                            <div className="w-full h-full flex items-center justify-center text-zinc-700 bg-zinc-900/50"><ShoppingCart size={24}/></div>
+                            )}
+                        </div>
+                        <div className="flex flex-col justify-center flex-1">
+                            <h3 className="font-bold text-xs uppercase text-white leading-tight mb-2">
+                                {(item.name || item.product_name || 'Produit').length > 40 ? (item.name || item.product_name || 'Produit').substring(0, 37) + '...' : (item.name || item.product_name || 'Produit')}
+                            </h3>
+                            <div className="flex flex-wrap gap-1.5">
+                            {item.quantity && <span className="text-[9px] bg-zinc-800/80 px-2 py-0.5 rounded-md text-zinc-300 font-bold">QTÉ: {item.quantity}</span>}
+                            {item.variant && <span className="text-[9px] bg-zinc-800/80 px-2 py-0.5 rounded-md text-zinc-300 font-bold">{item.variant}</span>}
+                            {item.color && <span className="text-[9px] bg-zinc-800/80 px-2 py-0.5 rounded-md text-zinc-300 font-bold">{item.color}</span>}
+                            {item.size && <span className="text-[9px] bg-zinc-800/80 px-2 py-0.5 rounded-md text-zinc-300 font-bold">TAILLE: {item.size}</span>}
+                            </div>
+                        </div>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Customer Details Box */}
-                <div className="bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden">
+                <div className="bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden mt-6">
                     <div className="px-5 py-3 border-b border-white/5 bg-white/[0.01]">
                         <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest flex items-center gap-2">
                             <User size={12}/> Informations de Livraison
@@ -301,7 +367,7 @@ function CheckoutContent() {
           </div>
 
           {/* TOTAL FOOTER */}
-          <div className="mt-12 pt-8 border-t border-white/5">
+          <div className="mt-8 pt-6 border-t border-white/5 sticky bottom-0 bg-[#050505] z-10 pb-4">
              <div className="flex items-baseline justify-between">
                 <div>
                    <p className="text-[11px] font-black uppercase text-zinc-500 tracking-widest mb-2">Total à régler</p>
@@ -440,6 +506,14 @@ function CheckoutContent() {
           </div>
         </div>
       </div>
+      
+      {/* CSS pou scrollbar la paret pwòp (Kopye sa nan globals.css ou pita si ou vle) */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+      `}} />
     </div>
   );
 }
