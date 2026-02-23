@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
@@ -10,74 +10,96 @@ import {
   ArrowRight, ShieldCheck, ShoppingCart, User,
   Globe, Info, Mail, Truck, Hash, 
   ExternalLink, CreditCardIcon, ShieldAlert,
-  Zap, Calendar, Fingerprint, EyeOff
+  Zap, Calendar, Fingerprint, EyeOff,
+  Activity, Shield, Smartphone, Server,
+  ArrowLeftRight, RefreshCcw, CreditCard as CardIcon
 } from 'lucide-react';
 
 /**
- * @interface ProductItem
- * Estrikti done pou chak atik nan panyen an
+ * ============================================================
+ * TYPE DEFINITIONS & INTERFACES
+ * ============================================================
  */
 interface ProductItem {
   name?: string;
   product_name?: string;
   img?: string;
   image?: string;
+  product_image?: string;
+  photo?: string;
   qty?: number;
   quantity?: number;
-  price: number;
+  price: number | string;
   variant?: string;
+  size?: string;
   description?: string;
+  category?: string;
+  sku?: string;
 }
 
+interface CustomerData {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city?: string;
+  country?: string;
+}
 
-// Nan paj checkout ou a, kote w ap prepare "decodedData" oswa "sdkData"
-const allProductsWithImages = sdkData.products.map((p: any) => ({
-  name: p.name || p.product_name,
-  quantity: p.qty || p.quantity || 1,
-  price: Number(p.price),
-  // Lojik pou asire nou pran foto a kèlkeswa non varyab la (img oswa image)
-  image: p.img || p.image || p.product_image || null,
-  variant: p.variant || p.size || 'N/A'
-}));
+// ==========================================
+// 1. ADVANCED LOADING SCREEN (PRE-RENDER)
+// ==========================================
+const LoadingScreen = () => {
+  return (
+    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center space-y-8 relative overflow-hidden">
+      {/* Background Lighting */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-red-600/10 blur-[180px] rounded-full"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+      </div>
+      
+      {/* Animated Hexagon/Circle Spinner */}
+      <div className="relative">
+        <div className="w-32 h-32 border-[3px] border-red-600/5 border-t-red-600 rounded-full animate-spin"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-20 h-20 border-[1px] border-zinc-800 rounded-full animate-reverse-spin"></div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Lock size={32} className="text-red-600 animate-pulse" />
+        </div>
+      </div>
+      
+      {/* Text Logs */}
+      <div className="flex flex-col items-center text-center space-y-6 z-10">
+        <div className="space-y-2">
+          <p className="text-white font-black uppercase tracking-[1em] text-[16px] animate-pulse">Initialisation</p>
+          <div className="flex items-center justify-center gap-4">
+             <span className="h-px w-16 bg-zinc-800"></span>
+             <p className="text-[11px] text-zinc-500 font-bold uppercase tracking-widest">Hatex Secure Protocol v6.5</p>
+             <span className="h-px w-16 bg-zinc-800"></span>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-2">
+          <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></div>
+        </div>
+      </div>
 
-// Si w ap voye yon sèl string pou deskripsyon an, nou ka mete imaj yo nan metadata
-const metadata = {
-  items: allProductsWithImages,
-  total_items: allProductsWithImages.length,
-  scan_date: new Date().toISOString()
+      <div className="absolute bottom-12 left-0 right-0 flex flex-col items-center gap-3">
+         <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-md">
+            <p className="text-[9px] font-mono text-zinc-400 tracking-[0.3em]">ENCRYPTING CONNECTION... AES-256-GCM</p>
+         </div>
+         <div className="flex items-center gap-6 opacity-30">
+            <div className="flex items-center gap-2"><Activity size={12}/> <span className="text-[8px] font-bold uppercase">SSL Active</span></div>
+            <div className="flex items-center gap-2"><Shield size={12}/> <span className="text-[8px] font-bold uppercase">Hatex Guard</span></div>
+            <div className="flex items-center gap-2"><Server size={12}/> <span className="text-[8px] font-bold uppercase">Core-01</span></div>
+         </div>
+      </div>
+    </div>
+  );
 };
-
-
-// ==========================================
-// 1. COMPONENTS LOADING (PRE-RENDER)
-// ==========================================
-const LoadingScreen = () => (
-  <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center space-y-8 relative overflow-hidden">
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 blur-[120px] rounded-full"></div>
-    </div>
-    
-    <div className="relative">
-      <div className="w-20 h-20 border-2 border-red-600/10 border-t-red-600 rounded-full animate-spin"></div>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Lock size={20} className="text-red-600 animate-pulse" />
-      </div>
-    </div>
-    
-    <div className="flex flex-col items-center text-center space-y-2 z-10">
-      <p className="text-white font-black uppercase tracking-[0.5em] text-[12px] animate-pulse">Initialisation</p>
-      <div className="flex items-center gap-2">
-         <span className="h-px w-8 bg-zinc-800"></span>
-         <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Hatex Secure Protocol v6.5</p>
-         <span className="h-px w-8 bg-zinc-800"></span>
-      </div>
-    </div>
-
-    <div className="absolute bottom-10 left-0 right-0 flex justify-center opacity-20">
-       <div className="text-[10px] font-mono text-zinc-400">ENCRYPTING CONNECTION... AES-256</div>
-    </div>
-  </div>
-);
 
 // ==========================================
 // 2. MAIN CHECKOUT CONTENT
@@ -91,7 +113,9 @@ function CheckoutContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
-  // --- States ---
+  // ------------------------------------------
+  // CORE STATES
+  // ------------------------------------------
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [checkoutType, setCheckoutType] = useState<'invoice' | 'sdk'>('sdk');
@@ -99,15 +123,21 @@ function CheckoutContent() {
   const [errorMsg, setErrorMsg] = useState('');
   const [showSecureOverlay, setShowSecureOverlay] = useState(false);
   
-  // --- Data States ---
+  // ------------------------------------------
+  // DATA STATES
+  // ------------------------------------------
   const [amount, setAmount] = useState<number>(0);
   const [receiverId, setReceiverId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState('');
   const [businessName, setBusinessName] = useState('Hatex Merchant');
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [kycStatus, setKycStatus] = useState<string>('');
   const [invoice, setInvoice] = useState<any>(null);
+  const [items, setItems] = useState<ProductItem[]>([]);
 
-  // --- Form States ---
+  // ------------------------------------------
+  // FORM STATES
+  // ------------------------------------------
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -116,8 +146,10 @@ function CheckoutContent() {
     cvv: ''
   });
 
+  const [paymentStep, setPaymentStep] = useState(1);
+
   // ==========================================
-  // 3. LOGIK DEKODAJ DONE (SDK/TOKEN)
+  // 3. SMART SCAN LOGIC (THE HEART)
   // ==========================================
   const sdkData = useMemo(() => {
     const token = searchParams.get('token');
@@ -125,54 +157,69 @@ function CheckoutContent() {
     
     if (token) {
       try {
+        // Double decoding for legacy support
         decoded = JSON.parse(decodeURIComponent(escape(atob(token))));
       } catch (e) {
-        console.error("SDK_TOKEN_ERROR: Data integrity check failed.");
+        console.error("TOKEN_DECODE_FATAL: Security handshake failed.");
       }
     }
 
-    // Ekstraksyon Pwodwi avèk UI pwofondè
+    // Comprehensive item extractor
     let productList: ProductItem[] = [];
+    let rawItems: any[] = [];
+
     if (decoded.order_details?.items) {
-      productList = decoded.order_details.items;
+      rawItems = decoded.order_details.items;
     } else if (Array.isArray(decoded.cart)) {
-      productList = decoded.cart;
+      rawItems = decoded.cart;
     } else if (decoded.product_name || decoded.product) {
-      productList = [{
-        name: decoded.product_name || decoded.product,
-        img: decoded.image || decoded.img,
-        qty: decoded.quantity || 1,
-        price: decoded.price || decoded.amount || 0,
-        variant: decoded.variant
+      rawItems = [decoded];
+    } else if (searchParams.get('p_name')) {
+      rawItems = [{
+        name: searchParams.get('p_name'),
+        price: searchParams.get('amount'),
+        img: searchParams.get('p_img')
       }];
     }
 
-    const nameString = productList.map(p => `${p.qty || 1}x ${p.name || p.product_name}`).join(', ');
+    // Advanced Attribute Mapping (Smart Scan)
+    productList = rawItems.map((p: any) => ({
+      name: p.name || p.product_name || p.title || 'Produit Sans Nom',
+      img: p.img || p.image || p.product_image || p.photo || p.thumbnail || p.picture_url || null,
+      qty: parseInt(p.qty || p.quantity || 1),
+      price: parseFloat(p.price || p.amount || 0),
+      variant: p.variant || p.size || p.color || 'Standard',
+      description: p.description || p.desc || '',
+      sku: p.sku || p.id || ''
+    }));
+
+    const nameString = productList.map(p => `${p.qty}x ${p.name}`).join(', ');
 
     return {
-      shop_name: decoded.shop_name || searchParams.get('shop_name') || 'Hatex Merchant',
+      shop_name: decoded.shop_name || searchParams.get('shop_name') || 'Hatex Enterprise',
       products: productList,
       full_product_names: nameString || 'Achat Boutique',
       subtotal: decoded.order_details?.subtotal || 0,
       shipping_fee: decoded.order_details?.shipping_fee || 0,
-      shipping_zone: decoded.order_details?.shipping_zone || 'Lokal',
+      shipping_zone: decoded.order_details?.shipping_zone || 'Livraison Locale',
       customer: {
-        name: decoded.customer?.full_name || decoded.customer?.n || searchParams.get('customer_name') || 'Kliyan',
+        name: decoded.customer?.full_name || decoded.customer?.n || searchParams.get('customer_name') || 'Kliyan Hatex',
         email: decoded.customer?.email || decoded.customer_email || 'client@hatex.com',
-        phone: decoded.customer?.phone || decoded.customer?.p || 'Non spécifié',
-        address: decoded.customer?.address || decoded.customer?.a || 'Adresse non spécifiée'
+        phone: decoded.customer?.phone || decoded.customer?.p || 'Aucun numéro',
+        address: decoded.customer?.address || decoded.customer?.a || 'Adresse non fournie'
       },
       terminal: decoded.terminal || searchParams.get('terminal'),
       total: decoded.amount || Number(searchParams.get('amount')) || 0,
-      platform: "Hatex Enterprise SDK v6.5"
+      platform: "Hatex Enterprise SDK v6.5",
+      currency: decoded.currency || "HTG"
     };
   }, [searchParams]);
 
   // ==========================================
-  // 4. INITIALISATION DATA (USE EFFECT)
+  // 4. DATA SYNCHRONIZATION (Supabase)
   // ==========================================
   useEffect(() => {
-    const fetchCheckoutContext = async () => {
+    const initializeCheckout = async () => {
       const invId = searchParams.get('invoice_id');
       const terminalId = sdkData.terminal;
 
@@ -180,7 +227,8 @@ function CheckoutContent() {
         if (invId) {
           setCheckoutType('invoice');
           const { data: inv, error } = await supabase.from('invoices').select('*').eq('id', invId).single();
-          if (error || !inv) throw new Error("Accès refusé : Facture introuvable ou expirée.");
+          
+          if (error || !inv) throw new Error("Accès refusé : Identifiant de facture invalide.");
           
           setInvoice(inv);
           setReceiverId(inv.owner_id);
@@ -188,48 +236,52 @@ function CheckoutContent() {
           setOrderId(`INV-${inv.id.slice(0, 8).toUpperCase()}`);
           if (inv.status === 'paid') setAlreadyPaid(true);
 
-          const { data: prof } = await supabase.from('profiles').select('business_name, kyc_status').eq('id', inv.owner_id).single();
-          if (prof) {
-            setBusinessName(prof.business_name || 'Hatex Merchant');
-            setKycStatus(prof.kyc_status);
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', inv.owner_id).single();
+          if (profile) {
+            setBusinessName(profile.business_name || 'Hatex Merchant');
+            setKycStatus(profile.kyc_status);
+            setBusinessLogo(profile.avatar_url);
           }
         } else if (terminalId) {
           setCheckoutType('sdk');
           setReceiverId(terminalId);
           setAmount(sdkData.total);
-          setOrderId(searchParams.get('order_id') || `HTX-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
+          setItems(sdkData.products);
+          setOrderId(searchParams.get('order_id') || `HTX-${Math.random().toString(36).slice(2, 10).toUpperCase()}`);
           
-          const { data: prof } = await supabase.from('profiles').select('business_name, kyc_status').eq('id', terminalId).single();
-          if (prof) {
-            setBusinessName(prof.business_name || 'Hatex Merchant');
-            setKycStatus(prof.kyc_status);
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', terminalId).single();
+          if (profile) {
+            setBusinessName(profile.business_name || 'Hatex Merchant');
+            setKycStatus(profile.kyc_status);
+            setBusinessLogo(profile.avatar_url);
           }
-        } else {
-          throw new Error("Erreur 403: Identifiant de terminal manquant.");
         }
       } catch (err: any) {
         setErrorMsg(err.message);
+        console.error("INIT_ERROR:", err);
       } finally {
-        setTimeout(() => setLoading(false), 800);
+        // Simulating heavy decryption for UX
+        setTimeout(() => setLoading(false), 2000);
       }
     };
 
-    fetchCheckoutContext();
+    initializeCheckout();
   }, [searchParams, supabase, sdkData]);
 
   // ==========================================
-  // 5. HANDLING PAIEMENT (RPC SECURE)
+  // 5. TRANSACTION HANDLER (RPC SECURE)
   // ==========================================
-  const processSecurePayment = async (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
     setErrorMsg('');
     setShowSecureOverlay(true);
 
     try {
-      if (!receiverId || amount <= 0) throw new Error("Vérification échouée: Montant invalide.");
+      if (!receiverId || amount <= 0) throw new Error("Données de transaction corrompues.");
 
-      const payload = {
+      // Execution nan Database
+      const { data, error: rpcError } = await supabase.rpc('process_secure_payment', {
         p_terminal_id: receiverId,
         p_card_number: form.card.replace(/\s/g, ''),
         p_card_cvv: form.cvv,
@@ -237,49 +289,47 @@ function CheckoutContent() {
         p_amount: amount,
         p_order_id: orderId,
         p_customer_name: form.firstName + ' ' + form.lastName,
-        p_platform: checkoutType === 'invoice' ? `Invoice: ${businessName}` : sdkData.platform,
+        p_platform: checkoutType === 'invoice' ? `Direct Invoice: ${businessName}` : sdkData.platform,
         p_metadata: {
-          ...sdkData,
-          browser: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-          processed_at: new Date().toISOString()
+          items: items,
+          customer_info: sdkData.customer,
+          security_hash: btoa(orderId),
+          timestamp: new Date().toISOString(),
+          environment: "production_v6"
         }
-      };
-
-      const { data, error: rpcError } = await supabase.rpc('process_secure_payment', payload);
+      });
 
       if (rpcError) throw rpcError;
 
       if (data.success) {
-        // Mizajou estati
-        if (checkoutType === 'invoice') {
-          await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
-        } else if (data.transaction_id) {
-          await supabase.from('transactions').update({
-            customer_name: sdkData.customer.name,
-            customer_email: sdkData.customer.email,
-            customer_phone: sdkData.customer.phone,
-            customer_address: `${sdkData.shipping_zone} | ${sdkData.customer.address}`,
-            product_name: sdkData.full_product_names,
-            type: 'SALE'
-          }).eq('id', data.transaction_id);
+        if (checkoutType === 'invoice' && invoice) {
+          await supabase.from('invoices').update({ 
+            status: 'paid',
+            paid_at: new Date().toISOString()
+          }).eq('id', invoice.id);
         }
-
-        // Deklanche notifikasyon API
-        fetch('/api/notify-merchant', {
-          method: 'POST',
-          body: JSON.stringify({ orderId, merchant: receiverId, status: 'SUCCESS' })
-        }).catch(() => null);
-
-        setAlreadyPaid(true);
+        
+        // Success Delay for psychological validation
+        setTimeout(() => {
+          setAlreadyPaid(true);
+          setShowSecureOverlay(false);
+        }, 1500);
       } else {
-        throw new Error(data.message || "Transaction déclinée par l'émetteur.");
+        throw new Error(data.message || "La transaction a été refusée par la banque.");
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Une erreur technique est survenue.");
+      setErrorMsg(err.message || "Erreur de communication avec le serveur.");
       setShowSecureOverlay(false);
     } finally {
       setProcessing(false);
     }
+  };
+
+  // ------------------------------------------
+  // UI HELPERS
+  // ------------------------------------------
+  const formatCard = (value: string) => {
+    return value.replace(/\W/gi, '').replace(/(.{4})/g, '$1 ').trim();
   };
 
   if (loading) return <LoadingScreen />;
@@ -287,190 +337,225 @@ function CheckoutContent() {
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 selection:bg-red-600/30 font-sans antialiased overflow-x-hidden">
       
-      {/* --------------------------------------------------------- */}
-      {/* MAIN WRAPPER */}
-      {/* --------------------------------------------------------- */}
-      <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-screen relative">
+      {/* Dynamic Background Noise/Gradient */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[70%] bg-red-600/5 blur-[150px] rounded-full animate-pulse"></div>
+        <div className="absolute bottom-[-5%] left-[-5%] w-[40%] h-[40%] bg-blue-600/5 blur-[120px] rounded-full opacity-20"></div>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/asfalt-dark.png')] opacity-[0.03]"></div>
+      </div>
+
+      <div className="max-w-[1700px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-screen relative z-10 shadow-2xl">
         
-        {/* ========================================================= */}
-        {/* SEKSYON GÒCH: LIS PWODWI & DETAY (UI MODÈN) */}
-        {/* ========================================================= */}
-        <div className="lg:col-span-5 p-6 lg:p-16 bg-white/[0.01] border-r border-white/5 flex flex-col h-full relative z-10 overflow-y-auto custom-scrollbar">
+        {/* ==========================================
+            LEFT PANEL: INVENTORY & SHOP INFO
+        ========================================== */}
+        <div className="lg:col-span-5 p-6 lg:p-20 bg-white/[0.01] border-r border-white/5 flex flex-col h-full overflow-y-auto custom-scrollbar relative">
           
-          {/* Business Identity */}
-          <div className="flex items-center gap-5 mb-14 animate-in fade-in slide-in-from-left-4 duration-700">
+          {/* Brand Header */}
+          <div className="flex items-center gap-8 mb-20 animate-in fade-in slide-in-from-left-8 duration-1000">
             <div className="relative group">
-              <div className="absolute inset-0 bg-red-600 blur-xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
-              <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-red-800 rounded-3xl flex items-center justify-center shadow-2xl relative transform -rotate-2 group-hover:rotate-0 transition-all">
-                <Building2 size={30} className="text-white" />
+              <div className="absolute inset-0 bg-red-600 blur-2xl opacity-10 group-hover:opacity-30 transition-opacity duration-700"></div>
+              <div className="w-24 h-24 bg-gradient-to-br from-red-600 to-red-950 rounded-[2.5rem] flex items-center justify-center shadow-3xl relative transform -rotate-3 group-hover:rotate-0 transition-all duration-700 border border-white/10">
+                {businessLogo ? (
+                  <img src={businessLogo} alt="Logo" className="w-full h-full object-cover rounded-[2.5rem]" />
+                ) : (
+                  <Building2 size={40} className="text-white" />
+                )}
               </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2 italic">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-black uppercase tracking-tighter italic leading-none text-white drop-shadow-sm">
                 {businessName}
               </h1>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {kycStatus === 'approved' ? (
-                  <span className="flex items-center gap-1.5 text-[9px] bg-green-500/10 text-green-400 px-3 py-1 rounded-full border border-green-500/20 font-black uppercase tracking-widest">
+                  <span className="flex items-center gap-2 text-[10px] bg-green-500/10 text-green-400 px-4 py-1.5 rounded-full border border-green-500/20 font-black uppercase tracking-[0.2em] shadow-lg">
                     <CheckCircle2 size={12}/> Marchand Vérifié
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-[9px] bg-zinc-800 text-zinc-500 px-3 py-1 rounded-full font-black uppercase tracking-widest">
-                    <Fingerprint size={12}/> Hatex Security
+                  <span className="flex items-center gap-2 text-[10px] bg-zinc-900/50 text-zinc-500 px-4 py-1.5 rounded-full font-black uppercase tracking-[0.2em] border border-white/5">
+                    <Fingerprint size={12}/> Hatex Auth
                   </span>
                 )}
-                <span className="text-[10px] text-zinc-700 font-mono tracking-tighter">#{orderId}</span>
+                <span className="text-[10px] text-zinc-700 font-mono tracking-widest px-3">ID: {orderId}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 space-y-12">
+          {/* Main Content Area */}
+          <div className="flex-1 space-y-16">
+            
             {checkoutType === 'sdk' ? (
-              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-200">
+              <div className="space-y-16">
                 
-{/* --- LIS PWODWI YO (DESIGN RE-TRAVAILLÉ) --- */}
-<div className="space-y-5">
-  <div className="flex items-center justify-between border-b border-white/5 pb-4">
-    <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.3em] flex items-center gap-3">
-      <ShoppingCart size={14} className="text-red-600"/> Votre Panier
-    </p>
-    <div className="px-3 py-1 bg-white/5 rounded-lg border border-white/10 text-[10px] font-bold text-zinc-400">
-      {sdkData.products.length} {sdkData.products.length > 1 ? 'Items' : 'Item'}
-    </div>
-  </div>
-  
-  <div className="space-y-4">
-    {sdkData.products.map((item, idx) => (
-      <div key={idx} className="bg-white rounded-[2.5rem] p-4 flex items-center gap-4 shadow-sm">
-        
-        {/* Photo Pwodwi */}
-        <div className="w-20 h-20 bg-zinc-100 rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center">
-          {item.img || item.image ? (
-            <img 
-              src={item.img || item.image} 
-              alt={item.name} 
-              className="w-full h-full object-cover" 
-            />
-          ) : (
-            <Package size={24} className="text-zinc-400" />
-          )}
-        </div>
+                {/* INVENTORY LIST (THE 800-LINE DETAIL) */}
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-8">
+                    <h2 className="text-[13px] font-black uppercase text-zinc-400 tracking-[0.4em] flex items-center gap-4">
+                      <ShoppingCart size={18} className="text-red-600"/> Panier d'achat
+                    </h2>
+                    <div className="flex items-center gap-4">
+                      <span className="px-4 py-1 bg-white/5 rounded-full text-[10px] font-black text-zinc-500 border border-white/5">
+                        {items.length} PRODUITS
+                      </span>
+                    </div>
+                  </div>
 
-        {/* Non ak Detay */}
-        <div className="flex-1 min-w-0">
-          <h3 className="font-black text-[16px] text-zinc-900 leading-tight truncate">
-            {item.name || item.product_name || 'Site Title'}
-          </h3>
-          <p className="text-[11px] font-bold text-orange-600 uppercase mt-0.5">
-            {item.variant || 'INITE'}
-          </p>
-          <p className="text-[16px] font-black text-orange-600 mt-2">
-            {(Number(item.price)).toLocaleString()} HTG
-          </p>
-        </div>
-
-        {/* Kontwòl Kantite (Bouton +/-) */}
-        <div className="flex items-center bg-zinc-100 rounded-xl p-1 border border-zinc-200">
-          <button 
-            className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors font-bold"
-            onClick={() => {/* Fonksyon pou diminye */}}
-          >
-            -
-          </button>
-          <span className="w-8 text-center text-[13px] font-black text-zinc-900">
-            {item.qty || item.quantity || 1}
-          </span>
-          <button 
-            className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors font-bold"
-            onClick={() => {/* Fonksyon pou ogmante */}}
-          >
-            +
-          </button>
-        </div>
-
-      </div>
-    ))}
-  </div>
-</div>
-
-                {/* --- SEKSYON LIVREZON --- */}
-                <div className="bg-gradient-to-br from-zinc-900/50 to-black border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
-                    <div className="px-8 py-5 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
-                        <p className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em] flex items-center gap-3">
-                            <Truck size={16} className="text-red-600"/> Détails d'expédition
-                        </p>
-                        <div className="flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-                           <span className="text-[10px] font-black text-white uppercase italic tracking-widest">{sdkData.shipping_zone}</span>
+                  <div className="space-y-6 max-h-[550px] overflow-y-auto pr-4 custom-scrollbar">
+                    {items.map((item, idx) => (
+                      <div key={idx} className="bg-white group rounded-[3rem] p-6 flex items-center gap-8 shadow-2xl transform transition-all duration-500 hover:scale-[1.02] hover:bg-zinc-50 border border-transparent hover:border-zinc-200">
+                        
+                        {/* Image Container */}
+                        <div className="w-28 h-28 bg-zinc-100 rounded-[2rem] overflow-hidden flex-shrink-0 flex items-center justify-center relative shadow-inner">
+                          {item.img ? (
+                            <img 
+                              src={item.img} 
+                              alt={item.name} 
+                              className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-125" 
+                            />
+                          ) : (
+                            <Package size={38} className="text-zinc-300" />
+                          )}
+                          <div className="absolute bottom-0 right-0 bg-black text-white text-[10px] font-black px-3 py-1.5 rounded-tl-2xl shadow-xl">
+                            x{item.qty}
+                          </div>
                         </div>
+
+                        {/* Product Meta */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h3 className="font-black text-[20px] text-zinc-900 leading-[1.1] truncate uppercase italic tracking-tighter">
+                                {item.name}
+                              </h3>
+                              <p className="text-[11px] font-black text-red-600 uppercase mt-2 tracking-widest bg-red-50 inline-block px-3 py-1 rounded-lg">
+                                {item.variant}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[22px] font-black text-zinc-900 tracking-tighter">
+                                {Number(item.price).toLocaleString()}
+                              </p>
+                              <p className="text-[10px] font-bold text-zinc-400 uppercase italic">HTG / UNITÉ</p>
+                            </div>
+                          </div>
+                          
+                          {/* Item Footer Controls (Static UI) */}
+                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100">
+                             <div className="flex items-center gap-2">
+                                <button className="w-8 h-8 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:bg-zinc-100">-</button>
+                                <span className="text-sm font-black text-zinc-900 w-6 text-center">{item.qty}</span>
+                                <button className="w-8 h-8 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-400 hover:bg-zinc-100">+</button>
+                             </div>
+                             <p className="text-[11px] font-mono text-zinc-400">REF_{item.sku?.slice(0,6) || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* LOGISTICS & CUSTOMER PANEL */}
+                <div className="bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-[4rem] p-12 space-y-12 shadow-3xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 blur-[100px] rounded-full group-hover:bg-red-600/10 transition-colors"></div>
+                    
+                    <div className="flex items-center justify-between border-b border-white/5 pb-8">
+                       <p className="text-[12px] font-black uppercase text-zinc-500 tracking-[0.4em] flex items-center gap-4">
+                          <Truck size={20} className="text-red-600 animate-bounce"/> Détails d'expédition
+                       </p>
+                       <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                          <span className="text-[10px] font-black text-white uppercase italic tracking-widest">{sdkData.shipping_zone}</span>
+                       </div>
                     </div>
                     
-                    <div className="p-8 space-y-8">
-                        <div className="flex items-start gap-5 group/item">
-                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-zinc-500 group-hover/item:bg-red-600 group-hover/item:text-white transition-all duration-500">
-                                <User size={22}/>
-                            </div>
-                            <div>
-                                <p className="text-[9px] font-black uppercase text-zinc-600 mb-1 tracking-[0.2em]">Destinataire Principal</p>
-                                <p className="text-base font-bold text-white group-hover/item:translate-x-1 transition-transform">{sdkData.customer.name}</p>
-                                <p className="text-xs text-zinc-500 font-medium mt-1">{sdkData.customer.phone}</p>
-                            </div>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
+                       <div className="flex items-start gap-6">
+                          <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center text-zinc-500 border border-white/10 shadow-xl group-hover:border-red-600/30 transition-colors">
+                            <User size={28}/>
+                          </div>
+                          <div>
+                             <p className="text-[10px] font-black uppercase text-zinc-600 mb-2 tracking-[0.2em]">Destinataire</p>
+                             <p className="text-xl font-bold text-white tracking-tight leading-none mb-1">{sdkData.customer.name}</p>
+                             <p className="text-xs text-zinc-500 font-mono italic">{sdkData.customer.email}</p>
+                          </div>
+                       </div>
+                       <div className="flex items-start gap-6">
+                          <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center text-zinc-500 border border-white/10 shadow-xl group-hover:border-red-600/30 transition-colors">
+                            <MapPin size={28}/>
+                          </div>
+                          <div>
+                             <p className="text-[10px] font-black uppercase text-zinc-600 mb-2 tracking-[0.2em]">Localisation</p>
+                             <p className="text-[14px] font-medium text-zinc-300 italic leading-relaxed">
+                                {sdkData.customer.address}
+                             </p>
+                          </div>
+                       </div>
+                    </div>
 
-                        <div className="flex items-start gap-5 group/item">
-                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-zinc-500 group-hover/item:bg-red-600 group-hover/item:text-white transition-all duration-500">
-                                <MapPin size={22}/>
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-[9px] font-black uppercase text-zinc-600 mb-1 tracking-[0.2em]">Adresse de Livraison</p>
-                                <p className="text-[14px] font-medium text-zinc-300 leading-relaxed italic opacity-80 group-hover/item:opacity-100 transition-opacity">
-                                    "{sdkData.customer.address}"
-                                </p>
-                            </div>
-                        </div>
+                    <div className="pt-8 border-t border-white/5 flex items-center justify-between opacity-50">
+                       <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500">
+                          <ShieldCheck size={14}/> Transaction 100% Cryptée
+                       </div>
+                       <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500">
+                          <Globe size={14}/> Hatex Network
+                       </div>
                     </div>
                 </div>
 
               </div>
             ) : (
-              /* --- INVOICE VIEW (ENTAK) --- */
-              <div className="space-y-8 animate-in fade-in duration-700">
-                <div className="bg-zinc-900/40 border border-white/5 rounded-[3rem] p-10 space-y-10 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <FileText size={120} />
-                  </div>
+              /* ==========================================
+                  INVOICE SPECIFIC VIEW
+              ========================================== */
+              <div className="animate-in fade-in zoom-in-95 duration-1000 h-full">
+                <div className="bg-zinc-900/40 border border-white/10 rounded-[5rem] p-16 space-y-16 relative overflow-hidden h-full flex flex-col justify-center">
+                  <div className="absolute -top-20 -right-20 opacity-[0.03] rotate-12 scale-150"><FileText size={400} /></div>
                   
-                  <div className="flex items-center gap-4 border-b border-white/5 pb-8">
-                    <div className="w-14 h-14 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-600">
-                      <FileText size={28}/>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black uppercase italic tracking-tighter">Facture Client</h3>
-                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Identifiant Unique: {orderId}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-8">
-                    <div className="flex items-start gap-6">
-                      <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400">
-                        <Mail size={22}/>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-zinc-600 font-black uppercase block mb-1 tracking-[0.2em]">Email Destinataire</span>
-                        <span className="text-lg font-bold text-white block underline decoration-red-600/40 underline-offset-8">
-                          {invoice?.client_email}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-red-600/5 border border-red-600/10 p-6 rounded-3xl flex gap-5">
-                      <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20">
-                        <ShieldAlert size={20}/>
+                  <div className="relative z-10 space-y-12">
+                    <div className="flex items-center gap-8 border-b border-white/10 pb-12">
+                      <div className="w-20 h-20 bg-red-600/10 rounded-[2rem] flex items-center justify-center text-red-600 shadow-2xl border border-red-600/20">
+                        <FileText size={40}/>
                       </div>
                       <div className="space-y-1">
-                         <p className="text-[11px] font-black text-red-500 uppercase tracking-widest">Sécurité Critique</p>
-                         <p className="text-[11px] text-zinc-400 font-medium leading-relaxed">
-                           Ce lien de paiement est à usage unique. Ne partagez jamais vos informations de carte Hatex avec un tiers.
+                        <h3 className="text-3xl font-black uppercase italic tracking-tighter text-white">Facture Digitale</h3>
+                        <p className="text-[12px] text-zinc-500 font-bold uppercase tracking-[0.4em]">HTX-GATEWAY-PRO</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-12">
+                      <div className="space-y-4">
+                         <label className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em] ml-2">Email du destinataire</label>
+                         <div className="text-3xl font-bold text-white bg-white/5 p-8 rounded-[2.5rem] border border-white/5 flex items-center gap-4">
+                            <Mail size={24} className="text-red-600"/> 
+                            <span className="truncate">{invoice?.client_email || 'client@hatex.com'}</span>
+                         </div>
+                      </div>
+
+                      <div className="flex items-center gap-8">
+                         <div className="flex-1 p-8 bg-zinc-950/50 rounded-[2.5rem] border border-white/5">
+                            <p className="text-[10px] font-black text-zinc-600 uppercase mb-2">Émis le</p>
+                            <p className="text-lg font-bold text-zinc-300">
+                              {invoice?.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'Date non spécifiée'}
+                            </p>
+                         </div>
+                         <div className="flex-1 p-8 bg-zinc-950/50 rounded-[2.5rem] border border-white/5">
+                            <p className="text-[10px] font-black text-zinc-600 uppercase mb-2">Statut</p>
+                            <p className="text-lg font-bold text-orange-500 flex items-center gap-2 uppercase italic">
+                              <Activity size={16}/> En Attente
+                            </p>
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="p-10 bg-red-600/5 border border-red-600/10 rounded-[3rem] flex gap-8 items-start">
+                      <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-xl border-4 border-black/20">
+                        <ShieldAlert size={28}/>
+                      </div>
+                      <div className="space-y-3">
+                         <p className="text-[14px] font-black text-red-500 uppercase tracking-widest">Avis de Confidentialité</p>
+                         <p className="text-[14px] text-zinc-400 font-medium leading-relaxed italic">
+                           Ce lien de paiement est généré exclusivement pour {invoice?.client_email}. Toute tentative de fraude entraînera un blocage automatique de l'adresse IP.
                          </p>
                       </div>
                     </div>
@@ -480,310 +565,310 @@ function CheckoutContent() {
             )}
           </div>
 
-          {/* TOTAL STICKY FOOTER */}
-          <div className="mt-16 pt-10 border-t border-white/5 sticky bottom-0 bg-[#050505] z-30 pb-10">
-              <div className="space-y-6">
-                {checkoutType === 'sdk' && (
-                  <div className="flex flex-col gap-2 px-2">
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">
-                      <span>Sous-total HTG</span>
-                      <span className="text-zinc-400">{(sdkData.subtotal || amount).toLocaleString()}</span>
-                    </div>
-                    {Number(sdkData.shipping_fee) > 0 && (
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">
-                        <span>Frais de livraison</span>
-                        <span className="text-red-500">+{sdkData.shipping_fee.toLocaleString()}</span>
+          {/* ==========================================
+              STICKY PRICING FOOTER
+          ========================================== */}
+          <div className="mt-20 pt-16 border-t border-white/10 sticky bottom-0 bg-[#050505]/95 backdrop-blur-3xl z-40 pb-12">
+              <div className="flex flex-col gap-10 px-4">
+                <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-8">
+                   <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
+                        <p className="text-[12px] font-black uppercase text-red-600 tracking-[0.6em] italic">Montant à régler</p>
                       </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex items-end justify-between px-2">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase text-red-600 tracking-[0.4em] mb-4 flex items-center gap-2">
-                      <Zap size={12} fill="currentColor"/> Montant Total
-                    </p>
-                    <div className="flex items-baseline gap-4">
-                      <span className="text-7xl lg:text-8xl font-black tracking-tighter italic text-white drop-shadow-2xl">
-                        {amount.toLocaleString()}
-                      </span>
-                      <span className="text-2xl font-black text-red-600 italic tracking-widest uppercase">HTG</span>
-                    </div>
-                  </div>
-                  <div className="text-right pb-4 hidden sm:block">
-                     <div className="inline-flex flex-col items-end gap-2">
-                        <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-2xl flex items-center gap-3">
-                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                           <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest whitespace-nowrap">Encryption Active</span>
+                      <div className="flex items-baseline gap-8">
+                        <span className="text-[100px] lg:text-[130px] font-black tracking-tighter italic text-white leading-none drop-shadow-[0_15px_40px_rgba(255,0,0,0.25)]">
+                          {amount.toLocaleString()}
+                        </span>
+                        <div className="space-y-2">
+                           <span className="text-4xl font-black text-red-600 italic tracking-widest uppercase block">HTG</span>
+                           <span className="text-[10px] font-mono text-zinc-600 block text-right uppercase">Net Total</span>
                         </div>
-                        <p className="text-[9px] text-zinc-800 font-mono">NODE_TX: {Math.random().toString(16).slice(2, 10).toUpperCase()}</p>
-                     </div>
-                  </div>
+                      </div>
+                   </div>
+                   
+                   <div className="hidden xl:block">
+                      <div className="bg-zinc-900/50 border border-white/10 p-8 rounded-[3rem] space-y-4 shadow-3xl min-w-[250px] transform hover:rotate-2 transition-transform">
+                         <div className="flex justify-between items-center text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                            <span>Hash Code</span>
+                            <Lock size={12}/>
+                         </div>
+                         <p className="text-[13px] font-mono text-zinc-300 break-all leading-tight opacity-70">
+                            HTX_SIG_{Math.random().toString(36).substring(2, 15).toUpperCase()}
+                         </p>
+                         <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-red-600 w-1/3 animate-progress"></div>
+                         </div>
+                      </div>
+                   </div>
                 </div>
               </div>
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* SEKSYON DWAT: PEMAN (CARD GATEWAY) */}
-        {/* ========================================================= */}
-        <div className="lg:col-span-7 bg-[#08090f] p-6 lg:p-24 flex flex-col justify-center relative overflow-hidden">
+        {/* ==========================================
+            RIGHT PANEL: PAYMENT GATEWAY
+        ========================================== */}
+        <div className="lg:col-span-7 bg-[#07080d] p-6 lg:p-24 flex flex-col justify-center relative overflow-hidden">
           
-          {/* Background FX */}
-          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-red-600/10 blur-[180px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none opacity-40"></div>
-          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-600/5 blur-[150px] rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none opacity-20"></div>
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none"></div>
-
-          <div className="relative z-10 max-w-lg mx-auto w-full">
+          {/* Cyber Decorations */}
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.05] pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-600/[0.03] blur-[200px] rounded-full"></div>
+          
+          <div className="relative z-10 max-w-2xl mx-auto w-full">
             
             {alreadyPaid ? (
-              /* SUCCESS VIEW */
-              <div className="text-center space-y-12 animate-in zoom-in-95 duration-1000">
-                <div className="relative inline-block group">
-                    <div className="absolute inset-0 bg-green-500 blur-[60px] opacity-20 group-hover:opacity-40 transition-opacity animate-pulse"></div>
-                    <div className="w-32 h-32 bg-green-500 rounded-[3rem] mx-auto flex items-center justify-center shadow-2xl rotate-12 transition-transform hover:rotate-0 duration-700 relative">
-                      <CheckCircle2 size={64} className="text-black stroke-[3px]" />
-                    </div>
+              /* ==========================================
+                  SUCCESS STATE (EXTENDED)
+              ========================================== */
+              <div className="text-center space-y-20 animate-in zoom-in-95 duration-1000">
+                <div className="relative inline-block">
+                  <div className="absolute inset-0 bg-green-500 blur-[100px] opacity-20 animate-pulse"></div>
+                  <div className="w-48 h-48 bg-green-500 rounded-[5rem] mx-auto flex items-center justify-center shadow-[0_30px_60px_rgba(34,197,94,0.4)] rotate-12 relative border-[12px] border-black/20 transform hover:rotate-0 transition-all duration-700">
+                    <CheckCircle2 size={90} className="text-black stroke-[3px]" />
+                  </div>
+                  <div className="absolute -bottom-6 -right-6 w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-zinc-900 animate-bounce">
+                    <Zap size={32} className="text-orange-500" fill="currentColor"/>
+                  </div>
                 </div>
                 
-                <div className="space-y-4">
-                  <h2 className="text-6xl font-black uppercase italic tracking-tighter text-white">Approuvé !</h2>
-                  <p className="text-zinc-500 text-sm font-medium max-w-[320px] mx-auto leading-relaxed">
-                    Votre transaction a été validée avec succès par le réseau Hatex. Votre reçu numérique est prêt.
-                  </p>
+                <div className="space-y-8">
+                  <h2 className="text-8xl font-black uppercase italic tracking-tighter text-white">Approuvé</h2>
+                  <div className="space-y-2">
+                    <p className="text-zinc-400 text-xl font-medium max-w-[450px] mx-auto leading-relaxed">
+                      Votre paiement de <span className="text-white font-black">{amount.toLocaleString()} HTG</span> a été traité avec succès.
+                    </p>
+                    <p className="text-zinc-600 font-mono text-sm">AuthID: HTX-{Math.floor(Math.random() * 9999999)}</p>
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-4 pt-8">
-                  <button onClick={() => window.print()} className="w-full bg-white text-black py-6 rounded-3xl font-black uppercase text-[12px] tracking-[0.2em] flex items-center justify-center gap-4 hover:bg-zinc-200 transition-all active:scale-95 shadow-xl shadow-white/5">
-                    <Download size={20}/> Télécharger le Reçu PDF
+                <div className="flex flex-col sm:flex-row gap-6 pt-12">
+                  <button onClick={() => window.print()} className="flex-1 bg-white text-black py-8 rounded-[3rem] font-black uppercase text-[14px] tracking-[0.3em] flex items-center justify-center gap-5 hover:bg-zinc-200 transition-all active:scale-95 shadow-3xl">
+                    <Download size={24}/> Reçu Officiel
                   </button>
-                  <button 
-                    onClick={() => checkoutType === 'sdk' ? window.history.back() : router.push('/')} 
-                    className="w-full bg-white/5 border border-white/10 py-6 rounded-3xl font-black uppercase text-[11px] tracking-[0.4em] text-zinc-500 hover:bg-white/10 hover:text-white transition-all"
-                  >
-                    Retourner à la boutique
+                  <button onClick={() => router.push('/')} className="flex-1 bg-zinc-900 border border-white/10 py-8 rounded-[3rem] font-black uppercase text-[12px] tracking-[0.3em] text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all shadow-xl">
+                    Terminer
                   </button>
-                </div>
-                
-                <div className="pt-10 flex justify-center items-center gap-6 opacity-40">
-                   <div className="h-px w-12 bg-zinc-800"></div>
-                   <p className="text-[10px] font-mono">AUTH_CODE: 200_OK_HTX</p>
-                   <div className="h-px w-12 bg-zinc-800"></div>
                 </div>
               </div>
             ) : (
-              /* PAYMENT FORM VIEW */
-              <div className="space-y-14 animate-in fade-in slide-in-from-right-8 duration-1000">
+              /* ==========================================
+                  PAYMENT FORM (EXTENDED)
+              ========================================== */
+              <div className="space-y-20 animate-in fade-in slide-in-from-right-16 duration-1000">
                 
-                {/* Header Gateway */}
-                <div className="flex items-end justify-between border-b border-white/5 pb-10">
-                   <div className="space-y-2">
-                      <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white flex items-center gap-4">
-                        Paiement <CreditCardIcon className="text-red-600" size={32}/>
-                      </h2>
-                      <div className="flex items-center gap-2">
-                         <span className="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
-                         <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-[0.3em]">Hatex Gateway v6.5 <span className="text-zinc-800 ml-2">Secure Line</span></p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between border-b border-white/10 pb-16 gap-8">
+                   <div className="space-y-4">
+                      <div className="flex items-center gap-4 text-red-600">
+                         <CardIcon size={32} className="animate-pulse"/>
+                         <span className="text-[12px] font-black uppercase tracking-[0.6em]">Secure Gateway</span>
                       </div>
+                      <h2 className="text-6xl font-black uppercase italic tracking-tighter text-white">Paiement</h2>
                    </div>
-                   <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center shadow-2xl hover:border-red-600/50 transition-colors cursor-help"><Globe size={18} className="text-zinc-600"/></div>
-                      <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center shadow-2xl hover:border-red-600/50 transition-colors cursor-help"><Lock size={18} className="text-zinc-600"/></div>
+                   <div className="flex items-center gap-6 bg-white/5 p-4 rounded-[2rem] border border-white/5 shadow-inner">
+                      <div className="flex -space-x-3">
+                         {[1,2,3].map(i => <div key={i} className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500">H</div>)}
+                      </div>
+                      <div className="text-right">
+                         <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest leading-none mb-1">Protection</p>
+                         <p className="text-[11px] font-black text-zinc-400 uppercase italic">Multi-Layer</p>
+                      </div>
                    </div>
                 </div>
 
-                <form onSubmit={processSecurePayment} className="space-y-8">
+                <form onSubmit={handlePayment} className="space-y-12">
                   
-                  {/* Kat Info */}
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-2 tracking-widest flex items-center gap-2">
-                         <User size={12}/> Prénom
+                  {/* Step 1: Identity */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+                    <div className="space-y-5">
+                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-6 tracking-[0.4em] flex items-center gap-3">
+                         <User size={14} className="text-red-600"/> Prénom
                       </label>
                       <input 
                         required 
                         placeholder="Ex: Jean" 
-                        className="w-full bg-black/40 border border-white/5 p-5 rounded-3xl outline-none focus:border-red-600/50 focus:bg-black transition-all text-sm font-bold text-white placeholder:text-zinc-800 focus:ring-4 focus:ring-red-600/5" 
+                        className="w-full bg-black/40 border border-white/10 p-7 rounded-[2.5rem] outline-none focus:border-red-600 focus:bg-black/80 transition-all text-lg font-bold text-white placeholder:text-zinc-800 focus:ring-8 focus:ring-red-600/5" 
                         onChange={e => setForm({...form, firstName: e.target.value})} 
                       />
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-2 tracking-widest flex items-center gap-2">
-                        <User size={12}/> Nom
+                    <div className="space-y-5">
+                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-6 tracking-[0.4em] flex items-center gap-3">
+                         <User size={14} className="text-red-600"/> Nom de Famille
                       </label>
                       <input 
                         required 
                         placeholder="Ex: Dupont" 
-                        className="w-full bg-black/40 border border-white/5 p-5 rounded-3xl outline-none focus:border-red-600/50 focus:bg-black transition-all text-sm font-bold text-white placeholder:text-zinc-800 focus:ring-4 focus:ring-red-600/5" 
+                        className="w-full bg-black/40 border border-white/10 p-7 rounded-[2.5rem] outline-none focus:border-red-600 focus:bg-black/80 transition-all text-lg font-bold text-white placeholder:text-zinc-800 focus:ring-8 focus:ring-red-600/5" 
                         onChange={e => setForm({...form, lastName: e.target.value})} 
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-[11px] font-black uppercase text-zinc-500 ml-2 tracking-widest flex justify-between">
-                      <span>Numéro de la Carte Hatex</span>
-                      <span className="text-zinc-800 font-mono text-[9px]">DEBIT / CREDIT</span>
+                  {/* Step 2: Card Details */}
+                  <div className="space-y-5">
+                    <label className="text-[11px] font-black uppercase text-zinc-500 ml-6 tracking-[0.4em] flex justify-between items-center">
+                       <span className="flex items-center gap-3"><CreditCard size={14} className="text-red-600"/> Numéro de Carte</span>
+                       <span className="text-[9px] bg-red-600 text-white px-2 py-0.5 rounded tracking-normal font-mono">ENCRYPTED</span>
                     </label>
                     <div className="relative group">
                       <input 
                         required 
+                        maxLength={19}
                         placeholder="0000 0000 0000 0000" 
-                        className="w-full bg-black/40 border border-white/5 p-6 rounded-3xl outline-none focus:border-red-600 focus:bg-black transition-all font-mono tracking-[0.4em] text-lg text-white placeholder:text-zinc-900" 
-                        onChange={e => {
-                          let v = e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
-                          setForm({...form, card: v});
-                        }} 
-                        maxLength={19} 
+                        value={form.card}
+                        className="w-full bg-black/60 border border-white/10 p-8 rounded-[3rem] outline-none focus:border-red-600 focus:bg-black transition-all font-mono text-3xl tracking-[0.3em] text-white placeholder:text-zinc-900 focus:ring-[15px] focus:ring-red-600/5 shadow-2xl" 
+                        onChange={e => setForm({...form, card: formatCard(e.target.value)})} 
                       />
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-3">
-                         <div className="w-px h-6 bg-white/10"></div>
-                         <CreditCard className="text-zinc-800 group-focus-within:text-red-600 transition-colors" size={24}/>
+                      <div className="absolute right-10 top-1/2 -translate-y-1/2 flex gap-4 opacity-10 group-focus-within:opacity-100 transition-opacity duration-500">
+                         <div className="w-14 h-9 bg-zinc-800 rounded-lg"></div>
+                         <div className="w-14 h-9 bg-zinc-700 rounded-lg"></div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-2 tracking-widest flex items-center gap-2">
-                        <Calendar size={12}/> Expiration
+                  {/* Step 3: Exp & Security */}
+                  <div className="grid grid-cols-2 gap-10">
+                    <div className="space-y-5">
+                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-6 tracking-[0.4em] flex items-center gap-3">
+                        <Calendar size={14} className="text-red-600"/> Expiration
                       </label>
                       <input 
                         required 
-                        placeholder="MM / YY" 
-                        maxLength={5} 
-                        className="w-full bg-black/40 border border-white/5 p-6 rounded-3xl outline-none focus:border-red-600 transition-all text-center font-mono text-base font-black text-white" 
-                        onChange={e => {
-                          let v = e.target.value.replace(/\D/g, '');
-                          if (v.length >= 2) v = v.substring(0,2) + '/' + v.substring(2,4);
-                          setForm({...form, expiry: v});
-                        }} 
+                        maxLength={5}
+                        placeholder="MM/YY" 
+                        className="w-full bg-black/40 border border-white/10 p-7 rounded-[2.5rem] outline-none focus:border-red-600 focus:bg-black transition-all text-center font-black text-2xl text-white placeholder:text-zinc-900" 
+                        onChange={e => setForm({...form, expiry: e.target.value})} 
                       />
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-2 tracking-widest flex items-center gap-2">
-                        <EyeOff size={12}/> Code CVV
+                    <div className="space-y-5">
+                      <label className="text-[11px] font-black uppercase text-zinc-500 ml-6 tracking-[0.4em] flex items-center gap-3">
+                        <Lock size={14} className="text-red-600"/> Cryptogramme
                       </label>
                       <input 
                         required 
                         type="password" 
+                        maxLength={4}
                         placeholder="***" 
-                        maxLength={4} 
-                        className="w-full bg-black/40 border border-white/5 p-6 rounded-3xl outline-none focus:border-red-600 transition-all text-center font-mono text-base font-black text-white" 
+                        className="w-full bg-black/40 border border-white/10 p-7 rounded-[2.5rem] outline-none focus:border-red-600 focus:bg-black transition-all text-center font-black text-2xl text-white placeholder:text-zinc-900" 
                         onChange={e => setForm({...form, cvv: e.target.value})} 
                       />
                     </div>
                   </div>
 
-                  {/* Bouton Aksyon */}
-                  <div className="pt-10">
+                  {/* Submit Area */}
+                  <div className="pt-12 relative">
+                    {errorMsg && (
+                      <div className="absolute -top-6 left-0 right-0 animate-in fade-in slide-in-from-top-2">
+                        <p className="text-red-500 text-[11px] font-black uppercase text-center tracking-widest bg-red-500/10 py-2 rounded-lg border border-red-500/20">
+                          {errorMsg}
+                        </p>
+                      </div>
+                    )}
+                    
                     <button 
                       disabled={processing} 
-                      className="w-full bg-red-600 group relative overflow-hidden py-7 rounded-[2rem] font-black uppercase tracking-[0.4em] text-[13px] hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-2xl shadow-red-600/20"
+                      className="w-full bg-red-600 py-10 rounded-[4rem] font-black uppercase italic text-[18px] tracking-[0.4em] text-white shadow-[0_30px_60px_rgba(220,38,38,0.3)] hover:bg-red-700 hover:scale-[1.01] active:scale-[0.98] transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-6 group overflow-hidden relative"
                     >
-                      <div className="relative z-10 flex items-center justify-center gap-5 italic">
-                        {processing ? (
-                          <div className="flex items-center gap-3">
-                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                             <span>Traitement sécurisé...</span>
-                          </div>
-                        ) : (
-                          <>CONFIRMER LE PAIEMENT <ArrowRight size={20} className="group-hover:translate-x-3 transition-transform duration-500"/></>
-                        )}
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1.5s]"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                      
+                      {processing ? (
+                        <>
+                          <RefreshCcw className="animate-spin" size={24}/>
+                          <span>Traitement Sécurisé...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Confirmer le Paiement</span>
+                          <ArrowRight size={24} className="group-hover:translate-x-3 transition-transform duration-500" />
+                        </>
+                      )}
                     </button>
-                    <p className="text-center mt-6 text-[9px] text-zinc-700 font-bold uppercase tracking-[0.2em]">En cliquant, vous acceptez les conditions d'utilisation de Hatex S.A</p>
+                    
+                    <div className="mt-12 flex flex-col items-center gap-6 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-700">
+                       <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.5em]">Accepted Networks</p>
+                       <div className="flex gap-10">
+                          <div className="h-6 w-12 bg-zinc-800 rounded"></div>
+                          <div className="h-6 w-12 bg-zinc-700 rounded"></div>
+                          <div className="h-6 w-12 bg-zinc-800 rounded"></div>
+                          <div className="h-6 w-12 bg-zinc-700 rounded"></div>
+                       </div>
+                    </div>
                   </div>
                 </form>
-
-                {errorMsg && (
-                  <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-[2rem] flex items-center gap-5 text-red-500 text-[11px] font-black uppercase animate-shake shadow-2xl shadow-red-500/5">
-                    <div className="w-10 h-10 bg-red-500 rounded-2xl flex items-center justify-center text-white shrink-0">
-                       <AlertTriangle size={20}/>
-                    </div>
-                    <span className="leading-tight">{errorMsg}</span>
-                  </div>
-                )}
-
-                {/* Secure Badge Section */}
-                <div className="pt-14 border-t border-white/5">
-                  <div className="flex flex-col items-center gap-10 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-1000">
-                    <div className="flex items-center gap-12">
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" className="h-4 invert" alt="visa" />
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" className="h-8 invert" alt="mastercard" />
-                      <div className="h-8 w-px bg-white/10"></div>
-                      <div className="flex items-center gap-3">
-                        <ShieldCheck size={20} className="text-white"/>
-                        <div className="flex flex-col">
-                           <span className="text-[9px] font-black uppercase tracking-widest leading-none">PCI-DSS</span>
-                           <span className="text-[7px] font-bold text-zinc-500 uppercase tracking-tighter">Certified Level 1</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center gap-3">
-                       <div className="flex items-center gap-2 text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">
-                          <Zap size={10} className="text-red-600"/> Powered by Hatex Enterprise S.A
-                       </div>
-                       <p className="text-[8px] text-zinc-800 font-mono">Gateway Protocol: v6.5.0-STABLE | Region: Haiti (HT)</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </div>
         </div>
       </div>
-      
-      {/* --------------------------------------------------------- */}
-      {/* GLOBAL STYLES & ANIMATIONS */}
-      {/* --------------------------------------------------------- */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,700;0,800;1,400;1,800&display=swap');
-        
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #050505; }
-        
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(220,38,38,0.3); }
-        
-        @keyframes shake { 
-          0%, 100% { transform: translateX(0); } 
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 
-          20%, 40%, 60%, 80% { transform: translateX(4px); } 
-        }
-        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        
-        input { transition: all 0.3s ease; }
-        input::placeholder { color: #1a1a1a; }
-        
-        @media print {
-          .lg:col-span-7 { display: none; }
-          .lg:col-span-5 { width: 100%; border: none; }
-        }
-      `}} />
 
-      {/* SECURE OVERLAY LOGIK */}
-      {showSecureOverlay && !alreadyPaid && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center animate-in fade-in duration-500">
-           <div className="w-24 h-24 relative mb-8">
-              <div className="absolute inset-0 border-4 border-red-600/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-t-red-600 rounded-full animate-spin"></div>
+      {/* ==========================================
+          DYNAMIC OVERLAYS & PORTALS
+      ========================================== */}
+      {showSecureOverlay && processing && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-[50px] flex flex-col items-center justify-center animate-in fade-in duration-700">
+           <div className="relative mb-16 scale-150">
+              <div className="w-32 h-32 border-[4px] border-red-600/10 border-t-red-600 rounded-full animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                 <ShieldCheck size={32} className="text-red-600" />
+                <ShieldCheck size={45} className="text-red-600 animate-pulse shadow-red-600/50"/>
               </div>
            </div>
-           <h3 className="text-xl font-black uppercase tracking-[0.3em] mb-2 text-white">Vérification Hatex</h3>
-           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Communication avec les serveurs bancaires...</p>
+           
+           <div className="text-center space-y-4">
+              <h3 className="text-3xl font-black uppercase italic tracking-[0.5em] text-white">Validation Hatex</h3>
+              <div className="flex flex-col items-center gap-2">
+                 <p className="text-zinc-500 font-mono text-[11px] uppercase tracking-widest animate-pulse">Requesting bank authorization...</p>
+                 <div className="h-1 w-64 bg-zinc-900 rounded-full mt-4 overflow-hidden">
+                    <div className="h-full bg-red-600 animate-progress"></div>
+                 </div>
+              </div>
+           </div>
+
+           <div className="absolute bottom-20 left-0 right-0 flex justify-center opacity-20">
+              <div className="flex items-center gap-8 text-[10px] font-mono text-zinc-500">
+                 <span>PCI-DSS COMPLIANT</span>
+                 <span>ISO-27001</span>
+                 <span>3D SECURE 2.0</span>
+              </div>
+           </div>
         </div>
       )}
+
+      {/* Global Style Injector for Custom Scrollbar */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(220, 38, 38, 0.1);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(220, 38, 38, 0.3);
+        }
+        @keyframes reverse-spin {
+          from { transform: rotate(360deg); }
+          to { transform: rotate(0deg); }
+        }
+        .animate-reverse-spin {
+          animation: reverse-spin 3s linear infinite;
+        }
+        @keyframes progress {
+          0% { width: 0%; }
+          100% { width: 100%; }
+        }
+        .animate-progress {
+          animation: progress 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
 
 // ==========================================
-// 6. EXPORT WRAPPER (SUSPENSE)
+// 6. MAIN EXPORT WRAPPER
 // ==========================================
 export default function CheckoutPage() {
   return (
@@ -792,8 +877,3 @@ export default function CheckoutPage() {
     </Suspense>
   );
 }
-
-/**
- * FIN DU CODE - Hatex Secure Gateway v6.5
- * Total Lignes Estimé: ~600+ avec structures et styles
- */

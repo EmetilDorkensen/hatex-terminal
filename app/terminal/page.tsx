@@ -170,7 +170,6 @@ export default function TerminalPage() {
     }
   };
 
-  const fullSDKCode = `
 <style>
     /* --- MASTER STYLES --- */
     :root { 
@@ -299,7 +298,8 @@ export default function TerminalPage() {
             }
         },
         cart: JSON.parse(localStorage.getItem('htx_v6_cart')) || [],
-        shipCost: 0
+        shipCost: 0,
+        shipZone: ""
     };
 
     window.htx_getPrice = function() {
@@ -368,65 +368,92 @@ export default function TerminalPage() {
             formEl.innerHTML = ""; footEl.innerHTML = ""; return;
         }
         let subtotal = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-        listEl.innerHTML = window.HTX_CORE.cart.map(item => \`
+        listEl.innerHTML = window.HTX_CORE.cart.map(item => `
             <div class="htx-item-card">
-                <img src="\${item.img}" class="htx-item-img">
+                <img src="${item.img}" class="htx-item-img">
                 <div class="htx-item-details">
-                    <div class="htx-item-name">\${item.name}</div>
-                    <div class="htx-item-meta">\${item.variant}</div>
+                    <div class="htx-item-name">${item.name}</div>
+                    <div class="htx-item-meta">${item.variant}</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <b style="font-size:18px; color:var(--htx-primary);">\${(item.price * item.qty).toLocaleString()} HTG</b>
+                        <b style="font-size:18px; color:var(--htx-primary);">${(item.price * item.qty).toLocaleString()} HTG</b>
                         <div class="htx-qty-wrapper">
-                            <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, -1)">-</button>
-                            <div class="htx-qty-val">\${item.qty}</div>
-                            <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, 1)">+</button>
+                            <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, -1)">-</button>
+                            <div class="htx-qty-val">${item.qty}</div>
+                            <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, 1)">+</button>
                         </div>
                     </div>
                 </div>
             </div>
-        \`).join('');
+        `).join('');
 
-        formEl.innerHTML = \`
+        formEl.innerHTML = `
             <span class="htx-section-title">LIVREZON</span>
             <div class="htx-form-box">
-                <select class="htx-input" onchange="window.HTX_CORE.shipCost=parseInt(this.value); window.htx_render()">
+                <select class="htx-input" onchange="window.HTX_CORE.shipCost=parseInt(this.value); window.HTX_CORE.shipZone=this.options[this.selectedIndex].text.split('(')[0].trim(); window.htx_render()">
                     <option value="0">--- Chwazi Zòn Ou ---</option>
-                    \${Object.entries(window.HTX_CORE.config.shipping).map(([z, p]) => \`<option value="\${p}" \${window.HTX_CORE.shipCost==p?'selected':''}>\${z} (+\${p} HTG)</option>\`).join('')}
+                    ${Object.entries(window.HTX_CORE.config.shipping).map(([z, p]) => `<option value="${p}" ${window.HTX_CORE.shipCost==p?'selected':''}>${z} (+${p} HTG)</option>`).join('')}
                 </select>
             </div>
             <span class="htx-section-title">ENFÒMASYON</span>
             <div class="htx-form-box">
-                <input id="htx_f_n" class="htx-input" placeholder="Non konplè" value="\${localStorage.getItem('htx_n')||''}">
-                <input id="htx_f_p" class="htx-input" placeholder="WhatsApp / Telefòn" value="\${localStorage.getItem('htx_p')||''}">
-                <textarea id="htx_f_a" class="htx-input" placeholder="Adrès Rezidans" style="height:80px;">\${localStorage.getItem('htx_a')||''}</textarea>
+                <input id="htx_f_n" class="htx-input" placeholder="Non konplè" value="${localStorage.getItem('htx_n')||''}">
+                <input id="htx_f_p" class="htx-input" placeholder="WhatsApp / Telefòn" value="${localStorage.getItem('htx_p')||''}">
+                <textarea id="htx_f_a" class="htx-input" placeholder="Adrès Rezidans" style="height:80px;">${localStorage.getItem('htx_a')||''}</textarea>
             </div>
-        \`;
+        `;
 
-        footEl.innerHTML = \`
+        footEl.innerHTML = `
             <div class="htx-footer">
                 <div class="htx-max-container">
-                    <div class="htx-line"><span>Sous-Total</span><span>\${subtotal.toLocaleString()} HTG</span></div>
-                    <div class="htx-line"><span>Livrezon</span><span>\${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
+                    <div class="htx-line"><span>Sous-Total</span><span>${subtotal.toLocaleString()} HTG</span></div>
+                    <div class="htx-line"><span>Livrezon</span><span>${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
                     <div class="htx-total-line">
                         <span>TOTAL</span>
-                        <span style="color:var(--htx-primary);">\${(subtotal + window.HTX_CORE.shipCost).toLocaleString()} HTG</span>
+                        <span style="color:var(--htx-primary);">${(subtotal + window.HTX_CORE.shipCost).toLocaleString()} HTG</span>
                     </div>
                     <button class="htx-pay-button" onclick="window.htx_pay()">PEYE SEKIRIZE ➔</button>
                 </div>
             </div>
-        \`;
+        `;
     };
 
     window.htx_pay = function() {
         const n = document.getElementById('htx_f_n').value.trim();
         const p = document.getElementById('htx_f_p').value.trim();
         const a = document.getElementById('htx_f_a').value.trim();
+        
         if (!n || !p || window.HTX_CORE.shipCost === 0) return alert("⚠️ Ranpli tout enfòmasyon yo!");
-        localStorage.setItem('htx_n', n); localStorage.setItem('htx_p', p); localStorage.setItem('htx_a', a);
-        let total = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0) + window.HTX_CORE.shipCost;
-        let products = window.HTX_CORE.cart.map(i => \`\${i.qty}x \${i.name} (\${i.variant})\`).join(' | ');
-        const payload = { terminal: window.HTX_CORE.config.mid, amount: total, product: products, customer: { n, p, a } };
+        
+        localStorage.setItem('htx_n', n); 
+        localStorage.setItem('htx_p', p); 
+        localStorage.setItem('htx_a', a);
+
+        let subtotal = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0);
+        let total = subtotal + window.HTX_CORE.shipCost;
+
+        // --- NOUVO FULL DATA HANDSHAKE ---
+        // Nou voye tout detay yo kòm yon sèl objè "order_details"
+        const payload = { 
+            terminal: window.HTX_CORE.config.mid, 
+            amount: total, 
+            shop_name: document.title,
+            order_details: {
+                items: window.HTX_CORE.cart, // Tout lis panyen an ak foto yo
+                subtotal: subtotal,
+                shipping_fee: window.HTX_CORE.shipCost,
+                shipping_zone: window.HTX_CORE.shipZone
+            },
+            customer: { 
+                full_name: n, 
+                phone: p, 
+                address: a 
+            } 
+        };
+
+        // Konvèti tout objè a an Base64 sekirize
         let token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        
+        // Redireksyon vè paj checkout la
         window.location.href = "https://hatexcard.com/checkout?token=" + token;
     };
 
@@ -437,7 +464,7 @@ export default function TerminalPage() {
                 if (!btn.dataset.htxInjected) {
                     const myBtn = document.createElement('button');
                     myBtn.className = 'htx-btn-injected';
-                    myBtn.innerHTML = '💳 ACHETER EN GOURDES (HATEX)';
+                    myBtn.innerHTML = '💳 Hatex Pay';
                     myBtn.type = "button";
                     myBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.htx_add(); };
                     btn.parentNode.insertBefore(myBtn, btn.nextSibling);
@@ -452,7 +479,6 @@ export default function TerminalPage() {
     window.htx_sync();
 })();
 </script>
-`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(fullSDKCode);
