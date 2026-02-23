@@ -66,11 +66,11 @@ function CheckoutContent() {
 
     // Gestion de plusieurs produits (si envoye sous forme de tableau "cart" ou "products")
     let productList = [];
-    if (Array.isArray(decodedData.cart)) {
+    if (Array.isArray(decodedData.cart) && decodedData.cart.length > 0) {
         productList = decodedData.cart;
-    } else if (Array.isArray(decodedData.products)) {
+    } else if (Array.isArray(decodedData.products) && decodedData.products.length > 0) {
         productList = decodedData.products;
-    } else if (decodedData.product_name || searchParams.get('product_name')) {
+    } else if (decodedData.product_name || searchParams.get('product_name') || decodedData.product) {
         // Fallback si c'est un seul produit envoyé avec l'ancien format
         productList = [{
             name: decodedData.product_name || decodedData.product || searchParams.get('product_name') || 'Achat Boutique',
@@ -83,10 +83,9 @@ function CheckoutContent() {
         }];
     }
 
-// Nou ajoute (p: any) pou di TypeScript nou aksepte nenpòt kalite done ladan l
-const allProductNames = productList.map((p: any) => 
-  `${p.quantity || 1}x ${p.name || p.product_name}`
-).join(', ');
+    const allProductNames = productList.map((p: any) => 
+      `${p.quantity || 1}x ${p.name || p.product_name}`
+    ).join(', ');
 
     return {
       shop_name: decodedData.shop_name || searchParams.get('shop_name') || searchParams.get('platform') || 'Hatex Gateway',
@@ -94,10 +93,10 @@ const allProductNames = productList.map((p: any) =>
       all_product_names_string: allProductNames || 'Achat Multiple',
       
       // Enfòmasyon Kliyan
-      customer_name: decodedData.customer?.n || searchParams.get('customer_name') || 'Kliyan Anonyme',
-      customer_email: decodedData.customer?.e || searchParams.get('customer_email') || `${decodedData.customer?.n?.replace(/\s/g, '').toLowerCase() || 'client'}@hatexcard.com`, // Email default si pa genyen
-      customer_address: decodedData.customer?.a || searchParams.get('customer_address') || 'Non spécifiée',
-      customer_phone: decodedData.customer?.p || searchParams.get('customer_phone') || 'Non spécifié',
+      customer_name: decodedData.customer?.n || decodedData.customer_name || searchParams.get('customer_name') || 'Kliyan Anonyme',
+      customer_email: decodedData.customer?.e || decodedData.customer_email || searchParams.get('customer_email') || `${decodedData.customer?.n?.replace(/\s/g, '').toLowerCase() || 'client'}@hatexcard.com`, // Email default si pa genyen
+      customer_address: decodedData.customer?.a || decodedData.customer_address || searchParams.get('customer_address') || 'Non spécifiée',
+      customer_phone: decodedData.customer?.p || decodedData.customer_phone || searchParams.get('customer_phone') || 'Non spécifié',
       
       platform: searchParams.get('platform') || 'Hatex Gateway',
       terminal: decodedData.terminal || searchParams.get('terminal'),
@@ -168,9 +167,13 @@ const allProductNames = productList.map((p: any) =>
     try {
       if (!receiverId || amount <= 0) throw new Error("Montan peman an pa kòrèk.");
 
+      // Vèrifikasyon de baz bò klyan (Nou tcheke si moun nan antre non l kòrèk)
+      if (form.firstName.trim().length < 2 || form.lastName.trim().length < 2) {
+          throw new Error("Tanpri antre yon non ak siyati ki valid sou kat la.");
+      }
+
       const rawCustomerName = checkoutType === 'invoice' ? (invoice?.client_email || 'Kliyan') : sdkData.customer_name;
 
-      // NOUVO KÒD POU VOYE BON DONE YO NAN BAZ DE DONE A (Pou evite erè 400 epi mete lajan sou wallet)
       const paymentPayload = {
         p_terminal_id: receiverId,
         p_card_number: form.card.replace(/\s/g, ''),
@@ -185,7 +188,6 @@ const allProductNames = productList.map((p: any) =>
             ...sdkData,
             card_holder: `${form.firstName} ${form.lastName}`,
             checkout_type: checkoutType,
-            // Done sa yo ap ede dev backend la si l bezwen track detay yo
             full_customer_name: rawCustomerName,
             customer_email: sdkData.customer_email,
             customer_phone: sdkData.customer_phone,
@@ -194,6 +196,7 @@ const allProductNames = productList.map((p: any) =>
         }
       };
 
+      // Vèrifikasyon kat la ak balans li fèt ANNDAN RPC 'process_secure_payment' la.
       const { data, error: rpcError } = await supabase.rpc('process_secure_payment', paymentPayload);
 
       if (rpcError) throw rpcError;
@@ -202,8 +205,6 @@ const allProductNames = productList.map((p: any) =>
         if (checkoutType === 'invoice') {
           await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoice.id);
         } else {
-            // SI SE SDK, NOU UPDATE TABLO TRANSACTIONS LA DIREKTEMAN POU NOU ASIRE NOU METE BON KOLON YO
-            // (RPC a petèt pa mete tout, donk nou fè yon update rapid pou ranpli kolon ki vid yo)
             if (data.transaction_id) {
                await supabase.from('transactions').update({
                    customer_name: rawCustomerName,
@@ -211,12 +212,14 @@ const allProductNames = productList.map((p: any) =>
                    customer_phone: sdkData.customer_phone,
                    customer_address: sdkData.customer_address,
                    product_name: sdkData.all_product_names_string,
-                   type: 'SALE_SDK' // Asire n type la se SALE_SDK
+                   // CHANJMAN POU ERÈ A: Constraint 'transactions_type_check' genlè atann li sèlman wè bagay tankou 'SALE', pa 'SALE_SDK'. 
+                   // Ou mèt mete 'SALE' ou 'sale' selan jan w te defini check la.
+                   type: 'SALE' 
                }).eq('id', data.transaction_id);
             }
         }
         
-        // VOYE EMAIL BAY MACHANN NAN (Rele Edge Function ou a si w genyen l)
+        // VOYE EMAIL BAY MACHANN NAN
         try {
              await fetch('/api/send-merchant-receipt', {
                  method: 'POST',
@@ -237,7 +240,7 @@ const allProductNames = productList.map((p: any) =>
 
         setAlreadyPaid(true);
       } else {
-        throw new Error(data.message || "Tranzaksyon an echwe.");
+        throw new Error(data.message || "Tranzaksyon an echwe. Balans ou gendwa pa sifizan oswa enfòmasyon yo pa kòrèk.");
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Yon erè rive.");
@@ -408,7 +411,6 @@ const allProductNames = productList.map((p: any) =>
                     <Download size={16}/> Imprimer le Reçu
                   </button>
                   <button onClick={() => {
-                      // Si c'est SDK, retourne vers le site, sinon back()
                       if(checkoutType === 'sdk') window.history.back();
                       else router.back();
                   }} className="w-full bg-white/5 border border-white/10 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all">
@@ -509,7 +511,7 @@ const allProductNames = productList.map((p: any) =>
         </div>
       </div>
       
-      {/* CSS pou scrollbar la paret pwòp (Kopye sa nan globals.css ou pita si ou vle) */}
+      {/* CSS pou scrollbar la paret pwòp */}
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
