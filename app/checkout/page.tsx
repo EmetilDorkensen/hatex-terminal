@@ -83,8 +83,10 @@ function CheckoutContent() {
         }];
     }
 
-    // Créer une chaine avec tous les noms pour la BDD
-    const allProductNames = productList.map(p => `${p.quantity || 1}x ${p.name || p.product_name}`).join(', ');
+// Nou ajoute (p: any) pou di TypeScript nou aksepte nenpòt kalite done ladan l
+const allProductNames = productList.map((p: any) => 
+  `${p.quantity || 1}x ${p.name || p.product_name}`
+).join(', ');
 
     return {
       shop_name: decodedData.shop_name || searchParams.get('shop_name') || searchParams.get('platform') || 'Hatex Gateway',
