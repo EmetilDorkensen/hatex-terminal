@@ -585,43 +585,48 @@ export default function TerminalPage() {
                </div>
             )}
           </div>
-{/* SIDEBAR - WALLET INFO */}
-<div className="bg-zinc-900/40 border border-white/5 p-8 rounded-[3rem] backdrop-blur-md">
-  <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 italic text-zinc-400 flex items-center gap-2">
-    <div className="w-1 h-1 bg-red-600 rounded-full animate-pulse"></div>
-    Terminal Info
-  </h4>
-  
-  <div className="space-y-4">
-    {/* Terminal ID */}
-    <div className="flex justify-between items-center border-b border-white/5 pb-4">
-      <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Terminal ID</span>
-      <span className="text-[10px] font-mono text-zinc-400 bg-white/5 px-2 py-0.5 rounded">
-        {profile?.id ? `${profile.id.slice(0, 12)}...` : '---'}
-      </span>
-    </div>
 
-    {/* KYC Status */}
-    <div className="flex justify-between items-center border-b border-white/5 pb-4">
-      <span className="text-[10px] font-bold text-zinc-600 uppercase italic">KYC Status</span>
-      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded border ${
-        profile?.kyc_status === 'approved' 
-          ? 'bg-green-500/10 text-green-500 border-green-500/20' 
-          : 'bg-red-500/10 text-red-500 border-red-500/20'
-      }`}>
-        {profile?.kyc_status || 'Pending'}
-      </span>
-    </div>
+          {/* SIDEBAR - WALLET INFO */}
+          <div className="lg:col-span-4 space-y-8">
+            <div className="bg-white text-black p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 rotate-12 opacity-10"><Wallet size={100} /></div>
+              <h3 className="text-[10px] font-black uppercase tracking-widest mb-10 border-b border-black/10 pb-4 italic">Merchant Balance</h3>
+              <div className="flex flex-col gap-1">
+                <span className="text-5xl font-black tracking-tighter italic">{(profile?.balance || 0).toLocaleString()}</span>
+                <span className="text-[14px] font-black uppercase opacity-60">Gourdes (HTG)</span>
+              </div>
+              <button 
+                onClick={handleSyncBalance} 
+                disabled={syncing} 
+                className="mt-12 w-full bg-black text-white py-6 rounded-[2rem] font-black uppercase text-[11px] flex items-center justify-center gap-3 hover:bg-red-600 transition-colors shadow-xl"
+              >
+                {syncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Sync Ledger
+              </button>
+            </div>
 
-    {/* Commission */}
-    <div className="flex justify-between items-center">
-      <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Commission</span>
-      <span className="text-[10px] font-black text-white bg-red-600/10 border border-red-600/20 px-2 py-0.5 rounded">
-        2.5% <span className="text-zinc-500 font-normal">per Tx</span>
-      </span>
-    </div>
-  </div>
-</div>
+            <div className="bg-zinc-900/40 border border-white/5 p-8 rounded-[3rem]">
+              <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 italic text-zinc-400">Terminal Info</h4>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Terminal ID</span>
+                  <span className="text-[10px] font-mono text-zinc-400">{profile?.id?.slice(0, 12)}...</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">KYC Status</span>
+                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${profile?.kyc_status === 'approved' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    {profile?.kyc_status || 'Pending'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Commission</span>
+                  <span className="text-[10px] font-black text-zinc-400">2.5% per Tx</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* INVOICE PAY INTERFACE */}
       {mode === 'request' && (
@@ -840,26 +845,19 @@ export default function TerminalPage() {
                </table>
              </div>
              
-{/* PAGINATION SIMULATION */}
-{transactions.length > 0 && (
-    <div className="bg-zinc-950/50 p-6 flex justify-between items-center border-t border-white/5 rounded-b-[2rem]">
-        <span className="text-[10px] font-bold text-zinc-600 uppercase italic tracking-wider">
-            Affichage de <span className="text-zinc-300">{transactions.length}</span> entrées
-        </span>
-        
-        <div className="flex gap-2">
-            <button 
-                disabled 
-                className="px-4 py-2 bg-zinc-900/50 border border-white/5 rounded-xl text-[10px] font-black uppercase opacity-30 cursor-not-allowed flex items-center gap-2"
-            >
-                Précédent
-            </button>
-            <button 
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase text-white hover:bg-red-600 hover:border-red-600 transition-all duration-300 flex items-center gap-2 group"
-            >
-                Suivant
-                <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-            </button>
+             {/* PAGINATION SIMULATION */}
+             {transactions.length > 0 && (
+               <div className="bg-zinc-950/50 p-6 flex justify-between items-center border-t border-white/5">
+                 <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Showing {transactions.length} entries</span>
+                 <div className="flex gap-2">
+                   <button className="px-4 py-2 bg-zinc-900 border border-white/5 rounded-lg text-[10px] font-black uppercase opacity-50 cursor-not-allowed">Prev</button>
+                   <button className="px-4 py-2 bg-zinc-800 border border-white/10 rounded-lg text-[10px] font-black uppercase text-white hover:bg-zinc-700 transition-colors">Next</button>
+                 </div>
+               </div>
+             )}
+           </div>
         </div>
+      )}
     </div>
-)}
+  );
+}
