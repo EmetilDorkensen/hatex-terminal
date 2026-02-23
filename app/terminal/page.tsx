@@ -840,19 +840,31 @@ export default function TerminalPage() {
                </table>
              </div>
              
-             {/* PAGINATION SIMULATION */}
-             {transactions.length > 0 && (
-               <div className="bg-zinc-950/50 p-6 flex justify-between items-center border-t border-white/5">
-                 <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Showing {transactions.length} entries</span>
-                 <div className="flex gap-2">
-                   <button className="px-4 py-2 bg-zinc-900 border border-white/5 rounded-lg text-[10px] font-black uppercase opacity-50 cursor-not-allowed">Prev</button>
-                   <button className="px-4 py-2 bg-zinc-800 border border-white/10 rounded-lg text-[10px] font-black uppercase text-white hover:bg-zinc-700 transition-colors">Next</button>
-                 </div>
-               </div>
-             )}
-           </div>
-        </div>
-      )}
-    </div>
+{/* PAGINATION SIMULATION */}
+{transactions.length > 0 && (
+            <div className="bg-zinc-950/50 p-6 flex justify-between items-center border-t border-white/5 rounded-b-[2rem]">
+              <span className="text-[10px] font-bold text-zinc-600 uppercase italic tracking-wider">
+                Affichage de <span className="text-zinc-300">{transactions.length}</span> entrées
+              </span>
+              
+              <div className="flex gap-2">
+                <button 
+                  disabled 
+                  className="px-4 py-2 bg-zinc-900/50 border border-white/5 rounded-xl text-[10px] font-black uppercase opacity-30 cursor-not-allowed flex items-center gap-2"
+                >
+                  Précédent
+                </button>
+                <button 
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase text-white hover:bg-red-600 hover:border-red-600 transition-all duration-300 flex items-center gap-2 group"
+                >
+                  Suivant
+                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div> {/* Fèmen Container Tablo a */}
+      </div> {/* Fèmen Seksyon Kontni an */}
+    </div> 
   );
 }
