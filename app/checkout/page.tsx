@@ -29,6 +29,29 @@ interface ProductItem {
   description?: string;
 }
 
+const allProductNames = productList.map((p: ProductItem) => 
+  `${p.quantity || 1}x ${p.name || p.product_name}`
+).join(', ');
+
+
+// Nan paj checkout ou a, kote w ap prepare "decodedData" oswa "sdkData"
+const allProductsWithImages = sdkData.products.map((p: any) => ({
+  name: p.name || p.product_name,
+  quantity: p.qty || p.quantity || 1,
+  price: Number(p.price),
+  // Lojik pou asire nou pran foto a kèlkeswa non varyab la (img oswa image)
+  image: p.img || p.image || p.product_image || null,
+  variant: p.variant || p.size || 'N/A'
+}));
+
+// Si w ap voye yon sèl string pou deskripsyon an, nou ka mete imaj yo nan metadata
+const metadata = {
+  items: allProductsWithImages,
+  total_items: allProductsWithImages.length,
+  scan_date: new Date().toISOString()
+};
+
+
 // ==========================================
 // 1. COMPONENTS LOADING (PRE-RENDER)
 // ==========================================
