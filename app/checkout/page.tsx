@@ -29,10 +29,6 @@ interface ProductItem {
   description?: string;
 }
 
-const allProductNames = productList.map((p: ProductItem) => 
-  `${p.quantity || 1}x ${p.name || p.product_name}`
-).join(', ');
-
 
 // Nan paj checkout ou a, kote w ap prepare "decodedData" oswa "sdkData"
 const allProductsWithImages = sdkData.products.map((p: any) => ({
