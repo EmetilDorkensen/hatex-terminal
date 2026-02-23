@@ -620,7 +620,7 @@ export default function TerminalPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center p-5 bg-black/40 rounded-2xl border border-white/5">
                   <span className="text-[10px] font-bold text-zinc-400">Merchant ID</span>
-                  <span className="text-[10px] font-mono text-red-500 uppercase">{profile?.id?.slice(0, 8)}...</span>
+                  <span className="text-[10px] font-mono text-red-500 uppercase">{String(profile?.id || "").slice(0, 8)}...</span>
                 </div>
                 <div className="flex justify-between items-center p-5 bg-black/40 rounded-2xl border border-white/5">
                   <span className="text-[10px] font-bold text-zinc-400">KYC Status</span>
@@ -752,7 +752,7 @@ export default function TerminalPage() {
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-[10px] font-bold text-zinc-500 uppercase">{new Date(tx.created_at).toLocaleDateString()}</span>
                         <span className="text-[10px] text-zinc-700">•</span>
-                        <span className="text-[10px] font-bold text-zinc-500">ID: {tx.id.slice(0, 8)}</span>
+                        <span className="text-[10px] font-bold text-zinc-500">ID: {String(tx.id || "").slice(0, 8)}</span>
                       </div>
                     </div>
                   </div>
