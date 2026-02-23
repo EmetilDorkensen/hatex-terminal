@@ -170,7 +170,7 @@ export default function TerminalPage() {
     }
   };
 
-<style>
+<style dangerouslySetInnerHTML={{ __html: `
     /* --- MASTER STYLES --- */
     :root { 
         --htx-primary: #e62e04; 
@@ -179,7 +179,8 @@ export default function TerminalPage() {
         --htx-glass: rgba(255, 255, 255, 0.08);
         --htx-glass-dark: rgba(0, 0, 0, 0.90);
     }
-
+    /* Rès kòd CSS ou a... */
+` }} />
     .htx-app-wrapper * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; transition: all 0.3s ease; }
 
     /* FAB - BOUTON FLOTAN */
