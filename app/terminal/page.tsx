@@ -585,30 +585,43 @@ export default function TerminalPage() {
                </div>
             )}
           </div>
+{/* SIDEBAR - WALLET INFO */}
+<div className="bg-zinc-900/40 border border-white/5 p-8 rounded-[3rem] backdrop-blur-md">
+  <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 italic text-zinc-400 flex items-center gap-2">
+    <div className="w-1 h-1 bg-red-600 rounded-full animate-pulse"></div>
+    Terminal Info
+  </h4>
+  
+  <div className="space-y-4">
+    {/* Terminal ID */}
+    <div className="flex justify-between items-center border-b border-white/5 pb-4">
+      <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Terminal ID</span>
+      <span className="text-[10px] font-mono text-zinc-400 bg-white/5 px-2 py-0.5 rounded">
+        {profile?.id ? `${profile.id.slice(0, 12)}...` : '---'}
+      </span>
+    </div>
 
-          {/* SIDEBAR - WALLET INFO */}
-            <div className="bg-zinc-900/40 border border-white/5 p-8 rounded-[3rem]">
-              <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 italic text-zinc-400">Terminal Info</h4>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Terminal ID</span>
-                  <span className="text-[10px] font-mono text-zinc-400">{profile?.id?.slice(0, 12)}...</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">KYC Status</span>
-                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${profile?.kyc_status === 'approved' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                    {profile?.kyc_status || 'Pending'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Commission</span>
-                  <span className="text-[10px] font-black text-zinc-400">2.5% per Tx</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+    {/* KYC Status */}
+    <div className="flex justify-between items-center border-b border-white/5 pb-4">
+      <span className="text-[10px] font-bold text-zinc-600 uppercase italic">KYC Status</span>
+      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded border ${
+        profile?.kyc_status === 'approved' 
+          ? 'bg-green-500/10 text-green-500 border-green-500/20' 
+          : 'bg-red-500/10 text-red-500 border-red-500/20'
+      }`}>
+        {profile?.kyc_status || 'Pending'}
+      </span>
+    </div>
+
+    {/* Commission */}
+    <div className="flex justify-between items-center">
+      <span className="text-[10px] font-bold text-zinc-600 uppercase italic">Commission</span>
+      <span className="text-[10px] font-black text-white bg-red-600/10 border border-red-600/20 px-2 py-0.5 rounded">
+        2.5% <span className="text-zinc-500 font-normal">per Tx</span>
+      </span>
+    </div>
+  </div>
+</div>
 
       {/* INVOICE PAY INTERFACE */}
       {mode === 'request' && (
