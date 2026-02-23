@@ -862,9 +862,5 @@ export default function TerminalPage() {
                 </button>
               </div>
             </div>
-          )}
-        </div> {/* Fèmen Container Tablo a */}
-      </div> {/* Fèmen Seksyon Kontni an */}
-    </div> 
-  );
-}
+           );
+           }
