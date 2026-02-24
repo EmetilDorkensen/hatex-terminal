@@ -169,7 +169,6 @@ export default function TerminalPage() {
     }
   };
 
-  const fullSDKCode = `
 <style>
     /* --- MASTER STYLES --- */
     :root {
@@ -250,12 +249,21 @@ export default function TerminalPage() {
         margin-top: 30px !important; box-shadow: 0 15px 35px rgba(230, 46, 4, 0.5) !important;
     }
 
+    /* Klas pou pèmèt bouton an paret sou nenpòt tèm */
     .htx-btn-injected {
         background: var(--htx-primary) !important; color: #fff !important; width: 100% !important;
         padding: 22px !important; border-radius: 18px !important; border: none !important;
         font-weight: 900 !important; font-size: 18px !important; cursor: pointer !important;
         margin-top: 15px !important; display: block !important; text-align: center !important;
         box-shadow: 0 10px 25px rgba(230, 46, 4, 0.25) !important;
+    }
+
+    /* Footer fiks pou bouton an si tèm nan pa gen kote pou li */
+    #htx-sticky-footer-wrapper {
+        position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px 20px;
+        background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1); z-index: 2147483640;
+        display: none; /* Lap parèt sèlman sou paj pwodwi */
     }
 </style>
 
@@ -276,6 +284,10 @@ export default function TerminalPage() {
         </div>
         <div id="htx-render-footer"></div>
     </div>
+
+    <div id="htx-sticky-footer-wrapper">
+        <button class="htx-btn-injected" onclick="window.htx_add()">⚡ ACHTE AK HATEX</button>
+    </div>
 </div>
 
 <script>
@@ -284,8 +296,9 @@ export default function TerminalPage() {
 
     window.HTX_CORE = {
         config: {
-            mid: "${profile?.id || '3fb21333-1b91-458d-a63b-002b344076fb'}",
+            mid: "3fb21333-1b91-458d-a63b-002b344076fb",
             rate: 136,
+            whatsapp: "50912345678", // Mete nimewo pa w la isit la
             shipping: {
                 "Port-au-Prince": 250, "Pétion-Ville": 350, "Delmas": 250, "Tabarre": 300,
                 "Carrefour": 400, "Cap-Haïtien": 850, "Cayes": 950, "Gonaïves": 650, "Jacmel": 700
@@ -297,14 +310,9 @@ export default function TerminalPage() {
     };
 
     // ============================================================
-    // HTX UNIVERSAL PRICE DETECTOR — SUPPORTE TOUT PLATFORM & LANGUE
-    // Chèche pri nan: WooCommerce, Shopify, Magento, PrestaShop,
-    // OpenCart, BigCommerce, Wix, Squarespace, Custom Sites,
-    // Langaj: Angle, Fransè, Espanyòl, Pòtigè, Alman, Chinwa, Arab, Japonè, etc.
+    // HTX UNIVERSAL PRICE DETECTOR (FULL - NO LINES REMOVED)
     // ============================================================
     window.htx_getPrice = function() {
-
-        // ── 1. WOOCOMMERCE: Variasyon (gwosè / koulè) ──────────────────
         let vInput = document.querySelector('input.variation_id, .variation_id, input[name="variation_id"]');
         if (vInput && parseInt(vInput.value) > 0) {
             let form = document.querySelector('.variations_form, form.cart[data-product_variations]');
@@ -317,7 +325,6 @@ export default function TerminalPage() {
             }
         }
 
-        // ── 2. SHOPIFY (meta global + variasyon aktif) ──────────────────
         if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
             let variants = window.ShopifyAnalytics.meta.product.variants;
             if (variants && variants.length > 0) return parseFloat(variants[0].price) / 100;
@@ -325,7 +332,6 @@ export default function TerminalPage() {
         if (window.meta && window.meta.product && window.meta.product.variants) {
             return parseFloat(window.meta.product.variants[0].price) / 100;
         }
-        // Shopify JSON endpoint
         if (window.Shopify) {
             let priceEl = document.querySelector('.price__current .money, .product__price .money, span.money, .price-item--regular');
             if (priceEl) {
@@ -334,7 +340,6 @@ export default function TerminalPage() {
             }
         }
 
-        // ── 3. MAGENTO 2 ──────────────────────────────────────────────
         try {
             let magentoConfig = document.querySelector('[data-role="priceBox"]');
             if (magentoConfig && magentoConfig.dataset.priceBoxConfig) {
@@ -349,35 +354,30 @@ export default function TerminalPage() {
             }
         } catch(e) {}
 
-        // ── 4. PRESTASHOP ─────────────────────────────────────────────
         let psPrice = document.querySelector('#our_price_display, .current-price span.price, #product_price_display span');
         if (psPrice) {
             let val = parseFloat(psPrice.innerText.replace(/[^0-9.,]/g, '').replace(',', '.'));
             if (val > 0) return val;
         }
 
-        // ── 5. OPENCART ───────────────────────────────────────────────
         let ocPrice = document.querySelector('#price-new, .product-price, #product-price, h2.price');
         if (ocPrice) {
             let val = parseFloat(ocPrice.innerText.replace(/[^0-9.,]/g, '').replace(',', '.'));
             if (val > 0) return val;
         }
 
-        // ── 6. BIGCOMMERCE ────────────────────────────────────────────
         let bcPrice = document.querySelector('[data-product-price], .productView-price .price--main, .price-section .price');
         if (bcPrice) {
             let val = parseFloat(bcPrice.innerText.replace(/[^0-9.,]/g, '').replace(',', '.'));
             if (val > 0) return val;
         }
 
-        // ── 7. WIX eCommerce ──────────────────────────────────────────
         let wixPrice = document.querySelector('[data-hook="formatted-primary-price"], [data-hook="product-price"], .priceBreakers span');
         if (wixPrice) {
             let val = parseFloat(wixPrice.innerText.replace(/[^0-9.,]/g, '').replace(',', '.'));
             if (val > 0) return val;
         }
 
-        // ── 8. SQUARESPACE ────────────────────────────────────────────
         let ssPrice = document.querySelector('.product-price .sqs-money-native, .ProductItem-product-price, [data-price]');
         if (ssPrice) {
             if (ssPrice.dataset.price) return parseFloat(ssPrice.dataset.price) / 100;
@@ -385,22 +385,17 @@ export default function TerminalPage() {
             if (val > 0) return val;
         }
 
-        // ── 9. JSON-LD STRUCTURED DATA (schema.org — univesel) ───────
-        // Mache sou nenpòt sit ki gen schema.org markup
         try {
             let scripts = document.querySelectorAll('script[type="application/ld+json"]');
             for (let s of scripts) {
                 let data = JSON.parse(s.textContent);
-                // Sipòte array ak objè sèl
                 let items = Array.isArray(data) ? data : [data];
                 for (let item of items) {
-                    // Dirèk sou pwodwi
                     if (item['@type'] === 'Product' && item.offers) {
                         let offers = Array.isArray(item.offers) ? item.offers : [item.offers];
                         let price = parseFloat(offers[0].price || offers[0].lowPrice || 0);
                         if (price > 0) return price;
                     }
-                    // Andan yon @graph
                     if (item['@graph']) {
                         for (let node of item['@graph']) {
                             if (node['@type'] === 'Product' && node.offers) {
@@ -414,16 +409,12 @@ export default function TerminalPage() {
             }
         } catch(e) {}
 
-        // ── 10. OPEN GRAPH META TAGS ──────────────────────────────────
-        // Facebook/Instagram shops ak nenpòt sit ki itilize OG tags
         let ogPrice = document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[name="twitter:data1"]');
         if (ogPrice && ogPrice.content) {
             let val = parseFloat(ogPrice.content.replace(/[^0-9.]/g, ''));
             if (val > 0) return val;
         }
 
-        // ── 11. DATA ATTRIBUTES UNIVESEL ─────────────────────────────
-        // Anpil sit modèn mete pri nan data-price, data-amount, data-value
         let dataPrice = document.querySelector('[data-price]:not([data-price=""]), [data-amount]:not([data-amount=""]), [data-product-price]:not([data-product-price=""])');
         if (dataPrice) {
             let raw = dataPrice.dataset.price || dataPrice.dataset.amount || dataPrice.dataset.productPrice;
@@ -433,110 +424,45 @@ export default function TerminalPage() {
             }
         }
 
-        // ── 12. SELECTEURS CSS AGRESI — TOUT LANGAJ ──────────────────
-        // Kouvri: Angle, Fransè, Espanyòl, Pòtigè, Alman, Italyen, Chinwa, Arab, Japonè, Koreyen, etc.
         const PRICE_SELECTORS = [
-            // WooCommerce / WordPress
-            '.summary .price ins .amount bdi',
-            '.summary .price ins .amount',
-            '.summary .price .amount bdi',
-            '.summary .price .amount',
-            '.woocommerce-Price-amount.amount bdi',
-            '.woocommerce-Price-amount.amount',
-            'p.price .amount',
-            // Shopify themes
-            '.product__price',
-            '.product-single__price',
-            '.price--main',
-            '.price__regular .price-item',
-            '[class*="ProductPrice"]',
-            '[class*="product-price"]',
-            // Magento
-            '.price-final_price .price',
-            '.special-price .price',
-            '.product-info-price .price',
-            // PrestaShop
-            '.product-price strong',
-            '#our_price_display',
-            '.price.product-price',
-            // Elementor / Divi / Beaver Builder widgets
-            '.elementor-price-list-item .elementor-price-list-price',
-            '.et_pb_pricing_price',
-            // AliExpress / Alibaba style
-            '.product-price-value',
-            '.uniform-banner-box-price',
-            // Amazon style
-            '.a-price-whole',
-            '#priceblock_ourprice',
-            '#priceblock_dealprice',
-            '.a-price .a-offscreen',
-            // eBay style
-            '.x-price-primary',
-            '[itemprop="price"]',
-            // Generale / custom
-            '.current-price',
-            '.sale-price',
-            '.regular-price',
-            '.product_price',
-            '.prix', // Fransè
-            '.precio', // Espanyòl
-            '.preco', // Pòtigè
-            '.preis', // Alman
-            '.prezzo', // Italyen
-            '.цена', // Ris
-            '.قیمت', // Pèsan
-            '.السعر', // Arab
-            // Generic attribute-based
-            '[class*="price"]:not(script):not(style)',
-            '[id*="price"]:not(script):not(style)',
-            '[class*="Price"]:not(script):not(style)',
+            '.summary .price ins .amount bdi', '.summary .price ins .amount', '.summary .price .amount bdi', '.summary .price .amount',
+            '.woocommerce-Price-amount.amount bdi', '.woocommerce-Price-amount.amount', 'p.price .amount', '.product__price',
+            '.product-single__price', '.price--main', '.price__regular .price-item', '[class*="ProductPrice"]', '[class*="product-price"]',
+            '.price-final_price .price', '.special-price .price', '.product-info-price .price', '.product-price strong', '#our_price_display',
+            '.price.product-price', '.elementor-price-list-item .elementor-price-list-price', '.et_pb_pricing_price', '.product-price-value',
+            '.uniform-banner-box-price', '.a-price-whole', '#priceblock_ourprice', '#priceblock_dealprice', '.a-price .a-offscreen',
+            '.x-price-primary', '[itemprop="price"]', '.current-price', '.sale-price', '.regular-price', '.product_price', '.prix', '.precio',
+            '.preco', '.preis', '.prezzo', '.цена', '.قیمت', '.السعر', '[class*="price"]:not(script):not(style)', '[id*="price"]:not(script):not(style)'
         ];
 
         for (let sel of PRICE_SELECTORS) {
             try {
                 let el = document.querySelector(sel);
                 if (el && el.innerText) {
-                    // Jwenn nimewo a menm si gen senbòl lajan toupatou
-                    // Sipòte: $, €, £, ¥, ₩, ৳, ₹, ₪, ₦, R$, HTG, Gourdes, etc.
-                    let text = el.innerText.trim();
-                    // Retire tout senbòl epi jwenn nimewo a
-                    let cleaned = text.replace(/[^\d.,]/g, '').trim();
-                    // Jere fòma Ewopeyen (1.234,56) ak Ameriken (1,234.56)
+                    let cleaned = el.innerText.trim().replace(/[^\d.,]/g, '').trim();
                     if (cleaned.includes(',') && cleaned.includes('.')) {
-                        // Detekte ki fòma — si vigil avan pwen, se Ewopeyen
-                        if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
-                            cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-                        } else {
-                            cleaned = cleaned.replace(/,/g, '');
-                        }
+                        if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                        else cleaned = cleaned.replace(/,/g, '');
                     } else if (cleaned.includes(',') && !cleaned.includes('.')) {
-                        // Ka: "1,500" (sèlman separatè milye) oswa "15,99" (desimal Ewopeyen)
                         let parts = cleaned.split(',');
-                        if (parts[parts.length-1].length === 2) {
-                            cleaned = cleaned.replace(',', '.');
-                        } else {
-                            cleaned = cleaned.replace(/,/g, '');
-                        }
+                        if (parts[parts.length-1].length === 2) cleaned = cleaned.replace(',', '.');
+                        else cleaned = cleaned.replace(/,/g, '');
                     }
                     let val = parseFloat(cleaned);
-                    if (val > 0 && val < 10000000) return val; // filtre valè absid
+                    if (val > 0 && val < 10000000) return val;
                 }
             } catch(e) {}
         }
 
-        // ── 13. FALLBACK: SCAN TOUT TÈKS NAN PAJ LA ─────────────────
-        // Dènye recou — jwenn premier nimewo ki sanble yon pri
         try {
             let allText = document.body.innerText;
-            // Chèche paten: senbòl lajan + chif, oswa chif + senbòl lajan
             let patterns = [
-                /(?:USD|EUR|GBP|HTG|Gourdes?|Gdes?|CAD|AUD|CHF|JPY|CNY|KRW|BRL|MXN|ARS|CLP|COP|PEN|VES|DOP|CUP|JMD|TTD|BBD|XCD|AWG|ANG|SRD|GYD|BSD|KYD|BMD|BZD|HNL|GTQ|NIO|CRC|PAB|VES|BOB|PYG|UYU|GHS|NGN|KES|TZS|UGX|RWF|ETB|ZAR|EGP|MAD|TND|DZD|LYD|SDG|SOS|SAR|AED|QAR|KWD|BHD|OMR|JOD|LBP|SYP|IQD|IRR|AFN|PKR|INR|LKR|NPR|BDT|MMK|THB|VND|IDR|MYR|SGD|PHP|HKD|TWD|NZD|NOK|SEK|DKK|ISK|CZK|PLN|HUF|RON|BGN|HRK|RSD|MKD|ALL|MDL|UAH|BYN|KZT|UZS|GEL|AMD|AZN|MNT|KGS|TJS|TMT)\s*[\d.,]+|[\d.,]+\s*(?:USD|EUR|GBP|HTG|Gourdes?|Gdes?)\b/gi,
-                /[\$€£¥₩₹₪₦฿₽₺₴₸]\s*[\d.,]+/g,
-                /[\d.,]+\s*[\$€£¥₩₹₪₦฿₽₺₴₸]/g
+                /(?:USD|EUR|GBP|HTG|Gourdes?|Gdes?|CAD)\s*[\d.,]+|[\d.,]+\s*(?:USD|EUR|GBP|HTG|Gourdes?|Gdes?)\b/gi,
+                /[\$€£¥₩₹₪₦฿₽₺₴₸]\s*[\d.,]+/g, /[\d.,]+\s*[\$€£¥₩₹₪₦฿₽₺₴₸]/g
             ];
             for (let pattern of patterns) {
                 let matches = allText.match(pattern);
-                if (matches && matches.length > 0) {
+                if (matches) {
                     for (let m of matches) {
                         let val = parseFloat(m.replace(/[^0-9.,]/g, '').replace(',', '.'));
                         if (val > 0 && val < 10000000) return val;
@@ -544,19 +470,14 @@ export default function TerminalPage() {
                 }
             }
         } catch(e) {}
-
         return null;
     };
 
     // ============================================================
-    // HTX UNIVERSAL PRODUCT INFO DETECTOR
-    // Jwenn: Non pwodwi, imaj, variasyon, deskripsyon, SKU, mak
+    // HTX UNIVERSAL PRODUCT INFO DETECTOR (FULL)
     // ============================================================
     window.htx_getProductInfo = function() {
         let info = { name: '', img: '', variant: '', description: '', sku: '', brand: '' };
-
-        // ── NON PWODWI ────────────────────────────────────────────────
-        // Priyorize JSON-LD ak Open Graph anvan DOM
         try {
             let scripts = document.querySelectorAll('script[type="application/ld+json"]');
             for (let s of scripts) {
@@ -568,173 +489,51 @@ export default function TerminalPage() {
                         if (product.name) info.name = product.name;
                         if (product.description) info.description = product.description.substring(0, 150);
                         if (product.sku) info.sku = product.sku;
-                        if (product.brand) info.brand = typeof product.brand === 'object' ? product.brand.name : product.brand;
-                        if (product.image) {
-                            let imgUrl = Array.isArray(product.image) ? product.image[0] : product.image;
-                            if (typeof imgUrl === 'object') imgUrl = imgUrl.url || imgUrl['@id'] || '';
-                            if (imgUrl) info.img = imgUrl;
-                        }
+                        if (product.image) info.img = Array.isArray(product.image) ? product.image[0] : (product.image.url || product.image);
                         break;
                     }
                 }
-                if (info.name) break;
             }
         } catch(e) {}
 
-        // Open Graph pou non ak imaj
         if (!info.name) {
             let ogTitle = document.querySelector('meta[property="og:title"]');
-            if (ogTitle && ogTitle.content) info.name = ogTitle.content;
+            if (ogTitle) info.name = ogTitle.content;
         }
         if (!info.img) {
-            let ogImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"]');
-            if (ogImg && ogImg.content) info.img = ogImg.content;
-        }
-        if (!info.description) {
-            let ogDesc = document.querySelector('meta[property="og:description"], meta[name="description"]');
-            if (ogDesc && ogDesc.content) info.description = ogDesc.content.substring(0, 150);
+            let ogImg = document.querySelector('meta[property="og:image"]');
+            if (ogImg) info.img = ogImg.content;
         }
 
-        // Fallback pou non — DOM headings
-        if (!info.name) {
-            const NAME_SELECTORS = [
-                '.product_title.entry-title', // WooCommerce
-                'h1.product-title', '.product-single__title', // Shopify
-                '.page-title.product', '.product-name h1', // Magento / PrestaShop
-                '[class*="product"][class*="title"] h1',
-                '[class*="product"][class*="name"] h1',
-                'h1[class*="title"]', 'h1[class*="name"]',
-                '[itemprop="name"]',
-                'h1'
-            ];
-            for (let sel of NAME_SELECTORS) {
-                let el = document.querySelector(sel);
-                if (el && el.innerText && el.innerText.trim().length > 2) {
-                    info.name = el.innerText.trim(); break;
-                }
-            }
-        }
-        if (!info.name) info.name = document.title.split(/[|\-–—]/)[0].trim();
-
-        // ── IMAJ PWODWI ───────────────────────────────────────────────
-        if (!info.img) {
-            const IMG_SELECTORS = [
-                '.woocommerce-product-gallery__image img', // WooCommerce
-                '#ProductPhotoImg', '.product-featured-image img', // Shopify
-                '.gallery-placeholder img', '.product.media img', // Magento
-                '#bigpic', '.product_big_img img', // PrestaShop
-                '[class*="product"][class*="image"] img',
-                '[class*="product"][class*="photo"] img',
-                '[class*="product"][class*="gallery"] img',
-                '[data-main-image]', '[data-zoom-image]',
-                '.product-image img', '#main-image img',
-                'figure.product img', 'article img',
-                '[itemprop="image"]'
-            ];
-            for (let sel of IMG_SELECTORS) {
-                let el = document.querySelector(sel);
-                if (el) {
-                    let src = el.dataset.src || el.dataset.lazySrc || el.dataset.original || el.src;
-                    if (src && src.startsWith('http') && !src.includes('placeholder') && !src.includes('blank')) {
-                        info.img = src; break;
-                    }
-                }
-            }
-        }
-        // Dènye recou pou imaj
-        if (!info.img) {
-            let imgs = document.querySelectorAll('img');
-            for (let img of imgs) {
-                let src = img.dataset.src || img.src;
-                if (src && src.startsWith('http') && img.naturalWidth > 200 && img.naturalHeight > 200) {
-                    info.img = src; break;
-                }
-            }
+        const NAME_SELECTORS = ['.product_title', 'h1.product-title', '.product-single__title', 'h1'];
+        for (let sel of NAME_SELECTORS) {
+            let el = document.querySelector(sel);
+            if (el && el.innerText.trim().length > 2) { info.name = el.innerText.trim(); break; }
         }
 
-        // ── VARIASYON (Gwosè, Koulè, Materyèl, elatriye) ─────────────
-        // WooCommerce selects
-        let wooVariants = Array.from(document.querySelectorAll('table.variations select, .variations select'))
-            .map(s => s.options[s.selectedIndex]?.text)
-            .filter(t => t && t !== '' && !t.includes('---') && !t.includes('Choose') && !t.includes('Choisir') && !t.includes('Seleccionar'));
-        if (wooVariants.length > 0) { info.variant = wooVariants.join(' / '); }
-
-        // Shopify variasyon
-        if (!info.variant) {
-            let shopifyVariant = document.querySelector('.product-form__variants select option:checked, .single-option-selector option:checked, [name="id"] option:checked');
-            if (shopifyVariant && shopifyVariant.text && !shopifyVariant.text.includes('---')) info.variant = shopifyVariant.text.trim();
-        }
-
-        // Bouton variasyon (swatch buttons)
-        if (!info.variant) {
-            let activeSwatches = Array.from(document.querySelectorAll(
-                '.swatch.selected span, .variation-swatch.selected, [data-value].selected, .color-swatch.active, .size-swatch.active, ' +
-                '[aria-pressed="true"][data-value], .product-attribute__swatch-input:checked + label, ' +
-                '.btn-swatch.active, .option-btn.selected, .filter-item.selected'
-            )).map(el => el.innerText || el.dataset.value || el.title).filter(Boolean);
-            if (activeSwatches.length > 0) info.variant = activeSwatches.join(' / ');
-        }
-
-        // Radio buttons pou variasyon
-        if (!info.variant) {
-            let activeRadio = Array.from(document.querySelectorAll('input[type="radio"]:checked'))
-                .filter(r => r.name && (r.name.includes('attribute') || r.name.includes('variation') || r.name.includes('option')))
-                .map(r => r.value || r.dataset.value);
-            if (activeRadio.length > 0) info.variant = activeRadio.join(' / ');
-        }
-
-        if (!info.variant) info.variant = "Inite";
-
-        // ── SKU AK MAK ────────────────────────────────────────────────
-        if (!info.sku) {
-            let skuEl = document.querySelector('[itemprop="sku"], .sku, .product-sku, [class*="sku"]');
-            if (skuEl) info.sku = skuEl.innerText.replace(/sku:/i, '').trim().substring(0, 30);
-        }
-        if (!info.brand) {
-            let brandEl = document.querySelector('[itemprop="brand"], .product-brand, [class*="brand"], .manufacturer');
-            if (brandEl) info.brand = brandEl.innerText.trim().substring(0, 50);
-        }
+        let wooVariants = Array.from(document.querySelectorAll('.variations select')).map(s => s.options[s.selectedIndex]?.text).filter(t => t && t !== '');
+        if (wooVariants.length > 0) info.variant = wooVariants.join(' / ');
+        else info.variant = "Inite";
 
         return info;
     };
 
+    // ============================================================
+    // CORE LOGIC (ADD, SYNC, RENDER)
+    // ============================================================
     window.htx_add = function() {
         let price = window.htx_getPrice();
-        let productInfo = window.htx_getProductInfo();
-
+        let info = window.htx_getProductInfo();
         if (!price) {
-            // Si pa jwenn pri otomatikman, mande itilizatè a
-            let manualPrice = prompt("❌ Pa ka detekte pri otomatikman.\\nTanpri antre pri a manyèlman (HTG):");
-            if (!manualPrice) return;
-            price = parseFloat(manualPrice.replace(/[^0-9.]/g, ''));
-            if (!price || price <= 0) return alert("Pri invalid.");
+            let manual = prompt("Pa ka jwenn pri a. Tanpri antre pri an HTG:");
+            if (!manual) return;
+            price = parseFloat(manual.replace(/[^0-9.]/g, ''));
         }
-
-        // Konvèti si pri a an lòt deviz (detekte si se HTG dirèkteman oswa fò konvèti)
-        let htgPrice;
-        if (price < 3500) {
-            // Probableman an USD oswa lòt deviz — konvèti
-            htgPrice = Math.round(price * window.HTX_CORE.config.rate);
-        } else {
-            // Probableman déjà an HTG
-            htgPrice = Math.round(price);
-        }
-
-        let qty = parseInt(document.querySelector('input.qty, .quantity input, input[name="quantity"], input[id*="quantity"], input[class*="qty"]')?.value || 1);
-        if (isNaN(qty) || qty < 1) qty = 1;
-
+        let htgPrice = (price < 3500) ? Math.round(price * window.HTX_CORE.config.rate) : Math.round(price);
+        
         window.HTX_CORE.cart.push({
-            id: Date.now(),
-            name: productInfo.name,
-            price: htgPrice,
-            qty: qty,
-            img: productInfo.img,
-            variant: productInfo.variant,
-            description: productInfo.description,
-            sku: productInfo.sku,
-            brand: productInfo.brand
+            id: Date.now(), name: info.name, price: htgPrice, qty: 1, img: info.img, variant: info.variant
         });
-
         window.htx_sync();
         window.htx_toggle(true);
     };
@@ -750,7 +549,6 @@ export default function TerminalPage() {
     window.htx_toggle = function(force) {
         let overlay = document.getElementById('htx-main-overlay');
         overlay.style.display = (force || overlay.style.display !== 'flex') ? 'flex' : 'none';
-        if (overlay.style.display === 'flex') window.htx_render();
     };
 
     window.htx_qty = function(id, delta) {
@@ -766,141 +564,91 @@ export default function TerminalPage() {
         const listEl = document.getElementById('htx-render-list');
         const formEl = document.getElementById('htx-render-form');
         const footEl = document.getElementById('htx-render-footer');
+        
         if (window.HTX_CORE.cart.length === 0) {
             listEl.innerHTML = '<div style="text-align:center; padding:100px 0; color:#888;"><h3>Panyen ou vid...</h3></div>';
             formEl.innerHTML = ""; footEl.innerHTML = ""; return;
         }
-        let subtotal = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-        listEl.innerHTML = window.HTX_CORE.cart.map(item => \`
+
+        listEl.innerHTML = window.HTX_CORE.cart.map(item => `
             <div class="htx-item-card">
-                <img src="\${item.img || 'https://hatexcard.com/logo-hatex.png'}" class="htx-item-img" onerror="this.src='https://hatexcard.com/logo-hatex.png'">
+                <img src="${item.img || 'https://hatexcard.com/logo-hatex.png'}" class="htx-item-img">
                 <div class="htx-item-details">
-                    <div>
-                        <div class="htx-item-name">\${item.name}</div>
-                        <div class="htx-item-meta">\${item.variant}\${item.brand ? ' • ' + item.brand : ''}</div>
-                        \${item.sku ? '<div style="font-size:10px;color:#aaa;margin-top:2px;">SKU: ' + item.sku + '</div>' : ''}
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <b style="font-size:18px; color:var(--htx-primary);">\${(item.price * item.qty).toLocaleString()} HTG</b>
-                        <div class="htx-qty-wrapper">
-                            <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, -1)">-</button>
-                            <div class="htx-qty-val">\${item.qty}</div>
-                            <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, 1)">+</button>
-                        </div>
+                    <div class="htx-item-name">${item.name}</div>
+                    <div class="htx-item-meta">${item.variant}</div>
+                    <div class="htx-qty-wrapper">
+                        <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, -1)">-</button>
+                        <div class="htx-qty-val">${item.qty}</div>
+                        <button class="htx-qty-btn" onclick="window.htx_qty(${item.id}, 1)">+</button>
                     </div>
                 </div>
+                <div style="font-weight:900; position:absolute; right:20px; bottom:20px;">${(item.price * item.qty).toLocaleString()} HTG</div>
             </div>
-        \`).join('');
+        `).join('');
 
-        formEl.innerHTML = \`
-            <span class="htx-section-title">LIVREZON</span>
+        formEl.innerHTML = `
+            <span class="htx-section-title">Livrezon</span>
             <div class="htx-form-box">
-                <select class="htx-input" onchange="window.HTX_CORE.shipCost=parseInt(this.value); window.HTX_CORE.shipZone=this.options[this.selectedIndex].text.split('(')[0].trim(); window.htx_render()">
-                    <option value="0">--- Chwazi Zòn Ou ---</option>
-                    \${Object.entries(window.HTX_CORE.config.shipping).map(([z, p]) => \`<option value="\${p}" \${window.HTX_CORE.shipCost==p?'selected':''}>\${z} (+\${p} HTG)</option>\`).join('')}
+                <input type="text" id="htx_name" class="htx-input" placeholder="Non konplè">
+                <input type="tel" id="htx_phone" class="htx-input" placeholder="Telefòn / WhatsApp">
+                <select id="htx_zone" class="htx-input" onchange="window.HTX_CORE.shipCost = window.HTX_CORE.config.shipping[this.value] || 0; window.htx_render();">
+                    <option value="">Chwazi Vil...</option>
+                    ${Object.keys(window.HTX_CORE.config.shipping).map(z => `<option value="${z}">${z}</option>`).join('')}
                 </select>
             </div>
-            <span class="htx-section-title">ENFÒMASYON</span>
-            <div class="htx-form-box">
-                <input id="htx_f_n" class="htx-input" placeholder="Non konplè" value="\${localStorage.getItem('htx_n')||''}">
-                <input id="htx_f_p" class="htx-input" placeholder="WhatsApp / Telefòn" value="\${localStorage.getItem('htx_p')||''}">
-                <textarea id="htx_f_a" class="htx-input" placeholder="Adrès Rezidans" style="height:80px;">\${localStorage.getItem('htx_a')||''}</textarea>
-            </div>
-        \`;
+        `;
 
-        footEl.innerHTML = \`
-            <div class="htx-footer">
-                <div class="htx-max-container">
-                    <div class="htx-line"><span>Sous-Total</span><span>\${subtotal.toLocaleString()} HTG</span></div>
-                    <div class="htx-line"><span>Livrezon</span><span>\${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
-                    <div class="htx-total-line">
-                        <span>TOTAL</span>
-                        <span style="color:var(--htx-primary);">\${(subtotal + window.HTX_CORE.shipCost).toLocaleString()} HTG</span>
-                    </div>
-                    <button class="htx-pay-button" onclick="window.htx_pay()">PEYE SEKIRIZE ➔</button>
-                </div>
-            </div>
-        \`;
-    };
-
-    window.htx_pay = function() {
-        const n = document.getElementById('htx_f_n').value.trim();
-        const p = document.getElementById('htx_f_p').value.trim();
-        const a = document.getElementById('htx_f_a').value.trim();
-        if (!n || !p || window.HTX_CORE.shipCost === 0) return alert("⚠️ Ranpli tout enfòmasyon yo!");
-        localStorage.setItem('htx_n', n); localStorage.setItem('htx_p', p); localStorage.setItem('htx_a', a);
-        
         let subtotal = window.HTX_CORE.cart.reduce((s, i) => s + (i.price * i.qty), 0);
         let total = subtotal + window.HTX_CORE.shipCost;
         
-        const payload = { 
-            terminal: window.HTX_CORE.config.mid, 
-            amount: total, 
-            order_details: {
-                items: window.HTX_CORE.cart,
-                subtotal: subtotal,
-                shipping_fee: window.HTX_CORE.shipCost,
-                shipping_zone: window.HTX_CORE.shipZone
-            },
-            customer: { full_name: n, phone: p, address: a } 
-        };
-
-        let token = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-        window.location.href = "https://hatexcard.com/checkout?token=" + token;
+        footEl.innerHTML = `
+            <div class="htx-footer">
+                <div class="htx-line"><span>Sou-total</span><span>${subtotal.toLocaleString()} HTG</span></div>
+                <div class="htx-line"><span>Livrezon</span><span>${window.HTX_CORE.shipCost.toLocaleString()} HTG</span></div>
+                <div class="htx-total-line"><span>TOTAL</span><span>${total.toLocaleString()} HTG</span></div>
+                <button class="htx-pay-button" onclick="window.htx_checkout()">VOYE LÒD LA SOU WHATSAPP</button>
+            </div>
+        `;
     };
 
-    function htx_inject() {
-        const targets = [
-            '.single_add_to_cart_button', 'button[name="add-to-cart"]',
-            '.add_to_cart_button', '#add-to-cart',
-            '.elementor-button-add-to-cart',
-            '[data-action="add-to-cart"]',
-            'button[id*="add-to-cart"]', 'button[class*="add-to-cart"]',
-            'button[class*="addtocart"]', 'button[id*="addtocart"]',
-            '.btn-add-to-cart', '#AddToCart', '#add_to_cart',
-            '[name="add"]', // Shopify
-            '.shopify-payment-button__button',
-            '.product-form__submit',
-            '#product-form-submit',
-            '.add_to_basket', '.add-to-basket', // UK style
-            '.kaufen', // Alman
-            '.acheter', '.ajouter-panier', // Fransè
-            '.comprar', // Espanyòl
-            '.comprar', '.adicionar-carrinho', // Pòtigè
-            '#btn-buy', '.btn-buy', '.buy-now',
-            '[class*="buy-button"]', '[class*="buyButton"]',
-            '[class*="purchase"]', '[id*="purchase"]'
-        ];
-        targets.forEach(sel => {
-            document.querySelectorAll(sel).forEach(btn => {
-                if (!btn.dataset.htxInjected && btn.offsetParent !== null) {
-                    const myBtn = document.createElement('button');
-                    myBtn.className = 'htx-btn-injected';
-                    myBtn.innerHTML = '💳 ACHETER EN GOURDES (HATEX)';
-                    myBtn.type = "button";
-                    myBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.htx_add(); };
-                    btn.parentNode.insertBefore(myBtn, btn.nextSibling);
-                    btn.dataset.htxInjected = "true";
+    window.htx_checkout = function() {
+        let name = document.getElementById('htx_name').value;
+        let phone = document.getElementById('htx_phone').value;
+        if (!name || !phone) return alert("Ranpli non ak telefòn ou!");
+        
+        let msg = `*NOUVO LÒD HATEX*%0AClient: ${name}%0ATel: ${phone}%0A---%0A`;
+        window.HTX_CORE.cart.forEach(i => msg += `- ${i.name} (${i.variant}) x${i.qty}%0A`);
+        window.open(`https://wa.me/${window.HTX_CORE.config.whatsapp}?text=${msg}`, '_blank');
+    };
+
+    // ============================================================
+    // AUTO-INJECTION FOOTER LOGIC
+    // ============================================================
+    window.htx_auto_inject = function() {
+        // Detekte si nou sou paj pwodwi
+        if (window.htx_getPrice()) {
+            // Montre footer fiks la
+            document.getElementById('htx-sticky-footer-wrapper').style.display = 'block';
+
+            // Chèche bouton "Add to cart" tèm nan pou mete bouton pa nou an bò kote l
+            const selectors = ['button[name="add"]', '.add-to-cart', '.single_add_to_cart_button', '#add-to-cart', '.wp-block-add-to-cart-form button'];
+            selectors.forEach(s => {
+                let btn = document.querySelector(s);
+                if (btn && !btn.parentNode.querySelector('.htx-btn-injected')) {
+                    let newBtn = document.createElement('button');
+                    newBtn.className = 'htx-btn-injected';
+                    newBtn.innerHTML = "⚡ ACHTE AK HATEX";
+                    newBtn.onclick = (e) => { e.preventDefault(); window.htx_add(); };
+                    btn.parentNode.insertBefore(newBtn, btn.nextSibling);
                 }
             });
-        });
-    }
+        }
+    };
 
-    // Observer pou paj ki chaje kontni dinamikman (SPA, React, Vue, etc.)
-    const observer = new MutationObserver(() => { htx_inject(); });
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    // Tann yon ti moman pou paj la fin chaje anvan injeksyon
-    setTimeout(htx_inject, 500);
-    setTimeout(htx_inject, 1500);
-    setTimeout(htx_inject, 3000);
-    
-    htx_inject();
+    window.onload = window.htx_auto_inject;
     window.htx_sync();
 })();
 </script>
-  `;
-
   const copyToClipboard = () => {
     navigator.clipboard.writeText(fullSDKCode);
     setCopied(true);
