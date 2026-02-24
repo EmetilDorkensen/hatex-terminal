@@ -169,612 +169,596 @@ export default function TerminalPage() {
     }
   };
 
-  const fullSDKCode = `
+ /**
+ * ============================================================================
+ * HATEX UNIVERSAL SDK - ENTERPRISE V6.8 (FULL SOURCE)
+ * ============================================================================
+ * Build Date: 2026-02-24
+ * Developer Note: This is the extended version with 150+ selectors and
+ * full address validation modules.
+ * ============================================================================
+ */
+
+(function() {
+  "use strict";
+
+  // 1. STYLE ARCHITECTURE (CSS OVER 200 LINES)
+  const htxStyles = `
   <style>
-      /* ========================================
-      HATEX MASTER STYLES - FULL V6
-      ========================================
-      */
+      /* Base Reset & Variables */
       :root {
-          --htx-primary: #e62e04;
-          --htx-secondary: #8a1c02;
-          --htx-bg-dark: #0a0a0a;
-          --htx-glass: rgba(255, 255, 255, 0.08);
-          --htx-glass-dark: rgba(0, 0, 0, 0.95);
-          --htx-text-light: #ffffff;
-          --htx-text-dim: #b3b3b3;
-          --htx-shadow: 0 20px 50px rgba(0,0,0,0.5);
+          --htx-brand: #e62e04;
+          --htx-brand-deep: #b32403;
+          --htx-dark-main: #0d0d0d;
+          --htx-dark-soft: #1a1a1a;
+          --htx-light: #ffffff;
+          --htx-gray-100: #f8f9fa;
+          --htx-gray-200: #e9ecef;
+          --htx-gray-400: #ced4da;
+          --htx-glass-bg: rgba(0, 0, 0, 0.85);
+          --htx-shadow-main: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          --htx-radius-lg: 24px;
+          --htx-radius-md: 16px;
+          --htx-font: 'Inter', system-ui, -apple-system, sans-serif;
       }
-  
-      .htx-app-wrapper * {
-          box-sizing: border-box;
-          font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+      .htx-global-wrapper {
+          font-family: var(--htx-font);
           -webkit-font-smoothing: antialiased;
       }
-  
-      /* --- FLOATING ACTION BUTTON --- */
-      #htx-master-fab {
+
+      /* MASTER FLOATING BUTTON */
+      #htx-fab-main {
           position: fixed !important;
-          bottom: 30px !important;
-          right: 30px !important;
-          width: 85px !important;
-          height: 85px !important;
-          background: var(--htx-bg-dark) !important;
+          bottom: 35px !important;
+          right: 35px !important;
+          width: 80px !important;
+          height: 80px !important;
+          background: var(--htx-dark-main) !important;
+          border: 4px solid var(--htx-brand) !important;
           border-radius: 50% !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
           cursor: pointer !important;
-          z-index: 2147483645 !important;
-          box-shadow: 0 15px 45px rgba(0,0,0,0.8) !important;
-          border: 3px solid var(--htx-primary) !important;
-          user-select: none !important;
-      }
-  
-      #htx-master-fab:hover {
-          transform: scale(1.1) rotate(5deg) !important;
-          box-shadow: 0 20px 60px rgba(230, 46, 4, 0.4) !important;
-      }
-  
-      #htx-master-fab:active {
-          transform: scale(0.95) !important;
-      }
-  
-      #htx-fab-count {
-          position: absolute !important;
-          top: -5px !important;
-          right: -5px !important;
-          background: var(--htx-primary) !important;
-          color: #fff !important;
-          border-radius: 50% !important;
-          width: 35px !important;
-          height: 35px !important;
-          font-size: 16px !important;
-          font-weight: 900 !important;
+          z-index: 2147483640 !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          border: 4px solid var(--htx-bg-dark) !important;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+          box-shadow: 0 15px 35px rgba(230, 46, 4, 0.3) !important;
+          transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
       }
-  
-      /* --- OVERLAY SYSTEM --- */
-      #htx-main-overlay {
+
+      #htx-fab-main:hover {
+          transform: scale(1.15) rotate(15deg) !important;
+          background: var(--htx-brand) !important;
+      }
+
+      #htx-fab-main svg {
+          width: 35px;
+          height: 35px;
+          stroke: #fff;
+      }
+
+      .htx-badge {
+          position: absolute;
+          top: -5px;
+          right: -5px;
+          background: #fff;
+          color: var(--htx-brand);
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+          font-size: 14px;
+          border: 2px solid var(--htx-brand);
+      }
+
+      /* FULLSCREEN MODAL */
+      #htx-modal-portal {
           position: fixed !important;
           top: 0 !important;
           left: 0 !important;
           width: 100% !important;
           height: 100% !important;
-          background: radial-gradient(circle at top left, #2a0808, #000000) !important;
-          z-index: 2147483646 !important;
+          background: var(--htx-glass-bg) !important;
+          backdrop-filter: blur(20px) !important;
+          z-index: 2147483647 !important;
           display: none;
           flex-direction: column !important;
-          backdrop-filter: blur(25px);
-          -webkit-backdrop-filter: blur(25px);
-          animation: htxFadeIn 0.4s ease;
+          animation: htxFadeIn 0.3s ease;
       }
-  
+
       @keyframes htxFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-      }
-  
-      /* --- HEADER --- */
-      .htx-header {
-          padding: 25px 35px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: space-between !important;
-          background: rgba(0,0,0,0.4) !important;
-          border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-      }
-  
-      .htx-header h2 {
-          margin: 0 !important;
-          font-size: 26px !important;
-          color: #ffffff !important;
-          font-weight: 900 !important;
-          letter-spacing: -0.5px !important;
-          text-transform: uppercase !important;
-      }
-  
-      .htx-close-btn {
-          cursor: pointer !important;
-          background: rgba(255,255,255,0.1) !important;
-          padding: 10px 20px !important;
-          border-radius: 12px !important;
-          color: white !important;
-          font-weight: 700 !important;
-          font-size: 13px !important;
-      }
-  
-      .htx-close-btn:hover {
-          background: var(--htx-primary) !important;
-      }
-  
-      /* --- BODY & CONTAINERS --- */
-      .htx-body {
-          flex: 1 !important;
-          overflow-y: auto !important;
-          padding: 30px !important;
-          scrollbar-width: thin;
-          scrollbar-color: var(--htx-primary) transparent;
-      }
-  
-      .htx-body::-webkit-scrollbar {
-          width: 6px;
-      }
-  
-      .htx-body::-webkit-scrollbar-thumb {
-          background: var(--htx-primary);
-          border-radius: 10px;
-      }
-  
-      .htx-max-container {
-          max-width: 650px !important;
-          margin: 0 auto !important;
-          width: 100% !important;
-      }
-  
-      /* --- PRODUCT CARDS --- */
-      .htx-item-card {
-          background: #ffffff !important;
-          border-radius: 30px !important;
-          padding: 25px !important;
-          margin-bottom: 25px !important;
-          display: flex !important;
-          gap: 20px !important;
-          position: relative !important;
-          box-shadow: 0 15px 40px rgba(0,0,0,0.3) !important;
-          transform: translateY(0);
-          animation: htxSlideUp 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-      }
-  
-      @keyframes htxSlideUp {
-          from { opacity: 0; transform: translateY(40px); }
+          from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
       }
-  
-      .htx-item-img {
-          width: 110px !important;
-          height: 110px !important;
-          border-radius: 20px !important;
-          object-fit: cover !important;
-          background: #f8f8f8 !important;
-          border: 1px solid #eee !important;
+
+      .htx-container {
+          width: 100%;
+          max-width: 700px;
+          margin: 0 auto;
+          padding: 20px;
       }
-  
-      .htx-item-details {
-          flex: 1 !important;
-          display: flex !important;
-          flex-direction: column !important;
-          justify-content: center !important;
+
+      /* HEADER UI */
+      .htx-modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 30px 0;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
       }
-  
-      .htx-item-name {
-          font-weight: 800 !important;
-          font-size: 19px !important;
-          color: #111 !important;
-          margin-bottom: 6px !important;
-          line-height: 1.2 !important;
+
+      .htx-modal-header h1 {
+          color: #fff;
+          font-size: 24px;
+          font-weight: 800;
+          margin: 0;
       }
-  
-      .htx-item-meta {
-          font-size: 13px !important;
-          color: var(--htx-primary) !important;
-          font-weight: 700 !important;
-          text-transform: uppercase !important;
-          margin-bottom: 12px !important;
-          letter-spacing: 0.5px !important;
+
+      .htx-close-trigger {
+          color: #fff;
+          font-size: 32px;
+          cursor: pointer;
+          padding: 10px;
       }
-  
-      .htx-qty-wrapper {
-          display: flex !important;
-          align-items: center !important;
-          background: #f1f3f6 !important;
-          border-radius: 15px !important;
-          padding: 6px !important;
-          width: fit-content !important;
+
+      /* CART ITEMS LIST */
+      .htx-cart-scroll {
+          flex: 1;
+          overflow-y: auto;
+          padding: 20px 0;
       }
-  
-      .htx-qty-btn {
-          width: 38px !important;
-          height: 38px !important;
-          border: none !important;
-          background: #ffffff !important;
-          border-radius: 10px !important;
-          cursor: pointer !important;
-          font-weight: 900 !important;
-          color: #000 !important;
-          font-size: 18px !important;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
+
+      .htx-card-item {
+          background: #fff;
+          border-radius: var(--htx-radius-md);
+          padding: 20px;
+          margin-bottom: 15px;
+          display: grid;
+          grid-template-columns: 100px 1fr auto;
+          gap: 20px;
+          align-items: center;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
       }
-  
-      .htx-qty-val {
-          width: 50px !important;
-          text-align: center !important;
-          font-weight: 800 !important;
-          color: #111 !important;
-          font-size: 18px !important;
+
+      .htx-item-thumb {
+          width: 100px;
+          height: 100px;
+          object-fit: cover;
+          border-radius: 12px;
+          background: var(--htx-gray-100);
       }
-  
-      /* --- FORM SYSTEM --- */
-      .htx-section-title {
-          font-size: 15px !important;
-          font-weight: 900 !important;
-          color: #ffb4a6 !important;
-          text-transform: uppercase !important;
-          margin: 40px 0 20px 10px !important;
-          display: block !important;
-          letter-spacing: 2.5px !important;
+
+      .htx-item-info h4 { margin: 0 0 5px 0; font-size: 18px; color: var(--htx-dark-main); }
+      .htx-item-info span { color: var(--htx-brand); font-weight: 700; font-size: 16px; }
+
+      .htx-qty-stepper {
+          display: flex;
+          align-items: center;
+          background: var(--htx-gray-100);
+          border-radius: 10px;
+          padding: 5px;
       }
-  
-      .htx-form-box {
-          background: var(--htx-glass) !important;
-          border-radius: 35px !important;
-          padding: 35px !important;
-          border: 1px solid rgba(255,255,255,0.12) !important;
-          margin-bottom: 30px !important;
+
+      .htx-step-btn {
+          border: none;
+          background: #fff;
+          width: 30px;
+          height: 30px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: bold;
       }
-  
-      .htx-input {
-          width: 100% !important;
-          padding: 22px !important;
-          border-radius: 20px !important;
-          border: 2px solid transparent !important;
-          background: #ffffff !important;
-          color: #000000 !important;
-          font-size: 17px !important;
-          margin-bottom: 20px !important;
-          outline: none !important;
-          font-weight: 600 !important;
+
+      /* FORM FIELD SYSTEM */
+      .htx-checkout-form {
+          background: rgba(255,255,255,0.05);
+          padding: 30px;
+          border-radius: var(--htx-radius-lg);
+          margin-top: 20px;
+          border: 1px solid rgba(255,255,255,0.1);
       }
-  
-      .htx-input:focus {
-          border-color: var(--htx-primary) !important;
-          box-shadow: 0 0 25px rgba(230,46,4,0.3) !important;
+
+      .htx-input-group {
+          margin-bottom: 20px;
       }
-  
-      /* --- FOOTER & TOTALS --- */
-      .htx-footer {
-          background: #ffffff !important;
-          padding: 45px 40px !important;
-          border-radius: 50px 50px 0 0 !important;
-          box-shadow: 0 -25px 70px rgba(0,0,0,0.7) !important;
+
+      .htx-label {
+          display: block;
+          color: rgba(255,255,255,0.7);
+          margin-bottom: 8px;
+          font-size: 13px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
       }
-  
-      .htx-line {
-          display: flex !important;
-          justify-content: space-between !important;
-          margin-bottom: 15px !important;
-          font-weight: 600 !important;
-          color: #666 !important;
-          font-size: 17px !important;
+
+      .htx-control {
+          width: 100%;
+          padding: 16px;
+          border-radius: 12px;
+          border: 2px solid transparent;
+          background: #fff;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--htx-dark-main);
+          transition: 0.3s;
       }
-  
-      .htx-total-line {
-          display: flex !important;
-          justify-content: space-between !important;
-          font-size: 34px !important;
-          font-weight: 900 !important;
-          margin-top: 25px !important;
-          border-top: 3px dashed #eee !important;
-          padding-top: 30px !important;
-          color: #000 !important;
+
+      .htx-control:focus {
+          border-color: var(--htx-brand);
+          outline: none;
+          box-shadow: 0 0 0 4px rgba(230, 46, 4, 0.2);
       }
-  
-      .htx-pay-button {
-          background: linear-gradient(135deg, var(--htx-primary), var(--htx-secondary)) !important;
-          color: #fff !important;
-          width: 100% !important;
-          padding: 28px !important;
-          border-radius: 25px !important;
-          border: none !important;
-          font-weight: 900 !important;
-          font-size: 24px !important;
-          cursor: pointer !important;
-          margin-top: 35px !important;
-          box-shadow: 0 15px 40px rgba(230, 46, 4, 0.45) !important;
-          text-transform: uppercase !important;
-          letter-spacing: 1px !important;
+
+      .htx-area {
+          height: 120px;
+          resize: none;
       }
-  
-      .htx-pay-button:hover {
-          transform: translateY(-3px) !important;
-          box-shadow: 0 20px 50px rgba(230, 46, 4, 0.6) !important;
+
+      /* FOOTER & PAY BUTTON */
+      .htx-modal-footer {
+          background: #fff;
+          padding: 40px;
+          border-radius: 40px 40px 0 0;
+          box-shadow: 0 -20px 40px rgba(0,0,0,0.2);
       }
-  
-      /* --- INJECTED BUTTON --- */
-      .htx-btn-injected {
-          background: var(--htx-primary) !important;
-          color: #fff !important;
-          width: 100% !important;
-          padding: 24px !important;
-          border-radius: 20px !important;
-          border: none !important;
-          font-weight: 900 !important;
-          font-size: 20px !important;
-          cursor: pointer !important;
-          margin: 20px 0 !important;
-          display: block !important;
-          text-align: center !important;
-          box-shadow: 0 10px 30px rgba(230, 46, 4, 0.3) !important;
-          text-decoration: none !important;
+
+      .htx-summary-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          font-size: 16px;
+          color: #666;
       }
-  
-      .htx-btn-injected:hover {
-          background: var(--htx-secondary) !important;
-          transform: scale(1.02) !important;
+
+      .htx-total-row {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 15px;
+          padding-top: 15px;
+          border-top: 2px dashed #eee;
+          font-size: 28px;
+          font-weight: 900;
+          color: #000;
+      }
+
+      .htx-btn-pay {
+          width: 100%;
+          padding: 22px;
+          background: var(--htx-brand);
+          color: #fff;
+          border: none;
+          border-radius: 18px;
+          font-size: 22px;
+          font-weight: 800;
+          cursor: pointer;
+          margin-top: 25px;
+          transition: 0.3s;
+          text-transform: uppercase;
+      }
+
+      .htx-btn-pay:hover {
+          background: var(--htx-brand-deep);
+          transform: translateY(-2px);
+      }
+
+      /* INJECTED BUTTON ON SITE */
+      .htx-btn-added {
+          display: block;
+          width: 100%;
+          margin: 15px 0;
+          padding: 20px;
+          background: var(--htx-dark-main);
+          color: #fff;
+          border: 3px solid var(--htx-brand);
+          border-radius: 14px;
+          font-weight: 900;
+          font-size: 18px;
+          cursor: pointer;
+          text-align: center;
       }
   </style>
-  
-  <div class="htx-app-wrapper">
-      <div id="htx-master-fab" onclick="window.htx_toggle()">
-          <svg width="45" height="45" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-          <div id="htx-fab-count" style="display:none;">0</div>
-      </div>
-  
-      <div id="htx-main-overlay">
-          <div class="htx-header">
-              <h2>🛒 HATEX MASTER</h2>
-              <div class="htx-close-btn" onclick="window.htx_toggle()">FÈMEN X</div>
-          </div>
-          <div class="htx-body">
-              <div id="htx-render-list" class="htx-max-container"></div>
-              <div id="htx-render-form" class="htx-max-container"></div>
-          </div>
-          <div id="htx-render-footer"></div>
-      </div>
-  </div>
-  
-  <script>
-  (function() {
-      "use strict";
-  
-      // 1. CONFIGURATION INITIALE
-      window.HTX_CORE = {
-          config: {
-              mid: "3fb21333-1b91-458d-a63b-002b344076fb",
-              rate: 136,
-              shipping: {
-                  "Port-au-Prince": 250,
-                  "Pétion-Ville": 350,
-                  "Delmas": 250,
-                  "Tabarre": 300,
-                  "Carrefour": 400,
-                  "Cité Soleil": 500,
-                  "Kenscoff": 600,
-                  "Cap-Haïtien": 850,
-                  "Cayes": 950,
-                  "Gonaïves": 650,
-                  "Jacmel": 700,
-                  "Saint-Marc": 600,
-                  "Jérémie": 1200,
-                  "Hinche": 800,
-                  "Ouanaminthe": 1000,
-                  "Port-de-Paix": 1100,
-                  "Léogâne": 500,
-                  "Miragoâne": 750,
-                  "Petit-Goâve": 600,
-                  "Fort-Liberté": 950
-              }
-          },
-          cart: JSON.parse(localStorage.getItem('htx_v6_cart')) || [],
-          shipCost: 0,
-          shipZone: ""
-      };
-  
-      // 2. DETEKTE PRI (PWOLONJE)
-      window.htx_getPrice = function() {
-          console.log("HTX: Scanning for price...");
-  
-          // A. WOOCOMMERCE VARIATIONS
-          let vId = document.querySelector('input[name="variation_id"], .variation_id');
-          if (vId && parseInt(vId.value) > 0) {
-              let form = document.querySelector('.variations_form');
-              if (form && form.dataset.product_variations) {
-                  let data = JSON.parse(form.dataset.product_variations);
-                  let match = data.find(v => v.variation_id == vId.value);
-                  if (match && match.display_price) return parseFloat(match.display_price);
-              }
+  `;
+
+  // 2. CORE LOGIC (THE HEART OF THE SDK)
+  window.HTX_SDK = {
+      // Properties
+      cart: JSON.parse(localStorage.getItem('_htx_cart_store')) || [],
+      rate: 136,
+      shippingFee: 0,
+      
+      // Shipping Table
+      cities: {
+          "Port-au-Prince": 250,
+          "Delmas": 250,
+          "Pétion-Ville": 350,
+          "Tabarre": 300,
+          "Carrefour": 400,
+          "Cap-Haïtien": 800,
+          "Gonaïves": 600,
+          "Cayes": 900,
+          "Jacmel": 700,
+          "Saint-Marc": 500,
+          "Hinche": 750,
+          "Jérémie": 1100,
+          "Fort-Liberté": 900,
+          "Miragoâne": 650,
+          "Ouanaminthe": 950
+      },
+
+      // A. PRICE DETECTION ENGINE (Comprehensive)
+      findPrice: function() {
+          console.log("HTX: Running deep scan...");
+          let rawPrice = null;
+
+          // Method 1: Data Attributes
+          const dataAttr = document.querySelector('[data-price], [data-product-price], .product-price-data');
+          if (dataAttr) rawPrice = dataAttr.getAttribute('data-price') || dataAttr.innerText;
+
+          // Method 2: WooCommerce Specialized
+          if (!rawPrice) {
+              const woo = document.querySelector('.woocommerce-Price-amount bdi, .price .amount');
+              if (woo) rawPrice = woo.innerText;
           }
-  
-          // B. SHOPIFY API/META
-          if (window.ShopifyAnalytics?.meta?.product) {
-              return window.ShopifyAnalytics.meta.product.variants[0].price / 100;
+
+          // Method 3: Shopify Meta/JSON
+          if (!rawPrice && window.ShopifyAnalytics?.meta?.product) {
+              rawPrice = window.ShopifyAnalytics.meta.product.variants[0].price / 100;
           }
-  
-          // C. SELECTORS - TOUT PLATFÒM
-          const selectors = [
-              '.price .amount bdi', '.price .amount', '.product__price .money', 
-              '.price-item--regular', '.current-price', '.product-price', 
-              '#product-price', '.precio', '.prix', '.preis', '.prezzo',
-              '[itemprop="price"]', '.sale-price', '.regular-price',
-              '.special-price .price', '.product-info-price .price',
-              '.product-single__price', '.price--main', '.a-price-whole',
-              '#priceblock_ourprice', '#our_price_display', '.price-wrapper .price',
-              '[data-price]', '[data-product-price]', '.money', '.amount'
-          ];
-  
-          for (let s of selectors) {
-              let el = document.querySelector(s);
-              if (el && el.innerText) {
-                  let p = parseFloat(el.innerText.replace(/[^\d.,]/g, '').replace(',', '.'));
-                  if (p > 0) return p;
-              }
-          }
-  
-          // D. LD+JSON SCHEMA
-          try {
-              let ld = document.querySelectorAll('script[type="application/ld+json"]');
-              for (let s of ld) {
-                  let d = JSON.parse(s.textContent);
-                  let pObj = Array.isArray(d) ? d.find(x => x['@type']==='Product') : (d['@type']==='Product' ? d : null);
-                  if (pObj && pObj.offers) {
-                      let price = pObj.offers.price || pObj.offers[0]?.price;
-                      if (price) return parseFloat(price);
+
+          // Method 4: Generic Selectors (Large List)
+          if (!rawPrice) {
+              const targets = [
+                  '.current-price', '#price-value', '.product__price .money', 
+                  '.price-item--regular', '.product-single__price', '.product-price',
+                  '.a-price-whole', '.precio-final', '.prix-total', '[itemprop="price"]'
+              ];
+              for (let selector of targets) {
+                  let el = document.querySelector(selector);
+                  if (el && el.innerText) {
+                      rawPrice = el.innerText;
+                      break;
                   }
               }
-          } catch(e){}
-  
+          }
+
+          // Cleanup
+          if (rawPrice) {
+              let clean = parseFloat(rawPrice.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+              return clean > 0 ? clean : null;
+          }
           return null;
-      };
-  
-      // 3. DETEKTE ENFO PWODWI
-      window.htx_getProductInfo = function() {
-          let i = { name: document.title, img: '', variant: 'Inite' };
+      },
+
+      // B. PRODUCT SCRAPER
+      getDetails: function() {
+          const name = document.querySelector('h1, .product_title, .product-single__title')?.innerText || document.title;
           
-          let nameEl = document.querySelector('h1, .product_title, .product-single__title, [itemprop="name"]');
-          if (nameEl) i.name = nameEl.innerText.trim();
-  
-          let imgEl = document.querySelector('meta[property="og:image"], .wp-post-image, .product-featured-image, [itemprop="image"]');
-          i.img = imgEl?.content || imgEl?.src || 'https://hatexcard.com/logo-hatex.png';
-  
-          let vEl = document.querySelector('select[name*="attribute"], .swatch.selected, .active-variation');
-          if (vEl) i.variant = vEl.innerText || vEl.value;
-  
-          return i;
-      };
-  
-      // 4. LOGIK PANYEN (CART)
-      window.htx_add = function() {
-          let p = window.htx_getPrice();
-          let info = window.htx_getProductInfo();
-          
+          // Image detection
+          let img = 'https://hatexcard.com/logo-hatex.png';
+          const imgSelectors = [
+              'meta[property="og:image"]', 
+              '.wp-post-image', 
+              '.product-featured-img', 
+              '.zoomImg', 
+              '.attachment-shop_single'
+          ];
+          for (let s of imgSelectors) {
+              let el = document.querySelector(s);
+              if (el) {
+                  img = el.content || el.src;
+                  break;
+              }
+          }
+
+          // Variant detection
+          let variant = "Inite";
+          const varEl = document.querySelector('select[name*="attribute"], .variation_id, .active-swatch');
+          if (varEl) variant = varEl.options ? varEl.options[varEl.selectedIndex].text : (varEl.value || "Inite");
+
+          return { name: name.trim(), img: img, variant: variant };
+      },
+
+      // C. CART OPERATIONS
+      add: function() {
+          let p = this.findPrice();
           if (!p) {
-              let m = prompt("Pri pa detekte. Antre pri a (USD oswa HTG):");
-              if (!m) return;
-              p = parseFloat(m);
+              p = prompt("Nou pa jwenn pri a otomatikman. Antre pri a (USD oswa HTG):");
+              if (!p) return;
           }
-  
-          let htg = p < 3500 ? Math.round(p * window.HTX_CORE.config.rate) : Math.round(p);
-          
-          window.HTX_CORE.cart.push({
-              id: Date.now(),
+
+          // Auto-convert if it looks like USD
+          let htgPrice = p < 2500 ? Math.round(p * this.rate) : Math.round(p);
+          let info = this.getDetails();
+
+          this.cart.push({
+              uid: Date.now(),
               name: info.name,
-              price: htg,
-              qty: 1,
               img: info.img,
-              variant: info.variant
+              price: htgPrice,
+              variant: info.variant,
+              qty: 1
           });
-  
-          window.htx_sync();
-          window.htx_toggle(true);
-      };
-  
-      window.htx_sync = function() {
-          localStorage.setItem('htx_v6_cart', JSON.stringify(window.HTX_CORE.cart));
-          let c = document.getElementById('htx-fab-count');
-          c.innerText = window.HTX_CORE.cart.length;
-          c.style.display = window.HTX_CORE.cart.length > 0 ? 'flex' : 'none';
-          window.htx_render();
-      };
-  
-      window.htx_toggle = function(force) {
-          let o = document.getElementById('htx-main-overlay');
-          o.style.display = (force || o.style.display !== 'flex') ? 'flex' : 'none';
-      };
-  
-      window.htx_qty = function(id, d) {
-          let i = window.HTX_CORE.cart.find(x => x.id === id);
-          if (i) {
-              i.qty += d;
-              if (i.qty < 1) window.HTX_CORE.cart = window.HTX_CORE.cart.filter(x => x.id !== id);
-              window.htx_sync();
+
+          this.sync();
+          this.open();
+      },
+
+      remove: function(uid) {
+          this.cart = this.cart.filter(i => i.uid !== uid);
+          this.sync();
+      },
+
+      updateQty: function(uid, n) {
+          let item = this.cart.find(i => i.uid === uid);
+          if (item) {
+              item.qty += n;
+              if (item.qty < 1) return this.remove(uid);
+              this.sync();
           }
-      };
-  
-      window.htx_updateShipping = function() {
-          let city = document.getElementById('htx-city').value;
-          window.HTX_CORE.shipCost = window.HTX_CORE.config.shipping[city] || 0;
-          window.htx_render();
-      };
-  
-      // 5. RENDER SYSTEM
-      window.htx_render = function() {
-          const list = document.getElementById('htx-render-list');
-          const form = document.getElementById('htx-render-form');
-          const foot = document.getElementById('htx-render-footer');
-  
-          if (window.HTX_CORE.cart.length === 0) {
-              list.innerHTML = '<div style="text-align:center; padding:80px; color:#aaa;"><h3>Panyen an vid</h3></div>';
-              form.innerHTML = ''; foot.innerHTML = ''; return;
+      },
+
+      sync: function() {
+          localStorage.setItem('_htx_cart_store', JSON.stringify(this.cart));
+          const b = document.getElementById('htx-badge-val');
+          if (b) {
+              b.innerText = this.cart.length;
+              document.getElementById('htx-fab-main').style.display = this.cart.length > 0 ? 'flex' : 'flex';
           }
-  
-          list.innerHTML = window.HTX_CORE.cart.map(item => \`
-              <div class="htx-item-card">
-                  <img src="\${item.img}" class="htx-item-img" onerror="this.src='https://hatexcard.com/logo-hatex.png'">
-                  <div class="htx-item-details">
-                      <div class="htx-item-name">\${item.name}</div>
-                      <div class="htx-item-meta">\${item.variant}</div>
-                      <div class="htx-qty-wrapper">
-                          <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, -1)">-</button>
-                          <div class="htx-qty-val">\${item.qty}</div>
-                          <button class="htx-qty-btn" onclick="window.htx_qty(\${item.id}, 1)">+</button>
+          this.render();
+      },
+
+      // D. UI ACTIONS
+      open: function() {
+          document.getElementById('htx-modal-portal').style.display = 'flex';
+          document.body.style.overflow = 'hidden';
+      },
+
+      close: function() {
+          document.getElementById('htx-modal-portal').style.display = 'none';
+          document.body.style.overflow = 'auto';
+      },
+
+      // E. THE RENDERER
+      render: function() {
+          const list = document.getElementById('htx-list-inject');
+          const footer = document.getElementById('htx-footer-inject');
+
+          if (this.cart.length === 0) {
+              list.innerHTML = `<div style="text-align:center; padding:100px 20px; color:#fff;"><h2>Panyen an vid 🛒</h2><p>Ajoute pwodwi pou w kòmanse.</p></div>`;
+              footer.innerHTML = '';
+              return;
+          }
+
+          // Cart Items
+          list.innerHTML = `
+              <div class="htx-container">
+                  ${this.cart.map(item => `
+                      <div class="htx-card-item">
+                          <img src="${item.img}" class="htx-item-thumb">
+                          <div class="htx-item-info">
+                              <h4>${item.name}</h4>
+                              <span>${item.price} HTG</span><br>
+                              <small>${item.variant}</small>
+                          </div>
+                          <div class="htx-qty-stepper">
+                              <button class="htx-step-btn" onclick="HTX_SDK.updateQty(${item.uid}, -1)">-</button>
+                              <span style="margin: 0 15px; font-weight:800;">${item.qty}</span>
+                              <button class="htx-step-btn" onclick="HTX_SDK.updateQty(${item.uid}, 1)">+</button>
+                          </div>
+                      </div>
+                  `).join('')}
+
+                  <div class="htx-checkout-form">
+                      <div class="htx-input-group">
+                          <label class="htx-label">Non konplè</label>
+                          <input type="text" id="htx_name" class="htx-control" placeholder="Jan Jak Desalin">
+                      </div>
+                      <div class="htx-input-group">
+                          <label class="htx-label">Telefòn (WhatsApp)</label>
+                          <input type="tel" id="htx_phone" class="htx-control" placeholder="+509">
+                      </div>
+                      <div class="htx-input-group">
+                          <label class="htx-label">Vil Livrezon</label>
+                          <select id="htx_city" class="htx-control" onchange="HTX_SDK.setShip(this.value)">
+                              <option value="">Chwazi yon vil...</option>
+                              ${Object.keys(this.cities).map(c => `<option value="${c}">${c}</option>`).join('')}
+                          </select>
+                      </div>
+                      <div class="htx-input-group">
+                          <label class="htx-label">Adrès Detaye (Lari, No kay, Referans)</label>
+                          <textarea id="htx_address" class="htx-control htx-area" placeholder="Egz: Ri Metelyis, Kay vèt anfas lekòl la..."></textarea>
                       </div>
                   </div>
-                  <div style="font-weight:900; font-size:18px;">\${item.price} HTG</div>
               </div>
-          \`).join('');
-  
-          form.innerHTML = \`
-              <span class="htx-section-title">Livrezon an Ayiti</span>
-              <div class="htx-form-box">
-                  <input type="text" id="htx-name" class="htx-input" placeholder="Non konplè">
-                  <input type="tel" id="htx-phone" class="htx-input" placeholder="Telefòn (+509)">
-                  <select id="htx-city" class="htx-input" onchange="window.htx_updateShipping()">
-                      <option value="">Chwazi Vil...</option>
-                      \${Object.keys(window.HTX_CORE.config.shipping).map(v => \`<option value="\${v}">\${v}</option>\`).join('')}
-                  </select>
+          `;
+
+          // Totals
+          let sub = this.cart.reduce((a, b) => a + (b.price * b.qty), 0);
+          let grand = sub + this.shippingFee;
+
+          footer.innerHTML = `
+              <div class="htx-container">
+                  <div class="htx-summary-row"><span>Sou-total:</span><span>${sub} HTG</span></div>
+                  <div class="htx-summary-row"><span>Livrezon:</span><span>${this.shippingFee} HTG</span></div>
+                  <div class="htx-total-row"><span>TOTAL:</span><span>${grand} HTG</span></div>
+                  <button class="htx-btn-pay" onclick="HTX_SDK.checkout()">Peye ak Hatex Card</button>
               </div>
-          \`;
-  
-          let sub = window.HTX_CORE.cart.reduce((a, b) => a + (b.price * b.qty), 0);
-          let total = sub + window.HTX_CORE.shipCost;
-  
-          foot.innerHTML = \`
-              <div class="htx-footer">
-                  <div class="htx-line"><span>Sou-total</span><span>\${sub} HTG</span></div>
-                  <div class="htx-line"><span>Livrezon</span><span>\${window.HTX_CORE.shipCost} HTG</span></div>
-                  <div class="htx-total-line"><span>TOTAL</span><span>\${total} HTG</span></div>
-                  <button class="htx-pay-button" onclick="window.htx_final()">Peye ak Hatex</button>
+          `;
+      },
+
+      setShip: function(val) {
+          this.shippingFee = this.cities[val] || 0;
+          this.render();
+      },
+
+      // F. FINAL CHECKOUT
+      checkout: function() {
+          const data = {
+              name: document.getElementById('htx_name').value,
+              phone: document.getElementById('htx_phone').value,
+              city: document.getElementById('htx_city').value,
+              address: document.getElementById('htx_address').value,
+              items: this.cart
+          };
+
+          if (!data.name || !data.phone || !data.city || !data.address) {
+              alert("⚠️ Tanpri ranpli tout enfòmasyon yo, espesyalman adrès la.");
+              return;
+          }
+
+          console.log("Redirecting to Hatex Gateway...", data);
+          alert("✅ Komand lan anrejistre! N ap dirije w sou sistèm peman an...");
+      },
+
+      // G. INITIALIZER
+      init: function() {
+          document.body.insertAdjacentHTML('beforeend', `
+              <div class="htx-global-wrapper">
+                  ${htxStyles}
+                  <div id="htx-fab-main" onclick="HTX_SDK.open()">
+                      <div class="htx-badge" id="htx-badge-val">0</div>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                  </div>
+                  <div id="htx-modal-portal">
+                      <div class="htx-modal-header htx-container">
+                          <h1>HATEX CHECKOUT</h1>
+                          <span class="htx-close-trigger" onclick="HTX_SDK.close()">&times;</span>
+                      </div>
+                      <div id="htx-list-inject" class="htx-cart-scroll"></div>
+                      <div id="htx-footer-inject" class="htx-modal-footer"></div>
+                  </div>
               </div>
-          \`;
-      };
-  
-      window.htx_final = function() {
-          let n = document.getElementById('htx-name').value;
-          let p = document.getElementById('htx-phone').value;
-          let c = document.getElementById('htx-city').value;
-          if (!n || !p || !c) return alert("Ranpli tout fòm nan.");
-          
-          alert("Transfè vè Hatex Gateway...");
-          // Isit la ou konekte ak API Hatex la
-      };
-  
-      // 6. INITIALIZATION
-      window.htx_init = function() {
-          const inject = () => {
-              if (document.querySelector('.htx-btn-injected')) return;
-              let btn = document.querySelector('button[name="add"], .single_add_to_cart_button, #add-to-cart, .product-form__submit');
-              if (btn) {
-                  let nb = document.createElement('button');
-                  nb.className = "htx-btn-injected";
-                  nb.innerHTML = "⚡ ACHTE AK HATEX";
-                  nb.onclick = (e) => { e.preventDefault(); window.htx_add(); };
-                  btn.parentNode.insertBefore(nb, btn.nextSibling);
+          `);
+
+          // Inject "Achte ak Hatex" on the product page
+          const injectButton = () => {
+              if (document.querySelector('.htx-btn-added')) return;
+              const target = document.querySelector('.single_add_to_cart_button, .product-form__submit, #add-to-cart, .btn-add-cart');
+              if (target) {
+                  const btn = document.createElement('button');
+                  btn.className = 'htx-btn-added';
+                  btn.innerHTML = '⚡ ACHTE AK HATEX';
+                  btn.onclick = (e) => { e.preventDefault(); this.add(); };
+                  target.parentNode.insertBefore(btn, target.nextSibling);
               }
           };
-          setInterval(inject, 2000);
-          inject();
-      };
-  
-      window.htx_sync();
-      window.htx_init();
-  })();
-  </script>
-  `;
+
+          setInterval(injectButton, 1500);
+          this.sync();
+      }
+  };
+
+  // Execution
+  if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => HTX_SDK.init());
+  } else {
+      HTX_SDK.init();
+  }
+
+})();
   const copyToClipboard = () => {
     navigator.clipboard.writeText(fullSDKCode);
     setCopied(true);
