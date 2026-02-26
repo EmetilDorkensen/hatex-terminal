@@ -150,14 +150,6 @@ export default function TerminalPage() {
     catch (err: any) { alert(err.message); } finally { setUploadingPdf(false); }
   };
 
-  // ════════════════════════════════════════════════════════════════════
-  //  HATEX AI SDK v10.0 — UNIVERSAL INTELLIGENT CART ENGINE
-  //  • Enjeksyon OTOMATIK anba bouton "Add to Cart" sou nenpòt theme
-  //  • AI pran: non, foto pwodwi, foto varyant, koule, tay, pri
-  //  • Konvèsyon entèlijan USD→HTG (taux 136) sèlman si site an dola
-  //  • Panyen konplè ak imaj reyèl, kantite, variant, total
-  //  • Checkout voye tout done bay paj chekout la (50+ pwodwi)
-  // ════════════════════════════════════════════════════════════════════
   const fullSDKCode = `<!-- ============================================================
   HATEX AI SDK v10.0 — Kole sa a nan FOOTER sit ou (avan </body>)
   Sipòte: WooCommerce · Shopify · Magento · PrestaShop · Custom
@@ -694,6 +686,9 @@ var LISTING = {
   ],
 
   inject: function() {
+    // ✅ PA ENJEKTE SI NOU NAN PANYEN AN
+    if (window.location.href.includes('/cart') || window.location.href.includes('/panier')) return;
+    
     var found = false;
     for (var ci = 0; ci < this.CARD_SELS.length; ci++) {
       var cards = document.querySelectorAll(this.CARD_SELS[ci]);
@@ -791,6 +786,9 @@ var DETAIL = {
   ],
 
   inject: function() {
+    // ✅ PA ENJEKTE SI NOU NAN PANYEN AN
+    if (window.location.href.includes('/cart') || window.location.href.includes('/panier')) return;
+    
     this.BTN_SELS.forEach(function(sel) {
       document.querySelectorAll(sel).forEach(function(btn) {
         if (btn.dataset.htxOk || btn.classList.contains('htx-ibtn')) return;
