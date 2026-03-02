@@ -1,179 +1,165 @@
-"use client";
-import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
-import { Lock, ShieldCheck, CreditCard, CheckCircle2, Building2, AlertTriangle } from 'lucide-react';
+'use client';
 
-export default function SecurePayPage() {
-  const { id } = useParams(); // Nou pran sèlman ID a nan URL la
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export default function PayPage() {
+  const { id } = useParams();
+  const [payment, setPayment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [invoice, setInvoice] = useState<any>(null);
-  const [form, setForm] = useState({ card: '', expiry: '', cvv: '' });
-  const [msg, setMsg] = useState({ type: '', text: '' });
+  const [formData, setFormData] = useState({
+    cardNumber: '',
+    expiry: '',
+    cvc: '',
+    name: ''
+  });
 
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
-
-  // 1. CHACHE DONE YO NAN BAZ DONE A (SEKIRITE)
   useEffect(() => {
-    const fetchInvoice = async () => {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*, profiles:owner_id(business_name, kyc_status)')
-        .eq('id', id)
-        .single();
+    loadPayment();
+  }, [id]);
 
-      if (error || !data) {
-        setMsg({ type: 'error', text: 'Fakti sa a pa egziste oswa li ekspire.' });
-      } else {
-        setInvoice(data);
-      }
-      setLoading(false);
-    };
-    fetchInvoice();
-  }, [id, supabase]);
+  const loadPayment = async () => {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*, merchants(*)')
+      .eq('id', id)
+      .single();
 
-  // 2. EKSEKITE PEMAN AN (KREDITE WALLET LA OTO)
-  const handlePayment = async (e: React.FormEvent) => {
+    if (error) {
+      console.error('Error loading payment:', error);
+      return;
+    }
+
+    setPayment(data);
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
-    setMsg({ type: '', text: '' });
 
     try {
-      // Nou rele RPC nou te kreye a ki jere kòb la nan backend la
-      const { data, error } = await supabase.rpc('process_invoice_payment', {
-        p_invoice_id: id,
-        p_card_number: form.card.replace(/\s/g, ''),
-        p_card_cvv: form.cvv,
-        p_card_expiry: form.expiry
+      // 1. Verifye peman an (simile - nan reyalite ou ta voye bay yon processeur)
+      const response = await fetch('/api/payments/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentId: id,
+          cardData: formData // Nan reyalite, pa ta dwe voye sa dirèkteman!
+        })
       });
 
-      if (error) throw error;
+      const data = await response.json();
 
       if (data.success) {
-        setMsg({ type: 'success', text: 'Peman Resevwa! Balans machann nan mete ajou.' });
-        setInvoice({ ...invoice, status: 'paid' }); // Mizajou UI a
+        // 2. Redireksyon an
+        window.location.href = payment.return_url;
       } else {
-        setMsg({ type: 'error', text: data.message });
+        alert('Peman an echwe. Tanpri rekòmanse.');
       }
-    } catch (err: any) {
-      setMsg({ type: 'error', text: 'Echèk tranzaksyon. Verifikasyon nesesè.' });
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Yon erè te rive. Tanpri rekòmanse.');
     } finally {
       setProcessing(false);
     }
   };
 
-  if (loading) return (
-    <div className="h-screen bg-black flex flex-col items-center justify-center gap-4">
-      <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-zinc-500 font-black text-[10px] tracking-[0.3em] uppercase">Hatex Secure Encryption...</p>
-    </div>
-  );
+  if (loading) return <div className="text-center p-8">Chajman...</div>;
+  if (!payment) return <div className="text-center p-8">Peman pa jwenn</div>;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-6 flex flex-col items-center justify-center italic">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
+        <h1 className="text-2xl font-bold mb-2">Peye ak HatexCard</h1>
         
-        {/* HEADER BIZNIS */}
-        <div className="text-center mb-8 space-y-3">
-          <div className="w-16 h-16 bg-gradient-to-tr from-red-600 to-red-400 rounded-3xl mx-auto flex items-center justify-center shadow-2xl shadow-red-600/20">
-            <Building2 size={32} />
-          </div>
+        <div className="mb-6 p-4 bg-gray-50 rounded">
+          <p className="text-sm text-gray-600">Machann:</p>
+          <p className="font-bold">{payment.merchants?.business_name || 'Machann'}</p>
+          <p className="text-2xl font-bold text-red-600 mt-2">
+            {payment.amount.toLocaleString()} {payment.currency}
+          </p>
+          <p className="text-sm text-gray-600 mt-1">{payment.description}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <h2 className="text-2xl font-black uppercase tracking-tight">{invoice?.profiles?.business_name || 'Hatex Merchant'}</h2>
-            {invoice?.profiles?.kyc_status === 'approved' && (
-              <span className="text-[9px] bg-green-500/10 text-green-500 border border-green-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
-                Business Verified
-              </span>
-            )}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Non sou kat la
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
           </div>
-        </div>
 
-        {/* BOX PEMAN AN */}
-        <div className="bg-[#0c0d15] border border-white/5 rounded-[2.5rem] p-8 shadow-3xl relative overflow-hidden">
-          
-          {invoice?.status === 'paid' ? (
-            <div className="py-12 text-center space-y-6 animate-in zoom-in-75 duration-500">
-               <div className="w-20 h-20 bg-green-500 rounded-full mx-auto flex items-center justify-center">
-                  <CheckCircle2 size={40} className="text-black" />
-               </div>
-               <div>
-                  <h3 className="text-3xl font-black uppercase italic">Peye ak Siksè</h3>
-                  <p className="text-zinc-500 text-sm mt-2">Mèsi! Tranzaksyon an konfime.</p>
-               </div>
-               <button onClick={() => window.print()} className="w-full bg-white/5 border border-white/10 py-4 rounded-2xl font-bold uppercase text-xs">Telechaje Resi</button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nimewo kat
+            </label>
+            <input
+              type="text"
+              required
+              maxLength={19}
+              placeholder="1234 5678 9012 3456"
+              value={formData.cardNumber}
+              onChange={(e) => setFormData({...formData, cardNumber: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ekspirasyon (MM/YY)
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="MM/YY"
+                maxLength={5}
+                value={formData.expiry}
+                onChange={(e) => setFormData({...formData, expiry: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
             </div>
-          ) : (
-            <form onSubmit={handlePayment} className="space-y-8">
-              {/* MONTAN KI BLOKE (Kliyan paka chanje l) */}
-              <div className="text-center border-b border-white/5 pb-8">
-                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">Montant à payer</p>
-                <div className="flex items-center justify-center gap-2">
-                   <span className="text-6xl font-black tracking-tighter tabular-nums">{Number(invoice?.amount).toLocaleString()}</span>
-                   <span className="text-2xl font-bold text-red-600 italic">HTG</span>
-                </div>
-              </div>
-
-              {/* FÒM KAT LA */}
-              <div className="space-y-5">
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Numéro de Carte Hatex</label>
-                    <div className="relative">
-                       <input 
-                         required 
-                         placeholder="0000 0000 0000 0000"
-                         className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-red-600 transition-all font-mono text-lg"
-                         onChange={e => setForm({...form, card: e.target.value})}
-                       />
-                       <CreditCard className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-700" size={20} />
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                    <input 
-                      required placeholder="MM/YY" maxLength={5}
-                      className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-red-600 text-center font-mono"
-                      onChange={e => setForm({...form, expiry: e.target.value})}
-                    />
-                    <input 
-                      required type="password" placeholder="CVV" maxLength={3}
-                      className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-red-600 text-center font-mono"
-                      onChange={e => setForm({...form, cvv: e.target.value})}
-                    />
-                 </div>
-              </div>
-
-              <button 
-                disabled={processing}
-                className="w-full bg-red-600 hover:bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-red-600/30 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {processing ? "Traitement..." : "Confirmer le Paiement"}
-              </button>
-            </form>
-          )}
-
-          {msg.text && (
-            <div className={`mt-6 p-4 rounded-2xl flex items-center gap-3 border ${msg.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-green-500/10 border-green-500/20 text-green-500'}`}>
-               <AlertTriangle size={18} />
-               <p className="text-[10px] font-black uppercase">{msg.text}</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                CVC
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={4}
+                value={formData.cvc}
+                onChange={(e) => setFormData({...formData, cvc: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* FOOTER SEKIRITE */}
-        <div className="mt-8 flex flex-col items-center gap-4 opacity-30">
-           <div className="flex items-center gap-2">
-              <ShieldCheck size={14} />
-              <p className="text-[9px] font-black uppercase tracking-[0.3em]">Hatex Payment Gateway</p>
-           </div>
-           <p className="text-[8px] text-center uppercase tracking-widest leading-loose">
-              Tranzaksyon sa a chifre ak AES-256. <br/> Pa pataje kòd sekirite ou ak pèsonn.
-           </p>
-        </div>
+          <button
+            type="submit"
+            disabled={processing}
+            className="w-full bg-red-600 text-white py-3 rounded font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {processing ? 'Ap trete...' : 'Peye kounye a'}
+          </button>
 
+          <p className="text-xs text-gray-500 text-center mt-4">
+            🔒 Peman an sekirize pa HatexCard. Nou pa janm estoke enfòmasyon kat ou.
+          </p>
+        </form>
       </div>
     </div>
   );
