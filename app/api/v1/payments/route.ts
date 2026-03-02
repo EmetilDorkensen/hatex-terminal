@@ -1,66 +1,78 @@
-import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const authHeader = request.headers.get('Authorization');
-  const token = authHeader?.split(' ')[1];
+  try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name: string, value: string, options: any) {
+            cookieStore.set(name, value, options);
+          },
+          remove(name: string, options: any) {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          },
+        },
+      }
+    );
 
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const body = await request.json();
+    const { merchantId, amount, currency, description, metadata, returnUrl } = body;
+
+    if (!merchantId || !amount) {
+      return NextResponse.json({ error: 'Done enkonplè' }, { status: 400 });
+    }
+
+    // Verifye machann nan
+    const { data: merchant, error: merchantError } = await supabase
+      .from('profiles')
+      .select('id, kyc_status')
+      .eq('id', merchantId)
+      .single();
+
+    if (merchantError || !merchant) {
+      return NextResponse.json({ error: 'Machann pa jwenn' }, { status: 404 });
+    }
+
+    if (merchant.kyc_status !== 'approved') {
+      return NextResponse.json({ error: 'KYC poko apwouve' }, { status: 403 });
+    }
+
+    // Kreye peman an
+    const paymentId = randomUUID();
+    const { data: payment, error } = await supabase
+      .from('payments')
+      .insert({
+        id: paymentId,
+        merchant_id: merchantId,
+        amount,
+        currency: currency || 'HTG',
+        description,
+        metadata,
+        return_url: returnUrl,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      paymentId: payment.id,
+      paymentUrl: `/pay/${payment.id}`
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { get: () => {} } }
-  );
-
-  // Verifye token an
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('*')
-    .eq('access_token', token)
-    .single();
-
-  if (!merchant) {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-  }
-
-  const body = await request.json();
-  const { order_id, amount, currency, description, return_url, webhook_url } = body;
-
-  const paymentId = randomUUID();
-
-
-// Apre verifyasyon peman an
-const { error: balanceError } = await supabase.rpc('increment_merchant_balance', {
-    merchant_id: payload.merchant_id,
-    amount_to_add: payload.amount,
-  });
-  
-  if (balanceError) {
-    console.error('Balance update failed:', balanceError);
-    // Pa bloke peman an, men anrejistre erè a
-  }
-
-  // Anrejistre peman an
-  await supabase.from('payments').insert({
-    id: paymentId,
-    merchant_id: merchant.id,
-    order_id,
-    amount,
-    currency,
-    description,
-    status: 'pending',
-    webhook_url,
-    created_at: new Date().toISOString(),
-  });
-
-  // Retounen URL pou kliyan an peye
-  const paymentUrl = `https://hatexcard.com/pay/${paymentId}`;
-
-  return NextResponse.json({ payment_url: paymentUrl });
 }

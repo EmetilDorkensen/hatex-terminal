@@ -2,10 +2,11 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
-    const { token } = await request.json();
-
+    const { searchParams } = new URL(request.url);
+    const token = searchParams.get('token');
+    
     if (!token) {
       return NextResponse.json({ error: 'Token manke' }, { status: 400 });
     }
@@ -30,44 +31,19 @@ export async function POST(request: Request) {
     );
 
     // Verifye token an
-    const { data: tokenData, error: tokenError } = await supabase
+    const { data: tokenData, error } = await supabase
       .from('oauth_tokens')
-      .select('*, user_id')
+      .select('user_id')
       .eq('token', token)
-      .gte('expires_at', new Date().toISOString())
+      .gt('expires_at', new Date().toISOString())
       .single();
 
-    if (tokenError || !tokenData) {
+    if (error || !tokenData) {
       return NextResponse.json({ error: 'Token pa valab oswa ekspire' }, { status: 401 });
     }
 
-    // Jwenn enfòmasyon machann nan
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', tokenData.user_id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Machann pa jwenn' }, { status: 404 });
-    }
-
-    // Efase token an apre itilizasyon (opsyonèl)
-    await supabase.from('oauth_tokens').delete().eq('id', tokenData.id);
-
-    // Retounen enfòmasyon yo
-    return NextResponse.json({
-      merchant_id: profile.id,
-      business_name: profile.business_name,
-      api_key: profile.api_key, // Si ou gen yon kle API
-    });
-
+    return NextResponse.json({ user_id: tokenData.user_id });
   } catch (error: any) {
-    console.error('Token verification error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
-
-export async function GET() {
-  return NextResponse.json({ message: 'OAuth token endpoint' });
 }
