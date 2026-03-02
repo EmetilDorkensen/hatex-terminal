@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
 
 const supabase = createClient(
