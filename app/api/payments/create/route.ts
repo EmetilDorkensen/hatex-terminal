@@ -14,8 +14,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing credentials' }, { status: 401 });
     }
 
-    // Inisyalize supabase ak cookies
-    const cookieStore = cookies();
+    // Await cookies() paske li retounen yon Promise nan Next.js 15+
+    const cookieStore = await cookies();
+    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 3. Verifye idempotency (anpeche doub peman)
+    // 3. Verifye idempotency
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('*')
@@ -54,21 +55,20 @@ export async function POST(request: Request) {
       .single();
 
     if (existingPayment) {
-      // Si deja egziste, retounen menm sesyon an
       return NextResponse.json({ 
         paymentUrl: `/pay/${existingPayment.id}`,
         paymentId: existingPayment.id 
       });
     }
 
-    // 4. Resewva done yo
+    // 4. Resevwa done yo
     const body = await request.json();
     const { amount, currency, description, metadata, returnUrl } = body;
 
-    // 5. Kreye yon ID inik pou peman an
+    // 5. Kreye yon ID inik
     const paymentId = randomUUID();
 
-    // 6. Anrejistre peman an nan baz done
+    // 6. Anrejistre peman an
     const { data: payment, error } = await supabase
       .from('payments')
       .insert({
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // 7. Retounen lyen peman an
+    // 7. Retounen lyen an
     return NextResponse.json({
       paymentId: payment.id,
       paymentUrl: `/pay/${payment.id}`
