@@ -5,28 +5,21 @@ import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
   try {
-    // ✅ Atann cookieStore a (paske cookies() retounen yon Promise)
+    // 1. INISYALIZASYON SUPABASE AK SERVICE ROLE KEY
     const cookieStore = await cookies();
-    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set(name, value, options);
-          },
-          remove(name: string, options: any) {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          },
+          get(name: string) { return cookieStore.get(name)?.value; },
+          set(name: string, value: string, options: any) { cookieStore.set(name, value, options); },
+          remove(name: string, options: any) { cookieStore.set(name, '', { ...options, maxAge: 0 }); },
         },
       }
     );
 
-    // 1. Verifye machann nan
+    // 2. VERIFYE IDANTITE MACHANN NAN
     const merchantId = request.headers.get('X-Merchant-ID');
     const apiKey = request.headers.get('X-API-Key');
     const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
@@ -35,7 +28,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing credentials' }, { status: 401 });
     }
 
-    // 2. Verifye kle API a
+    // 3. TCHÈKE SI KLE API A KÒRÈK
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
       .select('*')
@@ -47,7 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 3. Verifye idempotency (anpeche doub peman)
+    // 4. VERIFYE IDEMPOTENCY (anpeche doub peman)
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('*')
@@ -61,23 +54,27 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Resewva done yo
+    // 5. LI DONE YO
     const body = await request.json();
     const { amount, currency, description, metadata, returnUrl } = body;
 
-    // 5. Kreye yon ID inik pou peman an
+    // Validasyon minimòm
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ error: 'Montan envalid' }, { status: 400 });
+    }
+
+    // 6. KREYE DOSYE PEMAN AN
     const paymentId = randomUUID();
 
-    // 6. Anrejistre peman an nan baz done
     const { data: payment, error } = await supabase
       .from('payments')
       .insert({
         id: paymentId,
         merchant_id: merchantId,
         amount,
-        currency,
+        currency: currency || 'HTG',
         description,
-        metadata,
+        metadata: metadata || {},
         return_url: returnUrl,
         idempotency_key: idempotencyKey,
         status: 'pending',
@@ -88,6 +85,7 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
+    // 7. RETOUNEN LYEN POU KLIYAN AN PEYE
     return NextResponse.json({
       paymentId: payment.id,
       paymentUrl: `/pay/${payment.id}`
