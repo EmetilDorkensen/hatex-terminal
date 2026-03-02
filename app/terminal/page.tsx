@@ -398,9 +398,14 @@ export default function TerminalPage() {
   };
 
   // ============================================================
-  // SDK CODE (with dynamic merchant ID)
+  // SDK CODE (with dynamic merchant ID) - Defini anndan yon useEffect pou evite window pandan build
   // ============================================================
-  const fullSDKCode = `<!-- HATEX AI SDK v5.0 -->
+  const [fullSDKCode, setFullSDKCode] = useState('');
+
+  useEffect(() => {
+    // Kòd sa a ap egzekite sèlman nan navigatè a
+    if (typeof window !== 'undefined') {
+      const code = `<!-- HATEX AI SDK v5.0 -->
 <script>
 (function() {
   // Konfigirasyon
@@ -569,6 +574,9 @@ export default function TerminalPage() {
   setTimeout(() => Hatex.init(), 3000);
 })();
 </script>`;
+      setFullSDKCode(code);
+    }
+  }, [profile]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(fullSDKCode);
@@ -577,7 +585,7 @@ export default function TerminalPage() {
   };
 
   // ============================================================
-  // RENDER FUNCTIONS
+  // RENDER FUNCTIONS (yo pa chanje)
   // ============================================================
   const renderHeader = () => (
     <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
