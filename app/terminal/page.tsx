@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
@@ -406,8 +405,9 @@ export default function TerminalPage() {
 (function() {
   // Konfigirasyon
   const merchantId = "${profile?.id || 'VOTRE_MERCHANT_ID'}";
+  const businessName = "${profile?.business_name || 'Hatex Merchant'}";
   const rate = 136;
-  const checkoutUrl = "${window.location.origin}/checkout";
+  const apiUrl = "${window.location.origin}/api/payments/create";
 
   // Fonksyon prensipal
   window.Hatex = {
@@ -420,7 +420,11 @@ export default function TerminalPage() {
         '.single_add_to_cart_button',
         'button[name="add-to-cart"]',
         '.add_to_cart_button',
-        '#add-to-cart'
+        '#add-to-cart',
+        '.btn-add-to-cart',
+        '[data-action="add-to-cart"]',
+        '.product-form__submit',
+        '.add-to-cart'
       ];
       
       selectors.forEach(sel => {
@@ -467,6 +471,11 @@ export default function TerminalPage() {
       const qty = this.extractQuantity();
       const variant = this.extractVariant();
       
+      if (!price) {
+        alert('Pa kapab jwenn pri a. Tanpri chwazi opsyon yo.');
+        return;
+      }
+      
       const payload = {
         merchantId: merchantId,
         amount: price,
@@ -477,15 +486,20 @@ export default function TerminalPage() {
       };
       
       try {
-        const response = await fetch('${window.location.origin}/api/payments/create', {
+        const response = await fetch(apiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Merchant-ID': merchantId
+          },
           body: JSON.stringify(payload)
         });
         
         const data = await response.json();
         if (data.paymentUrl) {
           window.location.href = data.paymentUrl;
+        } else {
+          alert('Erè pandan peman. Tanpri rekòmanse.');
         }
       } catch (error) {
         alert('Erè pandan peman. Tanpri rekòmanse.');
@@ -493,18 +507,33 @@ export default function TerminalPage() {
     },
     
     extractPrice: function() {
+      // Metòd 1: WooCommerce variation input
+      const vInput = document.querySelector('input.variation_id');
+      if (vInput && vInput.value > 0) {
+        const form = document.querySelector('.variations_form');
+        if (form && form.dataset.product_variations) {
+          try {
+            const data = JSON.parse(form.dataset.product_variations);
+            const match = data.find(v => v.variation_id == vInput.value);
+            if (match) return parseFloat(match.display_price);
+          } catch(e) {}
+        }
+      }
+      
+      // Metòd 2: Sélecteurs CSS
       const priceEl = document.querySelector(
-        '.price .amount, .product-price, .price, [itemprop="price"]'
+        '.price .amount, .product-price, .price, [itemprop="price"], .woocommerce-Price-amount'
       );
       if (priceEl) {
         return parseFloat(priceEl.innerText.replace(/[^\\d.]/g, ''));
       }
+      
       return 0;
     },
     
     extractName: function() {
       const titleEl = document.querySelector(
-        'h1, .product_title, .product-title'
+        'h1, .product_title, .product-title, .entry-title'
       );
       return titleEl ? titleEl.innerText.trim() : document.title;
     },
@@ -516,7 +545,7 @@ export default function TerminalPage() {
     
     extractVariant: function() {
       const variants = [];
-      document.querySelectorAll('select.variations select, .variations select').forEach(sel => {
+      document.querySelectorAll('table.variations select, .variations select').forEach(sel => {
         const opt = sel.options[sel.selectedIndex];
         if (opt && opt.text) variants.push(opt.text.trim());
       });
@@ -530,6 +559,14 @@ export default function TerminalPage() {
   } else {
     Hatex.init();
   }
+  
+  // Re-eseye pou kontni dinamik
+  const observer = new MutationObserver(() => Hatex.init());
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  setTimeout(() => Hatex.init(), 1000);
+  setTimeout(() => Hatex.init(), 2000);
+  setTimeout(() => Hatex.init(), 3000);
 })();
 </script>`;
 
@@ -857,7 +894,7 @@ export default function TerminalPage() {
             </div>
             <div className="bg-black/40 p-4 rounded-2xl text-center col-span-2">
               <p className="text-[9px] text-zinc-500 font-bold">To konvèsyon</p>
-              <p className="text-lg font-black text-white">1 USD = {CFG.rate} HTG</p>
+              <p className="text-lg font-black text-white">1 USD = 136 HTG</p>
             </div>
           </div>
         </div>
