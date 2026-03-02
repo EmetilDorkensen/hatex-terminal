@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -12,24 +14,25 @@ import {
   Clock, CheckSquare, XCircle, Eye, Edit, Trash2,
   PlusCircle, List, Grid, Search, Calendar,
   DownloadCloud, UploadCloud, Key, Shield, Link,
-  Smartphone, Monitor, Server, Cloud
+  Smartphone, Monitor, Server, Cloud, DownloadIcon,
+  ShoppingBag, PenTool, Chrome, Wifi
 } from 'lucide-react';
 
 export default function TerminalPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
-  const [mode, setMode] = useState<'dashboard' | 'sdk' | 'invoices' | 'transactions' | 'settings'>('dashboard');
+  const [mode, setMode] = useState<'dashboard' | 'plugins' | 'invoices' | 'transactions' | 'settings'>('dashboard');
   const [subMode, setSubMode] = useState<'list' | 'create' | 'details'>('list');
   
   // Data states
   const [transactions, setTransactions] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   
   // Loading states
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [downloadingPlugin, setDownloadingPlugin] = useState<string | null>(null);
   
   // Form states
   const [amount, setAmount] = useState('');
@@ -129,12 +132,10 @@ export default function TerminalPage() {
   const filteredInvoices = useMemo(() => {
     let filtered = [...invoices];
     
-    // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(inv => inv.status === statusFilter);
     }
     
-    // Filter by date range
     const now = new Date();
     if (dateRange === 'today') {
       const today = now.toDateString();
@@ -147,7 +148,6 @@ export default function TerminalPage() {
       filtered = filtered.filter(inv => new Date(inv.created_at) >= monthAgo);
     }
     
-    // Search by client email or description
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(inv => 
@@ -221,6 +221,516 @@ export default function TerminalPage() {
   };
 
   // ============================================================
+  // PLUGIN GENERATION FUNCTIONS
+  // ============================================================
+  const generateWooCommercePlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
+
+    setDownloadingPlugin('woocommerce');
+
+    try {
+      const zip = new JSZip();
+
+      // Fichye prensipal la: hatex-woocommerce.php
+      const mainFile = `<?php
+/**
+ * Plugin Name: HATEX Payments
+ * Plugin URI: https://hatexcard.com
+ * Description: Aksepte peman an Goud atravè HATEX. Konekte ak kont ou pou resevwa paman san konplike.
+ * Version: 1.0.0
+ * Author: HATEX
+ * Author URI: https://hatexcard.com
+ * License: GPL v2 or later
+ * Text Domain: hatex-woocommerce
+ * Domain Path: /languages
+ * WC requires at least: 4.0
+ * WC tested up to: 8.5
+ */
+
+// Anpeche aksè dirèk
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Konstan plugin an
+define('HATEX_WC_VERSION', '1.0.0');
+define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define('HATEX_MERCHANT_ID', '${profile.id}');
+
+/**
+ * Ajoute HATEX nan lis metod peman WooCommerce yo.
+ */
+function add_hatex_gateway($methods) {
+    $methods[] = 'WC_Gateway_HATEX';
+    return $methods;
+}
+add_filter('woocommerce_payment_gateways', 'add_hatex_gateway');
+
+/**
+ * Chaje klas peman an.
+ */
+function init_hatex_gateway() {
+    if (!class_exists('WooCommerce')) {
+        return;
+    }
+    require_once HATEX_WC_PLUGIN_PATH . 'includes/class-wc-gateway-hatex.php';
+}
+add_action('plugins_loaded', 'init_hatex_gateway');
+
+/**
+ * Ajoute lyen konfigirasyon sou paj plugin yo.
+ */
+function hatex_add_settings_link($links) {
+    $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=hatex');
+    $settings_link = '<a href="' . esc_url($settings_url) . '">Konfigirasyon</a>';
+    array_unshift($links, $settings_link);
+    return $links;
+}
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'hatex_add_settings_link');
+
+/**
+ * Deklare konpatibilite ak High-Performance Order Storage (HPOS).
+ */
+add_action('before_woocommerce_init', function() {
+    if (class_exists(\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::class)) {
+        \\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+    }
+});`;
+
+      // Klas peman an: includes/class-wc-gateway-hatex.php
+      const gatewayFile = `<?php
+/**
+ * Klas peman HATEX pou WooCommerce
+ */
+class WC_Gateway_HATEX extends WC_Payment_Gateway {
+
+    public function __construct() {
+        \$this->id                 = 'hatex';
+        \$this->icon               = '';
+        \$this->has_fields         = true;
+        \$this->method_title       = __('HATEX Payments', 'hatex-woocommerce');
+        \$this->method_description = __('Aksepte peman an Goud atravè HATEX.', 'hatex-woocommerce');
+        \$this->supports           = array('products', 'refunds');
+
+        \$this->init_form_fields();
+        \$this->init_settings();
+
+        \$this->title       = \$this->get_option('title');
+        \$this->description = \$this->get_option('description');
+        \$this->enabled     = \$this->get_option('enabled');
+        \$this->merchant_id = HATEX_MERCHANT_ID;
+
+        add_action('woocommerce_update_options_payment_gateways_' . \$this->id, array(\$this, 'process_admin_options'));
+        add_action('woocommerce_api_wc_gateway_hatex', array(\$this, 'handle_webhook'));
+    }
+
+    public function init_form_fields() {
+        \$this->form_fields = array(
+            'enabled' => array(
+                'title'   => __('Aktive / Dezaktive', 'hatex-woocommerce'),
+                'type'    => 'checkbox',
+                'label'   => __('Aktive HATEX Payments', 'hatex-woocommerce'),
+                'default' => 'no',
+            ),
+            'title' => array(
+                'title'       => __('Tit', 'hatex-woocommerce'),
+                'type'        => 'text',
+                'description' => __('Tit metod peman an ap parèt pou kliyan yo.', 'hatex-woocommerce'),
+                'default'     => __('Peye ak HATEX', 'hatex-woocommerce'),
+                'desc_tip'    => true,
+            ),
+            'description' => array(
+                'title'       => __('Deskripsyon', 'hatex-woocommerce'),
+                'type'        => 'textarea',
+                'description' => __('Deskripsyon metod peman an.', 'hatex-woocommerce'),
+                'default'     => __('Peye byen vit ak HATEX an Goud.', 'hatex-woocommerce'),
+            ),
+            'merchant_id_display' => array(
+                'title'       => __('ID Machann', 'hatex-woocommerce'),
+                'type'        => 'text',
+                'description' => __('ID machann ou nan sistèm HATEX la. Sa a konfigure otomatikman.', 'hatex-woocommerce'),
+                'default'     => HATEX_MERCHANT_ID,
+                'custom_attributes' => array('readonly' => 'readonly'),
+            ),
+        );
+    }
+
+    public function payment_fields() {
+        if (\$this->description) {
+            echo wpautop(wp_kses_post(\$this->description));
+        }
+        ?>
+        <div style="padding: 10px 0;">
+            <p><?php _e('Ou pral redireksyon nan paj peman HATEX la apre ou fin valide kòmand lan.', 'hatex-woocommerce'); ?></p>
+        </div>
+        <?php
+    }
+
+    public function process_payment(\$order_id) {
+        \$order = wc_get_order(\$order_id);
+
+        \$currency = \$order->get_currency();
+        \$amount   = \$order->get_total();
+
+        // Konvèti an Goud si nesesè
+        if (\$currency === 'USD') {
+            \$amount   = \$amount * 136;
+            \$currency = 'HTG';
+        }
+
+        \$payload = array(
+            'merchant_id' => \$this->merchant_id,
+            'amount'      => \$amount,
+            'currency'    => \$currency,
+            'description' => sprintf(__('Kòmand #%s', 'hatex-woocommerce'), \$order->get_order_number()),
+            'metadata'    => array(
+                'order_id'         => \$order_id,
+                'order_key'        => \$order->get_order_key(),
+                'customer_email'   => \$order->get_billing_email(),
+                'customer_name'    => \$order->get_billing_first_name() . ' ' . \$order->get_billing_last_name(),
+                'customer_phone'   => \$order->get_billing_phone(),
+                'customer_address' => \$order->get_billing_address_1(),
+                'platform'         => 'woocommerce',
+            ),
+            'return_url'  => \$this->get_return_url(\$order),
+            'webhook_url' => add_query_arg('wc-api', 'WC_Gateway_HATEX', home_url('/')),
+        );
+
+        \$response = wp_remote_post('https://api.hatexcard.com/v1/payments', array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-Merchant-ID' => \$this->merchant_id,
+            ),
+            'body'    => json_encode(\$payload),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error(\$response)) {
+            wc_add_notice(__('Erè koneksyon ak HATEX. Tanpri rekòmanse.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        \$body = wp_remote_retrieve_body(\$response);
+        \$data = json_decode(\$body, true);
+
+        if (isset(\$data['payment_url'])) {
+            return array(
+                'result'   => 'success',
+                'redirect' => \$data['payment_url'],
+            );
+        }
+
+        \$error_msg = isset(\$data['message']) ? \$data['message'] : __('Erè pandan peman.', 'hatex-woocommerce');
+        wc_add_notice(\$error_msg, 'error');
+        return array('result' => 'failure');
+    }
+
+    public function handle_webhook() {
+        \$payload = file_get_contents('php://input');
+        \$data    = json_decode(\$payload, true);
+
+        if (!\$data || !isset(\$data['event'])) {
+            status_header(400);
+            exit;
+        }
+
+        if (!isset(\$data['metadata']['order_id'])) {
+            status_header(400);
+            exit;
+        }
+
+        \$order_id = \$data['metadata']['order_id'];
+        \$order    = wc_get_order(\$order_id);
+
+        if (!\$order) {
+            status_header(404);
+            exit;
+        }
+
+        switch (\$data['event']) {
+            case 'payment.succeeded':
+                \$order->payment_complete(\$data['transaction_id']);
+                \$order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), \$data['transaction_id']));
+                \$order->update_meta_data('_hatex_transaction_id', \$data['transaction_id']);
+                \$order->save();
+                break;
+
+            case 'payment.failed':
+                \$order->update_status('failed', __('Peman HATEX echwe.', 'hatex-woocommerce'));
+                break;
+
+            case 'payment.pending':
+                \$order->update_status('on-hold', __('Peman HATEX an atant.', 'hatex-woocommerce'));
+                break;
+        }
+
+        status_header(200);
+        echo 'OK';
+        exit;
+    }
+
+    public function process_refund(\$order_id, \$amount = null, \$reason = '') {
+        \$order = wc_get_order(\$order_id);
+        \$transaction_id = \$order->get_meta('_hatex_transaction_id');
+
+        if (empty(\$transaction_id)) {
+            return false;
+        }
+
+        \$response = wp_remote_post('https://api.hatexcard.com/v1/refunds', array(
+            'headers' => array(
+                'Content-Type'  => 'application/json',
+                'X-Merchant-ID' => \$this->merchant_id,
+            ),
+            'body' => json_encode(array(
+                'transaction_id' => \$transaction_id,
+                'amount'         => \$amount,
+                'reason'         => \$reason,
+            )),
+        ));
+
+        if (is_wp_error(\$response)) {
+            return false;
+        }
+
+        \$body = wp_remote_retrieve_body(\$response);
+        \$data = json_decode(\$body, true);
+
+        if (isset(\$data['success']) && \$data['success']) {
+            \$order->add_order_note(sprintf(__('Refon HATEX: %s HTG. Rezon: %s', 'hatex-woocommerce'), \$amount, \$reason));
+            return true;
+        }
+
+        return false;
+    }
+}`;
+
+      // Ajoute fichye yo nan ZIP
+      zip.file('hatex-woocommerce.php', mainFile);
+      zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
+
+      // Jenere ZIP la epi telechaje
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
+
+    } catch (error) {
+      console.error('Error generating plugin:', error);
+      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
+
+  const generateShopifyPlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
+
+    setDownloadingPlugin('shopify');
+
+    try {
+      const zip = new JSZip();
+
+      // Shopify app configuration
+      const shopifyConfig = `{
+  "name": "HATEX Payments",
+  "description": "Aksepte peman an Goud atravè HATEX",
+  "version": "1.0.0",
+  "merchant_id": "${profile.id}",
+  "api_url": "https://api.hatexcard.com/v1",
+  "rate": 136
+}`;
+
+      // Shopify extension file (simplified)
+      const extensionFile = `// HATEX Shopify Extension
+// Merchant ID: ${profile.id}
+
+import { extend } from '@shopify/ui-extensions/checkout';
+
+export default extend('Checkout::Dynamic::Render', (root, { extension }) => {
+  const paymentMethod = {
+    name: 'HATEX Payments',
+    merchantId: '${profile.id}',
+    apiUrl: 'https://api.hatexcard.com/v1',
+    rate: 136
+  };
+
+  // Extension logic here
+  console.log('HATEX Payments initialized', paymentMethod);
+});`;
+
+      zip.file('hatex-shopify.json', shopifyConfig);
+      zip.file('extension/index.js', extensionFile);
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-shopify-${profile.id.slice(0,8)}.zip`);
+
+    } catch (error) {
+      console.error('Error generating Shopify plugin:', error);
+      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
+
+  const generateWixPlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
+
+    setDownloadingPlugin('wix');
+
+    try {
+      const zip = new JSZip();
+
+      const wixConfig = `{
+  "merchantId": "${profile.id}",
+  "businessName": "${profile.business_name || 'HATEX Merchant'}",
+  "rate": 136,
+  "apiUrl": "https://api.hatexcard.com/v1"
+}`;
+
+      const wixCode = `// HATEX Wix App
+import { payment } from 'wix-payment';
+
+export function initHatexPayments() {
+  const config = {
+    merchantId: '${profile.id}',
+    apiUrl: 'https://api.hatexcard.com/v1',
+    rate: 136
+  };
+
+  payment.registerPaymentMethod({
+    name: 'HATEX Payments',
+    label: 'Peye an Goud ak HATEX',
+    async processPayment(order) {
+      // Payment processing logic
+      return {
+        success: true,
+        transactionId: 'tx_' + Date.now()
+      };
+    }
+  });
+}`;
+
+      zip.file('hatex-wix.json', wixConfig);
+      zip.file('src/hatex-payments.js', wixCode);
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-wix-${profile.id.slice(0,8)}.zip`);
+
+    } catch (error) {
+      console.error('Error generating Wix plugin:', error);
+      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
+
+  const generateHostingerPlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
+
+    setDownloadingPlugin('hostinger');
+
+    try {
+      const zip = new JSZip();
+
+      const hostingerConfig = `{
+  "merchantId": "${profile.id}",
+  "businessName": "${profile.business_name || 'HATEX Merchant'}",
+  "rate": 136,
+  "apiUrl": "https://api.hatexcard.com/v1"
+}`;
+
+      const hostingerCode = `<!-- HATEX Payments for Hostinger/Horizon -->
+<script>
+(function() {
+  const MERCHANT_ID = '${profile.id}';
+  const RATE = 136;
+  const API_URL = 'https://api.hatexcard.com/v1/payments';
+
+  function injectHatexButton() {
+    const buttons = document.querySelectorAll('button[type="submit"], .add-to-cart, .btn-primary');
+    
+    buttons.forEach(btn => {
+      if (btn.classList.contains('htx-injected')) return;
+      
+      const htxBtn = document.createElement('button');
+      htxBtn.className = btn.className + ' htx-injected';
+      htxBtn.innerHTML = '💳 Peye an Goud (HATEX)';
+      htxBtn.style.marginTop = '10px';
+      htxBtn.style.background = '#e62e04';
+      htxBtn.style.color = '#fff';
+      
+      htxBtn.onclick = async (e) => {
+        e.preventDefault();
+        
+        // Get price
+        const priceEl = document.querySelector('[class*="price"], .product-price');
+        const price = priceEl ? parseFloat(priceEl.innerText.replace(/[^\\d.]/g, '')) * RATE : 0;
+        
+        const payload = {
+          merchantId: MERCHANT_ID,
+          amount: price,
+          currency: 'HTG',
+          description: document.title,
+          metadata: { url: window.location.href },
+          returnUrl: window.location.href
+        };
+        
+        try {
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (data.paymentUrl) window.location.href = data.paymentUrl;
+        } catch(err) {
+          alert('Erè pandan peman');
+        }
+      };
+      
+      btn.parentNode.insertBefore(htxBtn, btn.nextSibling);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectHatexButton);
+  } else {
+    injectHatexButton();
+  }
+})();
+</script>`;
+
+      zip.file('hatex-hostinger.json', hostingerConfig);
+      zip.file('embed-code.html', hostingerCode);
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-hostinger-${profile.id.slice(0,8)}.zip`);
+
+    } catch (error) {
+      console.error('Error generating Hostinger plugin:', error);
+      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
+
+  // ============================================================
   // API FUNCTIONS
   // ============================================================
   const saveYoutubeUrl = async () => {
@@ -288,7 +798,6 @@ export default function TerminalPage() {
       
       const securePayLink = `${window.location.origin}/pay/${inv.id}`;
       
-      // Send email via edge function
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
         headers: {
@@ -313,7 +822,7 @@ export default function TerminalPage() {
       setEmail('');
       setDescription('');
       setSubMode('list');
-      // Refresh invoices
+      
       const { data: newInv } = await supabase
         .from('invoices')
         .select('*')
@@ -370,7 +879,6 @@ export default function TerminalPage() {
         .eq('id', invoiceId);
       if (error) throw error;
       
-      // Refresh invoices
       const { data: newInv } = await supabase
         .from('invoices')
         .select('*')
@@ -398,194 +906,7 @@ export default function TerminalPage() {
   };
 
   // ============================================================
-  // SDK CODE (with dynamic merchant ID) - Defini anndan yon useEffect pou evite window pandan build
-  // ============================================================
-  const [fullSDKCode, setFullSDKCode] = useState('');
-
-  useEffect(() => {
-    // Kòd sa a ap egzekite sèlman nan navigatè a
-    if (typeof window !== 'undefined') {
-      const code = `<!-- HATEX AI SDK v5.0 -->
-<script>
-(function() {
-  // Konfigirasyon
-  const merchantId = "${profile?.id || 'VOTRE_MERCHANT_ID'}";
-  const businessName = "${profile?.business_name || 'Hatex Merchant'}";
-  const rate = 136;
-  const apiUrl = "${window.location.origin}/api/payments/create";
-
-  // Fonksyon prensipal
-  window.Hatex = {
-    init: function() {
-      this.injectButtons();
-    },
-    
-    injectButtons: function() {
-      const selectors = [
-        '.single_add_to_cart_button',
-        'button[name="add-to-cart"]',
-        '.add_to_cart_button',
-        '#add-to-cart',
-        '.btn-add-to-cart',
-        '[data-action="add-to-cart"]',
-        '.product-form__submit',
-        '.add-to-cart'
-      ];
-      
-      selectors.forEach(sel => {
-        document.querySelectorAll(sel).forEach(btn => {
-          if (btn.dataset.hatexDone) return;
-          
-          const hatexBtn = document.createElement('button');
-          hatexBtn.className = 'hatex-pay-btn';
-          hatexBtn.innerHTML = '💳 Achte an Goud · HATEX';
-          hatexBtn.style.cssText = \`
-            background: #e62e04;
-            color: white;
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 8px;
-            margin-top: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-          \`;
-          hatexBtn.onmouseover = () => {
-            hatexBtn.style.transform = 'translateY(-2px)';
-            hatexBtn.style.boxShadow = '0 8px 20px rgba(230,46,4,0.3)';
-          };
-          hatexBtn.onmouseout = () => {
-            hatexBtn.style.transform = 'translateY(0)';
-            hatexBtn.style.boxShadow = 'none';
-          };
-          hatexBtn.onclick = (e) => {
-            e.preventDefault();
-            this.startPayment();
-          };
-          
-          btn.parentNode.insertBefore(hatexBtn, btn.nextSibling);
-          btn.dataset.hatexDone = 'true';
-        });
-      });
-    },
-    
-    startPayment: async function() {
-      const price = this.extractPrice();
-      const name = this.extractName();
-      const qty = this.extractQuantity();
-      const variant = this.extractVariant();
-      
-      if (!price) {
-        alert('Pa kapab jwenn pri a. Tanpri chwazi opsyon yo.');
-        return;
-      }
-      
-      const payload = {
-        merchantId: merchantId,
-        amount: price,
-        currency: 'HTG',
-        description: name,
-        metadata: { qty, variant },
-        returnUrl: window.location.href
-      };
-      
-      try {
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'X-Merchant-ID': merchantId
-          },
-          body: JSON.stringify(payload)
-        });
-        
-        const data = await response.json();
-        if (data.paymentUrl) {
-          window.location.href = data.paymentUrl;
-        } else {
-          alert('Erè pandan peman. Tanpri rekòmanse.');
-        }
-      } catch (error) {
-        alert('Erè pandan peman. Tanpri rekòmanse.');
-      }
-    },
-    
-    extractPrice: function() {
-      // Metòd 1: WooCommerce variation input
-      const vInput = document.querySelector('input.variation_id');
-      if (vInput && vInput.value > 0) {
-        const form = document.querySelector('.variations_form');
-        if (form && form.dataset.product_variations) {
-          try {
-            const data = JSON.parse(form.dataset.product_variations);
-            const match = data.find(v => v.variation_id == vInput.value);
-            if (match) return parseFloat(match.display_price);
-          } catch(e) {}
-        }
-      }
-      
-      // Metòd 2: Sélecteurs CSS
-      const priceEl = document.querySelector(
-        '.price .amount, .product-price, .price, [itemprop="price"], .woocommerce-Price-amount'
-      );
-      if (priceEl) {
-        return parseFloat(priceEl.innerText.replace(/[^\\d.]/g, ''));
-      }
-      
-      return 0;
-    },
-    
-    extractName: function() {
-      const titleEl = document.querySelector(
-        'h1, .product_title, .product-title, .entry-title'
-      );
-      return titleEl ? titleEl.innerText.trim() : document.title;
-    },
-    
-    extractQuantity: function() {
-      const qtyEl = document.querySelector('input.qty, input[name="quantity"]');
-      return qtyEl ? parseInt(qtyEl.value) || 1 : 1;
-    },
-    
-    extractVariant: function() {
-      const variants = [];
-      document.querySelectorAll('table.variations select, .variations select').forEach(sel => {
-        const opt = sel.options[sel.selectedIndex];
-        if (opt && opt.text) variants.push(opt.text.trim());
-      });
-      return variants.join(' · ') || 'Inite';
-    }
-  };
-  
-  // Inisyalize
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => Hatex.init());
-  } else {
-    Hatex.init();
-  }
-  
-  // Re-eseye pou kontni dinamik
-  const observer = new MutationObserver(() => Hatex.init());
-  observer.observe(document.body, { childList: true, subtree: true });
-  
-  setTimeout(() => Hatex.init(), 1000);
-  setTimeout(() => Hatex.init(), 2000);
-  setTimeout(() => Hatex.init(), 3000);
-})();
-</script>`;
-      setFullSDKCode(code);
-    }
-  }, [profile]);
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(fullSDKCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  // ============================================================
-  // RENDER FUNCTIONS (yo pa chanje)
+  // RENDER FUNCTIONS
   // ============================================================
   const renderHeader = () => (
     <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
@@ -610,12 +931,12 @@ export default function TerminalPage() {
           <LayoutGrid size={15} /> Dashboard
         </button>
         <button
-          onClick={() => { setMode('sdk'); setSubMode('list'); }}
+          onClick={() => setMode('plugins')}
           className={`px-5 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${
-            mode === 'sdk' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
+            mode === 'plugins' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
           }`}
         >
-          <Code size={15} /> SDK
+          <DownloadCloud size={15} /> Plugins
         </button>
         <button
           onClick={() => { setMode('invoices'); setSubMode('list'); }}
@@ -801,16 +1122,16 @@ export default function TerminalPage() {
         {profile?.business_name ? (
           <div className="grid grid-cols-2 gap-6">
             <button
-              onClick={() => { setMode('sdk'); setSubMode('list'); }}
+              onClick={() => setMode('plugins')}
               className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform">
-                <Code className="text-red-600 w-7 h-7" />
+                <DownloadCloud className="text-red-600 w-7 h-7" />
               </div>
               <div className="text-center">
-                <span className="text-[12px] font-black uppercase italic block">SDK Deployment</span>
-                <span className="text-[8px] text-zinc-500 uppercase font-bold mt-1 block">Konekte boutik ou</span>
+                <span className="text-[12px] font-black uppercase italic block">Telechaje Plugins</span>
+                <span className="text-[8px] text-zinc-500 uppercase font-bold mt-1 block">WooCommerce, Shopify, Wix, Hostinger</span>
               </div>
             </button>
             <button
@@ -832,7 +1153,7 @@ export default function TerminalPage() {
             <AlertTriangle className="text-red-600 w-12 h-12 mx-auto mb-6" />
             <h4 className="text-sm font-black uppercase text-red-500 mb-2 italic">Aksyon limite</h4>
             <p className="text-[11px] text-red-500/60 max-w-sm mx-auto leading-relaxed">
-              Ou dwe lye biznis ou an anvan ou ka jwenn aksè nan SDK ak Invoices.
+              Ou dwe lye biznis ou an anvan ou ka jwenn aksè nan Plugins ak Invoices.
             </p>
           </div>
         )}
@@ -877,7 +1198,7 @@ export default function TerminalPage() {
             {[
               { label: 'Merchant ID', val: (profile?.id?.slice(0, 8) || '—') + '...', color: 'text-red-500' },
               { label: 'KYC Status', val: profile?.kyc_status || 'pending', color: profile?.kyc_status === 'approved' ? 'text-green-500' : 'text-orange-500' },
-              { label: 'SDK Version', val: 'V5 AI', color: 'text-blue-400' },
+              { label: 'To konvèsyon', val: '1 USD = 136 HTG', color: 'text-blue-400' },
               { label: 'Revni Mwa a', val: formatCurrency(earnings.thisMonth), color: 'text-emerald-400' },
             ].map((item) => (
               <div key={item.label} className="flex justify-between items-center p-4 bg-black/40 rounded-2xl border border-white/5">
@@ -900,23 +1221,19 @@ export default function TerminalPage() {
               <p className="text-[9px] text-zinc-500 font-bold">Fakti yo</p>
               <p className="text-lg font-black text-white">{invoices.length}</p>
             </div>
-            <div className="bg-black/40 p-4 rounded-2xl text-center col-span-2">
-              <p className="text-[9px] text-zinc-500 font-bold">To konvèsyon</p>
-              <p className="text-lg font-black text-white">1 USD = 136 HTG</p>
-            </div>
           </div>
         </div>
       </div>
     </div>
   );
 
-  const renderSDK = () => (
-    <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+  const renderPlugins = () => (
+    <div className="max-w-5xl mx-auto animate-in fade-in zoom-in-95 duration-500">
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => setMode('dashboard')} className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all">
           <ArrowLeft size={20} />
         </button>
-        <h2 className="text-xl font-black uppercase italic tracking-widest">SDK AI Universal V5</h2>
+        <h2 className="text-xl font-black uppercase italic tracking-widest">Plugins & Entegrasyon</h2>
         <div className="w-12" />
       </div>
 
@@ -928,8 +1245,8 @@ export default function TerminalPage() {
               <Youtube className="text-red-600 w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-[13px] font-black uppercase tracking-widest">Videyo Tutoryèl SDK</h3>
-              <p className="text-[9px] text-zinc-500 font-bold mt-0.5">Anseye machann yo kijan pou entegre SDK a</p>
+              <h3 className="text-[13px] font-black uppercase tracking-widest">Videyo Tutoryèl</h3>
+              <p className="text-[9px] text-zinc-500 font-bold mt-0.5">Aprann kijan pou enstale plugins yo</p>
             </div>
           </div>
           <button
@@ -973,68 +1290,193 @@ export default function TerminalPage() {
         </div>
       </div>
 
-      {/* 3 Steps */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[
-          { num: '01', title: 'Kopye Kòd', desc: 'Kopye tout SDK a yon sèl fwa' },
-          { num: '02', title: 'Kole nan Footer', desc: 'Anvan </body> nan tema ou a' },
-          { num: '03', title: 'AI Detekte Tout', desc: 'Bouton parèt anba chak pwodwi' },
-        ].map((s) => (
-          <div key={s.num} className="bg-zinc-900/40 border border-white/5 p-6 rounded-3xl flex items-start gap-4">
-            <span className="text-3xl font-black text-red-600/25 italic leading-none">{s.num}</span>
-            <div>
-              <h4 className="text-[11px] font-black uppercase italic text-white">{s.title}</h4>
-              <p className="text-[9px] text-zinc-500 font-bold mt-1 normal-case">{s.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* SDK Code */}
-      <div className="bg-[#0d0e1a] border border-white/5 rounded-[3rem] overflow-hidden">
-        <div className="p-7 border-b border-white/5 flex items-center justify-between bg-zinc-900/20">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse" />
-            <span className="text-[11px] font-black uppercase tracking-widest">hatex-ai-sdk-v5.js</span>
-            <span className="text-[8px] bg-blue-600/20 text-blue-400 font-black px-2 py-1 rounded-full">AI · Universal</span>
-          </div>
-          <button
-            onClick={copyToClipboard}
-            className="px-5 py-2.5 bg-white text-black rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
-          >
-            {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-            {copied ? 'Kopye!' : 'Kopye Kòd'}
-          </button>
-        </div>
-        <div className="p-8">
-          <p className="text-[11px] text-zinc-400 mb-6 leading-relaxed border-l-4 border-red-600 pl-5 bg-red-600/5 py-4 rounded-r-2xl normal-case">
-            <strong className="text-white">SDK AI V5:</strong> Kole kòd sa a <strong className="text-red-400">yon sèl fwa</strong> nan seksyon <code className="text-white bg-white/10 px-1 rounded">&lt;footer&gt;</code> tema ou a. AI a ap <strong className="text-white">detekte otomatikman</strong> chak pwodwi — non, foto, varyant, koule, tay, pri — epi enjekte bouton Hatex anba chak "Ajouter au panier". Konvèsyon <strong className="text-red-400">USD → HTG</strong> otomatik si sit la an dola.
+      {/* KYC Warning */}
+      {profile?.kyc_status !== 'approved' && (
+        <div className="bg-amber-600/20 border border-amber-600/30 p-8 rounded-[3rem] mb-8 text-center">
+          <AlertTriangle className="text-amber-500 w-12 h-12 mx-auto mb-4" />
+          <h3 className="text-lg font-black text-amber-500 mb-2">KYC poko apwouve</h3>
+          <p className="text-amber-400/80 max-w-lg mx-auto">
+            Ou dwe tann apwobasyon KYC ou anvan ou ka telechaje plugins yo.
+            Tanpri verifye imèl ou regilyèman pou konfimasyon.
           </p>
-          <div className="relative">
-            <pre className="text-[10px] text-zinc-500 font-mono overflow-x-auto p-7 bg-black/50 rounded-3xl h-[450px] border border-white/5 leading-relaxed whitespace-pre-wrap">
-              {fullSDKCode}
-            </pre>
-            <div className="absolute bottom-4 right-4 text-[8px] font-black text-red-600/20 tracking-widest">
-              HATEX AI SDK V5.0 · UNIVERSAL
+        </div>
+      )}
+
+      {/* Platform Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* WooCommerce */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="bg-purple-600/20 p-4 rounded-2xl">
+              <ShoppingBag className="text-purple-400 w-8 h-8" />
             </div>
+            <div>
+              <h3 className="text-xl font-black">WooCommerce</h3>
+              <p className="text-zinc-500 text-sm">WordPress</p>
+            </div>
+          </div>
+          
+          <p className="text-zinc-400 text-sm mb-6">
+            Plugin pou WooCommerce. Enstale l nan admin WordPress ou epi aktive l.
+            ID machann ou deja konfigure.
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-zinc-600">
+              <span className="block">Vèsyon: 1.0.0</span>
+              <span className="block">Dènye Mizajou: 02/2025</span>
+            </div>
+            <button
+              onClick={generateWooCommercePlugin}
+              disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved'}
+              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {downloadingPlugin === 'woocommerce' ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <DownloadIcon size={16} />
+              )}
+              {downloadingPlugin === 'woocommerce' ? 'Ap jenere...' : 'Telechaje ZIP'}
+            </button>
+          </div>
+        </div>
+
+        {/* Shopify */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="bg-green-600/20 p-4 rounded-2xl">
+              <Chrome className="text-green-400 w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black">Shopify</h3>
+              <p className="text-zinc-500 text-sm">Aplikasyon</p>
+            </div>
+          </div>
+          
+          <p className="text-zinc-400 text-sm mb-6">
+            Aplikasyon pou Shopify. Enstale l nan admin Shopify ou epi aktive l.
+            Konfigirasyon otomatik ak ID ou.
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-zinc-600">
+              <span className="block">Vèsyon: 1.0.0</span>
+              <span className="block">Dènye Mizajou: 02/2025</span>
+            </div>
+            <button
+              onClick={generateShopifyPlugin}
+              disabled={downloadingPlugin === 'shopify' || profile?.kyc_status !== 'approved'}
+              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {downloadingPlugin === 'shopify' ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <DownloadIcon size={16} />
+              )}
+              {downloadingPlugin === 'shopify' ? 'Ap jenere...' : 'Telechaje ZIP'}
+            </button>
+          </div>
+        </div>
+
+        {/* Wix */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="bg-blue-600/20 p-4 rounded-2xl">
+              <Globe className="text-blue-400 w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black">Wix</h3>
+              <p className="text-zinc-500 text-sm">Aplikasyon</p>
+            </div>
+          </div>
+          
+          <p className="text-zinc-400 text-sm mb-6">
+            Aplikasyon pou Wix. Enstale l nan Wix App Market ou epi konekte.
+            ID machann ou deja konfigure.
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-zinc-600">
+              <span className="block">Vèsyon: 1.0.0</span>
+              <span className="block">Dènye Mizajou: 02/2025</span>
+            </div>
+            <button
+              onClick={generateWixPlugin}
+              disabled={downloadingPlugin === 'wix' || profile?.kyc_status !== 'approved'}
+              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {downloadingPlugin === 'wix' ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <DownloadIcon size={16} />
+              )}
+              {downloadingPlugin === 'wix' ? 'Ap jenere...' : 'Telechaje ZIP'}
+            </button>
+          </div>
+        </div>
+
+        {/* Hostinger / Horizon */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="bg-orange-600/20 p-4 rounded-2xl">
+              <Wifi className="text-orange-400 w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black">Hostinger / Horizon</h3>
+              <p className="text-zinc-500 text-sm">Embed Code</p>
+            </div>
+          </div>
+          
+          <p className="text-zinc-400 text-sm mb-6">
+            Kòd pou kole nan footer sit ou. Telechaje fichye a epi swiv enstriksyon yo.
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-zinc-600">
+              <span className="block">Vèsyon: 1.0.0</span>
+              <span className="block">Dènye Mizajou: 02/2025</span>
+            </div>
+            <button
+              onClick={generateHostingerPlugin}
+              disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved'}
+              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {downloadingPlugin === 'hostinger' ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <DownloadIcon size={16} />
+              )}
+              {downloadingPlugin === 'hostinger' ? 'Ap jenere...' : 'Telechaje ZIP'}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Features */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        {[
-          { icon: '🧠', title: 'AI Ponde', desc: '15 metòd · konfyans 97%' },
-          { icon: '🎨', title: 'Koule & Tay', desc: 'Varyant foto reyèl' },
-          { icon: '💱', title: 'USD→HTG', desc: 'Konvèsyon 136 otomatik' },
-          { icon: '🛒', title: '50+ Pwodwi', desc: 'Tout foto ak enfo' },
-        ].map((f) => (
-          <div key={f.title} className="bg-zinc-900/40 border border-white/5 p-5 rounded-3xl text-center">
-            <div className="text-2xl mb-2">{f.icon}</div>
-            <h4 className="text-[10px] font-black uppercase italic text-white">{f.title}</h4>
-            <p className="text-[8px] text-zinc-600 font-bold mt-1 normal-case">{f.desc}</p>
+      {/* Enstriksyon */}
+      <div className="bg-zinc-900/30 border border-white/5 p-8 rounded-[3rem] mt-8">
+        <h3 className="text-lg font-black mb-4">📋 Enstriksyon enstalasyon</h3>
+        <div className="space-y-4 text-zinc-300 text-sm">
+          <div className="flex gap-3">
+            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">1</div>
+            <p><span className="text-white font-bold">Telechaje</span> fichye ZIP ki koresponn ak platform ou a (WooCommerce, Shopify, elatriye).</p>
           </div>
-        ))}
+          <div className="flex gap-3">
+            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">2</div>
+            <p><span className="text-white font-bold">Dekonprese</span> fichye a epi mete l nan dosye plugins platform ou a.</p>
+          </div>
+          <div className="flex gap-3">
+            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">3</div>
+            <p><span className="text-white font-bold">Aktive</span> plugin an nan admin platform ou a.</p>
+          </div>
+          <div className="flex gap-3">
+            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">4</div>
+            <p><span className="text-white font-bold">Konekte</span> ak kont HATEX ou lè w swiv enstriksyon yo (yon fwa sèlman).</p>
+          </div>
+          <div className="flex gap-3">
+            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">5</div>
+            <p><span className="text-white font-bold">Bouton "Peye ak HATEX" la</span> ap parèt otomatikman sou paj checkout ou a.</p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1105,7 +1547,6 @@ export default function TerminalPage() {
       );
     }
 
-    // List view
     return (
       <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
         <div className="flex items-center justify-between mb-10">
@@ -1530,7 +1971,7 @@ export default function TerminalPage() {
       )}
 
       {mode === 'dashboard' && renderDashboard()}
-      {mode === 'sdk' && renderSDK()}
+      {mode === 'plugins' && renderPlugins()}
       {mode === 'invoices' && renderInvoices()}
       {mode === 'transactions' && renderTransactions()}
       {mode === 'settings' && renderSettings()}

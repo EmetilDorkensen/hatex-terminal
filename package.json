@@ -15,7 +15,9 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.91.0",
     "browser-image-compression": "^2.0.2",
+    "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
     "next": "16.1.0",
     "qrcode.react": "^4.2.0",
@@ -25,6 +27,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
+    "@types/jszip": "^3.4.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
