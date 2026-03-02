@@ -11,9 +11,8 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.91.0",
+    "@supabase/supabase-js": "^2.98.0",
     "browser-image-compression": "^2.0.2",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",

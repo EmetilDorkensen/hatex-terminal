@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr'; // Chanje sa a
 
 export default function WooCommerceOAuth() {
   const [email, setEmail] = useState('');
@@ -11,40 +11,59 @@ export default function WooCommerceOAuth() {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('return_url');
   const router = useRouter();
-  const supabase = createClientComponentClient();
+
+  // Kreye supabase client la
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // 1. Verifye machann nan nan baz done HATEX
-    const { data: { user }, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data: { user }, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error || !user) {
-      alert('Imèl oswa modpas pa bon.');
+      if (error || !user) {
+        alert('Imèl oswa modpas pa bon.');
+        setLoading(false);
+        return;
+      }
+
+      // Jenere yon token inik
+      const token = crypto.randomUUID();
+
+      // Anrejistre token an nan tab oauth_tokens
+      const { error: tokenError } = await supabase
+        .from('oauth_tokens')
+        .insert({
+          user_id: user.id,
+          token: token,
+          platform: 'woocommerce',
+          expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 èdtan
+        });
+
+      if (tokenError) {
+        console.error('Token insert error:', tokenError);
+        alert('Erè pandan jenere token an.');
+        setLoading(false);
+        return;
+      }
+
+      // Redireksyon tounen ak token an
+      const redirectUrl = new URL(returnUrl || 'https://example.com');
+      redirectUrl.searchParams.set('hatex_token', token);
+      router.push(redirectUrl.toString());
+
+    } catch (err) {
+      console.error('OAuth error:', err);
+      alert('Yon erè te rive. Tanpri rekòmanse.');
       setLoading(false);
-      return;
     }
-
-    // 2. Jenere yon token pou WooCommerce la
-    // (sa a ta dwe yon token ki valab pou 1 èdtan)
-    const token = crypto.randomUUID();
-
-    // 3. Anrejistre token an nan baz done pou machann nan
-    await supabase.from('oauth_tokens').insert({
-      user_id: user.id,
-      token: token,
-      platform: 'woocommerce',
-      expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 èdtan
-    });
-
-    // 4. Redireksyon tounen nan WooCommerce la ak token an
-    const redirectUrl = new URL(returnUrl || '');
-    redirectUrl.searchParams.set('hatex_token', token);
-    router.push(redirectUrl.toString());
   };
 
   return (
