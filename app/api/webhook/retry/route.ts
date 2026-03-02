@@ -1,23 +1,41 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 export async function GET(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set(name, value, options);
+        },
+        remove(name: string, options: any) {
+          cookieStore.set(name, '', { ...options, maxAge: 0 });
+        },
+      },
+    }
+  );
 
   // 1. Chèche failures ki prè pou retry
+  const now = new Date().toISOString();
   const { data: failures, error } = await supabase
     .from('webhook_failures')
     .select('*, webhooks(*)')
-    .lte('next_retry_at', new Date().toISOString())
+    .lte('next_retry_at', now)
     .lt('retry_count', 5); // Pa eseye plis pase 5 fwa
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  for (const fail of failures) {
+  for (const fail of failures || []) {
     const webhook = fail.webhooks;
     if (!webhook) continue;
 
@@ -62,7 +80,7 @@ export async function GET(request: Request) {
         // Si mache, efase failure a
         await supabase.from('webhook_failures').delete().eq('id', fail.id);
       } else {
-        // Si pa mache, mete ajou retry_count ak next_retry_at
+        // Si pa mache, mete ajou retry_count ak next_retry_at (backoff eksponansyèl)
         const nextRetry = new Date();
         nextRetry.setMinutes(nextRetry.getMinutes() + Math.pow(2, fail.retry_count + 1));
         await supabase
@@ -86,5 +104,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ processed: failures.length });
+  return NextResponse.json({ processed: failures?.length || 0 });
 }

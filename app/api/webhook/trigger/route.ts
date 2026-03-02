@@ -1,14 +1,28 @@
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Inisyalize Supabase ak sèvis backend
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Sa a se kle ki an sekirite (backend sèlman)
-);
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name: string, value: string, options: any) {
+            cookieStore.set(name, value, options);
+          },
+          remove(name: string, options: any) {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          },
+        },
+      }
+    );
+
     // 1. Resevwa done yo
     const { transaction } = await request.json();
     
@@ -18,7 +32,7 @@ export async function POST(request: Request) {
 
     console.log('✅ Webhook resevwa:', transaction);
 
-    // 2. Anrejistre tranzaksyon an nan baz done (si ou vle)
+    // 2. Anrejistre tranzaksyon an
     const { data, error } = await supabase
       .from('transactions')
       .insert({
@@ -42,10 +56,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 3. Ou ka voye imèl, SMS, elatriye isit
-    // (ou deja genyen api/send-email)
+    // 3. (Opsyonèl) Voye notifikasyon bay machann nan via webhooks
+    // ... (ou ka ajoute lojik pou sa)
 
-    // 4. Retounen yon siksè
     return NextResponse.json({ 
       success: true, 
       message: 'Webhook trete ak siksè',
@@ -58,7 +71,6 @@ export async function POST(request: Request) {
   }
 }
 
-// Opsyonèl: pou verifye ke route la mache (GET)
 export async function GET() {
   return NextResponse.json({ message: 'Webhook endpoint API a ap mache' });
 }
