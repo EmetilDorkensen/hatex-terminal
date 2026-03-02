@@ -1,29 +1,13 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js'; // ✅ Sa a se pi senp, pa bezwen cookies
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set(name, value, options);
-          },
-          remove(name: string, options: any) {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          },
-        },
-      }
-    );
-
-    // 1. Resevwa done yo
     const { transaction } = await request.json();
     
     if (!transaction) {
@@ -32,7 +16,6 @@ export async function POST(request: Request) {
 
     console.log('✅ Webhook resevwa:', transaction);
 
-    // 2. Anrejistre tranzaksyon an
     const { data, error } = await supabase
       .from('transactions')
       .insert({
@@ -55,9 +38,6 @@ export async function POST(request: Request) {
       console.error('❌ Erè nan anrejistreman:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    // 3. (Opsyonèl) Voye notifikasyon bay machann nan via webhooks
-    // ... (ou ka ajoute lojik pou sa)
 
     return NextResponse.json({ 
       success: true, 

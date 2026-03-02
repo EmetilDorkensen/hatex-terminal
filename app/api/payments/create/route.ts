@@ -5,16 +5,7 @@ import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
   try {
-    // 1. Verifye machann nan
-    const merchantId = request.headers.get('X-Merchant-ID');
-    const apiKey = request.headers.get('X-API-Key');
-    const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
-
-    if (!merchantId || !apiKey) {
-      return NextResponse.json({ error: 'Missing credentials' }, { status: 401 });
-    }
-
-    // Await cookies() paske li retounen yon Promise nan Next.js 15+
+    // ✅ Atann cookieStore a (paske cookies() retounen yon Promise)
     const cookieStore = await cookies();
     
     const supabase = createServerClient(
@@ -35,6 +26,15 @@ export async function POST(request: Request) {
       }
     );
 
+    // 1. Verifye machann nan
+    const merchantId = request.headers.get('X-Merchant-ID');
+    const apiKey = request.headers.get('X-API-Key');
+    const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
+
+    if (!merchantId || !apiKey) {
+      return NextResponse.json({ error: 'Missing credentials' }, { status: 401 });
+    }
+
     // 2. Verifye kle API a
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 3. Verifye idempotency
+    // 3. Verifye idempotency (anpeche doub peman)
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('*')
@@ -61,14 +61,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Resevwa done yo
+    // 4. Resewva done yo
     const body = await request.json();
     const { amount, currency, description, metadata, returnUrl } = body;
 
-    // 5. Kreye yon ID inik
+    // 5. Kreye yon ID inik pou peman an
     const paymentId = randomUUID();
 
-    // 6. Anrejistre peman an
+    // 6. Anrejistre peman an nan baz done
     const { data: payment, error } = await supabase
       .from('payments')
       .insert({
@@ -88,7 +88,6 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // 7. Retounen lyen an
     return NextResponse.json({
       paymentId: payment.id,
       paymentUrl: `/pay/${payment.id}`
