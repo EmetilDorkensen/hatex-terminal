@@ -56,39 +56,40 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
-  // ============================================================
-  // FONKSYON POU JENERE API KEY
-  // ============================================================
-  const generateApiKey = useCallback(async () => {
-    if (!profile?.id) return;
-    if (profile?.kyc_status !== 'approved') return;
+// ============================================================
+// FONKSYON POU JENERE API KEY
+// ============================================================
+const generateApiKey = useCallback(async () => {
+  if (!profile?.id) return;
+  if (profile?.kyc_status !== 'approved') return;
+  
+  setGeneratingApiKey(true);
+  try {
+    // Jenere yon kle API inik - itilize Web Crypto API
+    const array = new Uint8Array(24);
+    window.crypto.getRandomValues(array);
+    const apiKey = 'hx_live_' + Array.from(array)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
     
-    setGeneratingApiKey(true);
-    try {
-      // Jenere yon kle API inik
-      const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      
-      // Mete ajou nan baz done
-      const { error } = await supabase
-        .from('profiles')
-        .update({ api_key: apiKey })
-        .eq('id', profile.id);
-      
-      if (error) throw error;
-      
-      // Mete ajou state lokal la
-      setProfile({ ...profile, api_key: apiKey });
-      alert('Kle API jenere ak siksè!');
-    } catch (error) {
-      console.error('Error generating API key:', error);
-      alert('Erè pandan jenere kle API. Tanpri rekòmanse.');
-    } finally {
-      setGeneratingApiKey(false);
-    }
-  }, [profile, supabase]);
-
+    // Mete ajou nan baz done
+    const { error } = await supabase
+      .from('profiles')
+      .update({ api_key: apiKey })
+      .eq('id', profile.id);
+    
+    if (error) throw error;
+    
+    // Mete ajou state lokal la
+    setProfile({ ...profile, api_key: apiKey });
+    alert('Kle API jenere ak siksè!');
+  } catch (error) {
+    console.error('Error generating API key:', error);
+    alert('Erè pandan jenere kle API. Tanpri rekòmanse.');
+  } finally {
+    setGeneratingApiKey(false);
+  }
+}, [profile, supabase]);
   // ============================================================
   // INITIALIZATION (KYC verifye)
   // ============================================================
@@ -112,9 +113,14 @@ export default function TerminalPage() {
           setBusinessName(prof.business_name || '');
           setYoutubeUrl(prof.sdk_tutorial_url || '');
           
-          // Si KYC apwouve epi pa gen api_key, jenere youn
+          // ✅ NOUVO KOD LA - Si KYC apwouve epi pa gen api_key, jenere youn
           if (prof.kyc_status === 'approved' && !prof.api_key) {
-            await generateApiKey();
+            try {
+              await generateApiKey();
+            } catch (err) {
+              console.error("Pa kapab jenere kle API otomatikman:", err);
+              // Pa montre alèt, kite itilizatè a jenere manyèlman nan Settings
+            }
           }
         }
         
