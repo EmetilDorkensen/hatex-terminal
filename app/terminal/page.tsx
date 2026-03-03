@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
@@ -54,7 +55,7 @@ export default function TerminalPage() {
   ), []);
 
   // ============================================================
-  // INITIALIZATION
+  // INITIALIZATION (KYC verifye)
   // ============================================================
   useEffect(() => {
     const initTerminal = async () => {
@@ -220,28 +221,24 @@ export default function TerminalPage() {
     return amount.toLocaleString() + ' HTG';
   };
 
-// ============================================================
-// FONKSYON JENERASYON PLUGIN YO - KOREJE AK KOMPLET
-// ============================================================
+  // ============================================================
+  // FONKSYON JENERASYON PLUGIN YO (KOREJE)
+  // ============================================================
 
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+  const generateWooCommercePlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
 
-// ---- FONKSYON POU JENERE PLUGIN WOOCOMMERCE (KOREJE) ----
-const generateWooCommercePlugin = async (profile: any, setDownloadingPlugin: any) => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') {
-    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    return;
-  }
+    setDownloadingPlugin('woocommerce');
 
-  setDownloadingPlugin('woocommerce');
+    try {
+      const zip = new JSZip();
 
-  try {
-    const zip = new JSZip();
-
-    // --- 1. FICHYE PRENSIPAL: hatex-woocommerce.php ---
-    const mainFile = `<?php
+      // --- 1. FICHYE PRENSIPAL: hatex-woocommerce.php ---
+      const mainFile = `<?php
 /**
  * Plugin Name: HATEX Payments
  * Plugin URI: https://hatexcard.com
@@ -263,16 +260,14 @@ if (!defined('ABSPATH')) {
 define('HATEX_WC_VERSION', '1.0.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('HATEX_MERCHANT_ID', '${profile.id}'); // ID machann nan (ranplase otomatikman)
+define('HATEX_MERCHANT_ID', '${profile.id}'); // ID machann nan
 
-// Ajoute gateway nan lis WooCommerce
 function add_hatex_gateway($methods) {
     $methods[] = 'WC_Gateway_HATEX';
     return $methods;
 }
 add_filter('woocommerce_payment_gateways', 'add_hatex_gateway');
 
-// Chaje klas yo
 function init_hatex_gateway() {
     if (!class_exists('WooCommerce')) {
         return;
@@ -281,7 +276,6 @@ function init_hatex_gateway() {
 }
 add_action('plugins_loaded', 'init_hatex_gateway');
 
-// Lyen konfigirasyon sou paj plugin yo
 function hatex_add_settings_link($links) {
     $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=hatex');
     $settings_link = '<a href="' . esc_url($settings_url) . '">Konfigirasyon</a>';
@@ -290,17 +284,13 @@ function hatex_add_settings_link($links) {
 }
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'hatex_add_settings_link');
 
-// Deklare konpatibilite ak High-Performance Order Storage (HPOS) ak Checkout Blocks
 add_action('before_woocommerce_init', function() {
     if (class_exists(\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::class)) {
-        // HPOS
         \\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
-        // Checkout Blocks
         \\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::declare_compatibility('cart_checkout_blocks', __FILE__, true);
     }
 });
 
-// Anrejistre sipò pou blocks checkout yo
 add_action('woocommerce_blocks_loaded', 'hatex_register_block_support');
 function hatex_register_block_support() {
     if (class_exists('Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType')) {
@@ -315,13 +305,13 @@ function hatex_register_block_support() {
 }
 `;
 
-    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php ---
-    const gatewayFile = `<?php
+      // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php ---
+      const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
         \$this->id                 = 'hatex';
-        \$this->icon               = ''; // Mete yon icon si ou vle
+        \$this->icon               = '';
         \$this->has_fields         = true;
         \$this->method_title       = __('HATEX Payments', 'hatex-woocommerce');
         \$this->method_description = __('Aksepte peman an Goud atravè HATEX.', 'hatex-woocommerce');
@@ -333,7 +323,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         \$this->title       = \$this->get_option('title');
         \$this->description = \$this->get_option('description');
         \$this->enabled     = \$this->get_option('enabled');
-        \$this->merchant_id = HATEX_MERCHANT_ID; // ID machann nan (soti nan konstant lan)
+        \$this->merchant_id = HATEX_MERCHANT_ID;
 
         add_action('woocommerce_update_options_payment_gateways_' . \$this->id, array(\$this, 'process_admin_options'));
         add_action('woocommerce_api_wc_gateway_hatex', array(\$this, 'handle_webhook'));
@@ -387,7 +377,6 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         \$currency = \$order->get_currency();
         \$amount   = \$order->get_total();
 
-        // Konvèti an Goud si nesesè
         if (\$currency === 'USD') {
             \$amount   = \$amount * 136;
             \$currency = 'HTG';
@@ -521,13 +510,13 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
 }
 `;
 
-    // --- 3. SIPO POU BLOCKS: includes/class-wc-gateway-hatex-blocks-support.php ---
-    const blocksSupportFile = `<?php
+      // --- 3. SIPO POU BLOCKS: includes/class-wc-gateway-hatex-blocks-support.php ---
+      const blocksSupportFile = `<?php
 use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
 
 final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
-    protected \$name = 'hatex'; // ID metod peman an (dwe matche ak \$this->id nan klas prensipal la)
+    protected \$name = 'hatex';
 
     private \$gateway;
 
@@ -556,15 +545,14 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
             'title'       => \$this->gateway->title,
             'description' => \$this->gateway->description,
             'supports'    => array_filter(\$this->gateway->supports, array(\$this->gateway, 'supports')),
-            'icon'        => '', // ou ka ajoute yon URL icon si ou vle
+            'icon'        => '',
         );
     }
 }
 `;
 
-    // --- 4. JAVASCRIPT POU BLOCKS: assets/js/checkout.js ---
-    const jsFile = `// checkout.js - JavaScript pou sipòte checkout blocks
-const settings = window.wc.wcSettings.getSetting('hatex_data', {});
+      // --- 4. JAVASCRIPT POU BLOCKS: assets/js/checkout.js ---
+      const jsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
 const Content = () => {
@@ -586,8 +574,8 @@ const Block_Gateway = {
 window.wc.wcBlocksRegistry.registerPaymentMethod(Block_Gateway);
 `;
 
-    // --- 5. readme.txt (pou soumèt WordPress.org) ---
-    const readmeFile = `=== HATEX Payments ===
+      // --- 5. readme.txt ---
+      const readmeFile = `=== HATEX Payments ===
 Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
@@ -629,40 +617,36 @@ Plugin an itilize taux 136. Si w bezwen chanje taux la, kontakte sipò HATEX.
 * Premye vèsyon
 `;
 
-    // Ajoute tout fichye yo nan ZIP
-    zip.file('hatex-woocommerce.php', mainFile);
-    zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
-    zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
-    zip.file('assets/js/checkout.js', jsFile);
-    zip.file('readme.txt', readmeFile);
+      zip.file('hatex-woocommerce.php', mainFile);
+      zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
+      zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
+      zip.file('assets/js/checkout.js', jsFile);
+      zip.file('readme.txt', readmeFile);
 
-    // Jenere ZIP la epi telechaje
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
 
-  } catch (error) {
-    console.error('Error generating WooCommerce plugin:', error);
-    alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
-  } finally {
-    setDownloadingPlugin(null);
-  }
-};
+    } catch (error) {
+      console.error('Error generating WooCommerce plugin:', error);
+      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
 
-// ---- FONKSYON POU JENERE PLUGIN SHOPIFY (KOREJE) ----
-const generateShopifyPlugin = async (profile: any, setDownloadingPlugin: any) => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') {
-    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    return;
-  }
+  const generateShopifyPlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
 
-  setDownloadingPlugin('shopify');
+    setDownloadingPlugin('shopify');
 
-  try {
-    const zip = new JSZip();
+    try {
+      const zip = new JSZip();
 
-    // Shopify app configuration (JSON)
-    const shopifyConfig = `{
+      const shopifyConfig = `{
   "name": "HATEX Payments",
   "description": "Aksepte peman an Goud atravè HATEX",
   "version": "1.0.0",
@@ -671,14 +655,11 @@ const generateShopifyPlugin = async (profile: any, setDownloadingPlugin: any) =>
   "rate": 136
 }`;
 
-    // Shopify extension file (JavaScript)
-    const extensionFile = `// HATEX Shopify Extension
+      const extensionFile = `// HATEX Shopify Extension
 // Merchant ID: ${profile.id}
 
-// Sa a se yon senp egzanp. Pou yon aplikasyon reyèl, ou ta bezwen itilize Shopify API a.
 console.log('HATEX Payments initialized for merchant:', '${profile.id}');
 
-// Fonksyon pou kreye yon peman
 async function createHatexPayment(amount, currency, orderId) {
   const response = await fetch('https://api.hatexcard.com/v1/payments', {
     method: 'POST',
@@ -704,46 +685,44 @@ async function createHatexPayment(amount, currency, orderId) {
   }
 }
 
-// Ekspoze fonksyon an globalman pou itilize nan Shopify
 window.HatexShopify = {
   createPayment: createHatexPayment
 };`;
 
-    zip.file('hatex-shopify.json', shopifyConfig);
-    zip.file('extension/index.js', extensionFile);
+      zip.file('hatex-shopify.json', shopifyConfig);
+      zip.file('extension/index.js', extensionFile);
 
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `hatex-shopify-${profile.id.slice(0,8)}.zip`);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-shopify-${profile.id.slice(0,8)}.zip`);
 
-  } catch (error) {
-    console.error('Error generating Shopify plugin:', error);
-    alert('Erè pandan jenere Shopify plugin an. Tanpri rekòmanse.');
-  } finally {
-    setDownloadingPlugin(null);
-  }
-};
+    } catch (error) {
+      console.error('Error generating Shopify plugin:', error);
+      alert('Erè pandan jenere Shopify plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
 
-// ---- FONKSYON POU JENERE PLUGIN WIX (KOREJE) ----
-const generateWixPlugin = async (profile: any, setDownloadingPlugin: any) => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') {
-    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    return;
-  }
+  const generateWixPlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
 
-  setDownloadingPlugin('wix');
+    setDownloadingPlugin('wix');
 
-  try {
-    const zip = new JSZip();
+    try {
+      const zip = new JSZip();
 
-    const wixConfig = `{
+      const wixConfig = `{
   "merchantId": "${profile.id}",
   "businessName": "${profile.business_name || 'HATEX Merchant'}",
   "rate": 136,
   "apiUrl": "https://api.hatexcard.com/v1"
 }`;
 
-    const wixCode = `// HATEX Wix App
+      const wixCode = `// HATEX Wix App
 // Merchant ID: ${profile.id}
 
 import { payment } from 'wix-payment';
@@ -759,7 +738,6 @@ export function initHatexPayments() {
     name: 'HATEX Payments',
     label: 'Peye an Goud ak HATEX',
     async processPayment(order) {
-      // Lojik pou kreye peman
       const response = await fetch(config.apiUrl + '/payments', {
         method: 'POST',
         headers: {
@@ -793,41 +771,40 @@ export function initHatexPayments() {
   });
 }`;
 
-    zip.file('hatex-wix.json', wixConfig);
-    zip.file('src/hatex-payments.js', wixCode);
+      zip.file('hatex-wix.json', wixConfig);
+      zip.file('src/hatex-payments.js', wixCode);
 
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `hatex-wix-${profile.id.slice(0,8)}.zip`);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-wix-${profile.id.slice(0,8)}.zip`);
 
-  } catch (error) {
-    console.error('Error generating Wix plugin:', error);
-    alert('Erè pandan jenere Wix plugin an. Tanpri rekòmanse.');
-  } finally {
-    setDownloadingPlugin(null);
-  }
-};
+    } catch (error) {
+      console.error('Error generating Wix plugin:', error);
+      alert('Erè pandan jenere Wix plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
 
-// ---- FONKSYON POU JENERE PLUGIN HOSTINGER (KOREJE) ----
-const generateHostingerPlugin = async (profile: any, setDownloadingPlugin: any) => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') {
-    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    return;
-  }
+  const generateHostingerPlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
 
-  setDownloadingPlugin('hostinger');
+    setDownloadingPlugin('hostinger');
 
-  try {
-    const zip = new JSZip();
+    try {
+      const zip = new JSZip();
 
-    const hostingerConfig = `{
+      const hostingerConfig = `{
   "merchantId": "${profile.id}",
   "businessName": "${profile.business_name || 'HATEX Merchant'}",
   "rate": 136,
   "apiUrl": "https://api.hatexcard.com/v1"
 }`;
 
-    const hostingerCode = `<!-- HATEX Payments for Hostinger/Horizon -->
+      const hostingerCode = `<!-- HATEX Payments for Hostinger/Horizon -->
 <!-- Merchant ID: ${profile.id} -->
 <script>
 (function() {
@@ -836,7 +813,6 @@ const generateHostingerPlugin = async (profile: any, setDownloadingPlugin: any) 
   const API_URL = 'https://api.hatexcard.com/v1/payments';
 
   function injectHatexButton() {
-    // Chèche bouton ki sanble ak "Ajouter au panier" oswa "Add to cart"
     const buttons = document.querySelectorAll('button[type="submit"], .add-to-cart, .btn-primary, .product-form__submit, [class*="add-to-cart"]');
     
     buttons.forEach(btn => {
@@ -857,7 +833,6 @@ const generateHostingerPlugin = async (profile: any, setDownloadingPlugin: any) 
       htxBtn.onclick = async (e) => {
         e.preventDefault();
         
-        // Eseye jwenn pri a
         const priceEl = document.querySelector('[class*="price"], .product-price, .price, [itemprop="price"]');
         let price = 0;
         if (priceEl) {
@@ -907,40 +882,25 @@ const generateHostingerPlugin = async (profile: any, setDownloadingPlugin: any) 
     injectHatexButton();
   }
   
-  // Re-eseye pou kontni dinamik
   setTimeout(injectHatexButton, 1000);
   setTimeout(injectHatexButton, 2000);
 })();
 </script>`;
 
-    zip.file('hatex-hostinger.json', hostingerConfig);
-    zip.file('embed-code.html', hostingerCode);
+      zip.file('hatex-hostinger.json', hostingerConfig);
+      zip.file('embed-code.html', hostingerCode);
 
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `hatex-hostinger-${profile.id.slice(0,8)}.zip`);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-hostinger-${profile.id.slice(0,8)}.zip`);
 
-  } catch (error) {
-    console.error('Error generating Hostinger plugin:', error);
-    alert('Erè pandan jenere Hostinger plugin an. Tanpri rekòmanse.');
-  } finally {
-    setDownloadingPlugin(null);
-  }
-};
+    } catch (error) {
+      console.error('Error generating Hostinger plugin:', error);
+      alert('Erè pandan jenere Hostinger plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
 
-// ============================================================
-// KOMAN ITILIZE FONKSYON SA YO NAN TERMINAL LA
-// ============================================================
-// Nan kòd prensipal terminal ou a, ajoute sa:
-
-/*
-// Deklare downloadingPlugin nan useState
-const [downloadingPlugin, setDownloadingPlugin] = useState<string | null>(null);
-
-// Lè w klike sou bouton an pou telechaje, rele fonksyon an:
-<button onClick={() => generateWooCommercePlugin(profile, setDownloadingPlugin)}>
-  {downloadingPlugin === 'woocommerce' ? 'Ap jenere...' : 'Telechaje WooCommerce Plugin'}
-</button>
-*/
   // ============================================================
   // API FUNCTIONS
   // ============================================================
