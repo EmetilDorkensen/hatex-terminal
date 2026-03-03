@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
@@ -34,6 +34,7 @@ export default function TerminalPage() {
   const [syncing, setSyncing] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [downloadingPlugin, setDownloadingPlugin] = useState<string | null>(null);
+  const [generatingApiKey, setGeneratingApiKey] = useState(false);
   
   // Form states
   const [amount, setAmount] = useState('');
@@ -41,6 +42,7 @@ export default function TerminalPage() {
   const [description, setDescription] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedApiKey, setCopiedApiKey] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [showVideo, setShowVideo] = useState(false);
   
@@ -55,6 +57,39 @@ export default function TerminalPage() {
   ), []);
 
   // ============================================================
+  // FONKSYON POU JENERE API KEY
+  // ============================================================
+  const generateApiKey = useCallback(async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') return;
+    
+    setGeneratingApiKey(true);
+    try {
+      // Jenere yon kle API inik
+      const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      
+      // Mete ajou nan baz done
+      const { error } = await supabase
+        .from('profiles')
+        .update({ api_key: apiKey })
+        .eq('id', profile.id);
+      
+      if (error) throw error;
+      
+      // Mete ajou state lokal la
+      setProfile({ ...profile, api_key: apiKey });
+      alert('Kle API jenere ak siksè!');
+    } catch (error) {
+      console.error('Error generating API key:', error);
+      alert('Erè pandan jenere kle API. Tanpri rekòmanse.');
+    } finally {
+      setGeneratingApiKey(false);
+    }
+  }, [profile, supabase]);
+
+  // ============================================================
   // INITIALIZATION (KYC verifye)
   // ============================================================
   useEffect(() => {
@@ -64,16 +99,23 @@ export default function TerminalPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return router.push('/login');
         
-        const { data: prof } = await supabase
+        const { data: prof, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
           
+        if (error) throw error;
+        
         if (prof) {
           setProfile(prof);
           setBusinessName(prof.business_name || '');
           setYoutubeUrl(prof.sdk_tutorial_url || '');
+          
+          // Si KYC apwouve epi pa gen api_key, jenere youn
+          if (prof.kyc_status === 'approved' && !prof.api_key) {
+            await generateApiKey();
+          }
         }
         
         // Load transactions
@@ -99,7 +141,7 @@ export default function TerminalPage() {
       }
     };
     initTerminal();
-  }, [supabase, router]);
+  }, [supabase, router, generateApiKey]);
 
   // ============================================================
   // COMPUTED VALUES
@@ -221,7 +263,7 @@ export default function TerminalPage() {
     return amount.toLocaleString() + ' HTG';
   };
 
- // ============================================================
+  // ============================================================
   // FONKSYON JENERASYON PLUGIN YO (KOREJE)
   // ============================================================
 
@@ -229,6 +271,10 @@ export default function TerminalPage() {
     if (!profile?.id) return;
     if (profile?.kyc_status !== 'approved') {
       alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
+    if (!profile?.api_key) {
+      alert('Kle API poko jenere. Tanpri reyese answit.');
       return;
     }
 
@@ -260,7 +306,7 @@ if (!defined('ABSPATH')) {
 define('HATEX_WC_VERSION', '1.0.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('HATEX_MERCHANT_ID', '${profile.api_key || profile.id}'); // KOREKSYON: itilize api_key an premye
+define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Itilize kle API a
 
 function add_hatex_gateway($methods) {
     $methods[] = 'WC_Gateway_HATEX';
@@ -323,7 +369,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->title       = $this->get_option('title');
         $this->description = $this->get_option('description');
         $this->enabled     = $this->get_option('enabled');
-        $this->merchant_id = HATEX_MERCHANT_ID;
+        $this->merchant_id = HATEX_MERCHANT_ID; // Kle API a
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         add_action('woocommerce_api_wc_gateway_hatex', array($this, 'handle_webhook'));
@@ -383,7 +429,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         }
 
         $payload = array(
-            'merchant_id' => $this->merchant_id,
+            'merchant_id' => $this->merchant_id, // Voye kle API a
             'amount'      => $amount,
             'currency'    => $currency,
             'description' => sprintf(__('Kòmand #%s', 'hatex-woocommerce'), $order->get_order_number()),
@@ -403,14 +449,13 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $response = wp_remote_post('https://api.hatexcard.com/v1/payments', array(
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'X-Merchant-ID' => $this->merchant_id,
+                'X-API-Key' => $this->merchant_id, // Nou voye kle API a nan header X-API-Key
             ),
             'body'    => json_encode($payload),
             'timeout' => 30,
         ));
 
         if (is_wp_error($response)) {
-            // Ajoute debogaj
             error_log('HATEX API Error: ' . $response->get_error_message());
             wc_add_notice(__('Erè koneksyon ak HATEX: ' . $response->get_error_message(), 'hatex-woocommerce'), 'error');
             return array('result' => 'failure');
@@ -489,7 +534,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $response = wp_remote_post('https://api.hatexcard.com/v1/refunds', array(
             'headers' => array(
                 'Content-Type'  => 'application/json',
-                'X-Merchant-ID' => $this->merchant_id,
+                'X-API-Key' => $this->merchant_id,
             ),
             'body' => json_encode(array(
                 'transaction_id' => $transaction_id,
@@ -645,6 +690,10 @@ Plugin an itilize taux 136. Si w bezwen chanje taux la, kontakte sipò HATEX.
       alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
       return;
     }
+    if (!profile?.api_key) {
+      alert('Kle API poko jenere. Tanpri reyese answit.');
+      return;
+    }
 
     setDownloadingPlugin('shopify');
 
@@ -655,25 +704,25 @@ Plugin an itilize taux 136. Si w bezwen chanje taux la, kontakte sipò HATEX.
   "name": "HATEX Payments",
   "description": "Aksepte peman an Goud atravè HATEX",
   "version": "1.0.0",
-  "merchant_id": "${profile.id}",
+  "merchant_id": "${profile.api_key}",
   "api_url": "https://api.hatexcard.com/v1",
   "rate": 136
 }`;
 
       const extensionFile = `// HATEX Shopify Extension
-// Merchant ID: ${profile.id}
+// Merchant ID: ${profile.api_key}
 
-console.log('HATEX Payments initialized for merchant:', '${profile.id}');
+console.log('HATEX Payments initialized for merchant:', '${profile.api_key}');
 
 async function createHatexPayment(amount, currency, orderId) {
   const response = await fetch('https://api.hatexcard.com/v1/payments', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Merchant-ID': '${profile.id}'
+      'X-API-Key': '${profile.api_key}'
     },
     body: JSON.stringify({
-      merchant_id: '${profile.id}',
+      merchant_id: '${profile.api_key}',
       amount: amount,
       currency: currency,
       description: 'Shopify order #' + orderId,
@@ -714,6 +763,10 @@ window.HatexShopify = {
       alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
       return;
     }
+    if (!profile?.api_key) {
+      alert('Kle API poko jenere. Tanpri reyese answit.');
+      return;
+    }
 
     setDownloadingPlugin('wix');
 
@@ -721,20 +774,20 @@ window.HatexShopify = {
       const zip = new JSZip();
 
       const wixConfig = `{
-  "merchantId": "${profile.id}",
+  "merchantId": "${profile.api_key}",
   "businessName": "${profile.business_name || 'HATEX Merchant'}",
   "rate": 136,
   "apiUrl": "https://api.hatexcard.com/v1"
 }`;
 
       const wixCode = `// HATEX Wix App
-// Merchant ID: ${profile.id}
+// Merchant ID: ${profile.api_key}
 
 import { payment } from 'wix-payment';
 
 export function initHatexPayments() {
   const config = {
-    merchantId: '${profile.id}',
+    merchantId: '${profile.api_key}',
     apiUrl: 'https://api.hatexcard.com/v1',
     rate: 136
   };
@@ -747,7 +800,7 @@ export function initHatexPayments() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Merchant-ID': config.merchantId
+          'X-API-Key': config.merchantId
         },
         body: JSON.stringify({
           merchant_id: config.merchantId,
@@ -796,6 +849,10 @@ export function initHatexPayments() {
       alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
       return;
     }
+    if (!profile?.api_key) {
+      alert('Kle API poko jenere. Tanpri reyese answit.');
+      return;
+    }
 
     setDownloadingPlugin('hostinger');
 
@@ -803,17 +860,17 @@ export function initHatexPayments() {
       const zip = new JSZip();
 
       const hostingerConfig = `{
-  "merchantId": "${profile.id}",
+  "merchantId": "${profile.api_key}",
   "businessName": "${profile.business_name || 'HATEX Merchant'}",
   "rate": 136,
   "apiUrl": "https://api.hatexcard.com/v1"
 }`;
 
       const hostingerCode = `<!-- HATEX Payments for Hostinger/Horizon -->
-<!-- Merchant ID: ${profile.id} -->
+<!-- Merchant ID: ${profile.api_key} -->
 <script>
 (function() {
-  const MERCHANT_ID = '${profile.id}';
+  const MERCHANT_ID = '${profile.api_key}';
   const RATE = 136;
   const API_URL = 'https://api.hatexcard.com/v1/payments';
 
@@ -863,7 +920,7 @@ export function initHatexPayments() {
         try {
           const res = await fetch(API_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': MERCHANT_ID },
             body: JSON.stringify(payload)
           });
           const data = await res.json();
@@ -920,6 +977,10 @@ export function initHatexPayments() {
 
   const updateBusinessName = async () => {
     if (!businessName) return alert("Tanpri antre yon non biznis.");
+    if (profile?.business_name) {
+      alert("Ou pa ka modifye non biznis apre li fin anrejistre.");
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase
@@ -1174,15 +1235,7 @@ export function initHatexPayments() {
                 className="w-full bg-black/40 border border-white/10 py-6 pl-16 pr-6 rounded-3xl text-[14px] outline-none text-white italic focus:border-red-600/50 transition-all"
               />
             </div>
-            {!profile?.business_name && (
-              <button
-                onClick={updateBusinessName}
-                disabled={loading}
-                className="bg-white text-black px-10 py-6 rounded-3xl font-black uppercase text-[12px] hover:bg-red-600 hover:text-white transition-all active:scale-95"
-              >
-                {loading ? 'Processing...' : 'Verifye Idantite'}
-              </button>
-            )}
+            {/* Button "Verifye Idantite" retire nèt */}
           </div>
           
           <div className="mt-10 pt-10 border-t border-white/5 grid grid-cols-2 gap-6">
@@ -1233,7 +1286,7 @@ export function initHatexPayments() {
             </button>
           </div>
 
-          {/* Stats */}
+          {/* 4 Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-white/5">
             {[
               { label: 'Total SDK', val: earnings.sdkTotal, icon: <Zap size={15} />, sub: `${earnings.sdkCount} vant`, color: 'text-blue-400' },
@@ -1252,7 +1305,7 @@ export function initHatexPayments() {
             ))}
           </div>
 
-          {/* Recent Sales */}
+          {/* Dènye vant */}
           <div className="p-6 border-t border-white/5">
             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Dènye Vant</p>
             {recentSales.length > 0 ? (
@@ -1294,35 +1347,22 @@ export function initHatexPayments() {
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* QUICK ACTIONS */}
         {profile?.business_name ? (
           <div className="grid grid-cols-2 gap-6">
-            <button
-              onClick={() => setMode('plugins')}
-              className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform">
-                <DownloadCloud className="text-red-600 w-7 h-7" />
-              </div>
-              <div className="text-center">
-                <span className="text-[12px] font-black uppercase italic block">Telechaje Plugins</span>
-                <span className="text-[8px] text-zinc-500 uppercase font-bold mt-1 block">WooCommerce, Shopify, Wix, Hostinger</span>
-              </div>
-            </button>
-            <button
-              onClick={() => { setMode('invoices'); setSubMode('create'); }}
-              className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform">
-                <FileText className="text-red-600 w-7 h-7" />
-              </div>
-              <div className="text-center">
-                <span className="text-[12px] font-black uppercase italic block">Smart Invoice</span>
-                <span className="text-[8px] text-zinc-500 uppercase font-bold mt-1 block">Voye fakti bay kliyan</span>
-              </div>
-            </button>
+            {[
+              { icon: <Code className="text-red-600 w-7 h-7" />, label: 'SDK Deployment', sub: 'Konekte boutik ou', action: () => setMode('plugins') },
+              { icon: <FileText className="text-red-600 w-7 h-7" />, label: 'Smart Invoice', sub: 'Voye fakti bay kliyan', action: () => { setMode('invoices'); setSubMode('create'); } },
+            ].map((a) => (
+              <button key={a.label} onClick={a.action} className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform">{a.icon}</div>
+                <div className="text-center">
+                  <span className="text-[12px] font-black uppercase italic block">{a.label}</span>
+                  <span className="text-[8px] text-zinc-500 uppercase font-bold mt-1 block">{a.sub}</span>
+                </div>
+              </button>
+            ))}
           </div>
         ) : (
           <div className="bg-red-600/5 border border-red-600/20 p-12 rounded-[4rem] text-center">
@@ -1335,14 +1375,12 @@ export function initHatexPayments() {
         )}
       </div>
 
-      {/* Sidebar */}
+      {/* ── SIDEBAR ── */}
       <div className="lg:col-span-4 space-y-6">
-        {/* Wallet Balance */}
+        {/* Balans */}
         <div className="bg-white text-black p-8 rounded-[3.5rem] shadow-2xl shadow-red-600/10">
           <div className="flex justify-between items-start mb-5">
-            <div className="bg-black text-white p-4 rounded-2xl">
-              <Wallet size={18} />
-            </div>
+            <div className="bg-black text-white p-4 rounded-2xl"><Wallet size={18} /></div>
             <div className="text-right">
               <p className="text-[9px] font-black uppercase tracking-widest opacity-40">Balans Wallet</p>
               <h2 className="text-3xl font-black italic tracking-tighter mt-1">
@@ -1357,31 +1395,75 @@ export function initHatexPayments() {
               <span className="text-[8px] bg-red-100 text-red-600 font-black px-2 py-1 rounded-full">DISPONIB</span>
             </div>
           </div>
-          <button
-            onClick={handleSyncBalance}
-            disabled={syncing || earnings.total <= 0}
-            className="w-full bg-black hover:bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-[10px] transition-all flex items-center justify-center gap-2 disabled:opacity-40"
-          >
+          <button onClick={handleSyncBalance} disabled={syncing || earnings.total <= 0} className="w-full bg-black hover:bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-[10px] transition-all flex items-center justify-center gap-2 disabled:opacity-40">
             {syncing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
             Senkronize {earnings.total > 0 ? earnings.total.toLocaleString() + ' HTG' : ''}
           </button>
         </div>
 
-        {/* Config Info */}
+        {/* Node Config */}
         <div className="bg-zinc-900/30 border border-white/5 p-7 rounded-[3rem]">
           <h3 className="text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-zinc-500">Konfigirasyon</h3>
           <div className="space-y-3">
             {[
-              { label: 'Merchant ID', val: (profile?.id?.slice(0, 8) || '—') + '...', color: 'text-red-500' },
-              { label: 'KYC Status', val: profile?.kyc_status || 'pending', color: profile?.kyc_status === 'approved' ? 'text-green-500' : 'text-orange-500' },
-              { label: 'To konvèsyon', val: '1 USD = 136 HTG', color: 'text-blue-400' },
-              { label: 'Revni Mwa a', val: formatCurrency(earnings.thisMonth), color: 'text-emerald-400' },
+              { 
+                label: 'Merchant ID', 
+                val: (profile?.id?.slice(0, 8) || '—') + '...', 
+                color: 'text-red-500' 
+              },
+              { 
+                label: 'KYC Status', 
+                val: profile?.kyc_status || 'pending', 
+                color: profile?.kyc_status === 'approved' ? 'text-green-500' : 'text-orange-500' 
+              },
+              { 
+                label: 'API Key', 
+                val: profile?.api_key ? profile.api_key.slice(0, 8) + '...' : 'Pa genyen',
+                color: profile?.api_key ? 'text-blue-400' : 'text-zinc-500'
+              },
+              { 
+                label: 'Revni Mwa a', 
+                val: formatCurrency(earnings.thisMonth), 
+                color: 'text-emerald-400' 
+              },
             ].map((item) => (
               <div key={item.label} className="flex justify-between items-center p-4 bg-black/40 rounded-2xl border border-white/5">
                 <span className="text-[9px] font-bold text-zinc-400">{item.label}</span>
-                <span className={`text-[9px] font-black uppercase ${item.color}`}>{item.val}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] font-black uppercase ${item.color}`}>{item.val}</span>
+                  {item.label === 'API Key' && profile?.api_key && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(profile.api_key);
+                        setCopiedApiKey(true);
+                        setTimeout(() => setCopiedApiKey(false), 2000);
+                      }}
+                      className="p-1 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
+                      title="Kopye kle API"
+                    >
+                      {copiedApiKey ? <CheckCircle2 size={12} className="text-green-400" /> : <Copy size={12} className="text-zinc-400" />}
+                    </button>
+                  )}
+                  {item.label === 'Merchant ID' && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(profile?.id || '');
+                        alert('ID kopye! Pa pataje li ak pèsòn.');
+                      }}
+                      className="p-1 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
+                      title="Kopye ID"
+                    >
+                      <Copy size={12} className="text-zinc-400" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
+            <div className="mt-2 p-3 bg-red-600/10 border border-red-600/20 rounded-2xl">
+              <p className="text-[8px] text-red-400 font-bold uppercase tracking-wider text-center">
+                ⚠️ Pa janm pataje ID ou oswa kle API ak pèsonn
+              </p>
+            </div>
           </div>
         </div>
 
@@ -1494,7 +1576,7 @@ export function initHatexPayments() {
           
           <p className="text-zinc-400 text-sm mb-6">
             Plugin pou WooCommerce. Enstale l nan admin WordPress ou epi aktive l.
-            ID machann ou deja konfigure.
+            Kle API ou deja konfigure.
           </p>
           
           <div className="flex items-center justify-between">
@@ -1504,7 +1586,7 @@ export function initHatexPayments() {
             </div>
             <button
               onClick={generateWooCommercePlugin}
-              disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved'}
+              disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profile?.api_key}
               className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {downloadingPlugin === 'woocommerce' ? (
@@ -1531,7 +1613,7 @@ export function initHatexPayments() {
           
           <p className="text-zinc-400 text-sm mb-6">
             Aplikasyon pou Shopify. Enstale l nan admin Shopify ou epi aktive l.
-            Konfigirasyon otomatik ak ID ou.
+            Konfigirasyon otomatik ak kle API ou.
           </p>
           
           <div className="flex items-center justify-between">
@@ -1541,7 +1623,7 @@ export function initHatexPayments() {
             </div>
             <button
               onClick={generateShopifyPlugin}
-              disabled={downloadingPlugin === 'shopify' || profile?.kyc_status !== 'approved'}
+              disabled={downloadingPlugin === 'shopify' || profile?.kyc_status !== 'approved' || !profile?.api_key}
               className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {downloadingPlugin === 'shopify' ? (
@@ -1568,7 +1650,7 @@ export function initHatexPayments() {
           
           <p className="text-zinc-400 text-sm mb-6">
             Aplikasyon pou Wix. Enstale l nan Wix App Market ou epi konekte.
-            ID machann ou deja konfigure.
+            Kle API ou deja konfigure.
           </p>
           
           <div className="flex items-center justify-between">
@@ -1578,7 +1660,7 @@ export function initHatexPayments() {
             </div>
             <button
               onClick={generateWixPlugin}
-              disabled={downloadingPlugin === 'wix' || profile?.kyc_status !== 'approved'}
+              disabled={downloadingPlugin === 'wix' || profile?.kyc_status !== 'approved' || !profile?.api_key}
               className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {downloadingPlugin === 'wix' ? (
@@ -1614,7 +1696,7 @@ export function initHatexPayments() {
             </div>
             <button
               onClick={generateHostingerPlugin}
-              disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved'}
+              disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key}
               className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {downloadingPlugin === 'hostinger' ? (
@@ -1646,10 +1728,6 @@ export function initHatexPayments() {
           </div>
           <div className="flex gap-3">
             <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">4</div>
-            <p><span className="text-white font-bold">Konekte</span> ak kont HATEX ou lè w swiv enstriksyon yo (yon fwa sèlman).</p>
-          </div>
-          <div className="flex gap-3">
-            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">5</div>
             <p><span className="text-white font-bold">Bouton "Peye ak HATEX" la</span> ap parèt otomatikman sou paj checkout ou a.</p>
           </div>
         </div>
@@ -1997,8 +2075,12 @@ export function initHatexPayments() {
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
+                readOnly={!!profile?.business_name}
                 className="w-full bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm outline-none focus:border-red-600/50 transition-all mt-2"
               />
+              {profile?.business_name && (
+                <p className="text-[8px] text-red-400 mt-1">Non biznis pa ka modifye apre anrejistreman.</p>
+              )}
             </div>
 
             <div>
@@ -2019,12 +2101,12 @@ export function initHatexPayments() {
               </label>
               <div className="flex items-center gap-3 mt-2">
                 <code className="flex-1 bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm font-mono">
-                  {profile?.id || '...'}
+                  {profile?.id ? profile.id.slice(0, 8) + '...' : '...'}
                 </code>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(profile?.id || '');
-                    alert('ID kopye!');
+                    alert('ID kopye! Pa pataje li ak pèsonn.');
                   }}
                   className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
                 >
@@ -2033,13 +2115,47 @@ export function initHatexPayments() {
               </div>
             </div>
 
-            <button
-              onClick={updateBusinessName}
-              disabled={!businessName || businessName === profile?.business_name}
-              className="px-8 py-4 bg-red-600 rounded-2xl text-white font-black text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40"
-            >
-              Mete ajou
-            </button>
+            <div>
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
+                Kle API
+              </label>
+              <div className="flex items-center gap-3 mt-2">
+                <code className="flex-1 bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm font-mono">
+                  {profile?.api_key ? profile.api_key.slice(0, 8) + '...' : (generatingApiKey ? 'Ap jenere...' : 'Pa genyen')}
+                </code>
+                {!profile?.api_key && profile?.kyc_status === 'approved' && (
+                  <button
+                    onClick={generateApiKey}
+                    disabled={generatingApiKey}
+                    className="px-4 py-2 bg-red-600 rounded-xl text-white font-black text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40"
+                  >
+                    {generatingApiKey ? 'Ap jenere...' : 'Jenere Kle'}
+                  </button>
+                )}
+                {profile?.api_key && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(profile.api_key);
+                      alert('Kle API kopye!');
+                    }}
+                    className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
+                  >
+                    <Copy size={16} />
+                  </button>
+                )}
+              </div>
+              <p className="text-[8px] text-red-400 mt-1">⚠️ Pa janm pataje kle API sa a. Se tankou modpas ou.</p>
+            </div>
+
+            {!profile?.business_name && (
+              <button
+                onClick={updateBusinessName}
+                disabled={!businessName || loading}
+                className="px-8 py-4 bg-red-600 rounded-2xl text-white font-black text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40"
+              >
+                {loading ? 'Ap anrejistre...' : 'Anrejistre non biznis'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -2062,21 +2178,22 @@ export function initHatexPayments() {
               </label>
               <div className="flex items-center gap-3 mt-2">
                 <code className="flex-1 bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm font-mono">
-                  {profile?.api_key || 'sk_live_...'}
+                  {profile?.api_key || (generatingApiKey ? 'Ap jenere...' : 'sk_live_...')}
                 </code>
                 <button
-                  onClick={() => {
-                    // Generate new API key
-                  }}
+                  onClick={generateApiKey}
+                  disabled={generatingApiKey || !profile?.api_key}
                   className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
+                  title="Jenere nouvo kle API"
                 >
-                  <RefreshCw size={16} />
+                  <RefreshCw size={16} className={generatingApiKey ? 'animate-spin' : ''} />
                 </button>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(profile?.api_key || '');
                     alert('API key copied!');
                   }}
+                  disabled={!profile?.api_key}
                   className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
                 >
                   <Copy size={16} />
@@ -2091,8 +2208,10 @@ export function initHatexPayments() {
               <input
                 type="url"
                 value={profile?.webhook_url || ''}
-                onChange={(e) => {
-                  // Save webhook URL
+                onChange={async (e) => {
+                  const newUrl = e.target.value;
+                  await supabase.from('profiles').update({ webhook_url: newUrl }).eq('id', profile?.id);
+                  setProfile({ ...profile, webhook_url: newUrl });
                 }}
                 placeholder="https://monsite.com/webhook"
                 className="w-full bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm outline-none focus:border-red-600/50 transition-all mt-2"
