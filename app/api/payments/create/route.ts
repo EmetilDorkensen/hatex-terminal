@@ -5,10 +5,9 @@ import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
   try {
-    // 1. Atann cookieStore a paske cookies() retounen yon Promise
-    const cookieStore = await cookies();
-    
-    // 2. Inisyalize supabase ak konfigirasyon cookies ki kòrèk
+    // 1. INISYALIZASYON SUPABASE AK SERVICE ROLE KEY
+    const cookieStore = await cookies(); // ✅ Atann cookies
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -18,58 +17,51 @@ export async function POST(request: Request) {
             return cookieStore.get(name)?.value;
           },
           set(name: string, value: string, options: any) {
-            try {
-              cookieStore.set(name, value, options);
-            } catch (error) {
-              // Si gen erè nan server component, ignore
-            }
+            cookieStore.set(name, value, options);
           },
           remove(name: string, options: any) {
-            try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
-            } catch (error) {
-              // Ignore
-            }
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
           },
         },
       }
     );
 
-    // 3. Verifye idantite machann nan
+    // 2. JWENN ENFO NAN HEADER
     const merchantId = request.headers.get('X-Merchant-ID');
     const apiKey = request.headers.get('X-API-Key');
     const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
 
-    if (!merchantId || !apiKey) {
+    if (!apiKey) {
       return NextResponse.json(
-        { error: 'Missing credentials' },
+        { error: 'Missing API key' },
         { status: 401 }
       );
     }
 
-    // 4. Tcheke si kle API a kòrèk - nou verifye pa api_key
+    // 3. TCHÈKE SI KLE API A KÒRÈK
+    // (Nou verifye pa api_key paske se sa plugin an voye)
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
       .select('*')
-      .eq('api_key', apiKey)  // Sèvi ak api_key pou jwenn machann nan
+      .eq('api_key', apiKey)
       .single();
 
     if (merchantError || !merchant) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { error: 'Invalid API key' },
         { status: 401 }
       );
     }
 
-    // Opsyonèl: verifye si merchantId matche ak merchant.id
-    if (merchant.id !== merchantId) {
+    // Si yo voye merchantId, verifye li matche
+    if (merchantId && merchant.id !== merchantId) {
       return NextResponse.json(
         { error: 'Merchant ID mismatch' },
         { status: 401 }
       );
     }
 
-    // 5. Verifye idempotency (anpeche doub peman)
+    // 4. VERIFYE IDEMPOTENCY (anpeche doub peman)
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('*')
@@ -77,13 +69,13 @@ export async function POST(request: Request) {
       .single();
 
     if (existingPayment) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         paymentUrl: `/pay/${existingPayment.id}`,
-        paymentId: existingPayment.id 
+        paymentId: existingPayment.id
       });
     }
 
-    // 6. Li done yo
+    // 5. LI DONE YO
     const body = await request.json();
     const { amount, currency, description, metadata, returnUrl } = body;
 
@@ -95,14 +87,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // 7. Kreye dosye peman an
+    // 6. KREYE DOSYE PEMAN AN
     const paymentId = randomUUID();
 
     const { data: payment, error } = await supabase
       .from('payments')
       .insert({
         id: paymentId,
-        merchant_id: merchant.id,  // Sèvi ak merchant.id ki soti nan baz done
+        merchant_id: merchant.id, // Itilize id machann nan
         amount,
         currency: currency || 'HTG',
         description,
@@ -116,11 +108,11 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      console.error('Supabase insert error:', error);
+      console.error('Insert error:', error);
       throw error;
     }
 
-    // 8. Retounen lyen pou kliyan an peye
+    // 7. RETOUNEN LYEN POU KLIYAN AN PEYE
     return NextResponse.json({
       paymentId: payment.id,
       paymentUrl: `/pay/${payment.id}`
@@ -129,7 +121,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Payment creation error:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
