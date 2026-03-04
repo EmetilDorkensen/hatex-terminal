@@ -466,7 +466,7 @@ public function process_payment($order_id) {
         'webhook_url' => add_query_arg('wc-api', 'WC_Gateway_HATEX', home_url('/')),
     );
 
-    $response = wp_remote_post('https://api.hatexcard.com/v1/payments', array(
+$response = wp_remote_post('https://api.hatexcard.com/api/v1/payments', array(...))
         'headers' => array(
             'Content-Type' => 'application/json',
             'X-API-Key' => $this->merchant_id, // <-- CHANJMAN IMPORTAN
