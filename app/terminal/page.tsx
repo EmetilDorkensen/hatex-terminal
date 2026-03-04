@@ -373,6 +373,7 @@ function hatex_register_block_support() {
 
       // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php ---
       const gatewayFile = `<?php
+<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
@@ -389,7 +390,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->title       = $this->get_option('title');
         $this->description = $this->get_option('description');
         $this->enabled     = $this->get_option('enabled');
-        $this->merchant_id = HATEX_MERCHANT_ID; // Kle API a
+        $this->merchant_id = HATEX_MERCHANT_ID;
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         add_action('woocommerce_api_wc_gateway_hatex', array($this, 'handle_webhook'));
@@ -437,73 +438,73 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         <?php
     }
 
-public function process_payment($order_id) {
-    $order = wc_get_order($order_id);
+    public function process_payment($order_id) {
+        $order = wc_get_order($order_id);
 
-    $currency = $order->get_currency();
-    $amount   = $order->get_total();
+        $currency = $order->get_currency();
+        $amount   = $order->get_total();
 
-    if ($currency === 'USD') {
-        $amount   = $amount * 136;
-        $currency = 'HTG';
-    }
+        if ($currency === 'USD') {
+            $amount   = $amount * 136;
+            $currency = 'HTG';
+        }
 
-    $payload = array(
-        'merchant_id' => $this->merchant_id, // Kle API a
-        'amount'      => $amount,
-        'currency'    => $currency,
-        'description' => sprintf(__('Kòmand #%s', 'hatex-woocommerce'), $order->get_order_number()),
-        'metadata'    => array(
-            'order_id'         => $order_id,
-            'order_key'        => $order->get_order_key(),
-            'customer_email'   => $order->get_billing_email(),
-            'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-            'customer_phone'   => $order->get_billing_phone(),
-            'customer_address' => $order->get_billing_address_1(),
-            'platform'         => 'woocommerce',
-        ),
-        'return_url'  => $this->get_return_url($order),
-        'webhook_url' => add_query_arg('wc-api', 'WC_Gateway_HATEX', home_url('/')),
-    );
-
-$response = wp_remote_post('https://api.hatexcard.com/api/v1/payments', array(...))
-        'headers' => array(
-            'Content-Type' => 'application/json',
-            'X-API-Key' => $this->merchant_id, // <-- CHANJMAN IMPORTAN
-        ),
-        'body'    => json_encode($payload),
-        'timeout' => 30,
-    ));
-
-    if (is_wp_error($response)) {
-        error_log('HATEX API Error: ' . $response->get_error_message());
-        wc_add_notice(__('Erè koneksyon ak HATEX: ' . $response->get_error_message(), 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
-
-    $code = wp_remote_retrieve_response_code($response);
-    $body = wp_remote_retrieve_body($response);
-    error_log("HATEX API Response ($code): " . $body);
-
-    $data = json_decode($body, true);
-
-    if ($code !== 200) {
-        $error_msg = isset($data['error']) ? $data['error'] : __('Erè pandan peman.', 'hatex-woocommerce');
-        wc_add_notice(__('HATEX API te reponn ak kòd ' . $code . ': ' . $error_msg, 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
-
-    if (isset($data['paymentUrl'])) {
-        return array(
-            'result'   => 'success',
-            'redirect' => $data['paymentUrl'],
+        $payload = array(
+            'merchant_id' => $this->merchant_id,
+            'amount'      => $amount,
+            'currency'    => $currency,
+            'description' => sprintf(__('Kòmand #%s', 'hatex-woocommerce'), $order->get_order_number()),
+            'metadata'    => array(
+                'order_id'         => $order_id,
+                'order_key'        => $order->get_order_key(),
+                'customer_email'   => $order->get_billing_email(),
+                'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'customer_phone'   => $order->get_billing_phone(),
+                'customer_address' => $order->get_billing_address_1(),
+                'platform'         => 'woocommerce',
+            ),
+            'return_url'  => $this->get_return_url($order),
+            'webhook_url' => add_query_arg('wc-api', 'WC_Gateway_HATEX', home_url('/')),
         );
-    }
 
-    $error_msg = isset($data['message']) ? $data['message'] : __('Erè pandan peman.', 'hatex-woocommerce');
-    wc_add_notice($error_msg, 'error');
-    return array('result' => 'failure');
-}
+        $response = wp_remote_post('https://api.hatexcard.com/api/v1/payments', array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $this->merchant_id,
+            ),
+            'body'    => json_encode($payload),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('HATEX API Error: ' . $response->get_error_message());
+            wc_add_notice(__('Erè koneksyon ak HATEX: ' . $response->get_error_message(), 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        error_log("HATEX API Response ($code): " . $body);
+
+        $data = json_decode($body, true);
+
+        if ($code !== 200) {
+            $error_msg = isset($data['error']) ? $data['error'] : __('Erè pandan peman.', 'hatex-woocommerce');
+            wc_add_notice(__('HATEX API te reponn ak kòd ' . $code . ': ' . $error_msg, 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        if (isset($data['paymentUrl'])) {
+            return array(
+                'result'   => 'success',
+                'redirect' => $data['paymentUrl'],
+            );
+        }
+
+        $error_msg = isset($data['message']) ? $data['message'] : __('Erè pandan peman.', 'hatex-woocommerce');
+        wc_add_notice($error_msg, 'error');
+        return array('result' => 'failure');
+    }
 
     public function handle_webhook() {
         $payload = file_get_contents('php://input');
@@ -557,7 +558,7 @@ $response = wp_remote_post('https://api.hatexcard.com/api/v1/payments', array(..
             return false;
         }
 
-        $response = wp_remote_post('https://api.hatexcard.com/v1/refunds', array(
+        $response = wp_remote_post('https://api.hatexcard.com/api/v1/refunds', array(
             'headers' => array(
                 'Content-Type'  => 'application/json',
                 'X-API-Key' => $this->merchant_id,
@@ -584,16 +585,12 @@ $response = wp_remote_post('https://api.hatexcard.com/api/v1/payments', array(..
         return false;
     }
 }
-`;
 
-      // --- 3. SIPO POU BLOCKS: includes/class-wc-gateway-hatex-blocks-support.php ---
-      const blocksSupportFile = `<?php
-use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
+const blocksSupportFile = `<?php
+
 
 final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
-
     protected $name = 'hatex';
-
     private $gateway;
 
     public function initialize() {
