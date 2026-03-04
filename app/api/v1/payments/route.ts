@@ -1,3 +1,4 @@
+// app/api/v1/payments/route.ts
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -11,68 +12,95 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set(name, value, options);
-          },
-          remove(name: string, options: any) {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          },
+          get(name: string) { return cookieStore.get(name)?.value; },
+          set(name: string, value: string, options: any) { cookieStore.set(name, value, options); },
+          remove(name: string, options: any) { cookieStore.set(name, '', { ...options, maxAge: 0 }); },
         },
       }
     );
 
-    const body = await request.json();
-    const { merchantId, amount, currency, description, metadata, returnUrl } = body;
-
-    if (!merchantId || !amount) {
-      return NextResponse.json({ error: 'Done enkonplè' }, { status: 400 });
+    // 1. Jwenn kle API a nan header
+    const apiKey = request.headers.get('X-API-Key');
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'API key required' },
+        { status: 401 }
+      );
     }
 
-    // Verifye machann nan
-    const { data: merchant, error: merchantError } = await supabase
+    // 2. Verifye kle API a nan tab profiles
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, kyc_status')
-      .eq('id', merchantId)
+      .select('id, business_name')
+      .eq('api_key', apiKey)
       .single();
 
-    if (merchantError || !merchant) {
-      return NextResponse.json({ error: 'Machann pa jwenn' }, { status: 404 });
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Invalid API key' },
+        { status: 401 }
+      );
     }
 
-    if (merchant.kyc_status !== 'approved') {
-      return NextResponse.json({ error: 'KYC poko apwouve' }, { status: 403 });
+    // 3. Verifye idempotency (si ou vle)
+    const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
+
+    const { data: existingPayment } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('idempotency_key', idempotencyKey)
+      .single();
+
+    if (existingPayment) {
+      return NextResponse.json({
+        paymentUrl: `/pay/${existingPayment.id}`,
+        paymentId: existingPayment.id,
+      });
     }
 
-    // Kreye peman an
+    // 4. Resevwa done yo
+    const body = await request.json();
+    const { amount, currency, description, metadata, returnUrl } = body;
+
+    if (!amount || amount <= 0) {
+      return NextResponse.json(
+        { error: 'Montan envalid' },
+        { status: 400 }
+      );
+    }
+
+    // 5. Kreye peman an
     const paymentId = randomUUID();
+
     const { data: payment, error } = await supabase
       .from('payments')
       .insert({
         id: paymentId,
-        merchant_id: merchantId,
+        user_id: profile.id,
         amount,
         currency: currency || 'HTG',
         description,
-        metadata,
+        metadata: metadata || {},
         return_url: returnUrl,
+        idempotency_key: idempotencyKey,
         status: 'pending',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) throw error;
 
     return NextResponse.json({
       paymentId: payment.id,
-      paymentUrl: `/pay/${payment.id}`
+      paymentUrl: `/pay/${payment.id}`,
     });
+
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Payment creation error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

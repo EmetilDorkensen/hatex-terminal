@@ -1,4 +1,3 @@
-// app/api/payments/create/route.ts
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -6,9 +5,7 @@ import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
   try {
-    // 1. Atann cookies yo
     const cookieStore = await cookies();
-
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -21,10 +18,10 @@ export async function POST(request: Request) {
       }
     );
 
-    // 2. JWENN KLE API A (nan X-API-Key oswa X-Merchant-ID)
+    // Jwenn kle API a nan header (aksepte tou de)
     let apiKey = request.headers.get('X-API-Key');
     if (!apiKey) {
-      apiKey = request.headers.get('X-Merchant-ID'); // pou konpatibilite
+      apiKey = request.headers.get('X-Merchant-ID');
     }
 
     if (!apiKey) {
@@ -34,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. CHERCHE MACHANN NAN AK KLE API A
+    // Chèche machann nan ak kle API a
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
       .select('*')
@@ -48,9 +45,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. IDEMPOTENCY (si genyen)
     const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
 
+    // Tcheke idempotency
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('*')
@@ -64,7 +61,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5. LI DONE YO
     const body = await request.json();
     const { amount, currency, description, metadata, returnUrl } = body;
 
@@ -75,7 +71,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 6. KREYE PEMAN AN
     const paymentId = randomUUID();
 
     const { data: payment, error } = await supabase
@@ -97,7 +92,6 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // 7. RETOUNEN LYEN AN
     return NextResponse.json({
       paymentId: payment.id,
       paymentUrl: `/pay/${payment.id}`,
