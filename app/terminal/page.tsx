@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
@@ -65,10 +65,8 @@ const generateApiKey = useCallback(async () => {
   
   setGeneratingApiKey(true);
   try {
-    // Jenere yon kle API inik - itilize Web Crypto API
-    const array = new Uint8Array(24);
-    window.crypto.getRandomValues(array);
-    const apiKey = 'hx_live_' + Array.from(array)
+    // Jenere yon kle API inik
+    const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
     
@@ -90,11 +88,11 @@ const generateApiKey = useCallback(async () => {
     setGeneratingApiKey(false);
   }
 }, [profile, supabase]);
-  // ============================================================
-  // INITIALIZATION (KYC verifye)
-  // ============================================================
-// Ajoute yon ref pou anpeche bouk
-const isGenerating = useRef(false);
+
+// ============================================================
+// INITIALIZATION (KYC verifye)
+// ============================================================
+const isGenerating = useRef(false); // Pou anpeche bouk
 
 useEffect(() => {
   const initTerminal = async () => {
@@ -116,27 +114,16 @@ useEffect(() => {
         setBusinessName(prof.business_name || '');
         setYoutubeUrl(prof.sdk_tutorial_url || '');
         
-        // Si KYC apwouve, pa gen api_key, epi pa deja ap jenere
+        // Si KYC apwouve epi pa gen api_key, jenere youn
         if (prof.kyc_status === 'approved' && !prof.api_key && !isGenerating.current) {
-          isGenerating.current = true; // Make kòmanse
+          isGenerating.current = true;
           try {
-            const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('');
-            
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ api_key: apiKey })
-              .eq('id', user.id);
-            
-            if (updateError) throw updateError;
-            
-            // Mete ajou local profile
-            setProfile({ ...prof, api_key: apiKey });
+            await generateApiKey();
           } catch (err) {
             console.error("Pa kapab jenere kle API otomatikman:", err);
+            // Pa montre alèt, kite itilizatè a jenere manyèlman nan Settings
           } finally {
-            isGenerating.current = false; // Make fini
+            isGenerating.current = false;
           }
         }
       }
@@ -164,8 +151,7 @@ useEffect(() => {
     }
   };
   initTerminal();
-}, [supabase, router]); // Retire generateApiKey depandans
-
+}, [supabase, router, generateApiKey]);
   // ============================================================
   // COMPUTED VALUES
   // ============================================================
