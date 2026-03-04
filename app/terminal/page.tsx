@@ -95,62 +95,94 @@ const generateApiKey = useCallback(async () => {
 const isGenerating = useRef(false); // Pou anpeche bouk
 
 useEffect(() => {
+  let isMounted = true; // Pou anpeche aksyon apre demontman
+
   const initTerminal = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push('/login');
-      
-      const { data: prof, error } = await supabase
+      if (!user) {
+        if (isMounted) router.push('/login');
+        return;
+      }
+
+      // Chèche pwofil la
+      const { data: prof, error: profError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
-        
-      if (error) throw error;
-      
-      if (prof) {
-        setProfile(prof);
-        setBusinessName(prof.business_name || '');
-        setYoutubeUrl(prof.sdk_tutorial_url || '');
-        
-        // Si KYC apwouve epi pa gen api_key, jenere youn
-        if (prof.kyc_status === 'approved' && !prof.api_key && !isGenerating.current) {
-          isGenerating.current = true;
-          try {
-            await generateApiKey();
-          } catch (err) {
-            console.error("Pa kapab jenere kle API otomatikman:", err);
-            // Pa montre alèt, kite itilizatè a jenere manyèlman nan Settings
-          } finally {
-            isGenerating.current = false;
+        .maybeSingle(); // itilize maybeSingle olye single pou pa lanse erè si pa genyen
+
+      if (profError) throw profError;
+
+      if (isMounted) {
+        if (prof) {
+          setProfile(prof);
+          setBusinessName(prof.business_name || '');
+          setYoutubeUrl(prof.sdk_tutorial_url || '');
+
+          // Si KYC apwouve epi pa gen api_key, jenere youn
+          if (prof.kyc_status === 'approved' && !prof.api_key && !isGenerating.current) {
+            isGenerating.current = true;
+            try {
+              await generateApiKey();
+            } catch (err) {
+              console.error("Pa kapab jenere kle API otomatikman:", err);
+              // Pa montre alèt
+            } finally {
+              isGenerating.current = false;
+            }
           }
+        } else {
+          // Si pa gen pwofil, kreye youn
+          console.log("Pwofil pa egziste, kreye youn...");
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({ id: user.id, email: user.email });
+          
+          if (insertError) throw insertError;
+          
+          // Rechaje done yo
+          const { data: newProf } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (newProf) setProfile(newProf);
         }
       }
-      
-      // Load transactions
+
+      // Chaje tranzaksyon yo
       const { data: tx } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      setTransactions(tx || []);
       
-      // Load invoices
+      if (isMounted) setTransactions(tx || []);
+
+      // Chaje fakti yo
       const { data: inv } = await supabase
         .from('invoices')
         .select('*')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
-      setInvoices(inv || []);
       
+      if (isMounted) setInvoices(inv || []);
+
     } catch (error) {
       console.error('Initialization error:', error);
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   };
+
   initTerminal();
+
+  return () => {
+    isMounted = false; // Netwaye lè konpozan an demoute
+  };
 }, [supabase, router, generateApiKey]);
   // ============================================================
   // COMPUTED VALUES
