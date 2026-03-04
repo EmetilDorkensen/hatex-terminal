@@ -93,61 +93,78 @@ const generateApiKey = useCallback(async () => {
   // ============================================================
   // INITIALIZATION (KYC verifye)
   // ============================================================
-  useEffect(() => {
-    const initTerminal = async () => {
-      setLoading(true);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return router.push('/login');
+// Ajoute yon ref pou anpeche bouk
+const isGenerating = useRef(false);
+
+useEffect(() => {
+  const initTerminal = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.push('/login');
+      
+      const { data: prof, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
         
-        const { data: prof, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) throw error;
+      if (error) throw error;
+      
+      if (prof) {
+        setProfile(prof);
+        setBusinessName(prof.business_name || '');
+        setYoutubeUrl(prof.sdk_tutorial_url || '');
         
-        if (prof) {
-          setProfile(prof);
-          setBusinessName(prof.business_name || '');
-          setYoutubeUrl(prof.sdk_tutorial_url || '');
-          
-          // ✅ NOUVO KOD LA - Si KYC apwouve epi pa gen api_key, jenere youn
-          if (prof.kyc_status === 'approved' && !prof.api_key) {
-            try {
-              await generateApiKey();
-            } catch (err) {
-              console.error("Pa kapab jenere kle API otomatikman:", err);
-              // Pa montre alèt, kite itilizatè a jenere manyèlman nan Settings
-            }
+        // Si KYC apwouve, pa gen api_key, epi pa deja ap jenere
+        if (prof.kyc_status === 'approved' && !prof.api_key && !isGenerating.current) {
+          isGenerating.current = true; // Make kòmanse
+          try {
+            const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('');
+            
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ api_key: apiKey })
+              .eq('id', user.id);
+            
+            if (updateError) throw updateError;
+            
+            // Mete ajou local profile
+            setProfile({ ...prof, api_key: apiKey });
+          } catch (err) {
+            console.error("Pa kapab jenere kle API otomatikman:", err);
+          } finally {
+            isGenerating.current = false; // Make fini
           }
         }
-        
-        // Load transactions
-        const { data: tx } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-        setTransactions(tx || []);
-        
-        // Load invoices
-        const { data: inv } = await supabase
-          .from('invoices')
-          .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false });
-        setInvoices(inv || []);
-        
-      } catch (error) {
-        console.error('Initialization error:', error);
-      } finally {
-        setLoading(false);
       }
-    };
-    initTerminal();
-  }, [supabase, router, generateApiKey]);
+      
+      // Load transactions
+      const { data: tx } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      setTransactions(tx || []);
+      
+      // Load invoices
+      const { data: inv } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: false });
+      setInvoices(inv || []);
+      
+    } catch (error) {
+      console.error('Initialization error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  initTerminal();
+}, [supabase, router]); // Retire generateApiKey depandans
 
   // ============================================================
   // COMPUTED VALUES
