@@ -1,4 +1,3 @@
-// app/api/v1/payments/route.ts
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -19,16 +18,11 @@ export async function POST(request: Request) {
       }
     );
 
-    // 1. Jwenn kle API a nan header
     const apiKey = request.headers.get('X-API-Key');
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'API key required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'API key required' }, { status: 401 });
     }
 
-    // 2. Verifye kle API a nan tab profiles
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, business_name')
@@ -36,13 +30,9 @@ export async function POST(request: Request) {
       .single();
 
     if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
-    // 3. Verifye idempotency (si ou vle)
     const idempotencyKey = request.headers.get('Idempotency-Key') || randomUUID();
 
     const { data: existingPayment } = await supabase
@@ -58,18 +48,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Resevwa done yo
     const body = await request.json();
     const { amount, currency, description, metadata, returnUrl } = body;
 
     if (!amount || amount <= 0) {
-      return NextResponse.json(
-        { error: 'Montan envalid' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Montan envalid' }, { status: 400 });
     }
 
-    // 5. Kreye peman an
     const paymentId = randomUUID();
 
     const { data: payment, error } = await supabase
