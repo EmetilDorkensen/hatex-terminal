@@ -371,9 +371,8 @@ function hatex_register_block_support() {
 }
 `;
 
-      // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php ---
-      const gatewayFile = `<?php
-<?php
+ // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php ---
+const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
@@ -585,9 +584,11 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         return false;
     }
 }
+`;
 
+// --- 3. SIPO POU BLOCKS: includes/class-wc-gateway-hatex-blocks-support.php ---
 const blocksSupportFile = `<?php
-
+use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
 
 final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
     protected $name = 'hatex';
@@ -623,7 +624,6 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
     }
 }
 `;
-
       // --- 4. JAVASCRIPT POU BLOCKS: assets/js/checkout.js ---
       const jsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
