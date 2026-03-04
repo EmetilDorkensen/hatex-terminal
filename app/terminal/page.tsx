@@ -57,13 +57,11 @@ export default function TerminalPage() {
   ), []);
 
 // ============================================================
-// FONKSYON POU JENERE API KEY
+// FONKSYON POU JENERE API KEY (si nesesè)
 // ============================================================
 const generateApiKey = useCallback(async () => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') return;
+  if (!profile?.id || profile?.kyc_status !== 'approved') return null;
   
-  setGeneratingApiKey(true);
   try {
     // Jenere yon kle API inik
     const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
@@ -78,98 +76,81 @@ const generateApiKey = useCallback(async () => {
     
     if (error) throw error;
     
-    // Mete ajou state lokal la
-    setProfile({ ...profile, api_key: apiKey });
-    alert('Kle API jenere ak siksè!');
+    return apiKey;
   } catch (error) {
     console.error('Error generating API key:', error);
-    alert('Erè pandan jenere kle API. Tanpri rekòmanse.');
-  } finally {
-    setGeneratingApiKey(false);
+    return null;
   }
 }, [profile, supabase]);
-
 // ============================================================
-// INITIALIZATION (KYC verifye)
+// INITIALIZATION - VÈSYON AN SEKIRITE (PA GEN BOUK)
 // ============================================================
-const isGenerating = useRef(false); // Pou anpeche bouk
-
 useEffect(() => {
-  let isMounted = true; // Pou anpeche aksyon apre demontman
+  let isMounted = true;
+  let hasGeneratedKey = false; // pou anpeche jenere plizyè fwa
 
-  const initTerminal = async () => {
-    setLoading(true);
+  const init = async () => {
     try {
+      setLoading(true);
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        if (isMounted) router.push('/login');
+        router.push('/login');
         return;
       }
 
-      // Chèche pwofil la
-      const { data: prof, error: profError } = await supabase
+      let { data: prof, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .maybeSingle(); // itilize maybeSingle olye single pou pa lanse erè si pa genyen
+        .single();
 
-      if (profError) throw profError;
+      if (error && error.code === 'PGRST116') {
+        const { data: newProf, error: insertError } = await supabase
+          .from('profiles')
+          .insert({ id: user.id, email: user.email })
+          .select()
+          .single();
+        
+        if (insertError) throw insertError;
+        prof = newProf;
+      } else if (error) {
+        throw error;
+      }
 
-      if (isMounted) {
-        if (prof) {
-          setProfile(prof);
-          setBusinessName(prof.business_name || '');
-          setYoutubeUrl(prof.sdk_tutorial_url || '');
+      if (!isMounted) return;
 
-          // Si KYC apwouve epi pa gen api_key, jenere youn
-          if (prof.kyc_status === 'approved' && !prof.api_key && !isGenerating.current) {
-            isGenerating.current = true;
-            try {
-              await generateApiKey();
-            } catch (err) {
-              console.error("Pa kapab jenere kle API otomatikman:", err);
-              // Pa montre alèt
-            } finally {
-              isGenerating.current = false;
-            }
-          }
-        } else {
-          // Si pa gen pwofil, kreye youn
-          console.log("Pwofil pa egziste, kreye youn...");
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({ id: user.id, email: user.email });
-          
-          if (insertError) throw insertError;
-          
-          // Rechaje done yo
-          const { data: newProf } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          
-          if (newProf) setProfile(newProf);
+      setProfile(prof);
+      setBusinessName(prof.business_name || '');
+      setYoutubeUrl(prof.sdk_tutorial_url || '');
+
+      // Si KYC apwouve epi poko gen api_key, jenere youn
+      if (prof.kyc_status === 'approved' && !prof.api_key && !hasGeneratedKey) {
+        hasGeneratedKey = true;
+        
+        const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ api_key: apiKey })
+          .eq('id', prof.id);
+        
+        if (!updateError && isMounted) {
+          setProfile({ ...prof, api_key: apiKey });
         }
       }
 
-      // Chaje tranzaksyon yo
-      const { data: tx } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (isMounted) setTransactions(tx || []);
+      const [txResult, invResult] = await Promise.all([
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
+      ]);
 
-      // Chaje fakti yo
-      const { data: inv } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (isMounted) setInvoices(inv || []);
+      if (isMounted) {
+        setTransactions(txResult.data || []);
+        setInvoices(invResult.data || []);
+      }
 
     } catch (error) {
       console.error('Initialization error:', error);
@@ -178,12 +159,10 @@ useEffect(() => {
     }
   };
 
-  initTerminal();
+  init();
 
-  return () => {
-    isMounted = false; // Netwaye lè konpozan an demoute
-  };
-}, [supabase, router, generateApiKey]);
+  return () => { isMounted = false; };
+}, [supabase, router]); // Pa mete generateApiKey nan depandans
   // ============================================================
   // COMPUTED VALUES
   // ============================================================
