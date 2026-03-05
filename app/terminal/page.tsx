@@ -595,7 +595,7 @@ public function process_payment($order_id) {
     }
 
     // URL fonksyon Supabase (ou pral kreye li)
-const supabase_function_url = 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
+$supabase_function_url ='https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
     $payload = array(
         'merchant_id'   => $this->merchant_id,
         'amount'        => $amount,
