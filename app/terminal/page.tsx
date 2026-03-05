@@ -613,14 +613,17 @@ $supabase_function_url ='https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/v
         )
     );
 
-    $response = wp_remote_post($supabase_function_url, array(
-        'headers' => array(
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $this->merchant_id, // Ou ka itilize kle API a kòm token
-        ),
-        'body'    => json_encode($payload),
-        'timeout' => 30,
-    ));
+   // Jwenn anon key la (ou dwe ajoute l nan konfigirasyon plugin an)
+$supabase_anon_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg'; // Mete anon key ou a
+
+$response = wp_remote_post($supabase_function_url, array(
+    'headers' => array(
+        'Content-Type' => 'application/json',
+        'Authorization' => 'Bearer ' . $supabase_anon_key,
+    ),
+    'body'    => json_encode($payload),
+    'timeout' => 30,
+));
 
     if (is_wp_error($response)) {
         error_log('Supabase Function Error: ' . $response->get_error_message());
