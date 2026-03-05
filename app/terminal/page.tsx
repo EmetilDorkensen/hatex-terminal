@@ -575,7 +575,10 @@ public function payment_fields() {
     <?php
 }
 
-public function validate_fields() {
+public function process_payment($order_id) {
+    $order = wc_get_order($order_id);
+
+    // Resevwa done ki soti nan fòmilè a
     $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
     $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
     $card_holder = trim($first_name . ' ' . $last_name);
@@ -583,141 +586,79 @@ public function validate_fields() {
     $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
     $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
 
-    if (empty($first_name) || empty($last_name)) {
-        wc_add_notice(__('Non ak prenon sou kat la obligatwa.', 'hatex-woocommerce'), 'error');
-        return false;
+    $currency = $order->get_currency();
+    $amount   = $order->get_total();
+
+    if ($currency === 'USD') {
+        $amount   = $amount * 136;
+        $currency = 'HTG';
     }
 
-    if (!preg_match('/^\d{13,19}$/', $card_number)) {
-        wc_add_notice(__('Nimewo kat la pa valab (13-19 chif).', 'hatex-woocommerce'), 'error');
-        return false;
+    // URL fonksyon Supabase (ou pral kreye li)
+const supabase_function_url = 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
+    $payload = array(
+        'merchant_id'   => $this->merchant_id,
+        'amount'        => $amount,
+        'currency'      => $currency,
+        'card_holder'   => $card_holder,
+        'card_number'   => $card_number,
+        'card_expiry'   => $card_expiry,
+        'card_cvv'      => $card_cvv,
+        'metadata'      => array(
+            'order_id'         => $order_id,
+            'order_key'        => $order->get_order_key(),
+            'customer_email'   => $order->get_billing_email(),
+            'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'platform'         => 'woocommerce',
+        )
+    );
+
+    $response = wp_remote_post($supabase_function_url, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $this->merchant_id, // Ou ka itilize kle API a kòm token
+        ),
+        'body'    => json_encode($payload),
+        'timeout' => 30,
+    ));
+
+    if (is_wp_error($response)) {
+        error_log('Supabase Function Error: ' . $response->get_error_message());
+        wc_add_notice(__('Erè koneksyon ak sèvè validation. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
+        return array('result' => 'failure');
     }
 
-    if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
-        wc_add_notice(__('Dat ekspirasyon dwe fòma MM/AA.', 'hatex-woocommerce'), 'error');
-        return false;
-    } else {
-        // Verifye dat ekspirasyon pa pase
-        $parts = explode('/', $card_expiry);
-        $month = intval($parts[0]);
-        $year = intval($parts[1]) + 2000;
-        $now = new DateTime();
-        $exp = DateTime::createFromFormat('Y-m', $year . '-' . $month);
-        
-        if ($exp < $now) {
-            wc_add_notice(__('Dat ekspirasyon kat la fin pase.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
+    $code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    error_log("Supabase Validation Response ($code): " . print_r($data, true));
+
+    if ($code !== 200 || !isset($data['success'])) {
+        wc_add_notice(__('Repons envalid soti nan sèvè validation.', 'hatex-woocommerce'), 'error');
+        return array('result' => 'failure');
     }
 
-    if (!preg_match('/^\d{3,4}$/', $card_cvv)) {
-        wc_add_notice(__('Kòd CVV dwe 3 oubyen 4 chif.', 'hatex-woocommerce'), 'error');
-        return false;
+    if ($data['success'] !== true) {
+        // Se Supabase k ap bay mesaj erè a
+        $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
+        wc_add_notice($error_msg, 'error');
+        return array('result' => 'failure');
     }
 
-    return true;
+    // Si peman an reyisi (Supabase di li bon)
+    $order->payment_complete($data['transaction_id'] ?? uniqid('hx_'));
+    $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $data['transaction_id'] ?? 'N/A'));
+    $order->update_meta_data('_hatex_transaction_id', $data['transaction_id'] ?? '');
+    $order->save();
+
+    WC()->cart->empty_cart();
+
+    return array(
+        'result'   => 'success',
+        'redirect' => $this->get_return_url($order),
+    );
 }
-
-    public function process_payment($order_id) {
-        $order = wc_get_order($order_id);
-
-       $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
-$last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
-$card_holder = trim($first_name . ' ' . $last_name);
-        $card_number = preg_replace('/\\s+/', '', $_POST['hatex_card_number']);
-        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry']);
-        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv']);
-
-        $currency = $order->get_currency();
-        $amount   = $order->get_total();
-
-        if ($currency === 'USD') {
-            $amount   = $amount * 136;
-            $currency = 'HTG';
-        }
-
-        $payload = array(
-            'merchant_id'   => $this->merchant_id,
-            'amount'        => $amount,
-            'currency'      => $currency,
-            'description'   => sprintf(__('Kòmand #%s', 'hatex-woocommerce'), $order->get_order_number()),
-            'card_holder'   => $card_holder,
-            'card_number'   => $card_number,
-            'card_expiry'   => $card_expiry,
-            'card_cvv'      => $card_cvv,
-            'metadata'      => array(
-                'order_id'         => $order_id,
-                'order_key'        => $order->get_order_key(),
-                'customer_email'   => $order->get_billing_email(),
-                'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-                'customer_phone'   => $order->get_billing_phone(),
-                'customer_address' => $order->get_billing_address_1(),
-                'platform'         => 'woocommerce',
-            ),
-            'webhook_url'   => add_query_arg('wc-api', 'WC_Gateway_HATEX', home_url('/')),
-        );
-
-        $response = wp_remote_post('https://api.hatexcard.com/api/v1/process-payment', array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'X-API-Key'    => $this->merchant_id,
-            ),
-            'body'    => json_encode($payload),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($response)) {
-            error_log('HATEX API Error: ' . $response->get_error_message());
-            wc_add_notice(__('Erè koneksyon ak HATEX. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
-
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
-        error_log("HATEX Direct Payment Response ($code): " . print_r($data, true));
-
-        if ($code !== 200 || !isset($data['success']) || $data['success'] !== true) {
-            $error_msg = __('Peman an echwe. ', 'hatex-woocommerce');
-            
-            if (isset($data['code'])) {
-                switch ($data['code']) {
-                    case 'INSUFFICIENT_BALANCE':
-                        $error_msg = __('Balans ensifizan sou kat la.', 'hatex-woocommerce');
-                        break;
-                    case 'INVALID_CARD':
-                        $error_msg = __('Enfòmasyon kat yo pa bon. Verifye epi eseye ankò.', 'hatex-woocommerce');
-                        break;
-                    case 'EXPIRED_CARD':
-                        $error_msg = __('Dat ekspirasyon kat la fin pase.', 'hatex-woocommerce');
-                        break;
-                    case 'CARD_DECLINED':
-                        $error_msg = __('Kat la refize. Kontakte labank ou.', 'hatex-woocommerce');
-                        break;
-                    default:
-                        $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
-                }
-            } else {
-                $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
-            }
-            
-            wc_add_notice($error_msg, 'error');
-            return array('result' => 'failure');
-        }
-
-        $order->payment_complete($data['transaction_id']);
-        $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $data['transaction_id']));
-        $order->update_meta_data('_hatex_transaction_id', $data['transaction_id']);
-        $order->save();
-
-        WC()->cart->empty_cart();
-
-        return array(
-            'result'   => 'success',
-            'redirect' => $this->get_return_url($order),
-        );
-    }
 
     public function handle_webhook() {
         $payload = file_get_contents('php://input');
