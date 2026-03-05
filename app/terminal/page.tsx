@@ -433,18 +433,18 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         );
     }
 
-    public function payment_scripts() {
-        if (!is_checkout() || !$this->is_available()) {
-            return;
-        }
-        
-        wp_enqueue_script(
-            'hatex-checkout',
-            HATEX_WC_PLUGIN_URL . 'assets/js/hatex-checkout.js',
-            array('jquery'),
-            HATEX_WC_VERSION,
-            true
-        );
+public function payment_scripts() {
+    if (!is_checkout() || !$this->is_available()) {
+        return;
+    }
+    
+    wp_enqueue_script(
+        'hatex-checkout',
+        HATEX_WC_PLUGIN_URL . 'assets/js/hatex-checkout.js',
+        array('jquery'),
+        HATEX_WC_VERSION,
+        true
+    );
         
         wp_localize_script('hatex-checkout', 'hatex_params', array(
             'ajax_url' => admin_url('admin-ajax.php'),
@@ -452,72 +452,178 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         ));
     }
 
-    public function payment_fields() {
-        if ($this->description) {
-            echo wpautop(wp_kses_post($this->description));
-        }
-        ?>
-        <div id="hatex-payment-errors" style="color: #ff0000; margin-bottom: 15px; font-size: 13px;"></div>
+public function payment_fields() {
+    if ($this->description) {
+        echo wpautop(wp_kses_post($this->description));
+    }
+    ?>
+    <div id="hatex-payment-errors" style="color: #ff0000; margin-bottom: 20px; font-size: 14px; font-weight: bold;"></div>
+    
+    <fieldset id="wc-<?php echo esc_attr($this->id); ?>-cc-form" class="wc-credit-card-form wc-payment-form" style="background: transparent; border: none; padding: 0;">
         
-        <fieldset id="wc-<?php echo esc_attr($this->id); ?>-cc-form" class="wc-credit-card-form wc-payment-form" style="background: transparent; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px;">
-            <div class="form-row form-row-wide">
-                <label for="hatex-card-holder"><?php _e('Non ak prenon sou kat la', 'hatex-woocommerce'); ?> <span class="required">*</span></label>
-                <input type="text" id="hatex-card-holder" name="hatex_card_holder" placeholder="<?php _e('Jan Fi', 'hatex-woocommerce'); ?>" autocomplete="off" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px;" />
+        <!-- Step 1: Identity -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                    <span style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Prénom
+                    </span>
+                </label>
+                <input 
+                    type="text" 
+                    id="hatex-card-firstname" 
+                    name="hatex_card_firstname" 
+                    required 
+                    placeholder="Ex: Jean" 
+                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
+                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                />
             </div>
             
-            <div class="form-row form-row-wide">
-                <label for="hatex-card-number"><?php _e('Nimewo kat', 'hatex-woocommerce'); ?> <span class="required">*</span></label>
-                <input type="text" id="hatex-card-number" name="hatex_card_number" placeholder="**** **** **** ****" autocomplete="off" maxlength="19" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px;" />
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                    <span style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Nom de Famille
+                    </span>
+                </label>
+                <input 
+                    type="text" 
+                    id="hatex-card-lastname" 
+                    name="hatex_card_lastname" 
+                    required 
+                    placeholder="Ex: Dupont" 
+                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
+                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                />
             </div>
-            
-            <div class="form-row form-row-first">
-                <label for="hatex-card-expiry"><?php _e('Dat ekspirasyon (MM/AA)', 'hatex-woocommerce'); ?> <span class="required">*</span></label>
-                <input type="text" id="hatex-card-expiry" name="hatex_card_expiry" placeholder="MM / AA" maxlength="5" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px;" />
+        </div>
+
+        <!-- Step 2: Card Details -->
+        <div style="margin-bottom: 30px;">
+            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                <span style="display: inline-flex; align-items: center; gap: 8px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    Numéro de Carte
+                </span>
+                <span style="font-size: 9px; background: #e62e04; color: white; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: normal;">ENCRYPTED</span>
+            </label>
+            <div style="position: relative;">
+                <input 
+                    type="text" 
+                    id="hatex-card-number" 
+                    name="hatex_card_number" 
+                    required 
+                    maxlength="19"
+                    placeholder="0000 0000 0000 0000" 
+                    style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 24px; border-radius: 48px; outline: none; color: white; font-family: monospace; font-size: 24px; letter-spacing: 0.3em; transition: all 0.2s; box-shadow: 0 20px 40px rgba(0,0,0,0.5);" 
+                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='black'; this.style.boxShadow='0 0 0 15px rgba(230,46,4,0.05)';" 
+                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.6)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.5)';" 
+                />
+                <div style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); display: flex; gap: 15px; opacity: 0.1; transition: opacity 0.5s;">
+                    <div style="width: 50px; height: 32px; background: #333; border-radius: 6px;"></div>
+                    <div style="width: 50px; height: 32px; background: #444; border-radius: 6px;"></div>
+                </div>
             </div>
-            
-            <div class="form-row form-row-last">
-                <label for="hatex-card-cvv"><?php _e('Kòd CVV', 'hatex-woocommerce'); ?> <span class="required">*</span></label>
-                <input type="text" id="hatex-card-cvv" name="hatex_card_cvv" placeholder="123" maxlength="4" autocomplete="off" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px;" />
+        </div>
+
+        <!-- Step 3: Exp & Security -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                    <span style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Expiration
+                    </span>
+                </label>
+                <input 
+                    type="text" 
+                    id="hatex-card-expiry" 
+                    name="hatex_card_expiry" 
+                    required 
+                    maxlength="5"
+                    placeholder="MM/YY" 
+                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
+                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                />
             </div>
-            
-            <div class="clear"></div>
-        </fieldset>
-        <?php
+            <div>
+                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                    <span style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Cryptogramme
+                    </span>
+                </label>
+                <input 
+                    type="password" 
+                    id="hatex-card-cvv" 
+                    name="hatex_card_cvv" 
+                    required 
+                    maxlength="4"
+                    placeholder="***" 
+                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
+                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                />
+            </div>
+        </div>
+    </fieldset>
+    <?php
+}
+
+public function validate_fields() {
+    $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
+    $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
+    $card_holder = trim($first_name . ' ' . $last_name);
+    $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
+    $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
+    $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+
+    if (empty($first_name) || empty($last_name)) {
+        wc_add_notice(__('Non ak prenon sou kat la obligatwa.', 'hatex-woocommerce'), 'error');
+        return false;
     }
 
-    public function validate_fields() {
-        $card_holder = sanitize_text_field($_POST['hatex_card_holder'] ?? '');
-        $card_number = preg_replace('/\\s+/', '', $_POST['hatex_card_number'] ?? '');
-        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
-
-        if (empty($card_holder)) {
-            wc_add_notice(__('Non sou kat la obligatwa.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-
-        if (!preg_match('/^\\d{13,19}$/', $card_number)) {
-            wc_add_notice(__('Nimewo kat la pa valab (13-19 chif).', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-
-        if (!preg_match('/^\\d{2}\\/\\d{2}$/', $card_expiry)) {
-            wc_add_notice(__('Dat ekspirasyon dwe fòma MM/AA.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-
-        if (!preg_match('/^\\d{3,4}$/', $card_cvv)) {
-            wc_add_notice(__('Kòd CVV dwe 3 oubyen 4 chif.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-
-        return true;
+    if (!preg_match('/^\d{13,19}$/', $card_number)) {
+        wc_add_notice(__('Nimewo kat la pa valab (13-19 chif).', 'hatex-woocommerce'), 'error');
+        return false;
     }
+
+    if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
+        wc_add_notice(__('Dat ekspirasyon dwe fòma MM/AA.', 'hatex-woocommerce'), 'error');
+        return false;
+    } else {
+        // Verifye dat ekspirasyon pa pase
+        $parts = explode('/', $card_expiry);
+        $month = intval($parts[0]);
+        $year = intval($parts[1]) + 2000;
+        $now = new DateTime();
+        $exp = DateTime::createFromFormat('Y-m', $year . '-' . $month);
+        
+        if ($exp < $now) {
+            wc_add_notice(__('Dat ekspirasyon kat la fin pase.', 'hatex-woocommerce'), 'error');
+            return false;
+        }
+    }
+
+    if (!preg_match('/^\d{3,4}$/', $card_cvv)) {
+        wc_add_notice(__('Kòd CVV dwe 3 oubyen 4 chif.', 'hatex-woocommerce'), 'error');
+        return false;
+    }
+
+    return true;
+}
 
     public function process_payment($order_id) {
         $order = wc_get_order($order_id);
 
-        $card_holder = sanitize_text_field($_POST['hatex_card_holder']);
+       $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
+$last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
+$card_holder = trim($first_name . ' ' . $last_name);
         $card_number = preg_replace('/\\s+/', '', $_POST['hatex_card_number']);
         $card_expiry = sanitize_text_field($_POST['hatex_card_expiry']);
         $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv']);
@@ -694,86 +800,6 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
 }
 `;
 
-      const jsFile = `jQuery(function($) {
-    $('form.checkout').on('checkout_place_order_hatex', function() {
-        return hatexValidateForm();
-    });
-
-    $(document.body).on('updated_checkout', function() {});
-
-    $('#hatex-card-number').on('input', function() {
-        var value = $(this).val().replace(/\\D/g, '');
-        var formatted = '';
-        for (var i = 0; i < value.length; i++) {
-            if (i > 0 && i % 4 === 0) {
-                formatted += ' ';
-            }
-            formatted += value[i];
-        }
-        $(this).val(formatted);
-    });
-
-    $('#hatex-card-expiry').on('input', function() {
-        var value = $(this).val().replace(/\\D/g, '');
-        if (value.length >= 2) {
-            value = value.substring(0, 2) + '/' + value.substring(2, 4);
-        }
-        $(this).val(value);
-    });
-
-    $('#hatex-card-cvv').on('input', function() {
-        $(this).val($(this).val().replace(/\\D/g, ''));
-    });
-});
-
-function hatexValidateForm() {
-    var cardHolder = $('#hatex-card-holder').val().trim();
-    var cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
-    var cardExpiry = $('#hatex-card-expiry').val().trim();
-    var cardCVV = $('#hatex-card-cvv').val().trim();
-    var errors = [];
-
-    $('#hatex-payment-errors').html('');
-
-    if (cardHolder === '') {
-        errors.push('Non sou kat la obligatwa.');
-    }
-
-    if (!/^\\d{13,19}$/.test(cardNumber)) {
-        errors.push('Nimewo kat la pa valab (13-19 chif).');
-    }
-
-    if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
-        errors.push('Dat ekspirasyon dwe fòma MM/AA.');
-    } else {
-        var parts = cardExpiry.split('/');
-        var month = parseInt(parts[0], 10);
-        var year = parseInt(parts[1], 10) + 2000;
-        var now = new Date();
-        var currentYear = now.getFullYear();
-        var currentMonth = now.getMonth() + 1;
-        
-        if (year < currentYear || (year === currentYear && month < currentMonth)) {
-            errors.push('Dat ekspirasyon kat la fin pase.');
-        }
-        
-        if (month < 1 || month > 12) {
-            errors.push('Mwa ekspirasyon an pa valab.');
-        }
-    }
-
-    if (!/^\\d{3,4}$/.test(cardCVV)) {
-        errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
-    }
-
-    if (errors.length > 0) {
-        $('#hatex-payment-errors').html('<ul style="margin:0; padding-left:20px;"><li>' + errors.join('</li><li>') + '</li></ul>');
-        return false;
-    }
-    return true;
-}
-`;
-
       const blocksSupportFile = `<?php
 use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
 
@@ -812,6 +838,79 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 }
 `;
 
+
+// --- 3. NOUVO FICHYE JAVASCRIPT: assets/js/hatex-checkout.js ---
+const jsFile = `jQuery(function($) {
+  // Format numéro de carte
+  $('#hatex-card-number').on('input', function() {
+      let value = $(this).val().replace(/\\D/g, '');
+      let formatted = '';
+      for (let i = 0; i < value.length; i++) {
+          if (i > 0 && i % 4 === 0) formatted += ' ';
+          formatted += value[i];
+      }
+      $(this).val(formatted);
+  });
+
+  // Format date d'expiration
+  $('#hatex-card-expiry').on('input', function() {
+      let value = $(this).val().replace(/\\D/g, '');
+      if (value.length >= 2) {
+          value = value.substring(0, 2) + '/' + value.substring(2, 4);
+      }
+      $(this).val(value);
+  });
+
+  // CVV uniquement chiffres
+  $('#hatex-card-cvv').on('input', function() {
+      $(this).val($(this).val().replace(/\\D/g, ''));
+  });
+
+  // Validation avant soumission
+  $('form.checkout').on('checkout_place_order_hatex', function() {
+      let firstName = $('#hatex-card-firstname').val().trim();
+      let lastName = $('#hatex-card-lastname').val().trim();
+      let cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
+      let cardExpiry = $('#hatex-card-expiry').val().trim();
+      let cardCVV = $('#hatex-card-cvv').val().trim();
+      let errors = [];
+
+      $('#hatex-payment-errors').html('');
+
+      if (firstName === '' || lastName === '') {
+          errors.push('Non ak prenon sou kat la obligatwa.');
+      }
+
+      if (!/^\\d{13,19}$/.test(cardNumber)) {
+          errors.push('Nimewo kat la pa valab (13-19 chif).');
+      }
+
+      if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
+          errors.push('Dat ekspirasyon dwe fòma MM/AA.');
+      } else {
+          // Validasyon si dat ekspirasyon pase
+          let parts = cardExpiry.split('/');
+          let month = parseInt(parts[0], 10);
+          let year = parseInt(parts[1], 10) + 2000;
+          let now = new Date();
+          let currentYear = now.getFullYear();
+          let currentMonth = now.getMonth() + 1;
+          if (year < currentYear || (year === currentYear && month < currentMonth)) {
+              errors.push('Dat ekspirasyon kat la fin pase.');
+          }
+      }
+
+      if (!/^\\d{3,4}$/.test(cardCVV)) {
+          errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
+      }
+
+      if (errors.length > 0) {
+          $('#hatex-payment-errors').html('<ul style="margin:0; padding-left:20px;"><li>' + errors.join('</li><li>') + '</li></ul>');
+          return false;
+      }
+      return true;
+  });
+});`;
       const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
