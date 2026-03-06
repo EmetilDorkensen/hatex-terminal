@@ -671,55 +671,54 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         <?php
     }
 
-    public function process_payment($order_id) {
-        $order = wc_get_order($order_id);
+public function process_payment($order_id) {
+    $order = wc_get_order($order_id);
 
-        // Resevwa done ki soti nan fòmilè a
-        $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
-        $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
-        $card_holder = trim($first_name . ' ' . $last_name);
-        $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
-        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+    // Resevwa done ki soti nan fòmilè a
+    $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
+    $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
+    $full_name = trim($first_name . ' ' . $last_name); // Chanje non an
+    $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
+    $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
+    $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
 
-        $currency = $order->get_currency();
-        $amount   = $order->get_total();
+    $currency = $order->get_currency();
+    $amount   = $order->get_total();
 
-        if ($currency === 'USD') {
-            $amount   = $amount * 136;
-            $currency = 'HTG';
-        }
+    if ($currency === 'USD') {
+        $amount   = $amount * 136;
+        $currency = 'HTG';
+    }
 
-        // URL fonksyon Supabase (Edge Function)
-        $supabase_function_url = 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
-        $payload = array(
-            'merchant_id'   => $this->merchant_id,
-            'amount'        => $amount,
-            'currency'      => $currency,
-            'card_holder'   => $card_holder,
-            'card_number'   => $card_number,
-            'card_expiry'   => $card_expiry,
-            'card_cvv'      => $card_cvv,
-            'metadata'      => array(
-                'order_id'         => $order_id,
-                'order_key'        => $order->get_order_key(),
-                'customer_email'   => $order->get_billing_email(),
-                'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-                'platform'         => 'woocommerce',
-            )
-        );
+    $supabase_function_url = 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
+    $payload = array(
+        'merchant_id'   => $this->merchant_id,
+        'amount'        => $amount,
+        'currency'      => $currency,
+        'full_name'     => $full_name, // Chanje isit la
+        'card_number'   => $card_number,
+        'card_expiry'   => $card_expiry,
+        'card_cvv'      => $card_cvv,
+        'metadata'      => array(
+            'order_id'         => $order_id,
+            'order_key'        => $order->get_order_key(),
+            'customer_email'   => $order->get_billing_email(),
+            'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'platform'         => 'woocommerce',
+        )
+    );
 
-        // Kle API Supabase (service_role key)
-        $supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg';
+    $supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg';
 
-        $response = wp_remote_post($supabase_function_url, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $supabase_key,
-            ),
-            'body'    => json_encode($payload),
-            'timeout' => 30,
-        ));
+    $response = wp_remote_post($supabase_function_url, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $supabase_key,
+        ),
+        'body'    => json_encode($payload),
+        'timeout' => 30,
+    ));
+
 
         if (is_wp_error($response)) {
             error_log('Supabase Function Error: ' . $response->get_error_message());
