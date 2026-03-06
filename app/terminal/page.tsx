@@ -56,6 +56,92 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
+
+  // ============================================================
+// FONKSYON POU KREYE TAB CARDS (si li pa egziste)
+// ============================================================
+const ensureCardsTable = useCallback(async () => {
+  try {
+    // Tcheke si tab cards egziste
+    const { error } = await supabase
+      .from('cards')
+      .select('id')
+      .limit(1);
+    
+    // Si gen erè, sa vle di tab la pa egziste
+    if (error && error.message.includes('relation "cards" does not exist')) {
+      console.log('Tab cards pa egziste, ap kreye li...');
+      
+      // Kreye tab cards via SQL (ou bezwen yon fonksyon RPC)
+      const { error: createError } = await supabase.rpc('create_cards_table');
+      
+      if (createError) {
+        console.error('Erè kreye tab cards:', createError);
+      } else {
+        console.log('Tab cards kreye avèk siksè!');
+      }
+    }
+  } catch (err) {
+    console.error('Erè tcheke tab cards:', err);
+  }
+}, [supabase]);
+
+// ============================================================
+// FONKSYON POU AJOUTE KAT YON ITILIZATÈ NAN TAB CARDS
+// ============================================================
+const syncUserCards = useCallback(async (userId: string) => {
+  try {
+    // Rekipere tout kat itilizatè a (sipoze yo nan yon lòt tab)
+    // Egzanp: si gen yon tab 'user_cards' oswa yon lòt kote
+    const { data: userCards, error } = await supabase
+      .from('user_cards') // chanje ak non tab ou a
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('Erè rekipere kat itilizatè:', error);
+      return;
+    }
+    
+    if (!userCards || userCards.length === 0) {
+      console.log('Pa gen kat pou itilizatè sa a.');
+      return;
+    }
+    
+    // Pou chak kat, verifye si li deja nan tab cards
+    for (const card of userCards) {
+      const { data: existingCard } = await supabase
+        .from('cards')
+        .select('id')
+        .eq('card_number', card.card_number)
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (!existingCard) {
+        // Ajoute kat la nan tab cards
+        const { error: insertError } = await supabase
+          .from('cards')
+          .insert({
+            user_id: userId,
+            card_number: card.card_number,
+            card_holder: card.card_holder,
+            cvv: card.cvv,
+            exp_date: card.exp_date,
+            card_balance: card.card_balance || 0,
+            created_at: new Date().toISOString()
+          });
+        
+        if (insertError) {
+          console.error('Erè ajoute kat:', insertError);
+        } else {
+          console.log('Kat ajoute avèk siksè:', card.card_number);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erè pandan senkronizasyon kat:', err);
+  }
+}, [supabase]);
   // ============================================================
   // FONKSYON POU JENERE API KEY
   // ============================================================
@@ -85,49 +171,59 @@ export default function TerminalPage() {
     }
   }, [profile, supabase]);
 
-  // ============================================================
-  // INITIALIZATION
-  // ============================================================
-  useEffect(() => {
-    let isMounted = true;
-    let hasGeneratedKey = false;
+// ============================================================
+// INITIALIZATION
+// ============================================================
+useEffect(() => {
+  let isMounted = true;
+  let hasGeneratedKey = false;
 
-    const init = async () => {
-      try {
-        setLoading(true);
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          router.push('/login');
-          return;
-        }
+  const init = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
 
-        let { data: prof, error } = await supabase
+      let { data: prof, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        const { data: newProf, error: insertError } = await supabase
           .from('profiles')
-          .select('*')
-          .eq('id', user.id)
+          .insert({ id: user.id, email: user.email })
+          .select()
           .single();
+        
+        if (insertError) throw insertError;
+        prof = newProf;
+      } else if (error) {
+        throw error;
+      }
 
-        if (error && error.code === 'PGRST116') {
-          const { data: newProf, error: insertError } = await supabase
-            .from('profiles')
-            .insert({ id: user.id, email: user.email })
-            .select()
-            .single();
-          
-          if (insertError) throw insertError;
-          prof = newProf;
-        } else if (error) {
-          throw error;
-        }
+      if (!isMounted) return;
 
-        if (!isMounted) return;
+      setProfile(prof);
+      setBusinessName(prof.business_name || '');
+      setYoutubeUrl(prof.sdk_tutorial_url || '');
 
-        setProfile(prof);
-        setBusinessName(prof.business_name || '');
-        setYoutubeUrl(prof.sdk_tutorial_url || '');
-
-        if (prof.kyc_status === 'approved' && !prof.api_key && !hasGeneratedKey) {
+      // Si KYC apwouve, asire tab cards la egziste epi senkronize kat yo
+      if (prof.kyc_status === 'approved') {
+        // Asire tab cards la egziste
+        await ensureCardsTable();
+        
+        // Senkronize kat itilizatè a (si ou gen yon sous kat)
+        // Remake: 'user_cards' se yon egzanp, chanje ak non tab ou a
+        await syncUserCards(prof.id);
+        
+        // Jenere kle API si li poko genyen
+        if (!prof.api_key && !hasGeneratedKey) {
           hasGeneratedKey = true;
           
           const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
@@ -143,29 +239,29 @@ export default function TerminalPage() {
             setProfile({ ...prof, api_key: apiKey });
           }
         }
-
-        const [txResult, invResult] = await Promise.all([
-          supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-          supabase.from('invoices').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
-        ]);
-
-        if (isMounted) {
-          setTransactions(txResult.data || []);
-          setInvoices(invResult.data || []);
-        }
-
-      } catch (error) {
-        console.error('Initialization error:', error);
-      } finally {
-        if (isMounted) setLoading(false);
       }
-    };
 
-    init();
+      const [txResult, invResult] = await Promise.all([
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
+      ]);
 
-    return () => { isMounted = false; };
-  }, [supabase, router]);
+      if (isMounted) {
+        setTransactions(txResult.data || []);
+        setInvoices(invResult.data || []);
+      }
 
+    } catch (error) {
+      console.error('Initialization error:', error);
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  init();
+
+  return () => { isMounted = false; };
+}, [supabase, router]);
   // ============================================================
   // COMPUTED VALUES
   // ============================================================
@@ -311,8 +407,8 @@ export default function TerminalPage() {
 /**
  * Plugin Name: HATEX Payments
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman an Goud atravè HATEX. Fòmilè kat entegre dirèkteman sou paj checkout.
- * Version: 2.0.0
+ * Description: Aksepte peman an Goud atravè HATEX. Fòmilè kat entegre sou paj checkout, transfè balans otomatik, notifikasyon istorik kliyan, ak verifye KYC moun k ap peye a.
+ * Version: 2.1.0
  * Author: HATEX
  * Author URI: https://hatexcard.com
  * License: GPL v2 or later
@@ -326,10 +422,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('HATEX_WC_VERSION', '2.0.0');
+define('HATEX_WC_VERSION', '2.1.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('HATEX_MERCHANT_ID', '${profile.api_key}');
+define('HATEX_MERCHANT_ID', 'hx_live_76d57560efde5fb3974ca36a15eaee5908d2571796377702'); // Ranplase ak kle API ou a
 
 function add_hatex_gateway($methods) {
     $methods[] = 'WC_Gateway_HATEX';
@@ -433,18 +529,18 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         );
     }
 
-public function payment_scripts() {
-    if (!is_checkout() || !$this->is_available()) {
-        return;
-    }
-    
-    wp_enqueue_script(
-        'hatex-checkout',
-        HATEX_WC_PLUGIN_URL . 'assets/js/hatex-checkout.js',
-        array('jquery'),
-        HATEX_WC_VERSION,
-        true
-    );
+    public function payment_scripts() {
+        if (!is_checkout() || !$this->is_available()) {
+            return;
+        }
+        
+        wp_enqueue_script(
+            'hatex-checkout',
+            HATEX_WC_PLUGIN_URL . 'assets/js/hatex-checkout.js',
+            array('jquery'),
+            HATEX_WC_VERSION,
+            true
+        );
         
         wp_localize_script('hatex-checkout', 'hatex_params', array(
             'ajax_url' => admin_url('admin-ajax.php'),
@@ -452,216 +548,215 @@ public function payment_scripts() {
         ));
     }
 
-public function payment_fields() {
-    if ($this->description) {
-        echo wpautop(wp_kses_post($this->description));
-    }
-    ?>
-    <div id="hatex-payment-errors" style="color: #ff0000; margin-bottom: 20px; font-size: 14px; font-weight: bold;"></div>
-    
-    <fieldset id="wc-<?php echo esc_attr($this->id); ?>-cc-form" class="wc-credit-card-form wc-payment-form" style="background: transparent; border: none; padding: 0;">
+    public function payment_fields() {
+        if ($this->description) {
+            echo wpautop(wp_kses_post($this->description));
+        }
+        ?>
+        <div id="hatex-payment-errors" style="color: #ff0000; margin-bottom: 20px; font-size: 14px; font-weight: bold;"></div>
         
-        <!-- Step 1: Identity -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                    <span style="display: inline-flex; align-items: center; gap: 8px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        Prénom
-                    </span>
-                </label>
-                <input 
-                    type="text" 
-                    id="hatex-card-firstname" 
-                    name="hatex_card_firstname" 
-                    required 
-                    placeholder="Ex: Jean" 
-                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
-                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                />
-            </div>
+        <fieldset id="wc-<?php echo esc_attr($this->id); ?>-cc-form" class="wc-credit-card-form wc-payment-form" style="background: transparent; border: none; padding: 0;">
             
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                    <span style="display: inline-flex; align-items: center; gap: 8px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        Nom de Famille
-                    </span>
-                </label>
-                <input 
-                    type="text" 
-                    id="hatex-card-lastname" 
-                    name="hatex_card_lastname" 
-                    required 
-                    placeholder="Ex: Dupont" 
-                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
-                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                />
-            </div>
-        </div>
-
-        <!-- Step 2: Card Details -->
-        <div style="margin-bottom: 30px;">
-            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                <span style="display: inline-flex; align-items: center; gap: 8px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                    Numéro de Carte
-                </span>
-                <span style="font-size: 9px; background: #e62e04; color: white; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: normal;">ENCRYPTED</span>
-            </label>
-            <div style="position: relative;">
-                <input 
-                    type="text" 
-                    id="hatex-card-number" 
-                    name="hatex_card_number" 
-                    required 
-                    maxlength="19"
-                    placeholder="0000 0000 0000 0000" 
-                    style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 24px; border-radius: 48px; outline: none; color: white; font-family: monospace; font-size: 24px; letter-spacing: 0.3em; transition: all 0.2s; box-shadow: 0 20px 40px rgba(0,0,0,0.5);" 
-                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='black'; this.style.boxShadow='0 0 0 15px rgba(230,46,4,0.05)';" 
-                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.6)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.5)';" 
-                />
-                <div style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); display: flex; gap: 15px; opacity: 0.1; transition: opacity 0.5s;">
-                    <div style="width: 50px; height: 32px; background: #333; border-radius: 6px;"></div>
-                    <div style="width: 50px; height: 32px; background: #444; border-radius: 6px;"></div>
+            <!-- Step 1: Identity -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Prénom
+                        </span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="hatex-card-firstname" 
+                        name="hatex_card_firstname" 
+                        required 
+                        placeholder="Ex: Jean" 
+                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
+                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                    />
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Nom de Famille
+                        </span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="hatex-card-lastname" 
+                        name="hatex_card_lastname" 
+                        required 
+                        placeholder="Ex: Dupont" 
+                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
+                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                    />
                 </div>
             </div>
-        </div>
 
-        <!-- Step 3: Exp & Security -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div>
-                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+            <!-- Step 2: Card Details -->
+            <div style="margin-bottom: 30px;">
+                <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
                     <span style="display: inline-flex; align-items: center; gap: 8px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        Expiration
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                        Numéro de Carte
                     </span>
+                    <span style="font-size: 9px; background: #e62e04; color: white; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: normal;">ENCRYPTED</span>
                 </label>
-                <input 
-                    type="text" 
-                    id="hatex-card-expiry" 
-                    name="hatex_card_expiry" 
-                    required 
-                    maxlength="5"
-                    placeholder="MM/YY" 
-                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
-                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                />
+                <div style="position: relative;">
+                    <input 
+                        type="text" 
+                        id="hatex-card-number" 
+                        name="hatex_card_number" 
+                        required 
+                        maxlength="19"
+                        placeholder="0000 0000 0000 0000" 
+                        style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 24px; border-radius: 48px; outline: none; color: white; font-family: monospace; font-size: 24px; letter-spacing: 0.3em; transition: all 0.2s; box-shadow: 0 20px 40px rgba(0,0,0,0.5);" 
+                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='black'; this.style.boxShadow='0 0 0 15px rgba(230,46,4,0.05)';" 
+                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.6)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.5)';" 
+                    />
+                    <div style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); display: flex; gap: 15px; opacity: 0.1; transition: opacity 0.5s;">
+                        <div style="width: 50px; height: 32px; background: #333; border-radius: 6px;"></div>
+                        <div style="width: 50px; height: 32px; background: #444; border-radius: 6px;"></div>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                    <span style="display: inline-flex; align-items: center; gap: 8px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        Cryptogramme
-                    </span>
-                </label>
-                <input 
-                    type="password" 
-                    id="hatex-card-cvv" 
-                    name="hatex_card_cvv" 
-                    required 
-                    maxlength="4"
-                    placeholder="***" 
-                    style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
-                    onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                    onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                />
+
+            <!-- Step 3: Exp & Security -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            Expiration
+                        </span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="hatex-card-expiry" 
+                        name="hatex_card_expiry" 
+                        required 
+                        maxlength="5"
+                        placeholder="MM/YY" 
+                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
+                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                    />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Cryptogramme
+                        </span>
+                    </label>
+                    <input 
+                        type="password" 
+                        id="hatex-card-cvv" 
+                        name="hatex_card_cvv" 
+                        required 
+                        maxlength="4"
+                        placeholder="***" 
+                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
+                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
+                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
+                    />
+                </div>
             </div>
-        </div>
-    </fieldset>
-    <?php
-}
-
-public function process_payment($order_id) {
-    $order = wc_get_order($order_id);
-
-    // Resevwa done ki soti nan fòmilè a
-    $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
-    $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
-    $card_holder = trim($first_name . ' ' . $last_name);
-    $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
-    $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-    $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
-
-    $currency = $order->get_currency();
-    $amount   = $order->get_total();
-
-    if ($currency === 'USD') {
-        $amount   = $amount * 136;
-        $currency = 'HTG';
+        </fieldset>
+        <?php
     }
 
-    // URL fonksyon Supabase (ou pral kreye li)
-$supabase_function_url ='https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
-    $payload = array(
-        'merchant_id'   => $this->merchant_id,
-        'amount'        => $amount,
-        'currency'      => $currency,
-        'card_holder'   => $card_holder,
-        'card_number'   => $card_number,
-        'card_expiry'   => $card_expiry,
-        'card_cvv'      => $card_cvv,
-        'metadata'      => array(
-            'order_id'         => $order_id,
-            'order_key'        => $order->get_order_key(),
-            'customer_email'   => $order->get_billing_email(),
-            'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-            'platform'         => 'woocommerce',
-        )
-    );
+    public function process_payment($order_id) {
+        $order = wc_get_order($order_id);
 
-   // Jwenn anon key la (ou dwe ajoute l nan konfigirasyon plugin an)
-$supabase_anon_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg'; // Mete anon key ou a
+        // Resevwa done ki soti nan fòmilè a
+        $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
+        $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
+        $card_holder = trim($first_name . ' ' . $last_name);
+        $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
+        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
+        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
 
-$response = wp_remote_post($supabase_function_url, array(
-    'headers' => array(
-        'Content-Type' => 'application/json',
-        'Authorization' => 'Bearer ' . $supabase_anon_key,
-    ),
-    'body'    => json_encode($payload),
-    'timeout' => 30,
-));
+        $currency = $order->get_currency();
+        $amount   = $order->get_total();
 
-    if (is_wp_error($response)) {
-        error_log('Supabase Function Error: ' . $response->get_error_message());
-        wc_add_notice(__('Erè koneksyon ak sèvè validation. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
+        if ($currency === 'USD') {
+            $amount   = $amount * 136;
+            $currency = 'HTG';
+        }
+
+        // URL fonksyon Supabase (Edge Function)
+        $supabase_function_url = 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
+        $payload = array(
+            'merchant_id'   => $this->merchant_id,
+            'amount'        => $amount,
+            'currency'      => $currency,
+            'card_holder'   => $card_holder,
+            'card_number'   => $card_number,
+            'card_expiry'   => $card_expiry,
+            'card_cvv'      => $card_cvv,
+            'metadata'      => array(
+                'order_id'         => $order_id,
+                'order_key'        => $order->get_order_key(),
+                'customer_email'   => $order->get_billing_email(),
+                'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'platform'         => 'woocommerce',
+            )
+        );
+
+        // Kle API Supabase (service_role key)
+        $supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg';
+
+        $response = wp_remote_post($supabase_function_url, array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $supabase_key,
+            ),
+            'body'    => json_encode($payload),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('Supabase Function Error: ' . $response->get_error_message());
+            wc_add_notice(__('Erè koneksyon ak sèvè validation. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+
+        error_log("Supabase Validation Response ($code): " . print_r($data, true));
+
+        if ($code !== 200 || !isset($data['success'])) {
+            wc_add_notice(__('Repons envalid soti nan sèvè validation.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        if ($data['success'] !== true) {
+            $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
+            wc_add_notice($error_msg, 'error');
+            return array('result' => 'failure');
+        }
+
+        // Peman an reyisi – Edge Function te okipe debite kat la, kredi machann nan, ak ajoute tranzaksyon pou tou de pati.
+        $order->payment_complete($data['transaction_id'] ?? uniqid('hx_'));
+        $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $data['transaction_id'] ?? 'N/A'));
+        $order->update_meta_data('_hatex_transaction_id', $data['transaction_id'] ?? '');
+        $order->save();
+
+        WC()->cart->empty_cart();
+
+        return array(
+            'result'   => 'success',
+            'redirect' => $this->get_return_url($order),
+        );
     }
-
-    $code = wp_remote_retrieve_response_code($response);
-    $body = wp_remote_retrieve_body($response);
-    $data = json_decode($body, true);
-
-    error_log("Supabase Validation Response ($code): " . print_r($data, true));
-
-    if ($code !== 200 || !isset($data['success'])) {
-        wc_add_notice(__('Repons envalid soti nan sèvè validation.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
-
-    if ($data['success'] !== true) {
-        // Se Supabase k ap bay mesaj erè a
-        $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
-        wc_add_notice($error_msg, 'error');
-        return array('result' => 'failure');
-    }
-
-    // Si peman an reyisi (Supabase di li bon)
-    $order->payment_complete($data['transaction_id'] ?? uniqid('hx_'));
-    $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $data['transaction_id'] ?? 'N/A'));
-    $order->update_meta_data('_hatex_transaction_id', $data['transaction_id'] ?? '');
-    $order->save();
-
-    WC()->cart->empty_cart();
-
-    return array(
-        'result'   => 'success',
-        'redirect' => $this->get_return_url($order),
-    );
-}
 
     public function handle_webhook() {
         $payload = file_get_contents('php://input');
@@ -787,7 +882,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 const jsFile = `jQuery(function($) {
   // Format numéro de carte
   $('#hatex-card-number').on('input', function() {
-      let value = $(this).val().replace(/\\D/g, '');
+      let value = $(this).val().replace(/\D/g, '');
       let formatted = '';
       for (let i = 0; i < value.length; i++) {
           if (i > 0 && i % 4 === 0) formatted += ' ';
@@ -798,7 +893,7 @@ const jsFile = `jQuery(function($) {
 
   // Format date d'expiration
   $('#hatex-card-expiry').on('input', function() {
-      let value = $(this).val().replace(/\\D/g, '');
+      let value = $(this).val().replace(/\D/g, '');
       if (value.length >= 2) {
           value = value.substring(0, 2) + '/' + value.substring(2, 4);
       }
@@ -807,14 +902,14 @@ const jsFile = `jQuery(function($) {
 
   // CVV uniquement chiffres
   $('#hatex-card-cvv').on('input', function() {
-      $(this).val($(this).val().replace(/\\D/g, ''));
+      $(this).val($(this).val().replace(/\D/g, ''));
   });
 
   // Validation avant soumission
   $('form.checkout').on('checkout_place_order_hatex', function() {
       let firstName = $('#hatex-card-firstname').val().trim();
       let lastName = $('#hatex-card-lastname').val().trim();
-      let cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
+      let cardNumber = $('#hatex-card-number').val().replace(/\s+/g, '');
       let cardExpiry = $('#hatex-card-expiry').val().trim();
       let cardCVV = $('#hatex-card-cvv').val().trim();
       let errors = [];
@@ -825,11 +920,11 @@ const jsFile = `jQuery(function($) {
           errors.push('Non ak prenon sou kat la obligatwa.');
       }
 
-      if (!/^\\d{13,19}$/.test(cardNumber)) {
+      if (!/^\d{13,19}$/.test(cardNumber)) {
           errors.push('Nimewo kat la pa valab (13-19 chif).');
       }
 
-      if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
+      if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
           errors.push('Dat ekspirasyon dwe fòma MM/AA.');
       } else {
           // Validasyon si dat ekspirasyon pase
@@ -844,7 +939,7 @@ const jsFile = `jQuery(function($) {
           }
       }
 
-      if (!/^\\d{3,4}$/.test(cardCVV)) {
+      if (!/^\d{3,4}$/.test(cardCVV)) {
           errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
       }
 
@@ -855,7 +950,9 @@ const jsFile = `jQuery(function($) {
       return true;
   });
 });`;
-      const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
+
+// --- 4. JAVASCRIPT POU BLOCKS: assets/js/checkout.js ---
+const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
 const Content = () => {
@@ -967,12 +1064,13 @@ const Block_Gateway = {
 window.wc.wcBlocksRegistry.registerPaymentMethod(Block_Gateway);
 `;
 
-      const readmeFile = `=== HATEX Payments ===
+// --- 5. readme.txt ---
+const readmeFile = `=== HATEX Payments ===
 Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -986,7 +1084,11 @@ Fonksyonalite kle:
 * Peman an Goud (konvèsyon USD → HTG otomatik)
 * Koneksyon senp ak kont HATEX la
 * Fòmilè kat entegre sou paj checkout (pa gen redireksyon)
-* Validasyon an tan reyèl
+* Validasyon an tan reyèl (non, nimewo kat, dat, CVV)
+* Verifye balans kat la pou anpeche depase
+* Verifye KYC moun k ap peye a
+* Transfè lajan otomatik soti nan balans kliyan an ale nan balans machann nan
+* Notifikasyon istorik pou kliyan an (achat la anrejistre nan istorik li)
 * Webhooks pou met ajou estati kòmand otomatikman
 * Konpatib ak checkout blocks (nouvo WooCommerce)
 
@@ -1010,6 +1112,12 @@ Kliyan an ap wè yon mesaj erè klè sou paj checkout la, epi yo ka korije enfò
 
 == Changelog ==
 
+= 2.1.0 =
+* Nouvo: Transfè lajan otomatik nan balans machann nan
+* Nouvo: Notifikasyon istorik pou kliyan ki peye
+* Nouvo: Verifye KYC moun k ap peye a
+* Amelyorasyon: Validasyon balans kat la anvan peman
+
 = 2.0.0 =
 * Nouvo sistèm: fòmilè kat entegre sou paj checkout
 * Pa gen redireksyon ankò
@@ -1020,12 +1128,13 @@ Kliyan an ap wè yon mesaj erè klè sou paj checkout la, epi yo ka korije enfò
 * Premye vèsyon
 `;
 
-      zip.file('hatex-woocommerce.php', mainFile);
-      zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
-      zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
-      zip.file('assets/js/hatex-checkout.js', jsFile);
-      zip.file('assets/js/checkout.js', blocksJsFile);
-      zip.file('readme.txt', readmeFile);
+zip.file('hatex-woocommerce.php', mainFile);
+zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
+zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
+zip.file('assets/js/hatex-checkout.js', jsFile);
+zip.file('assets/js/checkout.js', blocksJsFile);
+zip.file('readme.txt', readmeFile);
+
 
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
