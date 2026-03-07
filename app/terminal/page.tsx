@@ -387,23 +387,24 @@ useEffect(() => {
   // ============================================================
 
   // ---------- WOOCOMMERCE PLUGIN (VÈSYON 2.0) ----------
-  const generateWooCommercePlugin = async () => {
-    if (!profile?.id) return;
-    if (profile?.kyc_status !== 'approved') {
-      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-      return;
-    }
-    if (!profile?.api_key) {
-      alert('Kle API poko jenere. Tanpri reyese answit.');
-      return;
-    }
+// ---------- WOOCOMMERCE PLUGIN (VÈSYON 2.0) ----------
+const generateWooCommercePlugin = async () => {
+  if (!profile?.id) return;
+  if (profile?.kyc_status !== 'approved') {
+    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+    return;
+  }
+  if (!profile?.api_key) {
+    alert('Kle API poko jenere. Tanpri reyese answit.');
+    return;
+  }
 
-    setDownloadingPlugin('woocommerce');
+  setDownloadingPlugin('woocommerce');
 
-    try {
-      const zip = new JSZip();
+  try {
+    const zip = new JSZip();
 
-      const mainFile = `<?php
+    const mainFile = `<?php
 /**
  * Plugin Name: HATEX Payments
  * Plugin URI: https://hatexcard.com
@@ -425,7 +426,7 @@ if (!defined('ABSPATH')) {
 define('HATEX_WC_VERSION', '3.0.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('HATEX_MERCHANT_ID', 'hx_live_76d57560efde5fb3974ca36a15eaee5908d2571796377702'); // Ranplase ak kle API ou a
+define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Ranplase ak kle API ou a
 
 // Konfigirasyon Supabase
 define('SUPABASE_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co');
@@ -475,7 +476,7 @@ function hatex_register_block_support() {
 }
 `;
 
-      const gatewayFile = `<?php
+    const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
@@ -842,9 +843,8 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
 }
 `;
 
-      const blocksSupportFile = `<?php
-// includes/class-wc-gateway-hatex-blocks-support.php
-use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType;
+    const blocksSupportFile = `<?php
+use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
 
 final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
     protected $name = 'hatex';
@@ -881,9 +881,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 }
 `;
 
-
-// --- 3. NOUVO FICHYE JAVASCRIPT: assets/js/hatex-checkout.js ---
-const jsFile = `jQuery(function($) {
+    const jsFile = `jQuery(function($) {
   // Format numéro de carte
   $('#hatex-card-number').on('input', function() {
       let value = $(this).val().replace(/\D/g, '');
@@ -955,8 +953,7 @@ const jsFile = `jQuery(function($) {
   });
 });`;
 
-// --- 4. JAVASCRIPT POU BLOCKS: assets/js/checkout.js ---
-const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
+    const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
 const Content = () => {
@@ -967,8 +964,8 @@ const Content = () => {
     const [errors, setErrors] = React.useState([]);
 
     const formatCardNumber = (value) => {
-        const v = value.replace(/\s+/g, '').replace(/\D/g, '');
-        const matches = v.match(/\d{4,16}/g);
+        const v = value.replace(/\\s+/g, '').replace(/\\D/g, '');
+        const matches = v.match(/\\d{4,16}/g);
         const match = (matches && matches[0]) || '';
         const parts = [];
         for (let i = 0; i < match.length; i += 4) {
@@ -978,7 +975,7 @@ const Content = () => {
     };
 
     const formatExpiry = (value) => {
-        const v = value.replace(/\s+/g, '').replace(/\D/g, '');
+        const v = value.replace(/\\s+/g, '').replace(/\\D/g, '');
         if (v.length >= 2) {
             return v.substring(0, 2) + (v.length > 2 ? '/' + v.substring(2, 4) : '');
         }
@@ -1041,7 +1038,7 @@ const Content = () => {
                         id: 'hatex-card-cvv',
                         name: 'hatex_card_cvv',
                         value: cardCvv,
-                        onChange: (e) => setCardCvv(e.target.value.replace(/\D/g, '').substring(0, 4)),
+                        onChange: (e) => setCardCvv(e.target.value.replace(/\\D/g, '').substring(0, 4)),
                         placeholder: '123',
                         className: 'wc-block-components-text-input',
                         maxLength: 4,
@@ -1066,16 +1063,14 @@ const Block_Gateway = {
 };
 
 window.wc.wcBlocksRegistry.registerPaymentMethod(Block_Gateway);
-
 `;
 
-// --- 5. readme.txt ---
-const readmeFile = `=== HATEX Payments ===
+    const readmeFile = `=== HATEX Payments ===
 Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 2.1.0
+Stable tag: 3.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -1117,11 +1112,17 @@ Kliyan an ap wè yon mesaj erè klè sou paj checkout la, epi yo ka korije enfò
 
 == Changelog ==
 
+= 3.0.0 =
+* Koneksyon dirèk ak Supabase (pa gen Edge Function)
+* Transfè lajan otomatik nan balans machann nan
+* Notifikasyon istorik pou kliyan ki peye
+* Verifye KYC moun k ap peye a
+* Amelyorasyon: Validasyon balans kat la anvan peman
+
 = 2.1.0 =
 * Nouvo: Transfè lajan otomatik nan balans machann nan
 * Nouvo: Notifikasyon istorik pou kliyan ki peye
 * Nouvo: Verifye KYC moun k ap peye a
-* Amelyorasyon: Validasyon balans kat la anvan peman
 
 = 2.0.0 =
 * Nouvo sistèm: fòmilè kat entegre sou paj checkout
@@ -1133,24 +1134,23 @@ Kliyan an ap wè yon mesaj erè klè sou paj checkout la, epi yo ka korije enfò
 * Premye vèsyon
 `;
 
-zip.file('hatex-woocommerce.php', mainFile);
-zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
-zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
-zip.file('assets/js/hatex-checkout.js', jsFile);
-zip.file('assets/js/checkout.js', blocksJsFile);
-zip.file('readme.txt', readmeFile);
+    zip.file('hatex-woocommerce.php', mainFile);
+    zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
+    zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
+    zip.file('assets/js/hatex-checkout.js', jsFile);
+    zip.file('assets/js/checkout.js', blocksJsFile);
+    zip.file('readme.txt', readmeFile);
 
+    const blob = await zip.generateAsync({ type: 'blob' });
+    saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
 
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
-
-    } catch (error) {
-      console.error('Error generating WooCommerce plugin:', error);
-      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
-    } finally {
-      setDownloadingPlugin(null);
-    }
-  };
+  } catch (error) {
+    console.error('Error generating WooCommerce plugin:', error);
+    alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+  } finally {
+    setDownloadingPlugin(null);
+  }
+};
 
   // ---------- SHOPIFY PLUGIN (VÈSYON 2.0) ----------
   const generateShopifyPlugin = async () => {
