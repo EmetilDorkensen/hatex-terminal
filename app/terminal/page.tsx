@@ -58,90 +58,91 @@ export default function TerminalPage() {
 
 
   // ============================================================
-// FONKSYON POU KREYE TAB CARDS (si li pa egziste)
-// ============================================================
-const ensureCardsTable = useCallback(async () => {
-  try {
-    // Tcheke si tab cards egziste
-    const { error } = await supabase
-      .from('cards')
-      .select('id')
-      .limit(1);
-    
-    // Si gen erè, sa vle di tab la pa egziste
-    if (error && error.message.includes('relation "cards" does not exist')) {
-      console.log('Tab cards pa egziste, ap kreye li...');
-      
-      // Kreye tab cards via SQL (ou bezwen yon fonksyon RPC)
-      const { error: createError } = await supabase.rpc('create_cards_table');
-      
-      if (createError) {
-        console.error('Erè kreye tab cards:', createError);
-      } else {
-        console.log('Tab cards kreye avèk siksè!');
-      }
-    }
-  } catch (err) {
-    console.error('Erè tcheke tab cards:', err);
-  }
-}, [supabase]);
-
-// ============================================================
-// FONKSYON POU AJOUTE KAT YON ITILIZATÈ NAN TAB CARDS
-// ============================================================
-const syncUserCards = useCallback(async (userId: string) => {
-  try {
-    // Rekipere tout kat itilizatè a (sipoze yo nan yon lòt tab)
-    // Egzanp: si gen yon tab 'user_cards' oswa yon lòt kote
-    const { data: userCards, error } = await supabase
-      .from('user_cards') // chanje ak non tab ou a
-      .select('*')
-      .eq('user_id', userId);
-    
-    if (error) {
-      console.error('Erè rekipere kat itilizatè:', error);
-      return;
-    }
-    
-    if (!userCards || userCards.length === 0) {
-      console.log('Pa gen kat pou itilizatè sa a.');
-      return;
-    }
-    
-    // Pou chak kat, verifye si li deja nan tab cards
-    for (const card of userCards) {
-      const { data: existingCard } = await supabase
+  // FONKSYON POU KREYE TAB CARDS (si li pa egziste)
+  // ============================================================
+  const ensureCardsTable = useCallback(async () => {
+    try {
+      // Tcheke si tab cards egziste
+      const { error } = await supabase
         .from('cards')
         .select('id')
-        .eq('card_number', card.card_number)
-        .eq('user_id', userId)
-        .maybeSingle();
+        .limit(1);
       
-      if (!existingCard) {
-        // Ajoute kat la nan tab cards
-        const { error: insertError } = await supabase
-          .from('cards')
-          .insert({
-            user_id: userId,
-            card_number: card.card_number,
-            card_holder: card.card_holder,
-            cvv: card.cvv,
-            exp_date: card.exp_date,
-            card_balance: card.card_balance || 0,
-            created_at: new Date().toISOString()
-          });
+      // Si gen erè, sa vle di tab la pa egziste
+      if (error && error.message.includes('relation "cards" does not exist')) {
+        console.log('Tab cards pa egziste, ap kreye li...');
         
-        if (insertError) {
-          console.error('Erè ajoute kat:', insertError);
+        // Kreye tab cards via SQL (ou bezwen yon fonksyon RPC)
+        const { error: createError } = await supabase.rpc('create_cards_table');
+        
+        if (createError) {
+          console.error('Erè kreye tab cards:', createError);
         } else {
-          console.log('Kat ajoute avèk siksè:', card.card_number);
+          console.log('Tab cards kreye avèk siksè!');
         }
       }
+    } catch (err) {
+      console.error('Erè tcheke tab cards:', err);
     }
-  } catch (err) {
-    console.error('Erè pandan senkronizasyon kat:', err);
-  }
-}, [supabase]);
+  }, [supabase]);
+
+  // ============================================================
+  // FONKSYON POU AJOUTE KAT YON ITILIZATÈ NAN TAB CARDS
+  // ============================================================
+  const syncUserCards = useCallback(async (userId: string) => {
+    try {
+      // Rekipere tout kat itilizatè a (sipoze yo nan yon lòt tab)
+      // Egzanp: si gen yon tab 'user_cards' oswa yon lòt kote
+      const { data: userCards, error } = await supabase
+        .from('user_cards') // chanje ak non tab ou a
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error('Erè rekipere kat itilizatè:', error);
+        return;
+      }
+      
+      if (!userCards || userCards.length === 0) {
+        console.log('Pa gen kat pou itilizatè sa a.');
+        return;
+      }
+      
+      // Pou chak kat, verifye si li deja nan tab cards
+      for (const card of userCards) {
+        const { data: existingCard } = await supabase
+          .from('cards')
+          .select('id')
+          .eq('card_number', card.card_number)
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (!existingCard) {
+          // Ajoute kat la nan tab cards
+          const { error: insertError } = await supabase
+            .from('cards')
+            .insert({
+              user_id: userId,
+              card_number: card.card_number,
+              card_holder: card.card_holder,
+              cvv: card.cvv,
+              exp_date: card.exp_date,
+              card_balance: card.card_balance || 0,
+              created_at: new Date().toISOString()
+            });
+          
+          if (insertError) {
+            console.error('Erè ajoute kat:', insertError);
+          } else {
+            console.log('Kat ajoute avèk siksè:', card.card_number);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erè pandan senkronizasyon kat:', err);
+    }
+  }, [supabase]);
+
   // ============================================================
   // FONKSYON POU JENERE API KEY
   // ============================================================
@@ -171,97 +172,98 @@ const syncUserCards = useCallback(async (userId: string) => {
     }
   }, [profile, supabase]);
 
-// ============================================================
-// INITIALIZATION
-// ============================================================
-useEffect(() => {
-  let isMounted = true;
-  let hasGeneratedKey = false;
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
+  useEffect(() => {
+    let isMounted = true;
+    let hasGeneratedKey = false;
 
-  const init = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
+    const init = async () => {
+      try {
+        setLoading(true);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/login');
+          return;
+        }
 
-      let { data: prof, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error && error.code === 'PGRST116') {
-        const { data: newProf, error: insertError } = await supabase
+        let { data: prof, error } = await supabase
           .from('profiles')
-          .insert({ id: user.id, email: user.email })
-          .select()
+          .select('*')
+          .eq('id', user.id)
           .single();
-        
-        if (insertError) throw insertError;
-        prof = newProf;
-      } else if (error) {
-        throw error;
-      }
 
-      if (!isMounted) return;
-
-      setProfile(prof);
-      setBusinessName(prof.business_name || '');
-      setYoutubeUrl(prof.sdk_tutorial_url || '');
-
-      // Si KYC apwouve, asire tab cards la egziste epi senkronize kat yo
-      if (prof.kyc_status === 'approved') {
-        // Asire tab cards la egziste
-        await ensureCardsTable();
-        
-        // Senkronize kat itilizatè a (si ou gen yon sous kat)
-        // Remake: 'user_cards' se yon egzanp, chanje ak non tab ou a
-        await syncUserCards(prof.id);
-        
-        // Jenere kle API si li poko genyen
-        if (!prof.api_key && !hasGeneratedKey) {
-          hasGeneratedKey = true;
-          
-          const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-          
-          const { error: updateError } = await supabase
+        if (error && error.code === 'PGRST116') {
+          const { data: newProf, error: insertError } = await supabase
             .from('profiles')
-            .update({ api_key: apiKey })
-            .eq('id', prof.id);
+            .insert({ id: user.id, email: user.email })
+            .select()
+            .single();
           
-          if (!updateError && isMounted) {
-            setProfile({ ...prof, api_key: apiKey });
+          if (insertError) throw insertError;
+          prof = newProf;
+        } else if (error) {
+          throw error;
+        }
+
+        if (!isMounted) return;
+
+        setProfile(prof);
+        setBusinessName(prof.business_name || '');
+        setYoutubeUrl(prof.sdk_tutorial_url || '');
+
+        // Si KYC apwouve, asire tab cards la egziste epi senkronize kat yo
+        if (prof.kyc_status === 'approved') {
+          // Asire tab cards la egziste
+          await ensureCardsTable();
+          
+          // Senkronize kat itilizatè a (si ou gen yon sous kat)
+          // Remake: 'user_cards' se yon egzanp, chanje ak non tab ou a
+          await syncUserCards(prof.id);
+          
+          // Jenere kle API si li poko genyen
+          if (!prof.api_key && !hasGeneratedKey) {
+            hasGeneratedKey = true;
+            
+            const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('');
+            
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ api_key: apiKey })
+              .eq('id', prof.id);
+            
+            if (!updateError && isMounted) {
+              setProfile({ ...prof, api_key: apiKey });
+            }
           }
         }
+
+        const [txResult, invResult] = await Promise.all([
+          supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+          supabase.from('invoices').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
+        ]);
+
+        if (isMounted) {
+          setTransactions(txResult.data || []);
+          setInvoices(invResult.data || []);
+        }
+
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+        if (isMounted) setLoading(false);
       }
+    };
 
-      const [txResult, invResult] = await Promise.all([
-        supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('invoices').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
-      ]);
+    init();
 
-      if (isMounted) {
-        setTransactions(txResult.data || []);
-        setInvoices(invResult.data || []);
-      }
+    return () => { isMounted = false; };
+  }, [supabase, router]);
 
-    } catch (error) {
-      console.error('Initialization error:', error);
-    } finally {
-      if (isMounted) setLoading(false);
-    }
-  };
-
-  init();
-
-  return () => { isMounted = false; };
-}, [supabase, router]);
   // ============================================================
   // COMPUTED VALUES
   // ============================================================
@@ -386,30 +388,30 @@ useEffect(() => {
   // FONKSYON JENERASYON PLUGIN YO (VÈSYON 2.0 - FÒMILÈ ENTEGRE)
   // ============================================================
 
-  // ---------- WOOCOMMERCE PLUGIN (VÈSYON 2.0) ----------
-// ---------- WOOCOMMERCE PLUGIN (VÈSYON 2.0) ----------
-const generateWooCommercePlugin = async () => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') {
-    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    return;
-  }
-  if (!profile?.api_key) {
-    alert('Kle API poko jenere. Tanpri reyese answit.');
-    return;
-  }
+  // ---------- WOOCOMMERCE PLUGIN (VÈSYON DIRÈK AK SUPABASE) ----------
+  const generateWooCommercePlugin = async () => {
+    if (!profile?.id) return;
+    if (profile?.kyc_status !== 'approved') {
+      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
+      return;
+    }
+    if (!profile?.api_key) {
+      alert('Kle API poko jenere. Tanpri reyese answit.');
+      return;
+    }
 
-  setDownloadingPlugin('woocommerce');
+    setDownloadingPlugin('woocommerce');
 
-  try {
-    const zip = new JSZip();
+    try {
+      const zip = new JSZip();
 
-    const mainFile = `<?php
+      // --- 1. FICHYE PRENSIPAL: hatex-woocommerce.php ---
+      const mainFile = `<?php
 /**
  * Plugin Name: HATEX Payments
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman an Goud atravè HATEX. Fòmilè kat entegre sou paj checkout, transfè balans otomatik, notifikasyon istorik kliyan, ak verifye KYC moun k ap peye a.
- * Version: 3.0.0
+ * Description: Aksepte peman an Goud atravè HATEX. Koneksyon dirèk ak baz done.
+ * Version: 3.1.0
  * Author: HATEX
  * Author URI: https://hatexcard.com
  * License: GPL v2 or later
@@ -423,10 +425,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('HATEX_WC_VERSION', '3.0.0');
+define('HATEX_WC_VERSION', '3.1.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Ranplase ak kle API ou a
+define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Kle API machann nan (otomatik)
 
 // Konfigirasyon Supabase
 define('SUPABASE_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co');
@@ -476,7 +478,8 @@ function hatex_register_block_support() {
 }
 `;
 
-    const gatewayFile = `<?php
+      // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php ---
+      const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
@@ -484,11 +487,10 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->icon               = '';
         $this->has_fields         = true;
         $this->method_title       = __('HATEX Payments', 'hatex-woocommerce');
-        $this->method_description = __('Aksepte peman an Goud atravè HATEX. Fòmilè kat entegre.', 'hatex-woocommerce');
+        $this->method_description = __('Aksepte peman an Goud atravè HATEX. Koneksyon dirèk ak baz done.', 'hatex-woocommerce');
         $this->supports           = array(
             'products',
-            'refunds',
-            'tokenization'
+            'refunds'
         );
 
         $this->init_form_fields();
@@ -497,10 +499,8 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->title       = $this->get_option('title');
         $this->description = $this->get_option('description');
         $this->enabled     = $this->get_option('enabled');
-        $this->merchant_id = HATEX_MERCHANT_ID;
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-        add_action('woocommerce_api_wc_gateway_hatex', array($this, 'handle_webhook'));
         add_action('wp_enqueue_scripts', array($this, 'payment_scripts'));
     }
 
@@ -525,13 +525,6 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                 'description' => __('Deskripsyon metod peman an.', 'hatex-woocommerce'),
                 'default'     => __('Peye byen vit ak HATEX an Goud.', 'hatex-woocommerce'),
             ),
-            'merchant_id_display' => array(
-                'title'       => __('ID Machann', 'hatex-woocommerce'),
-                'type'        => 'text',
-                'description' => __('ID machann ou nan sistèm HATEX la. Sa a konfigure otomatikman.', 'hatex-woocommerce'),
-                'default'     => HATEX_MERCHANT_ID,
-                'custom_attributes' => array('readonly' => 'readonly'),
-            ),
         );
     }
 
@@ -547,11 +540,6 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             HATEX_WC_VERSION,
             true
         );
-        
-        wp_localize_script('hatex-checkout', 'hatex_params', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce'    => wp_create_nonce('hatex-payment'),
-        ));
     }
 
     public function payment_fields() {
@@ -561,289 +549,258 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         ?>
         <div id="hatex-payment-errors" style="color: #ff0000; margin-bottom: 20px; font-size: 14px; font-weight: bold;"></div>
         
-        <fieldset id="wc-<?php echo esc_attr($this->id); ?>-cc-form" class="wc-credit-card-form wc-payment-form" style="background: transparent; border: none; padding: 0;">
-            
-            <!-- Step 1: Identity -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            Prénom
-                        </span>
-                    </label>
-                    <input 
-                        type="text" 
-                        id="hatex-card-firstname" 
-                        name="hatex_card_firstname" 
-                        required 
-                        placeholder="Ex: Jean" 
-                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
-                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                    />
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            Nom de Famille
-                        </span>
-                    </label>
-                    <input 
-                        type="text" 
-                        id="hatex-card-lastname" 
-                        name="hatex_card_lastname" 
-                        required 
-                        placeholder="Ex: Dupont" 
-                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; font-size: 18px; font-weight: bold; transition: all 0.2s;" 
-                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                    />
-                </div>
+        <fieldset style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: bold;">Nimewo kat <span style="color:red;">*</span></label>
+                <input type="text" id="hatex-card-number" name="hatex_card_number" required 
+                       placeholder="0000 0000 0000 0000" maxlength="19"
+                       style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
             </div>
 
-            <!-- Step 2: Card Details -->
-            <div style="margin-bottom: 30px;">
-                <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                    <span style="display: inline-flex; align-items: center; gap: 8px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                        Numéro de Carte
-                    </span>
-                    <span style="font-size: 9px; background: #e62e04; color: white; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: normal;">ENCRYPTED</span>
-                </label>
-                <div style="position: relative;">
-                    <input 
-                        type="text" 
-                        id="hatex-card-number" 
-                        name="hatex_card_number" 
-                        required 
-                        maxlength="19"
-                        placeholder="0000 0000 0000 0000" 
-                        style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 24px; border-radius: 48px; outline: none; color: white; font-family: monospace; font-size: 24px; letter-spacing: 0.3em; transition: all 0.2s; box-shadow: 0 20px 40px rgba(0,0,0,0.5);" 
-                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='black'; this.style.boxShadow='0 0 0 15px rgba(230,46,4,0.05)';" 
-                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.6)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.5)';" 
-                    />
-                    <div style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); display: flex; gap: 15px; opacity: 0.1; transition: opacity 0.5s;">
-                        <div style="width: 50px; height: 32px; background: #333; border-radius: 6px;"></div>
-                        <div style="width: 50px; height: 32px; background: #444; border-radius: 6px;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 3: Exp & Security -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div>
-                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            Expiration
-                        </span>
-                    </label>
-                    <input 
-                        type="text" 
-                        id="hatex-card-expiry" 
-                        name="hatex_card_expiry" 
-                        required 
-                        maxlength="5"
-                        placeholder="MM/YY" 
-                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
-                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                    />
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Dat ekspirasyon <span style="color:red;">*</span></label>
+                    <input type="text" id="hatex-card-expiry" name="hatex_card_expiry" required 
+                           placeholder="MM/YY" maxlength="5"
+                           style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; letter-spacing: 0.4em;">
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e62e04" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            Cryptogramme
-                        </span>
-                    </label>
-                    <input 
-                        type="password" 
-                        id="hatex-card-cvv" 
-                        name="hatex_card_cvv" 
-                        required 
-                        maxlength="4"
-                        placeholder="***" 
-                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 40px; outline: none; color: white; text-align: center; font-weight: 900; font-size: 20px; transition: all 0.2s;" 
-                        onfocus="this.style.borderColor='#e62e04'; this.style.backgroundColor='rgba(0,0,0,0.8)';" 
-                        onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(0,0,0,0.4)';" 
-                    />
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">CVV <span style="color:red;">*</span></label>
+                    <input type="password" id="hatex-card-cvv" name="hatex_card_cvv" required 
+                           placeholder="123" maxlength="4"
+                           style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
                 </div>
             </div>
         </fieldset>
         <?php
     }
 
+    public function validate_fields() {
+        $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
+        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
+        $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+
+        if (!preg_match('/^\d{13,19}$/', $card_number)) {
+            wc_add_notice(__('Nimewo kat la pa valab.', 'hatex-woocommerce'), 'error');
+            return false;
+        }
+
+        if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
+            wc_add_notice(__('Fòma dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
+            return false;
+        }
+
+        if (!preg_match('/^\d{3,4}$/', $card_cvv)) {
+            wc_add_notice(__('Kòd CVV dwe 3 oubyen 4 chif.', 'hatex-woocommerce'), 'error');
+            return false;
+        }
+
+        return true;
+    }
+
     public function process_payment($order_id) {
         $order = wc_get_order($order_id);
 
-        // Resevwa done ki soti nan fòmilè a
-        $first_name = sanitize_text_field($_POST['hatex_card_firstname'] ?? '');
-        $last_name  = sanitize_text_field($_POST['hatex_card_lastname'] ?? '');
-        $full_name = trim($first_name . ' ' . $last_name);
         $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
         $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+        $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
 
+        $amount = $order->get_total();
         $currency = $order->get_currency();
-        $amount   = $order->get_total();
-
         if ($currency === 'USD') {
-            $amount   = $amount * 136;
-            $currency = 'HTG';
+            $amount = $amount * 136;
         }
 
-        $supabase_function_url = 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment';
-        $payload = array(
-            'merchant_id'   => $this->merchant_id,
-            'amount'        => $amount,
-            'currency'      => $currency,
-            'full_name'     => $full_name,
-            'card_number'   => $card_number,
-            'card_expiry'   => $card_expiry,
-            'card_cvv'      => $card_cvv,
-            'metadata'      => array(
-                'order_id'         => $order_id,
-                'order_key'        => $order->get_order_key(),
-                'customer_email'   => $order->get_billing_email(),
-                'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-                'platform'         => 'woocommerce',
-            )
-        );
-
-        $supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg';
-
-        $response = wp_remote_post($supabase_function_url, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $supabase_key,
-            ),
-            'body'    => json_encode($payload),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($response)) {
-            error_log('Supabase Function Error: ' . $response->get_error_message());
-            wc_add_notice(__('Erè koneksyon ak sèvè validation. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
+        // 1. Verifye machann nan (moun k ap resevwa lajan an) – itilize HATEX_MERCHANT_ID
+        $receiver = $this->supabase_get_merchant(HATEX_MERCHANT_ID);
+        if (!$receiver) {
+            wc_add_notice(__('Machann pa valid.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+        if ($receiver['kyc_status'] !== 'approved') {
+            wc_add_notice(__('Kont machann poko apwouve.', 'hatex-woocommerce'), 'error');
             return array('result' => 'failure');
         }
 
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
-        error_log("Supabase Validation Response ($code): " . print_r($data, true));
-
-        if ($code !== 200 || !isset($data['success'])) {
-            wc_add_notice(__('Repons envalid soti nan sèvè validation.', 'hatex-woocommerce'), 'error');
+        // 2. Chache kliyan an (moun k ap peye) via card_number
+        $payer = $this->supabase_get_payer_by_card($card_number);
+        if (!$payer) {
+            wc_add_notice(__('Nimewo kat la pa egziste.', 'hatex-woocommerce'), 'error');
             return array('result' => 'failure');
         }
 
-        if ($data['success'] !== true) {
-            $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
-            wc_add_notice($error_msg, 'error');
+        // 3. Verifye dat ekspirasyon ak CVV
+        if ($payer['exp_date'] !== $card_expiry) {
+            wc_add_notice(__('Dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
             return array('result' => 'failure');
         }
 
-        // Peman an reyisi – Edge Function te okipe debite kat la, kredi machann nan, ak ajoute tranzaksyon pou tou de pati.
-        $order->payment_complete($data['transaction_id'] ?? uniqid('hx_'));
-        $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $data['transaction_id'] ?? 'N/A'));
-        $order->update_meta_data('_hatex_transaction_id', $data['transaction_id'] ?? '');
+        if ($payer['cvv'] !== $card_cvv) {
+            wc_add_notice(__('Kòd CVV pa bon.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 4. Verifye KYC kliyan an
+        if ($payer['kyc_status'] !== 'approved') {
+            wc_add_notice(__('Kont kliyan poko apwouve.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 5. Verifye balans
+        if ($payer['card_balance'] < $amount) {
+            wc_add_notice(sprintf(__('Balans ensifizan. Ou gen %s HTG.', 'hatex-woocommerce'), $payer['card_balance']), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 6. Fè transfè a
+        $transaction_id = 'tx_' . time() . '_' . uniqid();
+
+        // Debite kliyan
+        $debit = $this->supabase_update_balance($payer['id'], 'card_balance', -$amount);
+        if (!$debit) {
+            wc_add_notice(__('Erè pandan debite. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // Kredi machann
+        $credit = $this->supabase_update_balance($receiver['id'], 'wallet_balance', $amount);
+        if (!$credit) {
+            // Ranbouse kliyan
+            $this->supabase_update_balance($payer['id'], 'card_balance', $amount);
+            wc_add_notice(__('Erè pandan kredi. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // Kreye tranzaksyon
+        $this->supabase_create_transaction($transaction_id, $receiver['id'], $amount, 'SALE', $order);
+        $this->supabase_create_transaction($transaction_id . '_payer', $payer['id'], -$amount, 'PURCHASE', $order);
+
+        $order->payment_complete($transaction_id);
+        $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
+        $order->update_meta_data('_hatex_transaction_id', $transaction_id);
         $order->save();
 
         WC()->cart->empty_cart();
 
         return array(
-            'result'   => 'success',
+            'result' => 'success',
             'redirect' => $this->get_return_url($order),
         );
     }
 
-    public function handle_webhook() {
-        $payload = file_get_contents('php://input');
-        $data    = json_decode($payload, true);
+    // --- Fonksyon pou kominikasyon ak Supabase ---
 
-        if (!$data || !isset($data['event'])) {
-            status_header(400);
-            exit;
-        }
-
-        if (!isset($data['metadata']['order_id'])) {
-            status_header(400);
-            exit;
-        }
-
-        $order_id = $data['metadata']['order_id'];
-        $order    = wc_get_order($order_id);
-
-        if (!$order) {
-            status_header(404);
-            exit;
-        }
-
-        switch ($data['event']) {
-            case 'payment.succeeded':
-                $order->payment_complete($data['transaction_id']);
-                $order->add_order_note(sprintf(__('Peman HATEX konplete (webhook). ID tranzaksyon: %s', 'hatex-woocommerce'), $data['transaction_id']));
-                $order->update_meta_data('_hatex_transaction_id', $data['transaction_id']);
-                $order->save();
-                break;
-
-            case 'payment.failed':
-                $order->update_status('failed', __('Peman HATEX echwe (webhook).', 'hatex-woocommerce'));
-                break;
-
-            case 'payment.pending':
-                $order->update_status('on-hold', __('Peman HATEX an atant (webhook).', 'hatex-woocommerce'));
-                break;
-        }
-
-        status_header(200);
-        echo 'OK';
-        exit;
-    }
-
-    public function process_refund($order_id, $amount = null, $reason = '') {
-        $order = wc_get_order($order_id);
-        $transaction_id = $order->get_meta('_hatex_transaction_id');
-
-        if (empty($transaction_id)) {
-            return false;
-        }
-
-        $response = wp_remote_post('https://api.hatexcard.com/api/v1/refunds', array(
+    private function supabase_get_merchant($api_key) {
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?api_key=eq.' . urlencode($api_key) . '&select=id,kyc_status,wallet_balance', array(
             'headers' => array(
-                'Content-Type'  => 'application/json',
-                'X-API-Key' => $this->merchant_id,
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
             ),
-            'body' => json_encode(array(
-                'transaction_id' => $transaction_id,
-                'amount'         => $amount,
-                'reason'         => $reason,
-            )),
+            'timeout' => 30,
         ));
 
         if (is_wp_error($response)) {
-            return false;
+            error_log('Supabase error (get_merchant): ' . $response->get_error_message());
+            return null;
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+        return (is_array($data) && count($data) > 0) ? $data[0] : null;
+    }
 
-        if (isset($data['success']) && $data['success']) {
-            $order->add_order_note(sprintf(__('Refon HATEX: %s HTG. Rezon: %s', 'hatex-woocommerce'), $amount, $reason));
-            return true;
+    private function supabase_get_payer_by_card($card_number) {
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?card_number=eq.' . urlencode($card_number) . '&select=id,full_name,card_balance,kyc_status,exp_date,cvv', array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+            ),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('Supabase error (get_payer): ' . $response->get_error_message());
+            return null;
         }
 
-        return false;
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        return (is_array($data) && count($data) > 0) ? $data[0] : null;
+    }
+
+    private function supabase_update_balance($user_id, $field, $amount_change) {
+        // Jwenn balans aktyèl
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?id=eq.' . $user_id . '&select=' . $field, array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+            ),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) return false;
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        if (!is_array($data) || count($data) === 0) return false;
+
+        $current = $data[0][$field];
+        $new = $current + $amount_change;
+
+        $update = wp_remote_request(SUPABASE_URL . '/rest/v1/profiles?id=eq.' . $user_id, array(
+            'method' => 'PATCH',
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+                'Content-Type' => 'application/json',
+                'Prefer' => 'return=minimal',
+            ),
+            'body' => json_encode(array($field => $new)),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($update)) return false;
+        $code = wp_remote_retrieve_response_code($update);
+        return $code >= 200 && $code < 300;
+    }
+
+    private function supabase_create_transaction($txn_id, $user_id, $amount, $type, $order) {
+        $metadata = array(
+            'order_id' => $order->get_id(),
+            'order_key' => $order->get_order_key(),
+            'customer_email' => $order->get_billing_email(),
+            'platform' => 'woocommerce',
+        );
+
+        $response = wp_remote_post(SUPABASE_URL . '/rest/v1/transactions', array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+                'Content-Type' => 'application/json',
+                'Prefer' => 'return=minimal',
+            ),
+            'body' => json_encode(array(
+                'id' => $txn_id,
+                'user_id' => $user_id,
+                'amount' => $amount,
+                'currency' => 'HTG',
+                'status' => 'success',
+                'type' => $type,
+                'metadata' => $metadata,
+                'created_at' => gmdate('c'),
+            )),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) return false;
+        $code = wp_remote_retrieve_response_code($response);
+        return $code >= 200 && $code < 300;
     }
 }
 `;
 
-    const blocksSupportFile = `<?php
+      // --- 3. SIPO POU BLOCKS: includes/class-wc-gateway-hatex-blocks-support.php ---
+      const blocksSupportFile = `<?php
 use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
 
 final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
@@ -881,83 +838,67 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 }
 `;
 
-    const jsFile = `jQuery(function($) {
-  // Format numéro de carte
-  $('#hatex-card-number').on('input', function() {
-      let value = $(this).val().replace(/\D/g, '');
-      let formatted = '';
-      for (let i = 0; i < value.length; i++) {
-          if (i > 0 && i % 4 === 0) formatted += ' ';
-          formatted += value[i];
-      }
-      $(this).val(formatted);
-  });
+      // --- 4. JAVASCRIPT POU FÒMILÈ A: assets/js/hatex-checkout.js ---
+      const jsFile = `jQuery(function($) {
+    // Fòma nimewo kat
+    $('#hatex-card-number').on('input', function() {
+        let value = $(this).val().replace(/\\D/g, '');
+        let formatted = '';
+        for (let i = 0; i < value.length; i++) {
+            if (i > 0 && i % 4 === 0) formatted += ' ';
+            formatted += value[i];
+        }
+        $(this).val(formatted);
+    });
 
-  // Format date d'expiration
-  $('#hatex-card-expiry').on('input', function() {
-      let value = $(this).val().replace(/\D/g, '');
-      if (value.length >= 2) {
-          value = value.substring(0, 2) + '/' + value.substring(2, 4);
-      }
-      $(this).val(value);
-  });
+    // Fòma dat ekspirasyon
+    $('#hatex-card-expiry').on('input', function() {
+        let value = $(this).val().replace(/\\D/g, '');
+        if (value.length >= 2) {
+            value = value.substring(0, 2) + '/' + value.substring(2, 4);
+        }
+        $(this).val(value);
+    });
 
-  // CVV uniquement chiffres
-  $('#hatex-card-cvv').on('input', function() {
-      $(this).val($(this).val().replace(/\D/g, ''));
-  });
+    // CVV sèlman chif
+    $('#hatex-card-cvv').on('input', function() {
+        $(this).val($(this).val().replace(/\\D/g, ''));
+    });
 
-  // Validation avant soumission
-  $('form.checkout').on('checkout_place_order_hatex', function() {
-      let firstName = $('#hatex-card-firstname').val().trim();
-      let lastName = $('#hatex-card-lastname').val().trim();
-      let cardNumber = $('#hatex-card-number').val().replace(/\s+/g, '');
-      let cardExpiry = $('#hatex-card-expiry').val().trim();
-      let cardCVV = $('#hatex-card-cvv').val().trim();
-      let errors = [];
+    // Validasyon anvan soumisyon
+    $('form.checkout').on('checkout_place_order_hatex', function() {
+        let cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
+        let cardExpiry = $('#hatex-card-expiry').val().trim();
+        let cardCVV = $('#hatex-card-cvv').val().trim();
+        let errors = [];
 
-      $('#hatex-payment-errors').html('');
+        $('#hatex-payment-errors').html('');
 
-      if (firstName === '' || lastName === '') {
-          errors.push('Non ak prenon sou kat la obligatwa.');
-      }
+        if (!/^\\d{13,19}$/.test(cardNumber)) {
+            errors.push('Nimewo kat la pa valab.');
+        }
 
-      if (!/^\d{13,19}$/.test(cardNumber)) {
-          errors.push('Nimewo kat la pa valab (13-19 chif).');
-      }
+        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
+            errors.push('Dat ekspirasyon dwe fòma MM/AA.');
+        }
 
-      if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-          errors.push('Dat ekspirasyon dwe fòma MM/AA.');
-      } else {
-          // Validasyon si dat ekspirasyon pase
-          let parts = cardExpiry.split('/');
-          let month = parseInt(parts[0], 10);
-          let year = parseInt(parts[1], 10) + 2000;
-          let now = new Date();
-          let currentYear = now.getFullYear();
-          let currentMonth = now.getMonth() + 1;
-          if (year < currentYear || (year === currentYear && month < currentMonth)) {
-              errors.push('Dat ekspirasyon kat la fin pase.');
-          }
-      }
+        if (!/^\\d{3,4}$/.test(cardCVV)) {
+            errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
+        }
 
-      if (!/^\d{3,4}$/.test(cardCVV)) {
-          errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
-      }
-
-      if (errors.length > 0) {
-          $('#hatex-payment-errors').html('<ul style="margin:0; padding-left:20px;"><li>' + errors.join('</li><li>') + '</li></ul>');
-          return false;
-      }
-      return true;
-  });
+        if (errors.length > 0) {
+            $('#hatex-payment-errors').html('<ul style="margin:0; padding-left:20px;"><li>' + errors.join('</li><li>') + '</li></ul>');
+            return false;
+        }
+        return true;
+    });
 });`;
 
-    const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
+      // --- 5. JAVASCRIPT POU BLOCKS: assets/js/checkout.js ---
+      const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
 const Content = () => {
-    const [cardHolder, setCardHolder] = React.useState('');
     const [cardNumber, setCardNumber] = React.useState('');
     const [cardExpiry, setCardExpiry] = React.useState('');
     const [cardCvv, setCardCvv] = React.useState('');
@@ -982,6 +923,22 @@ const Content = () => {
         return v;
     };
 
+    const validate = () => {
+        const errs = [];
+        const cleanNumber = cardNumber.replace(/\\s+/g, '');
+        if (!/^\\d{13,19}$/.test(cleanNumber)) {
+            errs.push('Nimewo kat la pa valab.');
+        }
+        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
+            errs.push('Dat ekspirasyon dwe fòma MM/AA.');
+        }
+        if (!/^\\d{3,4}$/.test(cardCvv)) {
+            errs.push('Kòd CVV dwe 3 oubyen 4 chif.');
+        }
+        setErrors(errs);
+        return errs.length === 0;
+    };
+
     return React.createElement('div', { className: 'wc-block-components-payment-method' },
         React.createElement('div', { className: 'wc-block-components-payment-method-content' },
             errors.length > 0 && React.createElement('div', { className: 'wc-block-components-notice-banner is-error', style: { marginBottom: '15px' } },
@@ -991,19 +948,6 @@ const Content = () => {
             ),
             React.createElement('fieldset', { className: 'wc-block-credit-card-form' },
                 React.createElement('div', { className: 'wc-block-form-row' },
-                    React.createElement('label', { htmlFor: 'hatex-card-holder' }, window.wp.i18n.__('Non ak prenon sou kat la', 'hatex-woocommerce')),
-                    React.createElement('input', {
-                        type: 'text',
-                        id: 'hatex-card-holder',
-                        name: 'hatex_card_holder',
-                        value: cardHolder,
-                        onChange: (e) => setCardHolder(e.target.value),
-                        placeholder: 'Jan Fi',
-                        className: 'wc-block-components-text-input',
-                        required: true
-                    })
-                ),
-                React.createElement('div', { className: 'wc-block-form-row' },
                     React.createElement('label', { htmlFor: 'hatex-card-number' }, window.wp.i18n.__('Nimewo kat', 'hatex-woocommerce')),
                     React.createElement('input', {
                         type: 'text',
@@ -1011,6 +955,7 @@ const Content = () => {
                         name: 'hatex_card_number',
                         value: cardNumber,
                         onChange: (e) => setCardNumber(formatCardNumber(e.target.value)),
+                        onBlur: validate,
                         placeholder: '**** **** **** ****',
                         className: 'wc-block-components-text-input',
                         maxLength: 19,
@@ -1025,6 +970,7 @@ const Content = () => {
                         name: 'hatex_card_expiry',
                         value: cardExpiry,
                         onChange: (e) => setCardExpiry(formatExpiry(e.target.value)),
+                        onBlur: validate,
                         placeholder: 'MM/AA',
                         className: 'wc-block-components-text-input',
                         maxLength: 5,
@@ -1039,6 +985,7 @@ const Content = () => {
                         name: 'hatex_card_cvv',
                         value: cardCvv,
                         onChange: (e) => setCardCvv(e.target.value.replace(/\\D/g, '').substring(0, 4)),
+                        onBlur: validate,
                         placeholder: '123',
                         className: 'wc-block-components-text-input',
                         maxLength: 4,
@@ -1065,12 +1012,13 @@ const Block_Gateway = {
 window.wc.wcBlocksRegistry.registerPaymentMethod(Block_Gateway);
 `;
 
-    const readmeFile = `=== HATEX Payments ===
+      // --- 6. readme.txt ---
+      const readmeFile = `=== HATEX Payments ===
 Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 3.0.0
+Stable tag: 3.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -1078,79 +1026,62 @@ Aksepte peman an Goud atravè HATEX. Senp, vit, an sekirite.
 
 == Description ==
 
-HATEX Payments se yon plugin ki pèmèt machann WooCommerce yo resevwa peman an Goud Ayisyen (HTG). Li konekte dirèkteman ak sistèm HATEX la pou trete peman yo an tan reyèl.
+HATEX Payments se yon plugin ki pèmèt machann WooCommerce yo resevwa peman an Goud Ayisyen (HTG). Li konekte dirèkteman ak baz done pou verifye enfòmasyon yo.
 
 Fonksyonalite kle:
 * Peman an Goud (konvèsyon USD → HTG otomatik)
-* Koneksyon senp ak kont HATEX la
-* Fòmilè kat entegre sou paj checkout (pa gen redireksyon)
-* Validasyon an tan reyèl (non, nimewo kat, dat, CVV)
-* Verifye balans kat la pou anpeche depase
+* Fòmilè kat entegre sou paj checkout
+* Validasyon an tan reyèl (nimewo kat, dat, CVV)
+* Verifye balans kat la
 * Verifye KYC moun k ap peye a
 * Transfè lajan otomatik soti nan balans kliyan an ale nan balans machann nan
-* Notifikasyon istorik pou kliyan an (achat la anrejistre nan istorik li)
-* Webhooks pou met ajou estati kòmand otomatikman
-* Konpatib ak checkout blocks (nouvo WooCommerce)
+* Notifikasyon istorik pou kliyan an
+* Konpatib ak checkout blocks
 
 == Installation ==
 
-1. Upload the plugin files to the \`/wp-content/plugins/hatex-woocommerce\` directory, or install the plugin through the WordPress plugins screen directly.
+1. Upload the plugin files to the \`/wp-content/plugins/hatex-woocommerce\` directory.
 2. Activate the plugin through the 'Plugins' screen in WordPress.
 3. Go to WooCommerce > Settings > Payments, then click "Configure" on HATEX Payments.
-4. Klike sou "Connect with HATEX" pou konekte ak kont ou (w ap bezwen yon kont HATEX).
 
 == Frequently Asked Questions ==
 
 = Poukisa bouton an pa parèt sou paj checkout la? =
-Verifye ke plugin an aktive, ke HATEX mete kòm disponib nan anviwònman peman yo, epi ke paj checkout la pa itilize yon fòmilè custom ki pa sipòte blocks. Si w ap itilize blocks, asire w ke plugin an sipòte yo (li sipòte).
+Verifye ke plugin an aktive, ke HATEX mete kòm disponib nan anviwònman peman yo.
 
 = Ki jan konvèsyon USD → HTG fèt? =
-Plugin an itilize taux 136. Si w bezwen chanje taux la, kontakte sipò HATEX.
+Plugin an itilize taux 136. Kontakte sipò pou chanje taux la.
 
 = Kisa k ap pase si enfòmasyon kat la pa bon? =
-Kliyan an ap wè yon mesaj erè klè sou paj checkout la, epi yo ka korije enfòmasyon yo.
+Kliyan an ap wè yon mesaj erè klè sou paj checkout la.
 
 == Changelog ==
 
-= 3.0.0 =
-* Koneksyon dirèk ak Supabase (pa gen Edge Function)
-* Transfè lajan otomatik nan balans machann nan
-* Notifikasyon istorik pou kliyan ki peye
-* Verifye KYC moun k ap peye a
-* Amelyorasyon: Validasyon balans kat la anvan peman
+= 3.1.0 =
+* Nouvo: Koneksyon dirèk ak baz done (pa gen Edge Function)
+* Amelyorasyon: Pi rapid ak pi senp
 
 = 2.1.0 =
-* Nouvo: Transfè lajan otomatik nan balans machann nan
-* Nouvo: Notifikasyon istorik pou kliyan ki peye
-* Nouvo: Verifye KYC moun k ap peye a
-
-= 2.0.0 =
-* Nouvo sistèm: fòmilè kat entegre sou paj checkout
-* Pa gen redireksyon ankò
-* Validasyon an tan reyèl
-* Mesaj erè espesifik (balans ensifizan, kat pa bon, elatriye)
-
-= 1.0.0 =
-* Premye vèsyon
+* Vèsyon anvan
 `;
 
-    zip.file('hatex-woocommerce.php', mainFile);
-    zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
-    zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
-    zip.file('assets/js/hatex-checkout.js', jsFile);
-    zip.file('assets/js/checkout.js', blocksJsFile);
-    zip.file('readme.txt', readmeFile);
+      zip.file('hatex-woocommerce.php', mainFile);
+      zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
+      zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
+      zip.file('assets/js/hatex-checkout.js', jsFile);
+      zip.file('assets/js/checkout.js', blocksJsFile);
+      zip.file('readme.txt', readmeFile);
 
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
 
-  } catch (error) {
-    console.error('Error generating WooCommerce plugin:', error);
-    alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
-  } finally {
-    setDownloadingPlugin(null);
-  }
-};
+    } catch (error) {
+      console.error('Error generating WooCommerce plugin:', error);
+      alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
+    } finally {
+      setDownloadingPlugin(null);
+    }
+  };
 
   // ---------- SHOPIFY PLUGIN (VÈSYON 2.0) ----------
   const generateShopifyPlugin = async () => {
@@ -2476,13 +2407,13 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </div>
           
           <p className="text-zinc-400 text-sm mb-6">
-            Plugin pou WooCommerce. Vèsyon 2.0 ak fòmilè kat entegre sou paj checkout.
+            Plugin pou WooCommerce. Vèsyon 3.1.0 ak koneksyon dirèk Supabase.
           </p>
           
           <div className="flex items-center justify-between">
             <div className="text-xs text-zinc-600">
-              <span className="block">Vèsyon: 2.0.0</span>
-              <span className="block">Fòmilè entegre</span>
+              <span className="block">Vèsyon: 3.1.0</span>
+              <span className="block">Dirèk Supabase</span>
             </div>
             <button
               onClick={generateWooCommercePlugin}
@@ -2609,7 +2540,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
       </div>
 
       <div className="bg-zinc-900/30 border border-white/5 p-8 rounded-[3rem] mt-8">
-        <h3 className="text-lg font-black mb-4">📋 Enstriksyon enstalasyon (Vèsyon 2.0)</h3>
+        <h3 className="text-lg font-black mb-4">📋 Enstriksyon enstalasyon (Vèsyon 3.1.0)</h3>
         <div className="space-y-4 text-zinc-300 text-sm">
           <div className="flex gap-3">
             <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">1</div>
