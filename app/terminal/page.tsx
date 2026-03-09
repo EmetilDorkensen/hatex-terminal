@@ -388,7 +388,7 @@ export default function TerminalPage() {
   // FONKSYON JENERASYON PLUGIN YO (VÈSYON 2.0 - FÒMILÈ ENTEGRE)
   // ============================================================
 
-// ---------- WOOCOMMERCE PLUGIN (VÈSYON 3.2.0) ----------
+// ---------- WOOCOMMERCE PLUGIN (VÈSYON 4.1.0 - AK WEBHOOK & RESEND) ----------
 const generateWooCommercePlugin = async () => {
   if (!profile?.id) return;
   if (profile?.kyc_status !== 'approved') {
@@ -408,10 +408,10 @@ const generateWooCommercePlugin = async () => {
     // --- 1. FICHYE PRENSIPAL: hatex-woocommerce.php ---
     const mainFile = `<?php
 /**
- * Plugin Name: HATEX Payments Pro
+ * Plugin Name: HATEX Payments (Edge Function)
  * Plugin URI: https://hatexcard.com
- * Description: Peye an Goud ak HATEX – Fòmilè pwofesyonèl ak verifikasyon dirèk nan baz done
- * Version: 3.2.0
+ * Description: Peye an Goud ak HATEX – Plugin ki konekte ak Edge Function epi voye notifikasyon livrezon via Resend.
+ * Version: 4.1.0
  * Author: HATEX
  * Author URI: https://hatexcard.com
  * License: GPL v2 or later
@@ -425,15 +425,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('HATEX_WC_VERSION', '3.2.0');
+define('HATEX_WC_VERSION', '4.1.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Kle API machann nan
-
-// Konfigirasyon Supabase
-define('SUPABASE_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co');
-define('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNTYyOTksImV4cCI6MjA4MTczMjI5OX0._CjL8kZzHhJQrQ2xVnF3sY5tG9bKcL7pW9dXmY8NqZk');
-define('SUPABASE_SERVICE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg');
+define('RESEND_API_KEY', 're_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
+// URL Edge Function
+define('HATEX_EDGE_FUNCTION_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment');
 
 function add_hatex_gateway($methods) {
     $methods[] = 'WC_Gateway_HATEX';
@@ -478,20 +476,17 @@ function hatex_register_block_support() {
 }
 `;
 
- // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AVÈK RETENTION DONE) ---
-const gatewayFile = `<?php
+    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AK WEBHOOK AK RESEND) ---
+    const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
         $this->id                 = 'hatex';
         $this->icon               = '';
         $this->has_fields         = true;
-        $this->method_title       = __('HATEX Payments Pro', 'hatex-woocommerce');
-        $this->method_description = __('Peye an Goud ak HATEX – fòmilè pwofesyonèl ak verifikasyon an tan reyèl.', 'hatex-woocommerce');
-        $this->supports           = array(
-            'products',
-            'refunds'
-        );
+        $this->method_title       = __('HATEX Payments', 'hatex-woocommerce');
+        $this->method_description = __('Peye an Goud ak HATEX – validasyon fet nan Edge Function.', 'hatex-woocommerce');
+        $this->supports           = array('products', 'refunds');
 
         $this->init_form_fields();
         $this->init_settings();
@@ -501,6 +496,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->enabled     = $this->get_option('enabled');
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+        add_action('woocommerce_api_wc_gateway_hatex', array($this, 'handle_webhook')); // Webhook la
         add_action('wp_enqueue_scripts', array($this, 'payment_scripts'));
     }
 
@@ -515,23 +511,18 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             'title' => array(
                 'title'       => __('Tit', 'hatex-woocommerce'),
                 'type'        => 'text',
-                'description' => __('Tit metod peman an ap parèt pou kliyan yo.', 'hatex-woocommerce'),
                 'default'     => __('Peye ak HATEX', 'hatex-woocommerce'),
-                'desc_tip'    => true,
             ),
             'description' => array(
                 'title'       => __('Deskripsyon', 'hatex-woocommerce'),
                 'type'        => 'textarea',
-                'description' => __('Deskripsyon metod peman an.', 'hatex-woocommerce'),
                 'default'     => __('Peye byen vit ak HATEX an Goud.', 'hatex-woocommerce'),
             ),
         );
     }
 
     public function payment_scripts() {
-        if (!is_checkout() || !$this->is_available()) {
-            return;
-        }
+        if (!is_checkout() || !$this->is_available()) return;
         
         wp_enqueue_script(
             'hatex-checkout',
@@ -540,11 +531,6 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             HATEX_WC_VERSION,
             true
         );
-        
-        wp_localize_script('hatex-checkout', 'hatex_params', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce'    => wp_create_nonce('hatex-payment'),
-        ));
     }
 
     public function payment_fields() {
@@ -565,8 +551,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                 border-radius: 16px;
                 padding: 30px;
                 margin: 20px 0;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: sans-serif;
             }
             .hatex-payment-form .form-row {
                 margin-bottom: 25px;
@@ -576,62 +561,33 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                 margin-bottom: 10px;
                 font-weight: 600;
                 font-size: 15px;
-                color: #333;
-                letter-spacing: -0.3px;
             }
             .hatex-payment-form input {
                 width: 100%;
-                padding: 16px 18px;
+                padding: 16px;
                 border: 2px solid #ddd;
                 border-radius: 12px;
                 font-size: 18px;
-                transition: all 0.2s ease;
                 background: white;
-                box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
             }
             .hatex-payment-form input:focus {
                 border-color: #e62e04;
                 outline: none;
-                box-shadow: 0 0 0 4px rgba(230,46,4,0.1);
-            }
-            .hatex-payment-form .card-icons {
-                display: flex;
-                gap: 10px;
-                margin-top: 8px;
-                opacity: 0.7;
-            }
-            .hatex-payment-form .card-icons span {
-                background: #eee;
-                padding: 6px 12px;
-                border-radius: 30px;
-                font-size: 13px;
-                font-weight: 500;
-                color: #555;
-            }
-            .hatex-payment-form .exp-cvv-row {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
             }
             .hatex-payment-errors {
                 background: #fee;
                 color: #c00;
-                padding: 15px 20px;
+                padding: 15px;
                 border-radius: 12px;
                 margin-bottom: 25px;
-                font-weight: 500;
                 border: 1px solid #fcc;
-            }
-            .hatex-payment-errors ul {
-                margin: 0;
-                padding-left: 20px;
             }
         </style>
 
         <div id="hatex-payment-errors" class="hatex-payment-errors" style="display: none;"></div>
         
         <div class="hatex-payment-form">
-            <!-- Nimewo kat la -->
+            <!-- Nimewo kat -->
             <div class="form-row">
                 <label for="hatex-card-number">💳 Nimewo kat <span style="color:#e62e04;">*</span></label>
                 <input 
@@ -644,17 +600,12 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                     maxlength="19"
                     autocomplete="off"
                     inputmode="numeric"
-                    style="font-family: 'Courier New', monospace; letter-spacing: 1.5px;"
+                    style="font-family: monospace; letter-spacing: 1.5px;"
                 />
-                <div class="card-icons">
-                    <span>Visa</span>
-                    <span>Mastercard</span>
-                    <span>Amex</span>
-                </div>
             </div>
 
             <!-- Dat ekspirasyon ak CVV -->
-            <div class="exp-cvv-row">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div class="form-row">
                     <label for="hatex-card-expiry">📅 Dat ekspirasyon <span style="color:#e62e04;">*</span></label>
                     <input 
@@ -666,7 +617,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                         placeholder="MM/YY" 
                         maxlength="5"
                         autocomplete="off"
-                        style="text-align: center; font-size: 18px;"
+                        style="text-align: center;"
                     />
                 </div>
                 <div class="form-row">
@@ -681,19 +632,20 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                         maxlength="4"
                         autocomplete="off"
                         inputmode="numeric"
-                        style="text-align: center; font-size: 18px; letter-spacing: 4px;"
+                        style="text-align: center; letter-spacing: 4px;"
                     />
                 </div>
             </div>
             
             <p style="font-size: 13px; color: #777; margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;">
-                🔐 Enfòmasyon ou yo an sekirite. Yo pa janm estoke sou sit sa a.
+                🔐 Enfòmasyon ou yo an sekirite.
             </p>
         </div>
         <?php
     }
 
     public function validate_fields() {
+        // Validasyon minimòm fòma (Edge Function ap fè rès la)
         $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
         $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
         $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
@@ -702,17 +654,14 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             wc_add_notice(__('Nimewo kat la pa valab.', 'hatex-woocommerce'), 'error');
             return false;
         }
-
         if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
-            wc_add_notice(__('Fòma dat ekspirasyon an pa bon. Sèvi ak MM/AA.', 'hatex-woocommerce'), 'error');
+            wc_add_notice(__('Fòma dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
             return false;
         }
-
         if (!preg_match('/^\d{3,4}$/', $card_cvv)) {
             wc_add_notice(__('Kòd CVV dwe 3 oubyen 4 chif.', 'hatex-woocommerce'), 'error');
             return false;
         }
-
         return true;
     }
 
@@ -721,7 +670,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
         $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
         $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-        $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
 
         $amount = $order->get_total();
         $currency = $order->get_currency();
@@ -729,213 +678,129 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             $amount = $amount * 136;
         }
 
-        // LOG 1: Done resevwa
-        error_log('=== HATEX PAYMENT DEBUG ===');
-        error_log('Card number (cleaned): "' . $card_number . '"');
-        error_log('Card expiry: "' . $card_expiry . '"');
-        error_log('Card CVV: "' . $card_cvv . '"');
-        error_log('Amount: ' . $amount);
+        // Payload pou voye bay Edge Function
+        $payload = array(
+            'merchant_id' => HATEX_MERCHANT_ID,
+            'amount'      => $amount,
+            'currency'    => 'HTG',
+            'card_number' => $card_number,
+            'card_expiry' => $card_expiry,
+            'card_cvv'    => $card_cvv,
+            'metadata'    => array(
+                'order_id'       => $order_id,
+                'order_key'      => $order->get_order_key(),
+                'customer_email' => $order->get_billing_email(),
+                'customer_name'  => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'platform'       => 'woocommerce',
+            )
+        );
 
-        // 1. Verifye machann nan
-        $receiver = $this->supabase_get_merchant(HATEX_MERCHANT_ID);
-        if (!$receiver) {
-            wc_add_notice(__('Machann pa valid.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
-        if ($receiver['kyc_status'] !== 'approved') {
-            wc_add_notice(__('Kont machann poko apwouve.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
+        $response = wp_remote_post(HATEX_EDGE_FUNCTION_URL, array(
+            'headers' => array('Content-Type' => 'application/json'),
+            'body'    => json_encode($payload),
+            'timeout' => 30,
+        ));
 
-        // 2. Chache kliyan an
-        $payer = $this->supabase_get_payer_by_card($card_number);
-        
-        // LOG 2: Rezilta rechèch
-        if ($payer) {
-            error_log('Payer found in DB: ' . print_r($payer, true));
-        } else {
-            error_log('Payer NOT found in DB for card: ' . $card_number);
-            
-            // Teste si tab la aksesib
-            $test = $this->supabase_test_connection();
-            error_log('Test connection result: ' . ($test ? 'OK' : 'FAILED'));
-        }
-
-        if (!$payer) {
-            wc_add_notice(__('Nimewo kat la pa egziste nan sistèm HATEX.', 'hatex-woocommerce'), 'error');
+        if (is_wp_error($response)) {
+            error_log('HATEX Edge Function Error: ' . $response->get_error_message());
+            wc_add_notice(__('Erè koneksyon ak sèvè peman.', 'hatex-woocommerce'), 'error');
             return array('result' => 'failure');
         }
 
-        // 3. Verifye dat ekspirasyon
-        if ($payer['exp_date'] !== $card_expiry) {
-            error_log('Expiry mismatch: DB="' . $payer['exp_date'] . '" vs entered="' . $card_expiry . '"');
-            wc_add_notice(__('Dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
+        $code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+
+        error_log("HATEX Edge Function Response ($code): " . print_r($data, true));
+
+        if ($code !== 200) {
+            $error_msg = isset($data['message']) ? $data['message'] : __('Repons envalid soti nan sèvè peman.', 'hatex-woocommerce');
+            wc_add_notice($error_msg, 'error');
             return array('result' => 'failure');
         }
 
-        // 4. Verifye CVV
-        if ($payer['cvv'] !== $card_cvv) {
-            error_log('CVV mismatch: DB="' . $payer['cvv'] . '" vs entered="' . $card_cvv . '"');
-            wc_add_notice(__('Kòd CVV pa bon.', 'hatex-woocommerce'), 'error');
+        if (isset($data['success']) && $data['success'] !== true) {
+            $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
+            wc_add_notice($error_msg, 'error');
             return array('result' => 'failure');
         }
 
-        // 5. Verifye KYC
-        if ($payer['kyc_status'] !== 'approved') {
-            wc_add_notice(__('Kont kliyan poko apwouve.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
-
-        // 6. Verifye balans
-        if ($payer['card_balance'] < $amount) {
-            wc_add_notice(sprintf(__('Balans ensifizan. Ou gen %s HTG.', 'hatex-woocommerce'), number_format($payer['card_balance'], 0)), 'error');
-            return array('result' => 'failure');
-        }
-
-        // 7. Fè transfè a
-        $transaction_id = 'tx_' . time() . '_' . uniqid();
-
-        $debit = $this->supabase_update_balance($payer['id'], 'card_balance', -$amount);
-        if (!$debit) {
-            wc_add_notice(__('Erè pandan debite.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
-
-        $credit = $this->supabase_update_balance($receiver['id'], 'wallet_balance', $amount);
-        if (!$credit) {
-            $this->supabase_update_balance($payer['id'], 'card_balance', $amount);
-            wc_add_notice(__('Erè pandan kredi.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
-
-        $this->supabase_create_transaction($transaction_id, $receiver['id'], $amount, 'SALE', $order);
-        $this->supabase_create_transaction($transaction_id . '_payer', $payer['id'], -$amount, 'PURCHASE', $order);
-
+        // Si peman an reyisi, nou estoke merchant ID a nan metadata pou itilize nan webhook
+        $transaction_id = isset($data['transaction_id']) ? $data['transaction_id'] : uniqid('hx_');
         $order->payment_complete($transaction_id);
         $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
         $order->update_meta_data('_hatex_transaction_id', $transaction_id);
+        $order->update_meta_data('_hatex_merchant_id', HATEX_MERCHANT_ID); // Nou estoke kle API a pou webhook
         $order->save();
 
         WC()->cart->empty_cart();
 
         return array(
-            'result' => 'success',
+            'result'   => 'success',
             'redirect' => $this->get_return_url($order),
         );
     }
 
-    // --- Fonksyon pou kominikasyon ak Supabase ---
+    /**
+     * Webhook la – resevwa notifikasyon soti nan Edge Function.
+     */
+    public function handle_webhook() {
+        $payload = file_get_contents('php://input');
+        $data    = json_decode($payload, true);
 
-    private function supabase_get_merchant($api_key) {
-        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?api_key=eq.' . urlencode($api_key) . '&select=id,kyc_status,wallet_balance', array(
-            'headers' => array(
-                'apikey' => SUPABASE_ANON_KEY,
-                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-            ),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($response)) {
-            error_log('Supabase error (get_merchant): ' . $response->get_error_message());
-            return null;
+        if (!$data || !isset($data['event'])) {
+            status_header(400);
+            exit;
         }
 
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        return (is_array($data) && count($data) > 0) ? $data[0] : null;
-    }
-
-    private function supabase_get_payer_by_card($card_number) {
-        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?card_number=eq.' . urlencode($card_number) . '&select=id,full_name,card_balance,kyc_status,exp_date,cvv', array(
-            'headers' => array(
-                'apikey' => SUPABASE_ANON_KEY,
-                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-            ),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($response)) {
-            error_log('Supabase error (get_payer): ' . $response->get_error_message());
-            return null;
+        if (!isset($data['metadata']['order_id'])) {
+            status_header(400);
+            exit;
         }
 
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        return (is_array($data) && count($data) > 0) ? $data[0] : null;
+        $order_id = $data['metadata']['order_id'];
+        $order    = wc_get_order($order_id);
+
+        if (!$order) {
+            status_header(404);
+            exit;
+        }
+
+        switch ($data['event']) {
+            case 'payment.succeeded':
+                $order->add_order_note(__('Konfimasyon webhook resevwa.', 'hatex-woocommerce'));
+
+                // Rekipere merchant ID ki estoke nan order meta
+                $merchant_id = $order->get_meta('_hatex_merchant_id');
+                if ($merchant_id) {
+                    $merchant_email = $this->supabase_get_merchant_email($merchant_id);
+                    if ($merchant_email) {
+                        $this->hatex_send_delivery_notification($order, $merchant_email);
+                    } else {
+                        error_log('HATEX: Imèl machann pa jwenn pou merchant_id ' . $merchant_id);
+                    }
+                }
+                break;
+
+            case 'payment.failed':
+                $order->update_status('failed', __('Peman HATEX echwe (webhook).', 'hatex-woocommerce'));
+                break;
+
+            case 'payment.pending':
+                $order->update_status('on-hold', __('Peman HATEX an atant (webhook).', 'hatex-woocommerce'));
+                break;
+        }
+
+        status_header(200);
+        echo 'OK';
+        exit;
     }
 
-    private function supabase_update_balance($user_id, $field, $amount_change) {
-        // Jwenn balans aktyèl
-        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?id=eq.' . $user_id . '&select=' . $field, array(
-            'headers' => array(
-                'apikey' => SUPABASE_ANON_KEY,
-                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-            ),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($response)) return false;
-
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        if (!is_array($data) || count($data) === 0) return false;
-
-        $current = $data[0][$field];
-        $new = $current + $amount_change;
-
-        $update = wp_remote_request(SUPABASE_URL . '/rest/v1/profiles?id=eq.' . $user_id, array(
-            'method' => 'PATCH',
-            'headers' => array(
-                'apikey' => SUPABASE_ANON_KEY,
-                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-                'Content-Type' => 'application/json',
-                'Prefer' => 'return=minimal',
-            ),
-            'body' => json_encode(array($field => $new)),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($update)) return false;
-        $code = wp_remote_retrieve_response_code($update);
-        return $code >= 200 && $code < 300;
-    }
-
-    private function supabase_create_transaction($txn_id, $user_id, $amount, $type, $order) {
-        $metadata = array(
-            'order_id' => $order->get_id(),
-            'order_key' => $order->get_order_key(),
-            'customer_email' => $order->get_billing_email(),
-            'platform' => 'woocommerce',
-        );
-
-        $response = wp_remote_post(SUPABASE_URL . '/rest/v1/transactions', array(
-            'headers' => array(
-                'apikey' => SUPABASE_ANON_KEY,
-                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-                'Content-Type' => 'application/json',
-                'Prefer' => 'return=minimal',
-            ),
-            'body' => json_encode(array(
-                'id' => $txn_id,
-                'user_id' => $user_id,
-                'amount' => $amount,
-                'currency' => 'HTG',
-                'status' => 'success',
-                'type' => $type,
-                'metadata' => $metadata,
-                'created_at' => gmdate('c'),
-            )),
-            'timeout' => 30,
-        ));
-
-        if (is_wp_error($response)) return false;
-        $code = wp_remote_retrieve_response_code($response);
-        return $code >= 200 && $code < 300;
-    }
-
-    // Ajoute yon fonksyon tès (BYEN FÈMEN)
-    private function supabase_test_connection() {
-        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?select=id&limit=1', array(
+    /**
+     * Rekipere imèl machann nan depi nan tab profiles Supabase.
+     */
+    private function supabase_get_merchant_email($api_key) {
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?api_key=eq.' . urlencode($api_key) . '&select=email', array(
             'headers' => array(
                 'apikey' => SUPABASE_ANON_KEY,
                 'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
@@ -944,17 +809,127 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         ));
 
         if (is_wp_error($response)) {
-            error_log('Test connection error: ' . $response->get_error_message());
+            error_log('Supabase error (get_merchant_email): ' . $response->get_error_message());
+            return null;
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        return (is_array($data) && count($data) > 0) ? $data[0]['email'] : null;
+    }
+
+    /**
+     * Voye notifikasyon livrezon bay machann nan via Resend.
+     */
+    private function hatex_send_delivery_notification($order, $merchant_email) {
+        $resend_api_key = RESEND_API_KEY; // Sèvi ak konstant lan
+        if (empty($resend_api_key)) {
+            error_log('HATEX: RESEND_API_KEY pa defini.');
+            return false;
+        }
+
+        // Preparasyon done yo
+        $order_id      = $order->get_id();
+        $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+        $customer_email = $order->get_billing_email();
+        $customer_phone = $order->get_billing_phone();
+        $shipping_address = $order->get_shipping_address_1();
+        $shipping_city    = $order->get_shipping_city();
+        $shipping_postcode = $order->get_shipping_postcode();
+        $shipping_country  = $order->get_shipping_country();
+
+        // Detay pwodwi yo
+        $items_html = '';
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            $items_html .= '<tr style="border-bottom:1px solid #eee;">';
+            $items_html .= '<td style="padding:8px;">' . esc_html($item->get_name()) . '</td>';
+            $items_html .= '<td style="padding:8px; text-align:center;">' . $item->get_quantity() . '</td>';
+            $items_html .= '<td style="padding:8px; text-align:right;">' . wc_price($item->get_total()) . '</td>';
+            $items_html .= '</tr>';
+        }
+
+        $order_total = wc_price($order->get_total());
+
+        // Kò imèl la (HTML)
+        $subject = sprintf('Nouvo lòd #%s – Detay livrezon', $order_id);
+        $message = "
+        <html>
+        <head><style>body{font-family:sans-serif;}</style></head>
+        <body>
+            <h2>Nouvo lòd HATEX</h2>
+            <p>Yon lòd fèk konplete. Men detay livrezon yo :</p>
+
+            <h3>Enfòmasyon kliyan</h3>
+            <table cellpadding='5'>
+                <tr><td><strong>Non :</strong></td><td>{$customer_name}</td></tr>
+                <tr><td><strong>Imèl :</strong></td><td>{$customer_email}</td></tr>
+                <tr><td><strong>Telefòn :</strong></td><td>{$customer_phone}</td></tr>
+            </table>
+
+            <h3>Adrès livrezon</h3>
+            <p>
+                {$shipping_address}<br>
+                {$shipping_city} {$shipping_postcode}<br>
+                {$shipping_country}
+            </p>
+
+            <h3>Pwodwi yo</h3>
+            <table style='width:100%; border-collapse:collapse;'>
+                <thead>
+                    <tr style='background:#f5f5f5;'>
+                        <th style='padding:8px; text-align:left;'>Pwodwi</th>
+                        <th style='padding:8px;'>Kantite</th>
+                        <th style='padding:8px; text-align:right;'>Pri</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {$items_html}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan='2' style='padding:8px; text-align:right;'><strong>Total</strong></td>
+                        <td style='padding:8px; text-align:right;'><strong>{$order_total}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <p style='margin-top:30px; font-size:12px; color:#777;'>Mesaj sa a voye otomatikman pa HATEX.</p>
+        </body>
+        </html>";
+
+        $response = wp_remote_post('https://api.resend.com/emails', array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $resend_api_key,
+                'Content-Type'  => 'application/json',
+            ),
+            'body'    => json_encode(array(
+                'from'    => 'HATEX <notifications@hatexcard.com>', // Chanje ak yon domèn verifye
+                'to'      => $merchant_email,
+                'subject' => $subject,
+                'html'    => $message,
+            )),
+            'timeout' => 15,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('HATEX Resend error: ' . $response->get_error_message());
             return false;
         }
 
         $code = wp_remote_retrieve_response_code($response);
-        return $code === 200;
+        if ($code >= 200 && $code < 300) {
+            return true;
+        } else {
+            $body = wp_remote_retrieve_body($response);
+            error_log("HATEX Resend HTTP $code: $body");
+            return false;
+        }
     }
 }
 `;
 
-    // --- 3. SIPO POU BLOCKS: includes/class-wc-gateway-hatex-blocks-support.php ---
+    // --- 3. SIPO POU BLOCKS (senplifye) ---
     const blocksSupportFile = `<?php
 use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
 
@@ -986,16 +961,15 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         return array(
             'title'       => $this->gateway->title,
             'description' => $this->gateway->description,
-            'supports'    => array_filter($this->gateway->supports, array($this->gateway, 'supports')),
+            'supports'    => $this->gateway->supports,
             'icon'        => '',
         );
     }
 }
 `;
 
-    // --- 4. JAVASCRIPT POU FÒMILÈ A: assets/js/hatex-checkout.js (VALIDASYON AN TAN REYÈL) ---
+    // --- 4. JAVASCRIPT POU FÒMILÈ (sèlman fòma) ---
     const jsFile = `jQuery(function($) {
-    // Fòma nimewo kat (ajoute espas chak 4 chif)
     $('#hatex-card-number').on('input', function() {
         let value = $(this).val().replace(/\\D/g, '');
         let formatted = '';
@@ -1006,7 +980,6 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         $(this).val(formatted);
     });
 
-    // Fòma dat ekspirasyon (ajoute / apre 2 chif)
     $('#hatex-card-expiry').on('input', function() {
         let value = $(this).val().replace(/\\D/g, '');
         if (value.length >= 2) {
@@ -1015,12 +988,10 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         $(this).val(value);
     });
 
-    // CVV sèlman chif (pa gen fòma)
     $('#hatex-card-cvv').on('input', function() {
         $(this).val($(this).val().replace(/\\D/g, ''));
     });
 
-    // Validasyon anvan soumisyon (anplis validasyon PHP)
     $('form.checkout').on('checkout_place_order_hatex', function() {
         let cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
         let cardExpiry = $('#hatex-card-expiry').val().trim();
@@ -1032,22 +1003,9 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         if (!/^\\d{13,19}$/.test(cardNumber)) {
             errors.push('Nimewo kat la pa valab (13-19 chif).');
         }
-
         if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
             errors.push('Dat ekspirasyon dwe fòma MM/AA.');
-        } else {
-            // Validasyon si dat ekspirasyon pase (opsyonèl)
-            let parts = cardExpiry.split('/');
-            let month = parseInt(parts[0], 10);
-            let year = parseInt(parts[1], 10) + 2000;
-            let now = new Date();
-            let currentYear = now.getFullYear();
-            let currentMonth = now.getMonth() + 1;
-            if (year < currentYear || (year === currentYear && month < currentMonth)) {
-                errors.push('Dat ekspirasyon kat la fin pase.');
-            }
         }
-
         if (!/^\\d{3,4}$/.test(cardCVV)) {
             errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
         }
@@ -1060,7 +1018,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
     });
 });`;
 
-    // --- 5. JAVASCRIPT POU BLOCKS: assets/js/checkout.js (SI NESÈSÈ) ---
+    // --- 5. JAVASCRIPT POU BLOCKS ---
     const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
@@ -1068,7 +1026,6 @@ const Content = () => {
     const [cardNumber, setCardNumber] = React.useState('');
     const [cardExpiry, setCardExpiry] = React.useState('');
     const [cardCvv, setCardCvv] = React.useState('');
-    const [errors, setErrors] = React.useState([]);
 
     const formatCardNumber = (value) => {
         const v = value.replace(/\\s+/g, '').replace(/\\D/g, '');
@@ -1089,75 +1046,44 @@ const Content = () => {
         return v;
     };
 
-    const validate = () => {
-        const errs = [];
-        const cleanNumber = cardNumber.replace(/\\s+/g, '');
-        if (!/^\\d{13,19}$/.test(cleanNumber)) {
-            errs.push('Nimewo kat la pa valab.');
-        }
-        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
-            errs.push('Dat ekspirasyon dwe fòma MM/AA.');
-        }
-        if (!/^\\d{3,4}$/.test(cardCvv)) {
-            errs.push('Kòd CVV dwe 3 oubyen 4 chif.');
-        }
-        setErrors(errs);
-        return errs.length === 0;
-    };
-
     return React.createElement('div', { className: 'wc-block-components-payment-method' },
         React.createElement('div', { className: 'wc-block-components-payment-method-content' },
-            errors.length > 0 && React.createElement('div', { className: 'wc-block-components-notice-banner is-error', style: { marginBottom: '15px' } },
-                React.createElement('ul', { style: { margin: '0', paddingLeft: '20px' } },
-                    errors.map((err, i) => React.createElement('li', { key: i }, err))
-                )
-            ),
-            React.createElement('fieldset', { className: 'wc-block-credit-card-form', style: { padding: '20px', border: '2px solid #e0e0e0', borderRadius: '16px' } },
-                React.createElement('div', { className: 'wc-block-form-row', style: { marginBottom: '20px' } },
-                    React.createElement('label', { htmlFor: 'hatex-card-number', style: { fontWeight: '600', fontSize: '15px' } }, window.wp.i18n.__('Nimewo kat', 'hatex-woocommerce')),
+            React.createElement('fieldset', { style: { padding: '20px', border: '2px solid #e0e0e0', borderRadius: '16px' } },
+                React.createElement('div', { style: { marginBottom: '20px' } },
+                    React.createElement('label', { style: { fontWeight: '600' } }, 'Nimewo kat'),
                     React.createElement('input', {
                         type: 'text',
-                        id: 'hatex-card-number',
-                        name: 'hatex_card_number',
                         value: cardNumber,
                         onChange: (e) => setCardNumber(formatCardNumber(e.target.value)),
-                        onBlur: validate,
                         placeholder: '0000 0000 0000 0000',
-                        className: 'wc-block-components-text-input',
                         style: { width: '100%', padding: '16px', fontSize: '18px', borderRadius: '12px', border: '2px solid #ddd', fontFamily: 'monospace' },
                         maxLength: 19,
                         required: true
                     })
                 ),
-                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' } },
-                    React.createElement('div', { className: 'wc-block-form-row' },
-                        React.createElement('label', { htmlFor: 'hatex-card-expiry', style: { fontWeight: '600', fontSize: '15px' } }, window.wp.i18n.__('Dat ekspirasyon', 'hatex-woocommerce')),
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' } },
+                    React.createElement('div',
+                        null,
+                        React.createElement('label', { style: { fontWeight: '600' } }, 'Dat ekspirasyon'),
                         React.createElement('input', {
                             type: 'text',
-                            id: 'hatex-card-expiry',
-                            name: 'hatex_card_expiry',
                             value: cardExpiry,
                             onChange: (e) => setCardExpiry(formatExpiry(e.target.value)),
-                            onBlur: validate,
                             placeholder: 'MM/AA',
-                            className: 'wc-block-components-text-input',
-                            style: { width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px', border: '2px solid #ddd', textAlign: 'center' },
+                            style: { width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #ddd', textAlign: 'center' },
                             maxLength: 5,
                             required: true
                         })
                     ),
-                    React.createElement('div', { className: 'wc-block-form-row' },
-                        React.createElement('label', { htmlFor: 'hatex-card-cvv', style: { fontWeight: '600', fontSize: '15px' } }, window.wp.i18n.__('CVV', 'hatex-woocommerce')),
+                    React.createElement('div',
+                        null,
+                        React.createElement('label', { style: { fontWeight: '600' } }, 'CVV'),
                         React.createElement('input', {
                             type: 'text',
-                            id: 'hatex-card-cvv',
-                            name: 'hatex_card_cvv',
                             value: cardCvv,
                             onChange: (e) => setCardCvv(e.target.value.replace(/\\D/g, '').substring(0, 4)),
-                            onBlur: validate,
                             placeholder: '123',
-                            className: 'wc-block-components-text-input',
-                            style: { width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px', border: '2px solid #ddd', textAlign: 'center', letterSpacing: '2px' },
+                            style: { width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #ddd', textAlign: 'center', letterSpacing: '2px' },
                             maxLength: 4,
                             required: true
                         })
@@ -1175,66 +1101,40 @@ const Block_Gateway = {
     edit: Object(window.wp.element.createElement)(Content, null),
     canMakePayment: () => true,
     ariaLabel: label,
-    supports: {
-        features: settings.supports,
-    },
+    supports: { features: settings.supports },
 };
 
 window.wc.wcBlocksRegistry.registerPaymentMethod(Block_Gateway);
 `;
 
     // --- 6. readme.txt ---
-    const readmeFile = `=== HATEX Payments Pro ===
+    const readmeFile = `=== HATEX Payments ===
 Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 3.2.0
+Stable tag: 4.1.0
 License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Aksepte peman an Goud atravè HATEX. Fòmilè pwofesyonèl ak verifikasyon dirèk nan baz done.
+Aksepte peman an Goud atravè HATEX. Senp, vit, an sekirite.
 
 == Description ==
 
-HATEX Payments Pro se yon plugin ki pèmèt machann WooCommerce yo resevwa peman an Goud Ayisyen (HTG). Li konekte dirèkteman ak baz done pou verifye enfòmasyon yo.
-
-Fonksyonalite kle:
-* Fòmilè pwofesyonèl ak gwo bouton
-* Peman an Goud (konvèsyon USD → HTG otomatik)
-* Validasyon an tan reyèl (nimewo kat, dat, CVV)
-* Verifye balans kat la
-* Verifye KYC moun k ap peye a
-* Transfè lajan otomatik soti nan balans kliyan an ale nan balans machann nan
-* Notifikasyon istorik pou kliyan an
-* Konpatib ak checkout blocks
+Plugin sa a konekte ak Edge Function HATEX pou verifye peman yo. Li voye notifikasyon livrezon bay machann nan via Resend.
 
 == Installation ==
 
 1. Upload the plugin files to the \`/wp-content/plugins/hatex-woocommerce\` directory.
-2. Activate the plugin through the 'Plugins' screen in WordPress.
+2. Activate the plugin.
 3. Go to WooCommerce > Settings > Payments, then click "Configure" on HATEX Payments.
-
-== Frequently Asked Questions ==
-
-= Poukisa fòmilè a pa parèt? =
-Verifye ke plugin an aktive, ke HATEX mete kòm disponib nan anviwònman peman yo.
-
-= Ki jan konvèsyon USD → HTG fèt? =
-Plugin an itilize taux 136. Kontakte sipò pou chanje taux la.
-
-= Kisa k ap pase si enfòmasyon kat la pa bon? =
-Kliyan an ap wè yon mesaj erè klè anba fòmilè a.
 
 == Changelog ==
 
-= 3.2.0 =
-* Nouvo fòmilè pwofesyonèl ak pi gwo
-* Verifikasyon amelyore nan baz done
-* Pi bon validasyon
+= 4.1.0 =
+* Ajoute webhook ak notifikasyon livrezon via Resend.
 
-= 3.1.0 =
-* Premye vèsyon ak koneksyon dirèk
+= 4.0.0 =
+* Senplifye: sèlman koneksyon ak Edge Function
 `;
 
     zip.file('hatex-woocommerce.php', mainFile);
@@ -1254,7 +1154,6 @@ Kliyan an ap wè yon mesaj erè klè anba fòmilè a.
     setDownloadingPlugin(null);
   }
 };
-
   // ---------- SHOPIFY PLUGIN (VÈSYON 2.0) ----------
   const generateShopifyPlugin = async () => {
     if (!profile?.id) return;
