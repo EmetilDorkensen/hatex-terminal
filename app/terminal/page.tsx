@@ -478,7 +478,7 @@ function hatex_register_block_support() {
 }
 `;
 
-    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AVÈK FÒMILÈ PWOFESYONÈL) ---
+    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (KORIJE AK TOUT AKOLAD BYEN FÈMEN) ---
     const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
@@ -707,131 +707,241 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         return true;
     }
 
- public function process_payment($order_id) {
-    $order = wc_get_order($order_id);
+    public function process_payment($order_id) {
+        $order = wc_get_order($order_id);
 
-    $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
-    $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-    $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+        $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
+        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
+        $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
 
-    $amount = $order->get_total();
-    $currency = $order->get_currency();
-    if ($currency === 'USD') {
-        $amount = $amount * 136;
-    }
+        $amount = $order->get_total();
+        $currency = $order->get_currency();
+        if ($currency === 'USD') {
+            $amount = $amount * 136;
+        }
 
-    // LOG 1: Done resevwa
-    error_log('=== HATEX PAYMENT DEBUG ===');
-    error_log('Card number (cleaned): "' . $card_number . '"');
-    error_log('Card expiry: "' . $card_expiry . '"');
-    error_log('Card CVV: "' . $card_cvv . '"');
-    error_log('Amount: ' . $amount);
+        // LOG 1: Done resevwa
+        error_log('=== HATEX PAYMENT DEBUG ===');
+        error_log('Card number (cleaned): "' . $card_number . '"');
+        error_log('Card expiry: "' . $card_expiry . '"');
+        error_log('Card CVV: "' . $card_cvv . '"');
+        error_log('Amount: ' . $amount);
 
-    // 1. Verifye machann nan
-    $receiver = $this->supabase_get_merchant(HATEX_MERCHANT_ID);
-    if (!$receiver) {
-        wc_add_notice(__('Machann pa valid.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
-    if ($receiver['kyc_status'] !== 'approved') {
-        wc_add_notice(__('Kont machann poko apwouve.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
+        // 1. Verifye machann nan
+        $receiver = $this->supabase_get_merchant(HATEX_MERCHANT_ID);
+        if (!$receiver) {
+            wc_add_notice(__('Machann pa valid.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+        if ($receiver['kyc_status'] !== 'approved') {
+            wc_add_notice(__('Kont machann poko apwouve.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
 
-    // 2. Chache kliyan an
-    $payer = $this->supabase_get_payer_by_card($card_number);
-    
-    // LOG 2: Rezilta rechèch
-    if ($payer) {
-        error_log('Payer found in DB: ' . print_r($payer, true));
-    } else {
-        error_log('Payer NOT found in DB for card: ' . $card_number);
+        // 2. Chache kliyan an
+        $payer = $this->supabase_get_payer_by_card($card_number);
         
-        // Teste si tab la aksesib
-        $test = $this->supabase_test_connection();
-        error_log('Test connection result: ' . ($test ? 'OK' : 'FAILED'));
+        // LOG 2: Rezilta rechèch
+        if ($payer) {
+            error_log('Payer found in DB: ' . print_r($payer, true));
+        } else {
+            error_log('Payer NOT found in DB for card: ' . $card_number);
+            
+            // Teste si tab la aksesib
+            $test = $this->supabase_test_connection();
+            error_log('Test connection result: ' . ($test ? 'OK' : 'FAILED'));
+        }
+
+        if (!$payer) {
+            wc_add_notice(__('Nimewo kat la pa egziste nan sistèm HATEX.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 3. Verifye dat ekspirasyon
+        if ($payer['exp_date'] !== $card_expiry) {
+            error_log('Expiry mismatch: DB="' . $payer['exp_date'] . '" vs entered="' . $card_expiry . '"');
+            wc_add_notice(__('Dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 4. Verifye CVV
+        if ($payer['cvv'] !== $card_cvv) {
+            error_log('CVV mismatch: DB="' . $payer['cvv'] . '" vs entered="' . $card_cvv . '"');
+            wc_add_notice(__('Kòd CVV pa bon.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 5. Verifye KYC
+        if ($payer['kyc_status'] !== 'approved') {
+            wc_add_notice(__('Kont kliyan poko apwouve.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 6. Verifye balans
+        if ($payer['card_balance'] < $amount) {
+            wc_add_notice(sprintf(__('Balans ensifizan. Ou gen %s HTG.', 'hatex-woocommerce'), number_format($payer['card_balance'], 0)), 'error');
+            return array('result' => 'failure');
+        }
+
+        // 7. Fè transfè a
+        $transaction_id = 'tx_' . time() . '_' . uniqid();
+
+        $debit = $this->supabase_update_balance($payer['id'], 'card_balance', -$amount);
+        if (!$debit) {
+            wc_add_notice(__('Erè pandan debite.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        $credit = $this->supabase_update_balance($receiver['id'], 'wallet_balance', $amount);
+        if (!$credit) {
+            $this->supabase_update_balance($payer['id'], 'card_balance', $amount);
+            wc_add_notice(__('Erè pandan kredi.', 'hatex-woocommerce'), 'error');
+            return array('result' => 'failure');
+        }
+
+        $this->supabase_create_transaction($transaction_id, $receiver['id'], $amount, 'SALE', $order);
+        $this->supabase_create_transaction($transaction_id . '_payer', $payer['id'], -$amount, 'PURCHASE', $order);
+
+        $order->payment_complete($transaction_id);
+        $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
+        $order->update_meta_data('_hatex_transaction_id', $transaction_id);
+        $order->save();
+
+        WC()->cart->empty_cart();
+
+        return array(
+            'result' => 'success',
+            'redirect' => $this->get_return_url($order),
+        );
     }
 
-    if (!$payer) {
-        wc_add_notice(__('Nimewo kat la pa egziste nan sistèm HATEX.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
+    // --- Fonksyon pou kominikasyon ak Supabase ---
+
+    private function supabase_get_merchant($api_key) {
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?api_key=eq.' . urlencode($api_key) . '&select=id,kyc_status,wallet_balance', array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+            ),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('Supabase error (get_merchant): ' . $response->get_error_message());
+            return null;
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        return (is_array($data) && count($data) > 0) ? $data[0] : null;
     }
 
-    // 3. Verifye dat ekspirasyon
-    if ($payer['exp_date'] !== $card_expiry) {
-        error_log('Expiry mismatch: DB="' . $payer['exp_date'] . '" vs entered="' . $card_expiry . '"');
-        wc_add_notice(__('Dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
+    private function supabase_get_payer_by_card($card_number) {
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?card_number=eq.' . urlencode($card_number) . '&select=id,full_name,card_balance,kyc_status,exp_date,cvv', array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+            ),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('Supabase error (get_payer): ' . $response->get_error_message());
+            return null;
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        return (is_array($data) && count($data) > 0) ? $data[0] : null;
     }
 
-    // 4. Verifye CVV
-    if ($payer['cvv'] !== $card_cvv) {
-        error_log('CVV mismatch: DB="' . $payer['cvv'] . '" vs entered="' . $card_cvv . '"');
-        wc_add_notice(__('Kòd CVV pa bon.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
+    private function supabase_update_balance($user_id, $field, $amount_change) {
+        // Jwenn balans aktyèl
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?id=eq.' . $user_id . '&select=' . $field, array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+            ),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) return false;
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        if (!is_array($data) || count($data) === 0) return false;
+
+        $current = $data[0][$field];
+        $new = $current + $amount_change;
+
+        $update = wp_remote_request(SUPABASE_URL . '/rest/v1/profiles?id=eq.' . $user_id, array(
+            'method' => 'PATCH',
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+                'Content-Type' => 'application/json',
+                'Prefer' => 'return=minimal',
+            ),
+            'body' => json_encode(array($field => $new)),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($update)) return false;
+        $code = wp_remote_retrieve_response_code($update);
+        return $code >= 200 && $code < 300;
     }
 
-    // 5. Verifye KYC
-    if ($payer['kyc_status'] !== 'approved') {
-        wc_add_notice(__('Kont kliyan poko apwouve.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
+    private function supabase_create_transaction($txn_id, $user_id, $amount, $type, $order) {
+        $metadata = array(
+            'order_id' => $order->get_id(),
+            'order_key' => $order->get_order_key(),
+            'customer_email' => $order->get_billing_email(),
+            'platform' => 'woocommerce',
+        );
+
+        $response = wp_remote_post(SUPABASE_URL . '/rest/v1/transactions', array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+                'Content-Type' => 'application/json',
+                'Prefer' => 'return=minimal',
+            ),
+            'body' => json_encode(array(
+                'id' => $txn_id,
+                'user_id' => $user_id,
+                'amount' => $amount,
+                'currency' => 'HTG',
+                'status' => 'success',
+                'type' => $type,
+                'metadata' => $metadata,
+                'created_at' => gmdate('c'),
+            )),
+            'timeout' => 30,
+        ));
+
+        if (is_wp_error($response)) return false;
+        $code = wp_remote_retrieve_response_code($response);
+        return $code >= 200 && $code < 300;
     }
 
-    // 6. Verifye balans
-    if ($payer['card_balance'] < $amount) {
-        wc_add_notice(sprintf(__('Balans ensifizan. Ou gen %s HTG.', 'hatex-woocommerce'), number_format($payer['card_balance'], 0)), 'error');
-        return array('result' => 'failure');
+    // Ajoute yon fonksyon tès (BYEN FÈMEN)
+    private function supabase_test_connection() {
+        $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?select=id&limit=1', array(
+            'headers' => array(
+                'apikey' => SUPABASE_ANON_KEY,
+                'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
+            ),
+            'timeout' => 10,
+        ));
+
+        if (is_wp_error($response)) {
+            error_log('Test connection error: ' . $response->get_error_message());
+            return false;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        return $code === 200;
     }
-
-    // 7. Fè transfè a
-    $transaction_id = 'tx_' . time() . '_' . uniqid();
-
-    $debit = $this->supabase_update_balance($payer['id'], 'card_balance', -$amount);
-    if (!$debit) {
-        wc_add_notice(__('Erè pandan debite.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
-
-    $credit = $this->supabase_update_balance($receiver['id'], 'wallet_balance', $amount);
-    if (!$credit) {
-        $this->supabase_update_balance($payer['id'], 'card_balance', $amount);
-        wc_add_notice(__('Erè pandan kredi.', 'hatex-woocommerce'), 'error');
-        return array('result' => 'failure');
-    }
-
-    $this->supabase_create_transaction($transaction_id, $receiver['id'], $amount, 'SALE', $order);
-    $this->supabase_create_transaction($transaction_id . '_payer', $payer['id'], -$amount, 'PURCHASE', $order);
-
-    $order->payment_complete($transaction_id);
-    $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
-    $order->update_meta_data('_hatex_transaction_id', $transaction_id);
-    $order->save();
-
-    WC()->cart->empty_cart();
-
-    return array(
-        'result' => 'success',
-        'redirect' => $this->get_return_url($order),
-    );
-}
-
-// Ajoute yon fonksyon tès
-private function supabase_test_connection() {
-    $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?select=id&limit=1', array(
-        'headers' => array(
-            'apikey' => SUPABASE_ANON_KEY,
-            'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-        ),
-        'timeout' => 10,
-    ));
-
-    if (is_wp_error($response)) {
-        error_log('Test connection error: ' . $response->get_error_message());
-        return false;
-    }
-
-    $code = wp_remote_retrieve_response_code($response);
-    return $code === 200;
 }
 `;
 
