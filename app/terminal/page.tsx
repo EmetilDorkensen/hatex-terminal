@@ -478,8 +478,8 @@ function hatex_register_block_support() {
 }
 `;
 
-    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (KORIJE AK TOUT AKOLAD BYEN FÈMEN) ---
-    const gatewayFile = `<?php
+ // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AVÈK RETENTION DONE) ---
+const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
     public function __construct() {
@@ -551,6 +551,12 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         if ($this->description) {
             echo '<p class="form-row form-row-wide" style="margin-bottom: 20px; font-size: 16px; color: #555;">' . wp_kses_post($this->description) . '</p>';
         }
+
+        // Retni valè yo apre soumisyon (si gen erè)
+        $posted_card_number = isset($_POST['hatex_card_number']) ? esc_attr($_POST['hatex_card_number']) : '';
+        $posted_card_expiry = isset($_POST['hatex_card_expiry']) ? esc_attr($_POST['hatex_card_expiry']) : '';
+        $posted_card_cvv    = isset($_POST['hatex_card_cvv']) ? esc_attr($_POST['hatex_card_cvv']) : '';
+
         ?>
         <style>
             .hatex-payment-form {
@@ -625,13 +631,14 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         <div id="hatex-payment-errors" class="hatex-payment-errors" style="display: none;"></div>
         
         <div class="hatex-payment-form">
-            <!-- Nimewo kat la (pi gwo) -->
+            <!-- Nimewo kat la -->
             <div class="form-row">
                 <label for="hatex-card-number">💳 Nimewo kat <span style="color:#e62e04;">*</span></label>
                 <input 
                     type="text" 
                     id="hatex-card-number" 
                     name="hatex_card_number" 
+                    value="<?php echo $posted_card_number; ?>"
                     required 
                     placeholder="0000 0000 0000 0000" 
                     maxlength="19"
@@ -646,7 +653,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                 </div>
             </div>
 
-            <!-- Dat ekspirasyon ak CVV (ansanm) -->
+            <!-- Dat ekspirasyon ak CVV -->
             <div class="exp-cvv-row">
                 <div class="form-row">
                     <label for="hatex-card-expiry">📅 Dat ekspirasyon <span style="color:#e62e04;">*</span></label>
@@ -654,6 +661,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                         type="text" 
                         id="hatex-card-expiry" 
                         name="hatex_card_expiry" 
+                        value="<?php echo $posted_card_expiry; ?>"
                         required 
                         placeholder="MM/YY" 
                         maxlength="5"
@@ -667,6 +675,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                         type="password" 
                         id="hatex-card-cvv" 
                         name="hatex_card_cvv" 
+                        value="<?php echo $posted_card_cvv; ?>"
                         required 
                         placeholder="123" 
                         maxlength="4"
