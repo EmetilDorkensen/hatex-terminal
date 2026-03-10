@@ -679,40 +679,82 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         return true;
     }
 
-    public function process_payment($order_id) {
-        $order = wc_get_order($order_id);
+public function process_payment($order_id) {
+    $order = wc_get_order($order_id);
 
-        // === AI SCANNER: kolekte tout enfòmasyon nan paj checkout la ===
-        
-        // Enfòmasyon debaz
-        $customer_email = $order->get_billing_email();
-        $customer_name  = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
-        $amount         = $order->get_total();
-        $currency       = $order->get_currency();
-        
-        if ($currency === 'USD') {
-            $amount = $amount * 136;
-        }
+    // ---- LOG 1: Tout sa ki nan $_POST ----
+    error_log('=== HATEX: Tout $_POST ===');
+    error_log(print_r($_POST, true));
 
-        // Enfòmasyon kat
-        $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
-        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-        $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
+    // ---- LOG 2: Valè endividyèl yo ----
+    error_log('=== HATEX: Valè endividyèl yo ===');
+    error_log('Raw hatex_card_number: ' . ($_POST['hatex_card_number'] ?? 'PA GENYEN'));
+    error_log('Raw hatex_card_expiry: ' . ($_POST['hatex_card_expiry'] ?? 'PA GENYEN'));
+    error_log('Raw hatex_card_cvv: ' . ($_POST['hatex_card_cvv'] ?? 'PA GENYEN'));
 
-        // Adrès livrezon
-        $shipping = array(
-            'first_name' => $order->get_shipping_first_name(),
-            'last_name'  => $order->get_shipping_last_name(),
-            'address_1'  => $order->get_shipping_address_1(),
-            'address_2'  => $order->get_shipping_address_2(),
-            'city'       => $order->get_shipping_city(),
-            'postcode'   => $order->get_shipping_postcode(),
-            'country'    => $order->get_shipping_country(),
-            'phone'      => $order->get_billing_phone(), // WooCommerce pa gen shipping phone, itilize billing phone
-        );
+    // PRAN VALÈ YO AK FÒS (pi senp)
+    $card_number_raw = isset($_POST['hatex_card_number']) ? $_POST['hatex_card_number'] : '';
+    $card_expiry_raw = isset($_POST['hatex_card_expiry']) ? $_POST['hatex_card_expiry'] : '';
+    $card_cvv_raw    = isset($_POST['hatex_card_cvv']) ? $_POST['hatex_card_cvv'] : '';
 
-        // Adrès fakturayon
-        $billing = array(
+    // NETWAYE YO
+    $card_number = preg_replace('/\s+/', '', $card_number_raw);
+    $card_expiry = trim($card_expiry_raw);
+    $card_cvv    = trim($card_cvv_raw);
+
+    // ---- LOG 3: Valè apre netwayaj ----
+    error_log('=== HATEX: Valè apre netwayaj ===');
+    error_log('Cleaned card_number: "' . $card_number . '"');
+    error_log('Cleaned card_expiry: "' . $card_expiry . '"');
+    error_log('Cleaned card_cvv: "' . $card_cvv . '"');
+
+    // ---- LOG 4: Si yo toujou vid, tcheke si gen lòt non ----
+    if (empty($card_number)) {
+        error_log('!!! HATEX: card_number VID !!!');
+        // Eseye jwenn ak lòt non
+        $card_number = isset($_POST['card_number']) ? $_POST['card_number'] : '';
+        $card_number = isset($_POST['cardnumber']) ? $_POST['cardnumber'] : $card_number;
+        error_log('HATEX: card_number apre lòt non: "' . $card_number . '"');
+    }
+
+    if (empty($card_expiry)) {
+        error_log('!!! HATEX: card_expiry VID !!!');
+        $card_expiry = isset($_POST['expiry']) ? $_POST['expiry'] : '';
+        $card_expiry = isset($_POST['exp_date']) ? $_POST['exp_date'] : $card_expiry;
+        error_log('HATEX: card_expiry apre lòt non: "' . $card_expiry . '"');
+    }
+
+    if (empty($card_cvv)) {
+        error_log('!!! HATEX: card_cvv VID !!!');
+        $card_cvv = isset($_POST['cvv']) ? $_POST['cvv'] : '';
+        $card_cvv = isset($_POST['card_cvv']) ? $_POST['card_cvv'] : $card_cvv;
+        error_log('HATEX: card_cvv apre lòt non: "' . $card_cvv . '"');
+    }
+
+    $amount = $order->get_total();
+    $currency = $order->get_currency();
+    if ($currency === 'USD') {
+        $amount = $amount * 136;
+    }
+
+    // ---- LOG 5: Valè final yo ----
+    error_log('=== HATEX: Valè final yo ===');
+    error_log('Final card_number: "' . $card_number . '"');
+    error_log('Final card_expiry: "' . $card_expiry . '"');
+    error_log('Final card_cvv: "' . $card_cvv . '"');
+    error_log('Final amount: ' . $amount);
+
+    // Payload pou voye bay Edge Function
+    $payload = array(
+        'merchant_id'   => HATEX_MERCHANT_ID,
+        'card_number'   => $card_number,
+        'card_expiry'   => $card_expiry,
+        'card_cvv'      => $card_cvv,
+        'customer'      => array(
+            'email' => $order->get_billing_email(),
+            'name'  => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+        ),
+        'billing'       => array(
             'first_name' => $order->get_billing_first_name(),
             'last_name'  => $order->get_billing_last_name(),
             'address_1'  => $order->get_billing_address_1(),
@@ -722,103 +764,98 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             'country'    => $order->get_billing_country(),
             'email'      => $order->get_billing_email(),
             'phone'      => $order->get_billing_phone(),
-        );
+        ),
+        'shipping'      => array(
+            'first_name' => $order->get_shipping_first_name(),
+            'last_name'  => $order->get_shipping_last_name(),
+            'address_1'  => $order->get_shipping_address_1(),
+            'address_2'  => $order->get_shipping_address_2(),
+            'city'       => $order->get_shipping_city(),
+            'postcode'   => $order->get_shipping_postcode(),
+            'country'    => $order->get_shipping_country(),
+            'phone'      => $order->get_billing_phone(),
+        ),
+        'items'         => array(),
+        'order'         => array(
+            'order_id'  => $order_id,
+            'order_key' => $order->get_order_key(),
+            'total'     => $amount,
+        ),
+        'platform'      => 'woocommerce',
+        'scanned_at'    => current_time('c'),
+    );
 
-        // Pwodwi yo (ak foto)
-        $items = array();
-        foreach ($order->get_items() as $item_id => $item) {
-            $product = $item->get_product();
-            $image_id = $product->get_image_id();
-            $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'full') : wc_placeholder_img_src('full');
-            
-            $items[] = array(
-                'name'        => $item->get_name(),
-                'quantity'    => $item->get_quantity(),
-                'total'       => $item->get_total(),
-                'product_id'  => $product->get_id(),
-                'sku'         => $product->get_sku(),
-                'image_url'   => $image_url,
-            );
-        }
-
-        // Total lòd la ak lòt detay
-        $order_data = array(
-            'order_id'      => $order_id,
-            'order_key'     => $order->get_order_key(),
-            'total'         => $amount,
-            'currency'      => $currency,
-            'payment_method'=> $order->get_payment_method(),
-            'date_created'  => $order->get_date_created() ? $order->get_date_created()->date('c') : null,
-        );
-
-        // Payload konplè pou voye bay Edge Function
-        $payload = array(
-            'merchant_id'   => HATEX_MERCHANT_ID, // api_key machann nan
-            'card_number'   => $card_number,
-            'card_expiry'   => $card_expiry,
-            'card_cvv'      => $card_cvv,
-            'customer'      => array(
-                'email' => $customer_email,
-                'name'  => $customer_name,
-            ),
-            'billing'       => $billing,
-            'shipping'      => $shipping,
-            'items'         => $items,
-            'order'         => $order_data,
-            'platform'      => 'woocommerce',
-            'scanned_at'    => current_time('c'),
-        );
-
-        error_log('HATEX AI Scanner - Payload voye: ' . json_encode($payload));
-
-        // Anvoye demann nan bay Edge Function
-        $response = wp_remote_post(HATEX_EDGE_FUNCTION_URL, array(
-            'headers' => array('Content-Type' => 'application/json'),
-            'body'    => json_encode($payload),
-            'timeout' => 45, // Tan atant pi long paske gen plis done
-        ));
-
-        if (is_wp_error($response)) {
-            error_log('HATEX Edge Function Error: ' . $response->get_error_message());
-            wc_add_notice(__('Erè koneksyon ak sèvè peman. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
-            return array('result' => 'failure');
-        }
-
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
-        error_log("HATEX Edge Function Response ($code): " . print_r($data, true));
-
-        // Si gen erè nan kominikasyon an
-        if ($code !== 200) {
-            $error_msg = isset($data['message']) ? $data['message'] : 'Erè kominikasyon ak sèvè peman.';
-            wc_add_notice($error_msg, 'error');
-            return array('result' => 'failure');
-        }
-
-        // Si Edge Function voye yon mesaj erè
-        if (isset($data['success']) && $data['success'] !== true) {
-            $error_msg = isset($data['message']) ? $data['message'] : 'Peman an echwe.';
-            wc_add_notice($error_msg, 'error');
-            return array('result' => 'failure');
-        }
-
-        // Si peman an reyisi
-        $transaction_id = isset($data['transaction_id']) ? $data['transaction_id'] : uniqid('hx_');
-        $order->payment_complete($transaction_id);
-        $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
-        $order->update_meta_data('_hatex_transaction_id', $transaction_id);
-        $order->update_meta_data('_hatex_merchant_id', HATEX_MERCHANT_ID);
-        $order->save();
-
-        WC()->cart->empty_cart();
-
-        return array(
-            'result'   => 'success',
-            'redirect' => $this->get_return_url($order),
+    // Ajoute pwodwi yo
+    foreach ($order->get_items() as $item) {
+        $product = $item->get_product();
+        $image_id = $product->get_image_id();
+        $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'full') : wc_placeholder_img_src('full');
+        
+        $payload['items'][] = array(
+            'name'      => $item->get_name(),
+            'quantity'  => $item->get_quantity(),
+            'total'     => $item->get_total(),
+            'product_id'=> $product->get_id(),
+            'image_url' => $image_url,
         );
     }
+
+    // ---- LOG 6: Payload final la (san enfòmasyon sansib) ----
+    $log_payload = $payload;
+    if (!empty($log_payload['card_number'])) {
+        $log_payload['card_number'] = substr($log_payload['card_number'], 0, 4) . '...';
+    }
+    if (!empty($log_payload['card_cvv'])) {
+        $log_payload['card_cvv'] = '***';
+    }
+    error_log('=== HATEX: Payload final (san enfòmasyon sansib) ===');
+    error_log(print_r($log_payload, true));
+
+    // Anvoye demann nan bay Edge Function
+    $response = wp_remote_post(HATEX_EDGE_FUNCTION_URL, array(
+        'headers' => array('Content-Type' => 'application/json'),
+        'body'    => json_encode($payload),
+        'timeout' => 45,
+    ));
+
+    if (is_wp_error($response)) {
+        error_log('HATEX Edge Function Error: ' . $response->get_error_message());
+        wc_add_notice(__('Erè koneksyon ak sèvè peman. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
+        return array('result' => 'failure');
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    error_log("HATEX Edge Function Response ($code): " . print_r($data, true));
+
+    if ($code !== 200) {
+        $error_msg = isset($data['message']) ? $data['message'] : 'Erè kominikasyon ak sèvè peman.';
+        wc_add_notice($error_msg, 'error');
+        return array('result' => 'failure');
+    }
+
+    if (isset($data['success']) && $data['success'] !== true) {
+        $error_msg = isset($data['message']) ? $data['message'] : 'Peman an echwe.';
+        wc_add_notice($error_msg, 'error');
+        return array('result' => 'failure');
+    }
+
+    $transaction_id = isset($data['transaction_id']) ? $data['transaction_id'] : uniqid('hx_');
+    $order->payment_complete($transaction_id);
+    $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
+    $order->update_meta_data('_hatex_transaction_id', $transaction_id);
+    $order->update_meta_data('_hatex_merchant_id', HATEX_MERCHANT_ID);
+    $order->save();
+
+    WC()->cart->empty_cart();
+
+    return array(
+        'result'   => 'success',
+        'redirect' => $this->get_return_url($order),
+    );
+}
 }
 `;
 
