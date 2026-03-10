@@ -388,7 +388,7 @@ export default function TerminalPage() {
   // FONKSYON JENERASYON PLUGIN YO (VÈSYON 2.0 - FÒMILÈ ENTEGRE)
   // ============================================================
 
-// ---------- WOOCOMMERCE PLUGIN (VÈSYON 4.1.0 - AK WEBHOOK & RESEND) ----------
+// ---------- WOOCOMMERCE PLUGIN (VÈSYON 5.0.0 - PASARELL SOU EDGE FUNCTION) ----------
 const generateWooCommercePlugin = async () => {
   if (!profile?.id) return;
   if (profile?.kyc_status !== 'approved') {
@@ -408,10 +408,10 @@ const generateWooCommercePlugin = async () => {
     // --- 1. FICHYE PRENSIPAL: hatex-woocommerce.php ---
     const mainFile = `<?php
 /**
- * Plugin Name: HATEX Payments (Edge Function)
+ * Plugin Name: HATEX Payments (Pasarell)
  * Plugin URI: https://hatexcard.com
- * Description: Peye an Goud ak HATEX – Plugin ki konekte ak Edge Function epi voye notifikasyon livrezon via Resend.
- * Version: 4.1.0
+ * Description: Peye an Goud ak HATEX – Plugin pasarel. Tout validasyon fet nan Edge Function. Webhook voye enfòmasyon livrezon.
+ * Version: 5.0.0
  * Author: HATEX
  * Author URI: https://hatexcard.com
  * License: GPL v2 or later
@@ -425,13 +425,19 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('HATEX_WC_VERSION', '4.1.0');
+define('HATEX_WC_VERSION', '5.0.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Kle API machann nan
 define('RESEND_API_KEY', 're_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
+
 // URL Edge Function
 define('HATEX_EDGE_FUNCTION_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment');
+
+// Konfigirasyon Supabase (pou webhook la)
+define('SUPABASE_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co');
+define('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNTYyOTksImV4cCI6MjA4MTczMjI5OX0._CjL8kZzHhJQrQ2xVnF3sY5tG9bKcL7pW9dXmY8NqZk');
+define('SUPABASE_SERVICE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg');
 
 function add_hatex_gateway($methods) {
     $methods[] = 'WC_Gateway_HATEX';
@@ -476,7 +482,7 @@ function hatex_register_block_support() {
 }
 `;
 
-    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AK WEBHOOK AK RESEND) ---
+    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (PASARELL SOU EDGE FUNCTION) ---
     const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
@@ -485,7 +491,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->icon               = '';
         $this->has_fields         = true;
         $this->method_title       = __('HATEX Payments', 'hatex-woocommerce');
-        $this->method_description = __('Peye an Goud ak HATEX – validasyon fet nan Edge Function.', 'hatex-woocommerce');
+        $this->method_description = __('Peye an Goud ak HATEX – Plugin pasarell. Tout validasyon fet nan Edge Function.', 'hatex-woocommerce');
         $this->supports           = array('products', 'refunds');
 
         $this->init_form_fields();
@@ -587,6 +593,9 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         <div id="hatex-payment-errors" class="hatex-payment-errors" style="display: none;"></div>
         
         <div class="hatex-payment-form">
+            <!-- ID KLIYAN AN (jwenn li otomatikman) -->
+            <input type="hidden" id="hatex-payer-id" name="hatex_payer_id" value="<?php echo get_current_user_id(); ?>" />
+            
             <!-- Nimewo kat -->
             <div class="form-row">
                 <label for="hatex-card-number">💳 Nimewo kat <span style="color:#e62e04;">*</span></label>
@@ -644,30 +653,17 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         <?php
     }
 
+    // PA GEN OKENN VALIDASYON PHP - Tout validasyon fet nan Edge Function
     public function validate_fields() {
-        // Validasyon minimòm fòma (Edge Function ap fè rès la)
-        $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
-        $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
-        $card_cvv = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
-
-        if (!preg_match('/^\d{13,19}$/', $card_number)) {
-            wc_add_notice(__('Nimewo kat la pa valab.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-        if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
-            wc_add_notice(__('Fòma dat ekspirasyon an pa bon.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-        if (!preg_match('/^\d{3,4}$/', $card_cvv)) {
-            wc_add_notice(__('Kòd CVV dwe 3 oubyen 4 chif.', 'hatex-woocommerce'), 'error');
-            return false;
-        }
-        return true;
+        return true; // Edge Function ap okipe validasyon an
     }
 
     public function process_payment($order_id) {
         $order = wc_get_order($order_id);
 
+        // Jwenn ID kliyan an (soti nan sesyon an)
+        $payer_id = get_current_user_id(); // SA A SE ID INIK KLIYAN AN
+        
         $card_number = preg_replace('/\s+/', '', $_POST['hatex_card_number'] ?? '');
         $card_expiry = sanitize_text_field($_POST['hatex_card_expiry'] ?? '');
         $card_cvv    = sanitize_text_field($_POST['hatex_card_cvv'] ?? '');
@@ -678,9 +674,10 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             $amount = $amount * 136;
         }
 
-        // Payload pou voye bay Edge Function
+        // Payload pou voye bay Edge Function (AVEC ID KLIYAN AN)
         $payload = array(
             'merchant_id' => HATEX_MERCHANT_ID,
+            'payer_id'    => $payer_id,           // SA A SE ID INIK KLIYAN KAP PEYE A
             'amount'      => $amount,
             'currency'    => 'HTG',
             'card_number' => $card_number,
@@ -695,6 +692,8 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
             )
         );
 
+        error_log('HATEX: Voye payload bay Edge Function: ' . json_encode($payload));
+
         $response = wp_remote_post(HATEX_EDGE_FUNCTION_URL, array(
             'headers' => array('Content-Type' => 'application/json'),
             'body'    => json_encode($payload),
@@ -703,7 +702,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
         if (is_wp_error($response)) {
             error_log('HATEX Edge Function Error: ' . $response->get_error_message());
-            wc_add_notice(__('Erè koneksyon ak sèvè peman.', 'hatex-woocommerce'), 'error');
+            wc_add_notice(__('Erè koneksyon ak sèvè peman. Tanpri eseye ankò.', 'hatex-woocommerce'), 'error');
             return array('result' => 'failure');
         }
 
@@ -713,19 +712,21 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
         error_log("HATEX Edge Function Response ($code): " . print_r($data, true));
 
+        // Si gen erè nan kominikasyon an, montre mesaj la dirèkteman
         if ($code !== 200) {
-            $error_msg = isset($data['message']) ? $data['message'] : __('Repons envalid soti nan sèvè peman.', 'hatex-woocommerce');
+            $error_msg = isset($data['message']) ? $data['message'] : 'Erè kominikasyon ak sèvè peman.';
             wc_add_notice($error_msg, 'error');
             return array('result' => 'failure');
         }
 
+        // Si Edge Function voye yon mesaj erè (success: false)
         if (isset($data['success']) && $data['success'] !== true) {
-            $error_msg = isset($data['message']) ? $data['message'] : __('Peman an echwe.', 'hatex-woocommerce');
+            $error_msg = isset($data['message']) ? $data['message'] : 'Peman an echwe.';
             wc_add_notice($error_msg, 'error');
             return array('result' => 'failure');
         }
 
-        // Si peman an reyisi, nou estoke merchant ID a nan metadata pou itilize nan webhook
+        // Si peman an reyisi
         $transaction_id = isset($data['transaction_id']) ? $data['transaction_id'] : uniqid('hx_');
         $order->payment_complete($transaction_id);
         $order->add_order_note(sprintf(__('Peman HATEX konplete. ID tranzaksyon: %s', 'hatex-woocommerce'), $transaction_id));
@@ -822,7 +823,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
      * Voye notifikasyon livrezon bay machann nan via Resend.
      */
     private function hatex_send_delivery_notification($order, $merchant_email) {
-        $resend_api_key = RESEND_API_KEY; // Sèvi ak konstant lan
+        $resend_api_key = RESEND_API_KEY;
         if (empty($resend_api_key)) {
             error_log('HATEX: RESEND_API_KEY pa defini.');
             return false;
@@ -904,7 +905,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
                 'Content-Type'  => 'application/json',
             ),
             'body'    => json_encode(array(
-                'from'    => 'HATEX <notifications@hatexcard.com>', // Chanje ak yon domèn verifye
+                'from'    => 'HATEX <notifications@hatexcard.com>',
                 'to'      => $merchant_email,
                 'subject' => $subject,
                 'html'    => $message,
@@ -1113,14 +1114,14 @@ Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 4.1.0
+Stable tag: 5.0.0
 License: GPLv2 or later
 
 Aksepte peman an Goud atravè HATEX. Senp, vit, an sekirite.
 
 == Description ==
 
-Plugin sa a konekte ak Edge Function HATEX pou verifye peman yo. Li voye notifikasyon livrezon bay machann nan via Resend.
+Plugin pasarell HATEX. Li kolekte enfòmasyon kat yo, voye yo bay Edge Function, epi afiche repons lan. Tout validasyon fet nan Edge Function.
 
 == Installation ==
 
@@ -1130,11 +1131,13 @@ Plugin sa a konekte ak Edge Function HATEX pou verifye peman yo. Li voye notifik
 
 == Changelog ==
 
-= 4.1.0 =
-* Ajoute webhook ak notifikasyon livrezon via Resend.
+= 5.0.0 =
+* Pasarell senp: pa gen validasyon PHP
+* Sèlman Edge Function ki gen pouvwa pou voye repons
+* Webhook voye enfòmasyon livrezon
 
-= 4.0.0 =
-* Senplifye: sèlman koneksyon ak Edge Function
+= 4.1.0 =
+* Ajoute webhook ak notifikasyon livrezon via Resend
 `;
 
     zip.file('hatex-woocommerce.php', mainFile);
