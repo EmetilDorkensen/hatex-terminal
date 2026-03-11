@@ -733,7 +733,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
     const jsFile = `jQuery(function($) {
     // Fòma nimewo kat
     $('#hatex-card-number').on('input', function() {
-        let value = $(this).val().replace(/\\D/g, '');
+        let value = $(this).val().replace(/\D/g, '');
         let formatted = '';
         for (let i = 0; i < value.length; i++) {
             if (i > 0 && i % 4 === 0) formatted += ' ';
@@ -744,7 +744,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // Fòma dat ekspirasyon
     $('#hatex-card-expiry').on('input', function() {
-        let value = $(this).val().replace(/\\D/g, '');
+        let value = $(this).val().replace(/\D/g, '');
         if (value.length >= 2) {
             value = value.substring(0, 2) + '/' + value.substring(2, 4);
         }
@@ -753,25 +753,50 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // CVV sèlman chif
     $('#hatex-card-cvv').on('input', function() {
-        $(this).val($(this).val().replace(/\\D/g, ''));
+        $(this).val($(this).val().replace(/\D/g, ''));
     });
+
+    // Fonksyon pou jwenn bouton Place Order la (plizyè pase)
+    function findPlaceOrderButton() {
+        // Lis selektè posib yo
+        const selectors = [
+            '#place_order',
+            'button[name="woocommerce_checkout_place_order"]',
+            'button[type="submit"][name*="place_order"]',
+            '.checkout-button',
+            '.wc-block-checkout__place-order-button',
+            '.wc-block-components-checkout-place-order-button',
+            'button:contains("Place order")',
+            'button:contains("Pase lòd")',
+            'button:contains("Peye")',
+            '.button.alt:last'
+        ];
+
+        for (let selector of selectors) {
+            const $btn = $(selector);
+            if ($btn.length > 0) return $btn.first();
+        }
+        
+        // Si anyen pa jwenn, chèche dènye bouton an nan fòm nan
+        return $('form.checkout button[type="submit"]').last();
+    }
 
     // Fonksyon pou kolekte tout enfòmasyon nan paj la
     function hatexScanCheckoutPage() {
         // Enfòmasyon kat yo
-        const cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
+        const cardNumber = $('#hatex-card-number').val().replace(/\s+/g, '');
         const cardExpiry = $('#hatex-card-expiry').val().trim();
         const cardCvv = $('#hatex-card-cvv').val().trim();
 
         // Valide enfòmasyon kat yo
         const errors = [];
-        if (!/^\\d{13,19}$/.test(cardNumber)) {
+        if (!/^\d{13,19}$/.test(cardNumber)) {
             errors.push('Nimewo kat la pa valab (13-19 chif).');
         }
-        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
+        if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
             errors.push('Dat ekspirasyon dwe fòma MM/AA.');
         }
-        if (!/^\\d{3,4}$/.test(cardCvv)) {
+        if (!/^\d{3,4}$/.test(cardCvv)) {
             errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
         }
 
@@ -798,18 +823,19 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
         // Pwodwi yo (pran yo nan tablo a)
         const items = [];
-        $('.shop_table tbody tr.cart_item, .woocommerce-cart-form__cart-item').each(function() {
-            const itemName = $(this).find('.product-name').text().trim();
-            const quantity = $(this).find('.product-quantity').text().trim() || $(this).find('.quantity').text().trim();
-            const priceText = $(this).find('.product-subtotal .amount').text() || $(this).find('.product-price .amount').text();
-            const price = priceText.replace(/[^\\d]/g, '');
-            const imageUrl = $(this).find('.product-thumbnail img').attr('src') || '';
+        $('.shop_table tbody tr.cart_item, .woocommerce-cart-form__cart-item, .wc-block-cart-items__row').each(function() {
+            const itemName = $(this).find('.product-name').text().trim() || $(this).find('.wc-block-cart-item__product').text().trim();
+            const quantityText = $(this).find('.product-quantity').text().trim() || $(this).find('.quantity').text().trim() || $(this).find('.wc-block-cart-item__quantity').text().trim();
+            const quantity = parseInt(quantityText) || 1;
+            const priceText = $(this).find('.product-subtotal .amount').text() || $(this).find('.product-price .amount').text() || $(this).find('.wc-block-cart-item__total').text();
+            const price = parseFloat(priceText.replace(/[^\d.]/g, '')) || 0;
+            const imageUrl = $(this).find('.product-thumbnail img').attr('src') || $(this).find('img').first().attr('src') || '';
 
             if (itemName) {
                 items.push({
                     name: itemName,
-                    quantity: parseInt(quantity) || 1,
-                    total: parseFloat(price) || 0,
+                    quantity: quantity,
+                    total: price,
                     image_url: imageUrl
                 });
             }
@@ -817,9 +843,9 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
         // Total lòd la
         let total = 0;
-        const totalText = $('.order-total .amount').text() || $('.cart-subtotal .amount').last().text();
+        const totalText = $('.order-total .amount').text() || $('.cart-subtotal .amount').last().text() || $('.wc-block-cart-total .amount').text();
         if (totalText) {
-            total = parseFloat(totalText.replace(/[^\\d.]/g, '')) || 0;
+            total = parseFloat(totalText.replace(/[^\d.]/g, '')) || 0;
         }
 
         return {
@@ -857,8 +883,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
                 total: total,
             },
             platform: 'woocommerce',
-            scanned_at: new Date().toISOString(),
-            return_url: window.location.href // Yo ka itilize sa pou redireksyon apre peman
+            scanned_at: new Date().toISOString()
         };
     }
 
@@ -866,20 +891,26 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
     function addHatexButton() {
         if ($('#hatex-place-order').length) return;
 
+        const $placeOrder = findPlaceOrderButton();
+        if (!$placeOrder || $placeOrder.length === 0) {
+            console.log('HATEX: Pa ka jwenn bouton Place Order');
+            return;
+        }
+
         const $button = $('<button>', {
             type: 'button',
             id: 'hatex-place-order',
-            class: 'button alt',
+            class: 'button alt hatex-pay-button',
             text: '💳 Peye ak HATEX',
             css: {
-                marginLeft: '10px',
                 backgroundColor: '#e62e04',
                 color: 'white',
-                border: 'none'
+                border: 'none',
+                marginLeft: '10px'
             }
         });
 
-        $('#place_order').after($button);
+        $placeOrder.after($button);
 
         $button.on('click', function(e) {
             e.preventDefault();
@@ -892,7 +923,6 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
             $('#hatex-processing').show();
             $('#hatex-payment-errors').hide();
 
-            // Anvoye done yo bay Edge Function
             fetch(hatex_ajax.edge_url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -902,12 +932,11 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
             .then(data => {
                 $('#hatex-processing').hide();
                 if (data.success) {
-                    // Si Edge Function voye yon URL redireksyon, ale la; sinon, ale sou paj konfimasyon an
-                    if (data.redirect_url) {
-                        window.location.href = data.redirect_url;
+                    // Si gen yon order_id, redirije sou paj konfimasyon an
+                    if (checkoutData.order && checkoutData.order.order_id) {
+                        window.location.href = hatex_ajax.checkout_url + 'order-received/' + checkoutData.order.order_id + '/';
                     } else {
-                        // Sinon, ale sou paj la ak ID tranzaksyon an
-                        window.location.href = hatex_ajax.checkout_url + 'order-received/' + data.transaction_id + '/';
+                        window.location.href = hatex_ajax.checkout_url + 'order-received/';
                     }
                 } else {
                     $('#hatex-payment-errors').show().html('<ul><li>' + (data.message || 'Peman an echwe') + '</li></ul>');
