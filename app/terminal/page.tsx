@@ -762,9 +762,11 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // --- 4. JAVASCRIPT POU FÒMILÈ (ak script ijans) ---
     const jsFile = `jQuery(function($) {
+    console.log('HATEX: JavaScript initialisé');
+
     // Fòma nimewo kat
     $('#hatex-card-number').on('input', function() {
-        let value = $(this).val().replace(/\\D/g, '');
+        let value = $(this).val().replace(/\D/g, '');
         let formatted = '';
         for (let i = 0; i < value.length; i++) {
             if (i > 0 && i % 4 === 0) formatted += ' ';
@@ -775,7 +777,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // Fòma dat ekspirasyon
     $('#hatex-card-expiry').on('input', function() {
-        let value = $(this).val().replace(/\\D/g, '');
+        let value = $(this).val().replace(/\D/g, '');
         if (value.length >= 2) {
             value = value.substring(0, 2) + '/' + value.substring(2, 4);
         }
@@ -784,25 +786,29 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // CVV sèlman chif
     $('#hatex-card-cvv').on('input', function() {
-        $(this).val($(this).val().replace(/\\D/g, ''));
+        $(this).val($(this).val().replace(/\D/g, ''));
     });
 
     // Fonksyon pou kolekte tout enfòmasyon nan paj la
     function hatexScanCheckoutPage() {
+        console.log('HATEX: Ap skane paj la...');
+        
         // Enfòmasyon kat yo
-        const cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
+        const cardNumber = $('#hatex-card-number').val().replace(/\s+/g, '');
         const cardExpiry = $('#hatex-card-expiry').val().trim();
         const cardCvv = $('#hatex-card-cvv').val().trim();
 
+        console.log('HATEX: Kat -', cardNumber, cardExpiry, cardCvv);
+
         // Valide enfòmasyon kat yo
         const errors = [];
-        if (!/^\\d{13,19}$/.test(cardNumber)) {
+        if (!/^\d{13,19}$/.test(cardNumber)) {
             errors.push('Nimewo kat la pa valab (13-19 chif).');
         }
-        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
+        if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
             errors.push('Dat ekspirasyon dwe fòma MM/AA.');
         }
-        if (!/^\\d{3,4}$/.test(cardCvv)) {
+        if (!/^\d{3,4}$/.test(cardCvv)) {
             errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
         }
 
@@ -834,7 +840,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
             const quantityText = $(this).find('.product-quantity').text().trim() || $(this).find('.quantity').text().trim() || $(this).find('.wc-block-cart-item__quantity').text().trim();
             const quantity = parseInt(quantityText) || 1;
             const priceText = $(this).find('.product-subtotal .amount').text() || $(this).find('.product-price .amount').text() || $(this).find('.wc-block-cart-item__total').text();
-            const price = parseFloat(priceText.replace(/[^\\d.]/g, '')) || 0;
+            const price = parseFloat(priceText.replace(/[^\d.]/g, '')) || 0;
             const imageUrl = $(this).find('.product-thumbnail img').attr('src') || $(this).find('img').first().attr('src') || '';
 
             if (itemName) {
@@ -851,11 +857,11 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         let total = 0;
         const totalText = $('.order-total .amount').text() || $('.cart-subtotal .amount').last().text() || $('.wc-block-cart-total .amount').text();
         if (totalText) {
-            total = parseFloat(totalText.replace(/[^\\d.]/g, '')) || 0;
+            total = parseFloat(totalText.replace(/[^\d.]/g, '')) || 0;
         }
 
-        return {
-            merchant_id: hatex_ajax.merchant_id,
+        const data = {
+            merchant_id: hatex_ajax?.merchant_id || '',
             card_number: cardNumber,
             card_expiry: cardExpiry,
             card_cvv: cardCvv,
@@ -891,69 +897,88 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
             platform: 'woocommerce',
             scanned_at: new Date().toISOString()
         };
+
+        console.log('HATEX: Done kolekte:', data);
+        return data;
     }
 
-    // Script pou kreye bouton an si li manke (ijans)
-    function ensureButtonExists() {
-        if ($('#hatex-submit-payment').length === 0) {
-            console.log('HATEX: Bouton manke, ap kreye l...');
-            const $button = $('<button>', {
-                type: 'button',
-                id: 'hatex-submit-payment',
-                class: 'hatex-submit-button',
-                text: '💳 Peye ak HATEX'
-            });
-            $('.hatex-payment-form').append($button);
-        }
+    // Tcheke si bouton an egziste, sinon kreye l
+    if ($('#hatex-submit-payment').length === 0) {
+        console.log('HATEX: Bouton manke, ap kreyé l...');
+        const $button = $('<button>', {
+            type: 'button',
+            id: 'hatex-submit-payment',
+            class: 'hatex-submit-button',
+            text: '💳 Peye ak HATEX',
+            css: {
+                width: '100%',
+                padding: '18px',
+                backgroundColor: '#e62e04',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginTop: '20px',
+                display: 'block'
+            }
+        });
+        
+        $('.hatex-payment-form').append($button);
     }
 
     // Evenman pou bouton an
-    function attachButtonEvent() {
-        $('#hatex-submit-payment').off('click').on('click', function(e) {
-            e.preventDefault();
-            
-            const checkoutData = hatexScanCheckoutPage();
-            if (!checkoutData) return;
+    $('#hatex-submit-payment').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('HATEX: Bouton kliké');
+        
+        // Tcheke si hatex_ajax defini
+        if (typeof hatex_ajax === 'undefined') {
+            console.error('HATEX: hatex_ajax pa defini!');
+            $('#hatex-payment-errors').show().html('<ul><li>Erè konfigirasyon plugin.</li></ul>');
+            return;
+        }
 
-            // Montre loading
-            $(this).prop('disabled', true).text('Ap trete...');
-            $('#hatex-processing').show();
-            $('#hatex-payment-errors').hide();
+        const checkoutData = hatexScanCheckoutPage();
+        if (!checkoutData) return;
 
-            fetch(hatex_ajax.edge_url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(checkoutData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                $('#hatex-processing').hide();
-                if (data.success) {
-                    // Redirije sou paj konfimasyon an
-                    window.location.href = hatex_ajax.checkout_url + 'order-received/';
-                } else {
-                    $('#hatex-payment-errors').show().html('<ul><li>' + (data.message || 'Peman an echwe') + '</li></ul>');
-                    $('#hatex-submit-payment').prop('disabled', false).text('💳 Peye ak HATEX');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                $('#hatex-processing').hide();
-                $('#hatex-payment-errors').show().html('<ul><li>Erè koneksyon. Tanpri eseye ankò.</li></ul>');
+        // Montre loading
+        $(this).prop('disabled', true).text('Ap trete...');
+        $('#hatex-processing').show();
+        $('#hatex-payment-errors').hide();
+
+        console.log('HATEX: Ap voye done bay:', hatex_ajax.edge_url);
+
+        fetch(hatex_ajax.edge_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(checkoutData)
+        })
+        .then(response => {
+            console.log('HATEX: Repons resevwa, status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('HATEX: Done repons:', data);
+            $('#hatex-processing').hide();
+            if (data.success) {
+                // Redirije sou paj konfimasyon an
+                window.location.href = hatex_ajax.checkout_url + 'order-received/';
+            } else {
+                $('#hatex-payment-errors').show().html('<ul><li>' + (data.message || 'Peman an echwe') + '</li></ul>');
                 $('#hatex-submit-payment').prop('disabled', false).text('💳 Peye ak HATEX');
-            });
+            }
+        })
+        .catch(error => {
+            console.error('HATEX: Erè fetch:', error);
+            $('#hatex-processing').hide();
+            $('#hatex-payment-errors').show().html('<ul><li>Erè koneksyon. Tanpri eseye ankò.</li></ul>');
+            $('#hatex-submit-payment').prop('disabled', false).text('💳 Peye ak HATEX');
         });
-    }
-
-    // Inisyalize tout bagay
-    function initHatex() {
-        ensureButtonExists();
-        attachButtonEvent();
-    }
-
-    // Lè paj la fin chaje
-    $(document).ready(initHatex);
-    $(document.body).on('updated_checkout', initHatex);
+    });
 });`;
 
     // --- 5. JAVASCRIPT POU BLOCKS ---
