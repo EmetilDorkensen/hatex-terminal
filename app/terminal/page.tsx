@@ -387,7 +387,7 @@ export default function TerminalPage() {
   // ============================================================
   // FONKSYON JENERASYON PLUGIN YO (VÈSYON 2.0 - FÒMILÈ ENTEGRE)
   // ============================================================
-// ---------- WOOCOMMERCE PLUGIN (VÈSYON 7.0.0 - BOUTON DEDYE) ----------
+// ---------- WOOCOMMERCE PLUGIN (VÈSYON 7.1.0 - BOUTON ANBA) ----------
 const generateWooCommercePlugin = async () => {
   if (!profile?.id) return;
   if (profile?.kyc_status !== 'approved') {
@@ -409,8 +409,8 @@ const generateWooCommercePlugin = async () => {
 /**
  * Plugin Name: HATEX Payments (Dedicated Button)
  * Plugin URI: https://hatexcard.com
- * Description: Peye an Goud ak HATEX – Bouton dedye ki skane tout paj checkout la epi voye done yo bay Edge Function.
- * Version: 7.0.0
+ * Description: Peye an Goud ak HATEX – Bouton anba fòmilè kat la, kolekte tout enfòmasyon yo.
+ * Version: 7.1.0
  * Author: HATEX
  * Author URI: https://hatexcard.com
  * License: GPL v2 or later
@@ -424,7 +424,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('HATEX_WC_VERSION', '7.0.0');
+define('HATEX_WC_VERSION', '7.1.0');
 define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('HATEX_MERCHANT_ID', '${profile.api_key}'); // Kle API machann nan
@@ -475,7 +475,7 @@ function hatex_register_block_support() {
 }
 `;
 
-    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AVÈK BOUTON DEDYE) ---
+    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AVÈK BOUTON ANBA) ---
     const gatewayFile = `<?php
 class WC_Gateway_HATEX extends WC_Payment_Gateway {
 
@@ -484,7 +484,7 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         $this->icon               = '';
         $this->has_fields         = true;
         $this->method_title       = __('HATEX Payments', 'hatex-woocommerce');
-        $this->method_description = __('Peye an Goud ak HATEX – Bouton dedye ki voye done yo bay Edge Function.', 'hatex-woocommerce');
+        $this->method_description = __('Peye an Goud ak HATEX – Bouton anba fòmilè kat la.', 'hatex-woocommerce');
         $this->supports           = array('products', 'refunds');
 
         $this->init_form_fields();
@@ -541,174 +541,180 @@ class WC_Gateway_HATEX extends WC_Payment_Gateway {
         ));
     }
 
-public function payment_fields() {
-    if ($this->description) {
-        echo '<p class="form-row form-row-wide" style="margin-bottom: 20px; font-size: 16px; color: #555;">' . wp_kses_post($this->description) . '</p>';
-    }
+    public function payment_fields() {
+        if ($this->description) {
+            echo '<p class="form-row form-row-wide" style="margin-bottom: 20px; font-size: 16px; color: #555;">' . wp_kses_post($this->description) . '</p>';
+        }
 
-    $posted_card_number = isset($_POST['hatex_card_number']) ? esc_attr($_POST['hatex_card_number']) : '';
-    $posted_card_expiry = isset($_POST['hatex_card_expiry']) ? esc_attr($_POST['hatex_card_expiry']) : '';
-    $posted_card_cvv    = isset($_POST['hatex_card_cvv']) ? esc_attr($_POST['hatex_card_cvv']) : '';
+        // Mesaj tès pou verifye ke fonksyon an ap mache
+        echo '<!-- HATEX: payment_fields is rendering -->';
 
-    ?>
-    <style>
-        .hatex-payment-form {
-            background: #f9f9f9;
-            border: 2px solid #e0e0e0;
-            border-radius: 16px;
-            padding: 30px;
-            margin: 20px 0;
-            font-family: sans-serif;
-        }
-        .hatex-payment-form .form-row {
-            margin-bottom: 25px;
-        }
-        .hatex-payment-form label {
-            display: block;
-            margin-bottom: 10px;
-            font-weight: 600;
-            font-size: 15px;
-        }
-        .hatex-payment-form input {
-            width: 100%;
-            padding: 16px;
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            font-size: 18px;
-            background: white;
-        }
-        .hatex-payment-form input:focus {
-            border-color: #e62e04;
-            outline: none;
-        }
-        .hatex-payment-errors {
-            background: #fee;
-            color: #c00;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            border: 1px solid #fcc;
-            display: none;
-        }
-        .hatex-payment-errors ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-        .hatex-processing {
-            background: #e6f7ff;
-            color: #007cba;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            border: 1px solid #b8e2f2;
-            display: none;
-            align-items: center;
-            gap: 10px;
-        }
-        .hatex-processing .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #007cba;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .hatex-submit-button {
-            width: 100%;
-            padding: 18px;
-            background-color: #e62e04;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 20px;
-            transition: background-color 0.3s;
-        }
-        .hatex-submit-button:hover {
-            background-color: #c42500;
-        }
-        .hatex-submit-button:disabled {
-            background-color: #999;
-            cursor: not-allowed;
-        }
-    </style>
+        $posted_card_number = isset($_POST['hatex_card_number']) ? esc_attr($_POST['hatex_card_number']) : '';
+        $posted_card_expiry = isset($_POST['hatex_card_expiry']) ? esc_attr($_POST['hatex_card_expiry']) : '';
+        $posted_card_cvv    = isset($_POST['hatex_card_cvv']) ? esc_attr($_POST['hatex_card_cvv']) : '';
 
-    <div id="hatex-payment-errors" class="hatex-payment-errors"></div>
-    <div id="hatex-processing" class="hatex-processing">
-        <div class="spinner"></div>
-        <span>Ap trete peman an, tanpri pa fèmen paj la...</span>
-    </div>
-    
-    <div class="hatex-payment-form">
-        <div class="form-row">
-            <label for="hatex-card-number">💳 Nimewo kat <span style="color:#e62e04;">*</span></label>
-            <input 
-                type="text" 
-                id="hatex-card-number" 
-                name="hatex_card_number" 
-                value="<?php echo $posted_card_number; ?>"
-                required 
-                placeholder="0000 0000 0000 0000" 
-                maxlength="19"
-                autocomplete="off"
-                inputmode="numeric"
-                style="font-family: monospace; letter-spacing: 1.5px;"
-            />
+        ?>
+        <style>
+            .hatex-payment-form {
+                background: #f9f9f9;
+                border: 2px solid #e0e0e0;
+                border-radius: 16px;
+                padding: 30px;
+                margin: 20px 0;
+                font-family: sans-serif;
+            }
+            .hatex-payment-form .form-row {
+                margin-bottom: 25px;
+            }
+            .hatex-payment-form label {
+                display: block;
+                margin-bottom: 10px;
+                font-weight: 600;
+                font-size: 15px;
+            }
+            .hatex-payment-form input {
+                width: 100%;
+                padding: 16px;
+                border: 2px solid #ddd;
+                border-radius: 12px;
+                font-size: 18px;
+                background: white;
+            }
+            .hatex-payment-form input:focus {
+                border-color: #e62e04;
+                outline: none;
+            }
+            .hatex-payment-errors {
+                background: #fee;
+                color: #c00;
+                padding: 15px;
+                border-radius: 12px;
+                margin-bottom: 25px;
+                border: 1px solid #fcc;
+                display: none;
+            }
+            .hatex-payment-errors ul {
+                margin: 0;
+                padding-left: 20px;
+            }
+            .hatex-processing {
+                background: #e6f7ff;
+                color: #007cba;
+                padding: 15px;
+                border-radius: 12px;
+                margin-bottom: 25px;
+                border: 1px solid #b8e2f2;
+                display: none;
+                align-items: center;
+                gap: 10px;
+            }
+            .hatex-processing .spinner {
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #007cba;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            /* Bouton an fòs */
+            .hatex-submit-button {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                width: 100%;
+                padding: 18px;
+                background-color: #e62e04 !important;
+                color: white !important;
+                border: none;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                margin-top: 20px;
+                transition: background-color 0.3s;
+            }
+            .hatex-submit-button:hover {
+                background-color: #c42500 !important;
+            }
+            .hatex-submit-button:disabled {
+                background-color: #999 !important;
+                cursor: not-allowed;
+            }
+        </style>
+
+        <div id="hatex-payment-errors" class="hatex-payment-errors"></div>
+        <div id="hatex-processing" class="hatex-processing">
+            <div class="spinner"></div>
+            <span>Ap trete peman an, tanpri pa fèmen paj la...</span>
         </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        
+        <div class="hatex-payment-form">
             <div class="form-row">
-                <label for="hatex-card-expiry">📅 Dat ekspirasyon <span style="color:#e62e04;">*</span></label>
+                <label for="hatex-card-number">💳 Nimewo kat <span style="color:#e62e04;">*</span></label>
                 <input 
                     type="text" 
-                    id="hatex-card-expiry" 
-                    name="hatex_card_expiry" 
-                    value="<?php echo $posted_card_expiry; ?>"
+                    id="hatex-card-number" 
+                    name="hatex_card_number" 
+                    value="<?php echo $posted_card_number; ?>"
                     required 
-                    placeholder="MM/YY" 
-                    maxlength="5"
-                    autocomplete="off"
-                    style="text-align: center;"
-                />
-            </div>
-            <div class="form-row">
-                <label for="hatex-card-cvv">🔒 Kòd CVV <span style="color:#e62e04;">*</span></label>
-                <input 
-                    type="password" 
-                    id="hatex-card-cvv" 
-                    name="hatex_card_cvv" 
-                    value="<?php echo $posted_card_cvv; ?>"
-                    required 
-                    placeholder="123" 
-                    maxlength="4"
+                    placeholder="0000 0000 0000 0000" 
+                    maxlength="19"
                     autocomplete="off"
                     inputmode="numeric"
-                    style="text-align: center; letter-spacing: 4px;"
+                    style="font-family: monospace; letter-spacing: 1.5px;"
                 />
             </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-row">
+                    <label for="hatex-card-expiry">📅 Dat ekspirasyon <span style="color:#e62e04;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="hatex-card-expiry" 
+                        name="hatex_card_expiry" 
+                        value="<?php echo $posted_card_expiry; ?>"
+                        required 
+                        placeholder="MM/YY" 
+                        maxlength="5"
+                        autocomplete="off"
+                        style="text-align: center;"
+                    />
+                </div>
+                <div class="form-row">
+                    <label for="hatex-card-cvv">🔒 Kòd CVV <span style="color:#e62e04;">*</span></label>
+                    <input 
+                        type="password" 
+                        id="hatex-card-cvv" 
+                        name="hatex_card_cvv" 
+                        value="<?php echo $posted_card_cvv; ?>"
+                        required 
+                        placeholder="123" 
+                        maxlength="4"
+                        autocomplete="off"
+                        inputmode="numeric"
+                        style="text-align: center; letter-spacing: 4px;"
+                    />
+                </div>
+            </div>
+            
+            <!-- Bouton an anba fòmilè a (wouj) -->
+            <button type="button" id="hatex-submit-payment" class="hatex-submit-button">
+                💳 Peye ak HATEX
+            </button>
+            
+            <p style="font-size: 13px; color: #777; margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;">
+                🔐 Enfòmasyon ou yo an sekirite.
+            </p>
         </div>
-        
-        <!-- Bouton an koulè wouj anba fòmilè a -->
-        <button type="button" id="hatex-submit-payment" class="hatex-submit-button">
-            💳 Peye ak HATEX
-        </button>
-        
-        <p style="font-size: 13px; color: #777; margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;">
-            🔐 Enfòmasyon ou yo an sekirite.
-        </p>
-    </div>
-    <?php
-}
+        <?php
+    }
 
     // Nou pa itilize process_payment paske se bouton HATEX ki okipe peman an
     public function process_payment($order_id) {
-        // Si yon moun eseye itilize metòd tradisyonèl la, nou refize
         wc_add_notice(__('Tanpri itilize bouton "Peye ak HATEX" pou fè peman an.', 'hatex-woocommerce'), 'error');
         return array('result' => 'failure');
     }
@@ -754,11 +760,11 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 }
 `;
 
-    // --- 4. JAVASCRIPT POU FÒMILÈ (bouton dedye ak skanè) ---
+    // --- 4. JAVASCRIPT POU FÒMILÈ (ak script ijans) ---
     const jsFile = `jQuery(function($) {
     // Fòma nimewo kat
     $('#hatex-card-number').on('input', function() {
-        let value = $(this).val().replace(/\D/g, '');
+        let value = $(this).val().replace(/\\D/g, '');
         let formatted = '';
         for (let i = 0; i < value.length; i++) {
             if (i > 0 && i % 4 === 0) formatted += ' ';
@@ -769,7 +775,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // Fòma dat ekspirasyon
     $('#hatex-card-expiry').on('input', function() {
-        let value = $(this).val().replace(/\D/g, '');
+        let value = $(this).val().replace(/\\D/g, '');
         if (value.length >= 2) {
             value = value.substring(0, 2) + '/' + value.substring(2, 4);
         }
@@ -778,25 +784,25 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
 
     // CVV sèlman chif
     $('#hatex-card-cvv').on('input', function() {
-        $(this).val($(this).val().replace(/\D/g, ''));
+        $(this).val($(this).val().replace(/\\D/g, ''));
     });
 
     // Fonksyon pou kolekte tout enfòmasyon nan paj la
     function hatexScanCheckoutPage() {
         // Enfòmasyon kat yo
-        const cardNumber = $('#hatex-card-number').val().replace(/\s+/g, '');
+        const cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
         const cardExpiry = $('#hatex-card-expiry').val().trim();
         const cardCvv = $('#hatex-card-cvv').val().trim();
 
         // Valide enfòmasyon kat yo
         const errors = [];
-        if (!/^\d{13,19}$/.test(cardNumber)) {
+        if (!/^\\d{13,19}$/.test(cardNumber)) {
             errors.push('Nimewo kat la pa valab (13-19 chif).');
         }
-        if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
+        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
             errors.push('Dat ekspirasyon dwe fòma MM/AA.');
         }
-        if (!/^\d{3,4}$/.test(cardCvv)) {
+        if (!/^\\d{3,4}$/.test(cardCvv)) {
             errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
         }
 
@@ -828,7 +834,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
             const quantityText = $(this).find('.product-quantity').text().trim() || $(this).find('.quantity').text().trim() || $(this).find('.wc-block-cart-item__quantity').text().trim();
             const quantity = parseInt(quantityText) || 1;
             const priceText = $(this).find('.product-subtotal .amount').text() || $(this).find('.product-price .amount').text() || $(this).find('.wc-block-cart-item__total').text();
-            const price = parseFloat(priceText.replace(/[^\d.]/g, '')) || 0;
+            const price = parseFloat(priceText.replace(/[^\\d.]/g, '')) || 0;
             const imageUrl = $(this).find('.product-thumbnail img').attr('src') || $(this).find('img').first().attr('src') || '';
 
             if (itemName) {
@@ -845,7 +851,7 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         let total = 0;
         const totalText = $('.order-total .amount').text() || $('.cart-subtotal .amount').last().text() || $('.wc-block-cart-total .amount').text();
         if (totalText) {
-            total = parseFloat(totalText.replace(/[^\d.]/g, '')) || 0;
+            total = parseFloat(totalText.replace(/[^\\d.]/g, '')) || 0;
         }
 
         return {
@@ -887,45 +893,70 @@ final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
         };
     }
 
+    // Script pou kreye bouton an si li manke (ijans)
+    function ensureButtonExists() {
+        if ($('#hatex-submit-payment').length === 0) {
+            console.log('HATEX: Bouton manke, ap kreye l...');
+            const $button = $('<button>', {
+                type: 'button',
+                id: 'hatex-submit-payment',
+                class: 'hatex-submit-button',
+                text: '💳 Peye ak HATEX'
+            });
+            $('.hatex-payment-form').append($button);
+        }
+    }
+
     // Evenman pou bouton an
-    $('#hatex-submit-payment').on('click', function(e) {
-        e.preventDefault();
-        
-        const checkoutData = hatexScanCheckoutPage();
-        if (!checkoutData) return;
+    function attachButtonEvent() {
+        $('#hatex-submit-payment').off('click').on('click', function(e) {
+            e.preventDefault();
+            
+            const checkoutData = hatexScanCheckoutPage();
+            if (!checkoutData) return;
 
-        // Montre loading
-        $(this).prop('disabled', true).text('Ap trete...');
-        $('#hatex-processing').show();
-        $('#hatex-payment-errors').hide();
+            // Montre loading
+            $(this).prop('disabled', true).text('Ap trete...');
+            $('#hatex-processing').show();
+            $('#hatex-payment-errors').hide();
 
-        fetch(hatex_ajax.edge_url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(checkoutData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            $('#hatex-processing').hide();
-            if (data.success) {
-                // Si gen yon order_id, redirije sou paj konfimasyon an
-                // Note: Sa depann de sa Edge Function an retounen
-                window.location.href = hatex_ajax.checkout_url + 'order-received/';
-            } else {
-                $('#hatex-payment-errors').show().html('<ul><li>' + (data.message || 'Peman an echwe') + '</li></ul>');
+            fetch(hatex_ajax.edge_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(checkoutData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#hatex-processing').hide();
+                if (data.success) {
+                    // Redirije sou paj konfimasyon an
+                    window.location.href = hatex_ajax.checkout_url + 'order-received/';
+                } else {
+                    $('#hatex-payment-errors').show().html('<ul><li>' + (data.message || 'Peman an echwe') + '</li></ul>');
+                    $('#hatex-submit-payment').prop('disabled', false).text('💳 Peye ak HATEX');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                $('#hatex-processing').hide();
+                $('#hatex-payment-errors').show().html('<ul><li>Erè koneksyon. Tanpri eseye ankò.</li></ul>');
                 $('#hatex-submit-payment').prop('disabled', false).text('💳 Peye ak HATEX');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            $('#hatex-processing').hide();
-            $('#hatex-payment-errors').show().html('<ul><li>Erè koneksyon. Tanpri eseye ankò.</li></ul>');
-            $('#hatex-submit-payment').prop('disabled', false).text('💳 Peye ak HATEX');
+            });
         });
-    });
+    }
+
+    // Inisyalize tout bagay
+    function initHatex() {
+        ensureButtonExists();
+        attachButtonEvent();
+    }
+
+    // Lè paj la fin chaje
+    $(document).ready(initHatex);
+    $(document.body).on('updated_checkout', initHatex);
 });`;
 
-    // --- 5. JAVASCRIPT POU BLOCKS (senplifye) ---
+    // --- 5. JAVASCRIPT POU BLOCKS ---
     const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
 const label = window.wp.htmlEntities.decodeEntities(settings.title) || window.wp.i18n.__('Peye ak HATEX', 'hatex-woocommerce');
 
@@ -954,21 +985,9 @@ const Content = () => {
         return v;
     };
 
-    const validate = () => {
-        const cleanNumber = cardNumber.replace(/\\s+/g, '');
-        if (!/^\\d{13,19}$/.test(cleanNumber)) return false;
-        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) return false;
-        if (!/^\\d{3,4}$/.test(cardCvv)) return false;
-        return true;
-    };
-
-    const handleSubmit = () => {
-        if (!validate()) {
-            // Montre erè (pa enkli pou senplisite)
-            return false;
-        }
-        setIsProcessing(true);
-        return true;
+    const handlePayment = () => {
+        // I la pou blocks (senplifye)
+        alert('Fonksyonalite blocks ap vini an...');
     };
 
     return React.createElement('div', { className: 'wc-block-components-payment-method' },
@@ -1020,7 +1039,24 @@ const Content = () => {
                             disabled: isProcessing
                         })
                     )
-                )
+                ),
+                React.createElement('button', {
+                    type: 'button',
+                    onClick: handlePayment,
+                    disabled: isProcessing,
+                    style: {
+                        width: '100%',
+                        padding: '16px',
+                        marginTop: '20px',
+                        backgroundColor: '#e62e04',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                    }
+                }, '💳 Peye ak HATEX')
             )
         )
     );
@@ -1045,14 +1081,14 @@ Contributors: hatexcard
 Tags: payment, woocommerce, haitian gourde, htg, goud
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 7.0.0
+Stable tag: 7.1.0
 License: GPLv2 or later
 
-Aksepte peman an Goud atravè HATEX. Bouton dedye ki skane tout paj checkout la epi voye done yo bay Edge Function.
+Aksepte peman an Goud atravè HATEX. Bouton anba fòmilè kat la, kolekte tout enfòmasyon yo.
 
 == Description ==
 
-Plugin sa a ajoute yon bouton "Peye ak HATEX" bò kote bouton Place Order la. Lè kliyan an klike sou li, li kolekte tout enfòmasyon ki nan paj la (kat, adrès, pwodwi ak foto) epi voye yo bay Edge Function HATEX pou tretman. Pa gen okenn validasyon PHP; tout bagay fet nan Edge Function.
+Plugin sa a ajoute yon bouton "Peye ak HATEX" anba fòmilè kat la. Lè kliyan an klike sou li, li kolekte tout enfòmasyon ki nan paj la (kat, adrès, pwodwi ak foto) epi voye yo bay Edge Function HATEX pou tretman.
 
 == Installation ==
 
@@ -1062,13 +1098,13 @@ Plugin sa a ajoute yon bouton "Peye ak HATEX" bò kote bouton Place Order la. L�
 
 == Changelog ==
 
-= 7.0.0 =
-* Nouvo bouton dedye "Peye ak HATEX"
-* Skanè otomatik tout enfòmasyon paj checkout la
-* Pa itilize process_payment tradisyonèl
+= 7.1.0 =
+* Bouton an anba fòmilè kat la
+* CSS fòse pou asire vizibilite
+* Script ijans pou kreye bouton an si li manke
 
-= 6.0.0 =
-* AI Scanner: kolekte tout enfòmasyon paj checkout la
+= 7.0.0 =
+* Premye vèsyon ak bouton dedye
 `;
 
     zip.file('hatex-woocommerce.php', mainFile);
