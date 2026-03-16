@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import QRCodeLib from 'qrcode';
+import QRCode from 'qrcode';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -20,13 +20,13 @@ import {
   ShoppingBag, PenTool, Chrome, Wifi
 } from 'lucide-react';
 
-// Konpozan pou QR kòd la
+// Konpozan QR (itilize qrcode pou desine canvas)
 const QRCodeComponent = ({ value, size = 200 }: { value: string; size?: number }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (canvasRef.current && value) {
-      QRCodeLib.toCanvas(canvasRef.current, value, { width: size }, (error) => {
+      QRCode.toCanvas(canvasRef.current, value, { width: size }, (error) => {
         if (error) console.error('QR Code generation error:', error);
       });
     }
@@ -67,6 +67,9 @@ export default function TerminalPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Token pou QR kòd la (sekirite)
+  const [paymentToken, setPaymentToken] = useState<string | null>(null);
+
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -78,14 +81,12 @@ export default function TerminalPage() {
   useEffect(() => {
     if (!profile?.id) return;
 
-    // Abònman pou tranzaksyon
     const transactionChannel = supabase
       .channel('transactions-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${profile.id}` },
         (payload) => {
-          console.log('Transaction changed:', payload);
           if (payload.eventType === 'INSERT') {
             setTransactions(prev => [payload.new, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
@@ -97,14 +98,12 @@ export default function TerminalPage() {
       )
       .subscribe();
 
-    // Abònman pou fakti
     const invoiceChannel = supabase
       .channel('invoices-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'invoices', filter: `owner_id=eq.${profile.id}` },
         (payload) => {
-          console.log('Invoice changed:', payload);
           if (payload.eventType === 'INSERT') {
             setInvoices(prev => [payload.new, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
@@ -121,6 +120,20 @@ export default function TerminalPage() {
       supabase.removeChannel(invoiceChannel);
     };
   }, [profile?.id, supabase]);
+
+  // ============================================================
+  // Jwenn token pou QR kòd (lè KYC apwouve)
+  // ============================================================
+  useEffect(() => {
+    if (profile?.kyc_status === 'approved') {
+      fetch('/api/payment-token')
+        .then(res => res.json())
+        .then(data => {
+          if (data.token) setPaymentToken(data.token);
+        })
+        .catch(err => console.error('Error fetching payment token:', err));
+    }
+  }, [profile?.kyc_status]);
 
   // ============================================================
   // FONKSYON POU JENERE API KEY
@@ -353,12 +366,12 @@ export default function TerminalPage() {
   };
 
   // ============================================================
-  // FONKSYON QR KÒD
+  // FONKSYON QR KÒD (ak token)
   // ============================================================
   const paymentUrl = useMemo(() => {
-    if (!profile?.id) return '';
-    return `${window.location.origin}/pay/${profile.id}`;
-  }, [profile?.id]);
+    if (!paymentToken) return '';
+    return `${window.location.origin}/checkout?token=${paymentToken}`;
+  }, [paymentToken]);
 
   const downloadQR = () => {
     const canvas = document.querySelector('#hatex-qr-code canvas') as HTMLCanvasElement;
@@ -638,7 +651,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
   };
 
   // ============================================================
-  // API FUNCTIONS
+  // API FUNCTIONS (kenbe yo tout)
   // ============================================================
   const saveYoutubeUrl = async () => {
     if (!profile?.id) return;
@@ -978,7 +991,6 @@ Vèsyon 2.0 - Fòmilè kat entegre
             </button>
           </div>
 
-          {/* 4 Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-white/5">
             {[
               { label: 'Total SDK', val: earnings.sdkTotal, icon: <Zap size={15} />, sub: `${earnings.sdkCount} vant`, color: 'text-blue-400' },
@@ -997,7 +1009,6 @@ Vèsyon 2.0 - Fòmilè kat entegre
             ))}
           </div>
 
-          {/* Dènye vant */}
           <div className="p-6 border-t border-white/5">
             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Dènye Vant</p>
             {recentSales.length > 0 ? (
