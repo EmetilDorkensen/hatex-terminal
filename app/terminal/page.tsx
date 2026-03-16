@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import QRCodeLib from 'qrcode';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -18,6 +19,21 @@ import {
   Smartphone, Monitor, Server, Cloud, DownloadIcon,
   ShoppingBag, PenTool, Chrome, Wifi
 } from 'lucide-react';
+
+// Konpozan pou QR kòd la
+const QRCodeComponent = ({ value, size = 200 }: { value: string; size?: number }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (canvasRef.current && value) {
+      QRCodeLib.toCanvas(canvasRef.current, value, { width: size }, (error) => {
+        if (error) console.error('QR Code generation error:', error);
+      });
+    }
+  }, [value, size]);
+
+  return <canvas ref={canvasRef} width={size} height={size} />;
+};
 
 export default function TerminalPage() {
   const router = useRouter();
@@ -56,92 +72,55 @@ export default function TerminalPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
+  // ============================================================
+  // REALTIME SUBSCRIPTIONS
+  // ============================================================
+  useEffect(() => {
+    if (!profile?.id) return;
 
-  // ============================================================
-  // FONKSYON POU KREYE TAB CARDS (si li pa egziste)
-  // ============================================================
-  const ensureCardsTable = useCallback(async () => {
-    try {
-      // Tcheke si tab cards egziste
-      const { error } = await supabase
-        .from('cards')
-        .select('id')
-        .limit(1);
-      
-      // Si gen erè, sa vle di tab la pa egziste
-      if (error && error.message.includes('relation "cards" does not exist')) {
-        console.log('Tab cards pa egziste, ap kreye li...');
-        
-        // Kreye tab cards via SQL (ou bezwen yon fonksyon RPC)
-        const { error: createError } = await supabase.rpc('create_cards_table');
-        
-        if (createError) {
-          console.error('Erè kreye tab cards:', createError);
-        } else {
-          console.log('Tab cards kreye avèk siksè!');
-        }
-      }
-    } catch (err) {
-      console.error('Erè tcheke tab cards:', err);
-    }
-  }, [supabase]);
-
-  // ============================================================
-  // FONKSYON POU AJOUTE KAT YON ITILIZATÈ NAN TAB CARDS
-  // ============================================================
-  const syncUserCards = useCallback(async (userId: string) => {
-    try {
-      // Rekipere tout kat itilizatè a (sipoze yo nan yon lòt tab)
-      // Egzanp: si gen yon tab 'user_cards' oswa yon lòt kote
-      const { data: userCards, error } = await supabase
-        .from('user_cards') // chanje ak non tab ou a
-        .select('*')
-        .eq('user_id', userId);
-      
-      if (error) {
-        console.error('Erè rekipere kat itilizatè:', error);
-        return;
-      }
-      
-      if (!userCards || userCards.length === 0) {
-        console.log('Pa gen kat pou itilizatè sa a.');
-        return;
-      }
-      
-      // Pou chak kat, verifye si li deja nan tab cards
-      for (const card of userCards) {
-        const { data: existingCard } = await supabase
-          .from('cards')
-          .select('id')
-          .eq('card_number', card.card_number)
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        if (!existingCard) {
-          // Ajoute kat la nan tab cards
-          const { error: insertError } = await supabase
-            .from('cards')
-            .insert({
-              user_id: userId,
-              card_number: card.card_number,
-              card_holder: card.card_holder,
-              cvv: card.cvv,
-              exp_date: card.exp_date,
-              card_balance: card.card_balance || 0,
-              created_at: new Date().toISOString()
-            });
-          
-          if (insertError) {
-            console.error('Erè ajoute kat:', insertError);
-          } else {
-            console.log('Kat ajoute avèk siksè:', card.card_number);
+    // Abònman pou tranzaksyon
+    const transactionChannel = supabase
+      .channel('transactions-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${profile.id}` },
+        (payload) => {
+          console.log('Transaction changed:', payload);
+          if (payload.eventType === 'INSERT') {
+            setTransactions(prev => [payload.new, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setTransactions(prev => prev.map(tx => tx.id === payload.new.id ? payload.new : tx));
+          } else if (payload.eventType === 'DELETE') {
+            setTransactions(prev => prev.filter(tx => tx.id !== payload.old.id));
           }
         }
-      }
-    } catch (err) {
-      console.error('Erè pandan senkronizasyon kat:', err);
-    }
-  }, [supabase]);
+      )
+      .subscribe();
+
+    // Abònman pou fakti
+    const invoiceChannel = supabase
+      .channel('invoices-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices', filter: `owner_id=eq.${profile.id}` },
+        (payload) => {
+          console.log('Invoice changed:', payload);
+          if (payload.eventType === 'INSERT') {
+            setInvoices(prev => [payload.new, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setInvoices(prev => prev.map(inv => inv.id === payload.new.id ? payload.new : inv));
+          } else if (payload.eventType === 'DELETE') {
+            setInvoices(prev => prev.filter(inv => inv.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(transactionChannel);
+      supabase.removeChannel(invoiceChannel);
+    };
+  }, [profile?.id, supabase]);
 
   // ============================================================
   // FONKSYON POU JENERE API KEY
@@ -214,31 +193,20 @@ export default function TerminalPage() {
         setBusinessName(prof.business_name || '');
         setYoutubeUrl(prof.sdk_tutorial_url || '');
 
-        // Si KYC apwouve, asire tab cards la egziste epi senkronize kat yo
-        if (prof.kyc_status === 'approved') {
-          // Asire tab cards la egziste
-          await ensureCardsTable();
+        if (prof.kyc_status === 'approved' && !prof.api_key && !hasGeneratedKey) {
+          hasGeneratedKey = true;
           
-          // Senkronize kat itilizatè a (si ou gen yon sous kat)
-          // Remake: 'user_cards' se yon egzanp, chanje ak non tab ou a
-          await syncUserCards(prof.id);
+          const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
           
-          // Jenere kle API si li poko genyen
-          if (!prof.api_key && !hasGeneratedKey) {
-            hasGeneratedKey = true;
-            
-            const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('');
-            
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ api_key: apiKey })
-              .eq('id', prof.id);
-            
-            if (!updateError && isMounted) {
-              setProfile({ ...prof, api_key: apiKey });
-            }
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ api_key: apiKey })
+            .eq('id', prof.id);
+          
+          if (!updateError && isMounted) {
+            setProfile({ ...prof, api_key: apiKey });
           }
         }
 
@@ -385,1089 +353,28 @@ export default function TerminalPage() {
   };
 
   // ============================================================
-  // FONKSYON JENERASYON PLUGIN YO (VÈSYON 2.0 - FÒMILÈ ENTEGRE)
-// ---------- WOOCOMMERCE PLUGIN (VÈSYON 11.0.0 - KOMPLÈ) ----------
-const generateWooCommercePlugin = async () => {
-  if (!profile?.id) return;
-  if (profile?.kyc_status !== 'approved') {
-    alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    return;
-  }
-  if (!profile?.api_key) {
-    alert('Kle API poko jenere. Tanpri reyese answit.');
-    return;
-  }
-
-  setDownloadingPlugin('woocommerce');
-
-  try {
-    const zip = new JSZip();
-
-    // --- 1. FICHYE PRENSIPAL: hatex-woocommerce.php ---
-    const mainFile = `<?php
-/**
- * Plugin Name: HATEX Payments
- * Plugin URI: https://hatexcard.com
- * Description: Peye an Goud ak HATEX – Fòmilè kat pwofesyonèl, bouton wouj anba, validasyon nan Edge Function.
- * Version: 11.0.0
- * Author: HATEX
- * Author URI: https://hatexcard.com
- * License: GPL v2 or later
- * Text Domain: hatex-woocommerce
- * WC requires at least: 4.0
- * WC tested up to: 8.5
- */
-
-if (!defined('ABSPATH')) exit;
-
-define('HATEX_WC_VERSION', '11.0.0');
-define('HATEX_WC_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('HATEX_WC_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('HATEX_MERCHANT_ID', '${profile.api_key}');
-define('HATEX_EDGE_FUNCTION_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment');
-
-// Konfigirasyon Supabase (pou webhook)
-define('SUPABASE_URL', 'https://psdnklsqttyqhqhkhmgq.supabase.co');
-define('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNTYyOTksImV4cCI6MjA4MTczMjI5OX0._CjL8kZzHhJQrQ2xVnF3sY5tG9bKcL7pW9dXmY8NqZk');
-define('SUPABASE_SERVICE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzZG5rbHNxdHR5cWhxaGtobWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE1NjI5OSwiZXhwIjoyMDgxNzMyMjk5fQ.I5Krz9Etjl84Hyl32wg3pZMaiz9oxZCK0SIb_uV5vqg');
-define('RESEND_API_KEY', 're_8jNiA3p6_5byjVa9V8hQzxJfeEZsXwUNA');
-
-function add_hatex_gateway($methods) {
-    $methods[] = 'WC_Gateway_HATEX';
-    return $methods;
-}
-add_filter('woocommerce_payment_gateways', 'add_hatex_gateway');
-
-function init_hatex_gateway() {
-    if (!class_exists('WooCommerce')) return;
-    require_once HATEX_WC_PLUGIN_PATH . 'includes/class-wc-gateway-hatex.php';
-}
-add_action('plugins_loaded', 'init_hatex_gateway');
-
-function hatex_add_settings_link($links) {
-    $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=hatex');
-    $settings_link = '<a href="' . esc_url($settings_url) . '">Konfigirasyon</a>';
-    array_unshift($links, $settings_link);
-    return $links;
-}
-add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'hatex_add_settings_link');
-
-// Endpoint webhook
-add_action('rest_api_init', function() {
-    register_rest_route('hatex/v1', '/webhook', array(
-        'methods' => 'POST',
-        'callback' => 'hatex_handle_webhook',
-        'permission_callback' => '__return_true'
-    ));
-});
-
-function hatex_handle_webhook($request) {
-    $data = $request->get_json_params();
-    
-    if (!$data || !isset($data['event'])) {
-        return new WP_REST_Response(array('error' => 'Invalid payload'), 400);
-    }
-
-    if (!isset($data['metadata']['order_id'])) {
-        return new WP_REST_Response(array('error' => 'Missing order_id'), 400);
-    }
-
-    $order_id = $data['metadata']['order_id'];
-    $order = wc_get_order($order_id);
-
-    if (!$order) {
-        return new WP_REST_Response(array('error' => 'Order not found'), 404);
-    }
-
-    switch ($data['event']) {
-        case 'payment.succeeded':
-            $order->update_status('processing', __('Peman HATEX konplete', 'hatex-woocommerce'));
-            
-            // Voye imèl livrezon
-            $merchant_id = $order->get_meta('_hatex_merchant_id');
-            if ($merchant_id) {
-                hatex_send_delivery_email($order, $merchant_id);
-            }
-            break;
-            
-        case 'payment.failed':
-            $order->update_status('failed', __('Peman HATEX echwe', 'hatex-woocommerce'));
-            break;
-    }
-
-    return new WP_REST_Response(array('status' => 'ok'), 200);
-}
-
-function hatex_send_delivery_email($order, $merchant_id) {
-    // Rekipere imèl machann nan
-    $response = wp_remote_get(SUPABASE_URL . '/rest/v1/profiles?api_key=eq.' . urlencode($merchant_id) . '&select=email', array(
-        'headers' => array(
-            'apikey' => SUPABASE_ANON_KEY,
-            'Authorization' => 'Bearer ' . SUPABASE_SERVICE_KEY,
-        ),
-        'timeout' => 10
-    ));
-
-    if (is_wp_error($response)) return;
-    
-    $body = wp_remote_retrieve_body($response);
-    $data = json_decode($body, true);
-    if (empty($data)) return;
-    
-    $merchant_email = $data[0]['email'];
-    
-    // Konstwi imèl la
-    $to = $merchant_email;
-    $subject = 'Nouvo lòd #' . $order->get_id();
-    
-    $items = '';
-    foreach ($order->get_items() as $item) {
-        $items .= $item->get_name() . ' x ' . $item->get_quantity() . ' - ' . wc_price($item->get_total()) . "\n";
-    }
-    
-    $message = "Lòd #{$order->get_id()} konplete.\n\n";
-    $message .= "Kliyan: {$order->get_billing_first_name()} {$order->get_billing_last_name()}\n";
-    $message .= "Imèl: {$order->get_billing_email()}\n";
-    $message .= "Telefòn: {$order->get_billing_phone()}\n";
-    $message .= "Adrès: {$order->get_billing_address_1()}, {$order->get_billing_city()}\n\n";
-    $message .= "Pwodwi yo:\n$items\n";
-    $message .= "Total: " . wc_price($order->get_total()) . "\n";
-    
-    wp_mail($to, $subject, $message);
-}
-`;
-
-    // --- 2. KLAS PRENSIPAL: includes/class-wc-gateway-hatex.php (AK FÒMILÈ KOMPLÈ) ---
-    const gatewayFile = `<?php
-class WC_Gateway_HATEX extends WC_Payment_Gateway {
-
-    public function __construct() {
-        $this->id = 'hatex';
-        $this->icon = '';
-        $this->has_fields = true;
-        $this->method_title = __('HATEX Payments', 'hatex-woocommerce');
-        $this->method_description = __('Peye an Goud ak HATEX – Fòmilè kat pwofesyonèl.', 'hatex-woocommerce');
-        $this->supports = array('products');
-
-        $this->init_form_fields();
-        $this->init_settings();
-
-        $this->title = $this->get_option('title');
-        $this->description = $this->get_option('description');
-        $this->enabled = $this->get_option('enabled');
-
-        add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-        add_action('wp_enqueue_scripts', array($this, 'payment_scripts'));
-    }
-
-    public function init_form_fields() {
-        $this->form_fields = array(
-            'enabled' => array(
-                'title' => __('Aktive', 'hatex-woocommerce'),
-                'type' => 'checkbox',
-                'label' => __('Aktive HATEX Payments', 'hatex-woocommerce'),
-                'default' => 'no',
-            ),
-            'title' => array(
-                'title' => __('Tit', 'hatex-woocommerce'),
-                'type' => 'text',
-                'default' => __('Peye ak HATEX', 'hatex-woocommerce'),
-            ),
-            'description' => array(
-                'title' => __('Deskripsyon', 'hatex-woocommerce'),
-                'type' => 'textarea',
-                'default' => __('Peye byen vit ak HATEX an Goud.', 'hatex-woocommerce'),
-            ),
-        );
-    }
-
-    public function payment_scripts() {
-        if (!is_checkout() || !$this->is_available()) return;
-        
-        wp_enqueue_script(
-            'hatex-checkout',
-            HATEX_WC_PLUGIN_URL . 'assets/js/hatex-checkout.js',
-            array('jquery'),
-            HATEX_WC_VERSION,
-            true
-        );
-        
-        wp_localize_script('hatex-checkout', 'hatex_ajax', array(
-            'merchant_id' => HATEX_MERCHANT_ID,
-            'edge_url'    => HATEX_EDGE_FUNCTION_URL,
-            'checkout_url'=> wc_get_checkout_url(),
-        ));
-    }
-
-    public function payment_fields() {
-        if ($this->description) {
-            echo '<p>' . wp_kses_post($this->description) . '</p>';
-        }
-        ?>
-        <style>
-            .hatex-payment-form {
-                background: #f9f9f9;
-                border: 2px solid #e0e0e0;
-                border-radius: 16px;
-                padding: 30px;
-                margin: 20px 0;
-                font-family: sans-serif;
-            }
-            .hatex-payment-form .form-row {
-                margin-bottom: 25px;
-            }
-            .hatex-payment-form label {
-                display: block;
-                margin-bottom: 10px;
-                font-weight: 600;
-                font-size: 15px;
-            }
-            .hatex-payment-form input {
-                width: 100%;
-                padding: 16px;
-                border: 2px solid #ddd;
-                border-radius: 12px;
-                font-size: 18px;
-                background: white;
-            }
-            .hatex-payment-form input:focus {
-                border-color: #e62e04;
-                outline: none;
-            }
-            .hatex-payment-form .card-icons {
-                display: flex;
-                gap: 10px;
-                margin-top: 8px;
-                opacity: 0.7;
-            }
-            .hatex-payment-form .card-icons span {
-                background: #eee;
-                padding: 6px 12px;
-                border-radius: 30px;
-                font-size: 13px;
-                font-weight: 500;
-                color: #555;
-            }
-            .hatex-payment-form .exp-cvv-row {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-            }
-            #hatex-payment-errors {
-                background: #fee;
-                color: #c00;
-                padding: 15px;
-                border-radius: 12px;
-                margin-bottom: 25px;
-                font-weight: 500;
-                border: 1px solid #fcc;
-                display: none;
-            }
-            #hatex-payment-errors ul {
-                margin: 0;
-                padding-left: 20px;
-            }
-            #hatex-processing {
-                background: #e6f7ff;
-                color: #007cba;
-                padding: 15px;
-                border-radius: 12px;
-                margin-bottom: 25px;
-                border: 1px solid #b8e2f2;
-                display: none;
-                align-items: center;
-                gap: 10px;
-            }
-            #hatex-processing .spinner {
-                border: 3px solid #f3f3f3;
-                border-top: 3px solid #007cba;
-                border-radius: 50%;
-                width: 20px;
-                height: 20px;
-                animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-            #hatex-submit-payment {
-                width: 100%;
-                padding: 18px;
-                background-color: #e62e04;
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-size: 18px;
-                font-weight: bold;
-                cursor: pointer;
-                margin-top: 20px;
-                transition: background-color 0.3s;
-            }
-            #hatex-submit-payment:hover {
-                background-color: #c42500;
-            }
-            #hatex-submit-payment:disabled {
-                background-color: #999;
-                cursor: not-allowed;
-            }
-        </style>
-
-        <div id="hatex-payment-errors"></div>
-        <div id="hatex-processing">
-            <div class="spinner"></div>
-            <span>Ap trete peman an, tanpri pa fèmen paj la...</span>
-        </div>
-        
-        <div class="hatex-payment-form">
-            <div class="form-row">
-                <label for="hatex-card-number">💳 Nimewo kat <span style="color:#e62e04;">*</span></label>
-                <input 
-                    type="text" 
-                    id="hatex-card-number" 
-                    name="hatex_card_number" 
-                    required 
-                    placeholder="0000 0000 0000 0000" 
-                    maxlength="19"
-                    autocomplete="off"
-                    inputmode="numeric"
-                    style="font-family: monospace; letter-spacing: 1.5px;"
-                />
-                <div class="card-icons">
-                    <span>Visa</span>
-                    <span>Mastercard</span>
-                    <span>Amex</span>
-                </div>
-            </div>
-
-            <div class="exp-cvv-row">
-                <div class="form-row">
-                    <label for="hatex-card-expiry">📅 Dat ekspirasyon <span style="color:#e62e04;">*</span></label>
-                    <input 
-                        type="text" 
-                        id="hatex-card-expiry" 
-                        name="hatex_card_expiry" 
-                        required 
-                        placeholder="MM/YY" 
-                        maxlength="5"
-                        autocomplete="off"
-                        style="text-align: center;"
-                    />
-                </div>
-                <div class="form-row">
-                    <label for="hatex-card-cvv">🔒 Kòd CVV <span style="color:#e62e04;">*</span></label>
-                    <input 
-                        type="password" 
-                        id="hatex-card-cvv" 
-                        name="hatex_card_cvv" 
-                        required 
-                        placeholder="123" 
-                        maxlength="4"
-                        autocomplete="off"
-                        inputmode="numeric"
-                        style="text-align: center; letter-spacing: 4px;"
-                    />
-                </div>
-            </div>
-            
-            <button type="button" id="hatex-submit-payment">💳 Peye ak HATEX</button>
-        </div>
-        <?php
-    }
-
-    public function process_payment($order_id) {
-        return array('result' => 'failure');
-    }
-}
-`;
-
-    // --- 3. JAVASCRIPT: assets/js/hatex-checkout.js (AK FÒMA AK VALIDASYON) ---
-    const jsFile = `jQuery(function($) {
-    // Fòma nimewo kat
-    $('#hatex-card-number').on('input', function() {
-        let value = $(this).val().replace(/\\D/g, '');
-        let formatted = '';
-        for (let i = 0; i < value.length; i++) {
-            if (i > 0 && i % 4 === 0) formatted += ' ';
-            formatted += value[i];
-        }
-        $(this).val(formatted);
-    });
-
-    // Fòma dat ekspirasyon
-    $('#hatex-card-expiry').on('input', function() {
-        let value = $(this).val().replace(/\\D/g, '');
-        if (value.length >= 2) {
-            value = value.substring(0, 2) + '/' + value.substring(2, 4);
-        }
-        $(this).val(value);
-    });
-
-    // CVV sèlman chif
-    $('#hatex-card-cvv').on('input', function() {
-        $(this).val($(this).val().replace(/\\D/g, ''));
-    });
-
-    // Fonksyon pou kolekte tout enfòmasyon nan paj la
-    function hatexCollectAllData() {
-        const cardNumber = $('#hatex-card-number').val().replace(/\\s+/g, '');
-        const cardExpiry = $('#hatex-card-expiry').val().trim();
-        const cardCvv = $('#hatex-card-cvv').val().trim();
-
-        // Validasyon minimòm (fòma)
-        const errors = [];
-        if (!/^\\d{13,19}$/.test(cardNumber)) {
-            errors.push('Nimewo kat la pa valab (13-19 chif).');
-        }
-        if (!/^\\d{2}\\/\\d{2}$/.test(cardExpiry)) {
-            errors.push('Dat ekspirasyon dwe fòma MM/AA.');
-        }
-        if (!/^\\d{3,4}$/.test(cardCvv)) {
-            errors.push('Kòd CVV dwe 3 oubyen 4 chif.');
-        }
-
-        if (errors.length > 0) {
-            $('#hatex-payment-errors').show().html('<ul><li>' + errors.join('</li><li>') + '</li></ul>');
-            return null;
-        }
-
-        // Kolekte done ki soti nan fòmilè a
-        const billingEmail = $('#billing_email').val() || '';
-        const billingPhone = $('#billing_phone').val() || '';
-        const billingFirstName = $('#billing_first_name').val() || '';
-        const billingLastName = $('#billing_last_name').val() || '';
-
-        const shippingFirstName = $('#shipping_first_name').val() || billingFirstName;
-        const shippingLastName = $('#shipping_last_name').val() || billingLastName;
-        const shippingAddress1 = $('#shipping_address_1').val() || $('#billing_address_1').val() || '';
-        const shippingAddress2 = $('#shipping_address_2').val() || $('#billing_address_2').val() || '';
-        const shippingCity = $('#shipping_city').val() || $('#billing_city').val() || '';
-        const shippingPostcode = $('#shipping_postcode').val() || $('#billing_postcode').val() || '';
-        const shippingCountry = $('#shipping_country').val() || $('#billing_country').val() || '';
-        const shippingPhone = $('#shipping_phone').val() || billingPhone;
-
-        // Pwodwi yo
-        const items = [];
-        $('.cart_item').each(function() {
-            const name = $(this).find('.product-name').text().trim();
-            const qty = parseInt($(this).find('.product-quantity').text().trim()) || 1;
-            const price = parseFloat($(this).find('.product-subtotal .amount').text().replace(/[^\\d.]/g, '')) || 0;
-            const img = $(this).find('img').first().attr('src') || '';
-            if (name) {
-                items.push({ name, quantity: qty, total: price, image_url: img });
-            }
-        });
-
-        // Total
-        const total = parseFloat($('.order-total .amount').text().replace(/[^\\d.]/g, '')) || 0;
-
-        return {
-            merchant_id: hatex_ajax.merchant_id,
-            card_number: cardNumber,
-            card_expiry: cardExpiry,
-            card_cvv: cardCvv,
-            customer: {
-                email: billingEmail,
-                name: billingFirstName + ' ' + billingLastName
-            },
-            billing: {
-                first_name: billingFirstName,
-                last_name: billingLastName,
-                email: billingEmail,
-                phone: billingPhone,
-                address_1: $('#billing_address_1').val() || '',
-                address_2: $('#billing_address_2').val() || '',
-                city: $('#billing_city').val() || '',
-                postcode: $('#billing_postcode').val() || '',
-                country: $('#billing_country').val() || ''
-            },
-            shipping: {
-                first_name: shippingFirstName,
-                last_name: shippingLastName,
-                address_1: shippingAddress1,
-                address_2: shippingAddress2,
-                city: shippingCity,
-                postcode: shippingPostcode,
-                country: shippingCountry,
-                phone: shippingPhone
-            },
-            items: items,
-            order: { total: total },
-            platform: 'woocommerce',
-            scanned_at: new Date().toISOString()
-        };
-    }
-
-    // Klike sou bouton an
-    $('#hatex-submit-payment').on('click', function() {
-        const $btn = $(this);
-        const data = hatexCollectAllData();
-        if (!data) return;
-
-        $btn.prop('disabled', true).text('Ap trete...');
-        $('#hatex-payment-errors').hide().html('');
-        $('#hatex-processing').show();
-
-        $.ajax({
-            url: hatex_ajax.edge_url,
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(data),
-            success: function(res) {
-                $('#hatex-processing').hide();
-                if (res.success) {
-                    window.location.href = hatex_ajax.checkout_url + 'order-received/';
-                } else {
-                    $('#hatex-payment-errors').show().html(res.message || 'Peman an echwe');
-                    $btn.prop('disabled', false).text('💳 Peye ak HATEX');
-                }
-            },
-            error: function(xhr) {
-                $('#hatex-processing').hide();
-                const msg = xhr.responseJSON?.message || 'Erè koneksyon';
-                $('#hatex-payment-errors').show().html(msg);
-                $btn.prop('disabled', false).text('💳 Peye ak HATEX');
-            }
-        });
-    });
-});`;
-
-    // --- 4. SIPO POU BLOCKS ---
-    const blocksSupportFile = `<?php
-use Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType;
-
-final class WC_Gateway_HATEX_Blocks_Support extends AbstractPaymentMethodType {
-    protected $name = 'hatex';
-    private $gateway;
-
-    public function initialize() {
-        $this->settings = get_option("woocommerce_{$this->name}_settings", array());
-        $this->gateway = new WC_Gateway_HATEX();
-    }
-
-    public function is_active() {
-        return $this->gateway->is_available();
-    }
-
-    public function get_payment_method_script_handles() {
-        wp_register_script(
-            'wc-hatex-blocks-integration',
-            plugins_url('assets/js/checkout.js', dirname(__FILE__)),
-            array('wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities'),
-            HATEX_WC_VERSION,
-            true
-        );
-        return array('wc-hatex-blocks-integration');
-    }
-
-    public function get_payment_method_data() {
-        return array(
-            'title'       => $this->gateway->title,
-            'description' => $this->gateway->description,
-            'supports'    => $this->gateway->supports,
-            'icon'        => '',
-        );
-    }
-}
-`;
-
-    // --- 5. JS POU BLOCKS ---
-    const blocksJsFile = `const settings = window.wc.wcSettings.getSetting('hatex_data', {});
-const label = window.wp.htmlEntities.decodeEntities(settings.title) || 'Peye ak HATEX';
-
-const Content = () => {
-    return React.createElement('p', null, settings.description || '');
-};
-
-window.wc.wcBlocksRegistry.registerPaymentMethod({
-    name: 'hatex',
-    label: label,
-    content: Object(window.wp.element.createElement)(Content, null),
-    edit: Object(window.wp.element.createElement)(Content, null),
-    canMakePayment: () => true,
-    ariaLabel: label,
-    supports: { features: settings.supports || [] }
-});
-`;
-
-    zip.file('hatex-woocommerce.php', mainFile);
-    zip.file('includes/class-wc-gateway-hatex.php', gatewayFile);
-    zip.file('includes/class-wc-gateway-hatex-blocks-support.php', blocksSupportFile);
-    zip.file('assets/js/hatex-checkout.js', jsFile);
-    zip.file('assets/js/checkout.js', blocksJsFile);
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `hatex-woocommerce-${profile.id.slice(0,8)}.zip`);
-
-  } catch (error) {
-    console.error('Error generating WooCommerce plugin:', error);
-    alert('Erè pandan jenere plugin an. Tanpri rekòmanse.');
-  } finally {
-    setDownloadingPlugin(null);
-  }
-};
-  // ---------- SHOPIFY PLUGIN (VÈSYON 2.0) ----------
-  const generateShopifyPlugin = async () => {
-    if (!profile?.id) return;
-    if (profile?.kyc_status !== 'approved') {
-      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-      return;
-    }
-    if (!profile?.api_key) {
-      alert('Kle API poko jenere. Tanpri reyese answit.');
-      return;
-    }
-
-    setDownloadingPlugin('shopify');
-
-    try {
-      const zip = new JSZip();
-
-      const shopifyConfig = `{
-  "name": "HATEX Payments",
-  "description": "Aksepte peman an Goud atravè HATEX - Fòmilè kat entegre",
-  "version": "2.0.0",
-  "merchant_id": "${profile.api_key}",
-  "api_url": "https://api.hatexcard.com/v1",
-  "rate": 136
-}`;
-
-      const extensionFile = `// HATEX Shopify Extension - Vèsyon 2.0 (Fòmilè entegre)
-// Merchant ID: ${profile.api_key}
-
-console.log('HATEX Payments initialized for merchant:', '${profile.api_key}');
-
-function validateCard(cardNumber, expiry, cvv) {
-  const errors = [];
-  
-  if (!/^\\d{13,19}$/.test(cardNumber.replace(/\\s/g, ''))) {
-    errors.push('Nimewo kat la pa valab');
-  }
-  
-  if (!/^\\d{2}\\/\\d{2}$/.test(expiry)) {
-    errors.push('Dat ekspirasyon dwe fòma MM/AA');
-  } else {
-    const [month, year] = expiry.split('/');
-    const now = new Date();
-    const currentYear = now.getFullYear() % 100;
-    const currentMonth = now.getMonth() + 1;
-    
-    if (parseInt(year) < currentYear || 
-        (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
-      errors.push('Dat ekspirasyon kat la fin pase');
-    }
-  }
-  
-  if (!/^\\d{3,4}$/.test(cvv)) {
-    errors.push('Kòd CVV dwe 3 oubyen 4 chif');
-  }
-  
-  return errors;
-}
-
-function createPaymentForm(container, amount, currency, orderId) {
-  const form = document.createElement('div');
-  form.innerHTML = \`
-    <div style="margin: 20px 0; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-      <h3 style="margin-top: 0;">Peye ak HATEX</h3>
-      <div id="hatex-errors" style="color: #ff0000; margin-bottom: 15px; font-size: 13px;"></div>
-      
-      <div style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px;">Non sou kat la</label>
-        <input type="text" id="hatex-card-holder" placeholder="Jan Fi" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
-      </div>
-      
-      <div style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px;">Nimewo kat</label>
-        <input type="text" id="hatex-card-number" placeholder="**** **** **** ****" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
-      </div>
-      
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-        <div>
-          <label style="display: block; margin-bottom: 5px;">Dat ekspirasyon (MM/AA)</label>
-          <input type="text" id="hatex-card-expiry" placeholder="MM/AA" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
-        </div>
-        <div>
-          <label style="display: block; margin-bottom: 5px;">Kòd CVV</label>
-          <input type="text" id="hatex-card-cvv" placeholder="123" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" />
-        </div>
-      </div>
-      
-      <button id="hatex-pay-button" style="width: 100%; padding: 15px; background: #e62e04; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer;">
-        Peye \${amount} \${currency}
-      </button>
-    </div>
-  \`;
-  
-  container.appendChild(form);
-  
-  document.getElementById('hatex-card-number').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\\D/g, '');
-    let formatted = '';
-    for (let i = 0; i < value.length; i++) {
-      if (i > 0 && i % 4 === 0) formatted += ' ';
-      formatted += value[i];
-    }
-    e.target.value = formatted;
-  });
-  
-  document.getElementById('hatex-card-expiry').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\\D/g, '');
-    if (value.length >= 2) {
-      value = value.substring(0, 2) + '/' + value.substring(2, 4);
-    }
-    e.target.value = value;
-  });
-  
-  document.getElementById('hatex-card-cvv').addEventListener('input', function(e) {
-    e.target.value = e.target.value.replace(/\\D/g, '').substring(0, 4);
-  });
-  
-  document.getElementById('hatex-pay-button').addEventListener('click', async function() {
-    const cardHolder = document.getElementById('hatex-card-holder').value.trim();
-    const cardNumber = document.getElementById('hatex-card-number').value.replace(/\\s/g, '');
-    const cardExpiry = document.getElementById('hatex-card-expiry').value.trim();
-    const cardCvv = document.getElementById('hatex-card-cvv').value.trim();
-    const errorDiv = document.getElementById('hatex-errors');
-    
-    const errors = validateCard(cardNumber, cardExpiry, cardCvv);
-    if (!cardHolder) errors.push('Non sou kat la obligatwa');
-    
-    if (errors.length > 0) {
-      errorDiv.innerHTML = '<ul style="margin:0; padding-left:20px;"><li>' + errors.join('</li><li>') + '</li></ul>';
-      return;
-    }
-    
-    errorDiv.innerHTML = '';
-    
-    try {
-      const response = await fetch('https://api.hatexcard.com/api/v1/process-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': '${profile.api_key}'
-        },
-        body: JSON.stringify({
-          merchant_id: '${profile.api_key}',
-          amount: amount,
-          currency: currency === 'HTG' ? 'HTG' : 'HTG',
-          description: 'Shopify order #' + orderId,
-          card_holder: cardHolder,
-          card_number: cardNumber,
-          card_expiry: cardExpiry,
-          card_cvv: cardCvv,
-          metadata: {
-            platform: 'shopify',
-            order_id: orderId
-          }
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.transaction_id) {
-        window.location.href = '/checkout/' + orderId + '/thank_you';
-      } else {
-        let errorMsg = 'Peman an echwe';
-        if (data.code === 'INSUFFICIENT_BALANCE') {
-          errorMsg = 'Balans ensifizan sou kat la';
-        } else if (data.code === 'INVALID_CARD') {
-          errorMsg = 'Enfòmasyon kat yo pa bon';
-        } else if (data.message) {
-          errorMsg = data.message;
-        }
-        errorDiv.innerHTML = errorMsg;
-      }
-    } catch (err) {
-      errorDiv.innerHTML = 'Erè koneksyon. Tanpri eseye ankò.';
-    }
-  });
-}
-
-window.HatexShopify = {
-  init: function() {
-    console.log('HATEX Shopify ready');
-    const checkoutInterval = setInterval(() => {
-      const paymentContainer = document.querySelector('[data-payment-form]') || 
-                              document.querySelector('.payment-method-list') ||
-                              document.querySelector('#checkout-payment');
-      if (paymentContainer) {
-        clearInterval(checkoutInterval);
-        const amount = parseFloat(document.querySelector('[data-checkout-total]')?.innerText || '0');
-        const currency = 'HTG';
-        const orderId = new URLSearchParams(window.location.search).get('order_id') || 'unknown';
-        createPaymentForm(paymentContainer, amount, currency, orderId);
-      }
-    }, 500);
-  }
-};
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => window.HatexShopify.init());
-} else {
-  window.HatexShopify.init();
-}
-`;
-
-      zip.file('hatex-shopify.json', shopifyConfig);
-      zip.file('extension/index.js', extensionFile);
-      zip.file('README.md', `# HATEX Payments for Shopify
-
-Vèsyon 2.0 - Fòmilè kat entegre
-
-## Enstriksyon
-
-1. Ale nan **Online Store** > **Themes**
-2. Klike sou **Actions** > **Edit code**
-3. Nan **Layout**, louvri **theme.liquid**
-4. Anvan \`</body>\`, ajoute:
-   \`\`\`html
-   <script src="{{ 'hatex-shopify.js' | asset_url }}"></script>
-   \`\`\`
-5. Telechaje fichye a nan dosye \`assets/\` epi renome l **hatex-shopify.js**
-6. Sove chanjman yo
-
-## Fonksyonalite
-
-- Fòmilè kat dirèkteman sou paj checkout
-- Validasyon an tan reyèl
-- Mesaj erè espesifik
-- Pa gen redireksyon
-`);
-
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, `hatex-shopify-${profile.id.slice(0,8)}.zip`);
-
-    } catch (error) {
-      console.error('Error generating Shopify plugin:', error);
-      alert('Erè pandan jenere Shopify plugin an. Tanpri rekòmanse.');
-    } finally {
-      setDownloadingPlugin(null);
-    }
+  // FONKSYON QR KÒD
+  // ============================================================
+  const paymentUrl = useMemo(() => {
+    if (!profile?.id) return '';
+    return `${window.location.origin}/pay/${profile.id}`;
+  }, [profile?.id]);
+
+  const downloadQR = () => {
+    const canvas = document.querySelector('#hatex-qr-code canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+    const pngUrl = canvas.toDataURL('image/png');
+    const downloadLink = document.createElement('a');
+    downloadLink.href = pngUrl;
+    downloadLink.download = `hatex-qr-${profile?.id?.slice(0,8)}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
   };
 
-  // ---------- WIX PLUGIN (VÈSYON 2.0) ----------
-  const generateWixPlugin = async () => {
-    if (!profile?.id) return;
-    if (profile?.kyc_status !== 'approved') {
-      alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-      return;
-    }
-    if (!profile?.api_key) {
-      alert('Kle API poko jenere. Tanpri reyese answit.');
-      return;
-    }
-
-    setDownloadingPlugin('wix');
-
-    try {
-      const zip = new JSZip();
-
-      const wixConfig = `{
-  "merchantId": "${profile.api_key}",
-  "businessName": "${profile.business_name || 'HATEX Merchant'}",
-  "rate": 136,
-  "apiUrl": "https://api.hatexcard.com/v1",
-  "version": "2.0.0"
-}`;
-
-      const wixCode = `// HATEX Wix App - Vèsyon 2.0 (Fòmilè entegre)
-// Merchant ID: ${profile.api_key}
-
-import { payment } from 'wix-payment';
-import { local } from 'wix-storage';
-
-function validateCard(cardNumber, expiry, cvv) {
-  const errors = [];
-  
-  if (!/^\\d{13,19}$/.test(cardNumber.replace(/\\s/g, ''))) {
-    errors.push('Nimewo kat la pa valab');
-  }
-  
-  if (!/^\\d{2}\\/\\d{2}$/.test(expiry)) {
-    errors.push('Dat ekspirasyon dwe fòma MM/AA');
-  } else {
-    const [month, year] = expiry.split('/');
-    const now = new Date();
-    const currentYear = now.getFullYear() % 100;
-    const currentMonth = now.getMonth() + 1;
-    
-    if (parseInt(year) < currentYear || 
-        (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
-      errors.push('Dat ekspirasyon kat la fin pase');
-    }
-  }
-  
-  if (!/^\\d{3,4}$/.test(cvv)) {
-    errors.push('Kòd CVV dwe 3 oubyen 4 chif');
-  }
-  
-  return errors;
-}
-
-export function initHatexPayments() {
-  const config = {
-    merchantId: '${profile.api_key}',
-    apiUrl: 'https://api.hatexcard.com/v1',
-    rate: 136
-  };
-
-  payment.registerPaymentMethod({
-    name: 'HATEX Payments',
-    label: 'Peye an Goud ak HATEX',
-    
-    renderPaymentMethod(container, order) {
-      const form = document.createElement('div');
-      form.innerHTML = \`
-        <div style="margin: 20px 0;">
-          <div id="hatex-errors" style="color: #ff0000; margin-bottom: 15px;"></div>
-          
-          <div style="margin-bottom: 15px;">
-            <label>Non sou kat la</label>
-            <input type="text" id="hatex-card-holder" class="wix-input" style="width: 100%; padding: 10px;" />
-          </div>
-          
-          <div style="margin-bottom: 15px;">
-            <label>Nimewo kat</label>
-            <input type="text" id="hatex-card-number" class="wix-input" style="width: 100%; padding: 10px;" />
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <div>
-              <label>Dat ekspirasyon</label>
-              <input type="text" id="hatex-card-expiry" placeholder="MM/AA" class="wix-input" style="width: 100%; padding: 10px;" />
-            </div>
-            <div>
-              <label>CVV</label>
-              <input type="text" id="hatex-card-cvv" placeholder="123" class="wix-input" style="width: 100%; padding: 10px;" />
-            </div>
-          </div>
-        </div>
-      \`;
-      
-      container.appendChild(form);
-      
-      document.getElementById('hatex-card-number').addEventListener('input', (e) => {
-        let value = e.target.value.replace(/\\D/g, '');
-        let formatted = '';
-        for (let i = 0; i < value.length; i++) {
-          if (i > 0 && i % 4 === 0) formatted += ' ';
-          formatted += value[i];
-        }
-        e.target.value = formatted;
-      });
-      
-      document.getElementById('hatex-card-expiry').addEventListener('input', (e) => {
-        let value = e.target.value.replace(/\\D/g, '');
-        if (value.length >= 2) {
-          value = value.substring(0, 2) + '/' + value.substring(2, 4);
-        }
-        e.target.value = value;
-      });
-      
-      document.getElementById('hatex-card-cvv').addEventListener('input', (e) => {
-        e.target.value = e.target.value.replace(/\\D/g, '').substring(0, 4);
-      });
-    },
-    
-    async processPayment(order) {
-      const cardHolder = document.getElementById('hatex-card-holder')?.value.trim();
-      const cardNumber = document.getElementById('hatex-card-number')?.value.replace(/\\s/g, '');
-      const cardExpiry = document.getElementById('hatex-card-expiry')?.value.trim();
-      const cardCvv = document.getElementById('hatex-card-cvv')?.value.trim();
-      const errorDiv = document.getElementById('hatex-errors');
-      
-      const errors = validateCard(cardNumber, cardExpiry, cardCvv);
-      if (!cardHolder) errors.push('Non sou kat la obligatwa');
-      
-      if (errors.length > 0) {
-        errorDiv.innerHTML = '<ul><li>' + errors.join('</li><li>') + '</li></ul>';
-        return { success: false };
-      }
-      
-      try {
-        const response = await fetch(config.apiUrl + '/process-payment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': config.merchantId
-          },
-          body: JSON.stringify({
-            merchant_id: config.merchantId,
-            amount: order.total,
-            currency: order.currency === 'USD' ? 'HTG' : order.currency,
-            description: 'Wix order #' + order.number,
-            card_holder: cardHolder,
-            card_number: cardNumber,
-            card_expiry: cardExpiry,
-            card_cvv: cardCvv,
-            metadata: {
-              platform: 'wix',
-              order_id: order.id
-            }
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success && data.transaction_id) {
-          return {
-            success: true,
-            transactionId: data.transaction_id
-          };
-        } else {
-          let errorMsg = 'Peman an echwe';
-          if (data.code === 'INSUFFICIENT_BALANCE') {
-            errorMsg = 'Balans ensifizan sou kat la';
-          } else if (data.code === 'INVALID_CARD') {
-            errorMsg = 'Enfòmasyon kat yo pa bon';
-          } else if (data.message) {
-            errorMsg = data.message;
-          }
-          errorDiv.innerHTML = errorMsg;
-          return { success: false };
-        }
-      } catch (err) {
-        errorDiv.innerHTML = 'Erè koneksyon';
-        return { success: false };
-      }
-    }
-  });
-}
-`;
-
-      zip.file('hatex-wix.json', wixConfig);
-      zip.file('src/hatex-payments.js', wixCode);
-      zip.file('README.md', `# HATEX Payments for Wix
-
-Vèsyon 2.0 - Fòmilè kat entegre
-
-## Enstriksyon
-
-1. Ale nan **Wix App Market**
-2. Kreye yon nouvo app
-3. Telechaje kòd sa yo nan dosye \`src/hatex-payments.js\`
-4. Konfigure app la ak kle API ou
-
-## Fonksyonalite
-
-- Fòmilè kat dirèkteman sou paj checkout
-- Validasyon an tan reyèl
-- Mesaj erè espesifik
-- Pa gen redireksyon
-`);
-
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, `hatex-wix-${profile.id.slice(0,8)}.zip`);
-
-    } catch (error) {
-      console.error('Error generating Wix plugin:', error);
-      alert('Erè pandan jenere Wix plugin an. Tanpri rekòmanse.');
-    } finally {
-      setDownloadingPlugin(null);
-    }
-  };
-
-  // ---------- HOSTINGER PLUGIN (VÈSYON 2.0) ----------
+  // ============================================================
+  // FONKSYON JENERASYON PLUGIN HOSTINGER
+  // ============================================================
   const generateHostingerPlugin = async () => {
     if (!profile?.id) return;
     if (profile?.kyc_status !== 'approved') {
@@ -1883,12 +790,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
         .eq('id', invoiceId);
       if (error) throw error;
       
-      const { data: newInv } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('owner_id', profile?.id)
-        .order('created_at', { ascending: false });
-      setInvoices(newInv || []);
+      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'paid' } : inv));
     } catch (err: any) {
       alert(err.message);
     }
@@ -1903,14 +805,14 @@ Vèsyon 2.0 - Fòmilè kat entegre
         .eq('id', invoiceId);
       if (error) throw error;
       
-      setInvoices(invoices.filter(inv => inv.id !== invoiceId));
+      setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
     } catch (err: any) {
       alert(err.message);
     }
   };
 
   // ============================================================
-  // RENDER FUNCTIONS (yo rete menm jan an)
+  // RENDER FUNCTIONS
   // ============================================================
   const renderHeader = () => (
     <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
@@ -1973,6 +875,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
   const renderDashboard = () => (
     <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="lg:col-span-8 space-y-8">
+        {/* Merchant Identity */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-20 transition-opacity">
             <ShieldCheck size={110} className="text-red-600" />
@@ -2027,8 +930,33 @@ Vèsyon 2.0 - Fòmilè kat entegre
               </div>
             </div>
           </div>
+
+          {/* Seksyon QR Kòd la (si KYC apwouve) */}
+          {profile?.kyc_status === 'approved' && (
+            <div className="mt-10 pt-10 border-t border-white/5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">QR Kòd Peman</h4>
+                <button
+                  onClick={downloadQR}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase transition-all"
+                >
+                  <Download size={14} /> Telechaje QR
+                </button>
+              </div>
+              <div className="flex flex-col items-center bg-black/20 p-6 rounded-3xl" id="hatex-qr-code">
+                <QRCodeComponent value={paymentUrl} size={200} />
+                <p className="text-[9px] text-zinc-500 mt-4 break-all max-w-xs text-center">
+                  {paymentUrl}
+                </p>
+                <p className="text-[9px] text-zinc-600 mt-2">
+                  Skane sa a pou peye dirèkteman nan kont ou.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* Revenue Table */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden">
           <div className="p-8 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -2050,6 +978,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
             </button>
           </div>
 
+          {/* 4 Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-white/5">
             {[
               { label: 'Total SDK', val: earnings.sdkTotal, icon: <Zap size={15} />, sub: `${earnings.sdkCount} vant`, color: 'text-blue-400' },
@@ -2068,6 +997,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
             ))}
           </div>
 
+          {/* Dènye vant */}
           <div className="p-6 border-t border-white/5">
             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Dènye Vant</p>
             {recentSales.length > 0 ? (
@@ -2109,10 +1039,11 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </div>
         </div>
 
+        {/* QUICK ACTIONS */}
         {profile?.business_name ? (
           <div className="grid grid-cols-2 gap-6">
             {[
-              { icon: <Code className="text-red-600 w-7 h-7" />, label: 'SDK Deployment', sub: 'Konekte boutik ou', action: () => setMode('plugins') },
+              { icon: <Code className="text-red-600 w-7 h-7" />, label: 'Hostinger Plugin', sub: 'Kòd pou site Hostinger', action: () => setMode('plugins') },
               { icon: <FileText className="text-red-600 w-7 h-7" />, label: 'Smart Invoice', sub: 'Voye fakti bay kliyan', action: () => { setMode('invoices'); setSubMode('create'); } },
             ].map((a) => (
               <button key={a.label} onClick={a.action} className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden">
@@ -2136,7 +1067,9 @@ Vèsyon 2.0 - Fòmilè kat entegre
         )}
       </div>
 
+      {/* ── SIDEBAR ── */}
       <div className="lg:col-span-4 space-y-6">
+        {/* Balans */}
         <div className="bg-white text-black p-8 rounded-[3.5rem] shadow-2xl shadow-red-600/10">
           <div className="flex justify-between items-start mb-5">
             <div className="bg-black text-white p-4 rounded-2xl"><Wallet size={18} /></div>
@@ -2160,6 +1093,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </button>
         </div>
 
+        {/* Node Config */}
         <div className="bg-zinc-900/30 border border-white/5 p-7 rounded-[3rem]">
           <h3 className="text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-zinc-500">Konfigirasyon</h3>
           <div className="space-y-3">
@@ -2225,6 +1159,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </div>
         </div>
 
+        {/* Quick Stats */}
         <div className="bg-zinc-900/30 border border-white/5 p-7 rounded-[3rem]">
           <h3 className="text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-zinc-500">Estatistik rapid</h3>
           <div className="grid grid-cols-2 gap-3">
@@ -2252,6 +1187,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
         <div className="w-12" />
       </div>
 
+      {/* YouTube Tutorial */}
       <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3rem] overflow-hidden mb-8">
         <div className="p-7 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -2304,6 +1240,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
         </div>
       </div>
 
+      {/* KYC Warning */}
       {profile?.kyc_status !== 'approved' && (
         <div className="bg-amber-600/20 border border-amber-600/30 p-8 rounded-[3rem] mb-8 text-center">
           <AlertTriangle className="text-amber-500 w-12 h-12 mx-auto mb-4" />
@@ -2315,115 +1252,8 @@ Vèsyon 2.0 - Fòmilè kat entegre
         </div>
       )}
 
+      {/* Platform Cards - ONLY HOSTINGER */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* WooCommerce */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="bg-purple-600/20 p-4 rounded-2xl">
-              <ShoppingBag className="text-purple-400 w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black">WooCommerce</h3>
-              <p className="text-zinc-500 text-sm">WordPress</p>
-            </div>
-          </div>
-          
-          <p className="text-zinc-400 text-sm mb-6">
-            Plugin pou WooCommerce. Vèsyon 3.1.0 ak koneksyon dirèk Supabase.
-          </p>
-          
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-zinc-600">
-              <span className="block">Vèsyon: 3.1.0</span>
-              <span className="block">Dirèk Supabase</span>
-            </div>
-            <button
-              onClick={generateWooCommercePlugin}
-              disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profile?.api_key}
-              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {downloadingPlugin === 'woocommerce' ? (
-                <RefreshCw size={16} className="animate-spin" />
-              ) : (
-                <DownloadIcon size={16} />
-              )}
-              {downloadingPlugin === 'woocommerce' ? 'Ap jenere...' : 'Telechaje ZIP'}
-            </button>
-          </div>
-        </div>
-
-        {/* Shopify */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="bg-green-600/20 p-4 rounded-2xl">
-              <Chrome className="text-green-400 w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black">Shopify</h3>
-              <p className="text-zinc-500 text-sm">Aplikasyon</p>
-            </div>
-          </div>
-          
-          <p className="text-zinc-400 text-sm mb-6">
-            Aplikasyon pou Shopify. Vèsyon 2.0 ak fòmilè kat entegre.
-          </p>
-          
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-zinc-600">
-              <span className="block">Vèsyon: 2.0.0</span>
-              <span className="block">Fòmilè entegre</span>
-            </div>
-            <button
-              onClick={generateShopifyPlugin}
-              disabled={downloadingPlugin === 'shopify' || profile?.kyc_status !== 'approved' || !profile?.api_key}
-              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {downloadingPlugin === 'shopify' ? (
-                <RefreshCw size={16} className="animate-spin" />
-              ) : (
-                <DownloadIcon size={16} />
-              )}
-              {downloadingPlugin === 'shopify' ? 'Ap jenere...' : 'Telechaje ZIP'}
-            </button>
-          </div>
-        </div>
-
-        {/* Wix */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="bg-blue-600/20 p-4 rounded-2xl">
-              <Globe className="text-blue-400 w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black">Wix</h3>
-              <p className="text-zinc-500 text-sm">Aplikasyon</p>
-            </div>
-          </div>
-          
-          <p className="text-zinc-400 text-sm mb-6">
-            Aplikasyon pou Wix. Vèsyon 2.0 ak fòmilè kat entegre.
-          </p>
-          
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-zinc-600">
-              <span className="block">Vèsyon: 2.0.0</span>
-              <span className="block">Fòmilè entegre</span>
-            </div>
-            <button
-              onClick={generateWixPlugin}
-              disabled={downloadingPlugin === 'wix' || profile?.kyc_status !== 'approved' || !profile?.api_key}
-              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {downloadingPlugin === 'wix' ? (
-                <RefreshCw size={16} className="animate-spin" />
-              ) : (
-                <DownloadIcon size={16} />
-              )}
-              {downloadingPlugin === 'wix' ? 'Ap jenere...' : 'Telechaje ZIP'}
-            </button>
-          </div>
-        </div>
-
         {/* Hostinger / Horizon */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
           <div className="flex items-center gap-4 mb-6">
@@ -2461,8 +1291,9 @@ Vèsyon 2.0 - Fòmilè kat entegre
         </div>
       </div>
 
+      {/* Enstriksyon */}
       <div className="bg-zinc-900/30 border border-white/5 p-8 rounded-[3rem] mt-8">
-        <h3 className="text-lg font-black mb-4">📋 Enstriksyon enstalasyon (Vèsyon 3.1.0)</h3>
+        <h3 className="text-lg font-black mb-4">📋 Enstriksyon enstalasyon</h3>
         <div className="space-y-4 text-zinc-300 text-sm">
           <div className="flex gap-3">
             <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">1</div>
@@ -2567,6 +1398,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </button>
         </div>
 
+        {/* Filters */}
         <div className="bg-zinc-900/30 border border-white/5 p-6 rounded-[2rem] mb-8">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex items-center gap-2 bg-black/40 p-2 rounded-xl">
@@ -2610,6 +1442,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </div>
         </div>
 
+        {/* Invoice List */}
         {filteredInvoices.length === 0 ? (
           <div className="text-center py-40 bg-zinc-900/10 rounded-[4rem] border border-dashed border-white/5">
             <FileText className="w-16 h-16 text-zinc-800 mx-auto mb-6" />
@@ -2802,6 +1635,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
       </div>
 
       <div className="grid gap-8">
+        {/* Profile Settings */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem]">
           <div className="flex items-center gap-4 mb-8">
             <div className="bg-red-600/10 p-4 rounded-3xl">
@@ -2906,6 +1740,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </div>
         </div>
 
+        {/* Security Settings */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem]">
           <div className="flex items-center gap-4 mb-8">
             <div className="bg-red-600/10 p-4 rounded-3xl">
@@ -2966,6 +1801,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
           </div>
         </div>
 
+        {/* Notification Settings */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem]">
           <div className="flex items-center gap-4 mb-8">
             <div className="bg-red-600/10 p-4 rounded-3xl">
