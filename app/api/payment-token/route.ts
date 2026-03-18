@@ -18,13 +18,12 @@ export async function GET() {
       }
     );
 
-    // Verifye otantifikasyon an
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Pa otorize' }, { status: 401 });
     }
 
-    // Chache yon token ki pa ekspire pou machann sa a
+    // Chache yon token ki poko ekspire
     const { data: existing } = await supabase
       .from('payment_tokens')
       .select('id')
@@ -36,10 +35,9 @@ export async function GET() {
       return NextResponse.json({ token: existing.id });
     }
 
-    // Kreye yon nouvo token
-    const token = randomBytes(16).toString('hex'); // 32 karaktè
+    const token = randomBytes(16).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 jou
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
     const { error: insertError } = await supabase
       .from('payment_tokens')
