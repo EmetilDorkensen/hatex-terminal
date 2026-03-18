@@ -367,10 +367,11 @@ export default function TerminalPage() {
 
   // ============================================================
   // FONKSYON QR KÒD (ak token)
-  // ============================================================
   const paymentUrl = useMemo(() => {
     if (!paymentToken) return '';
-    return `${window.location.origin}/checkout?token=${paymentToken}`;
+    // Itilize NEXT_PUBLIC_SITE_URL si disponib, sinon itilize window.location.origin
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    return `${baseUrl}/checkout?token=${paymentToken}`;
   }, [paymentToken]);
 
   const downloadQR = () => {
