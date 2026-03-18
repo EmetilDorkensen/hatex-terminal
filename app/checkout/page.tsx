@@ -1,15 +1,15 @@
 "use client";
 
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { CreditCard, Calendar, Lock, AlertCircle } from 'lucide-react';
 
-// Kompozan ki itilize useSearchParams
 function CheckoutContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const token = searchParams.get('token');
+  
   const [merchant, setMerchant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,7 +32,6 @@ function CheckoutContent() {
         return;
       }
 
-      // Verifye token an epi jwenn merchant_id
       const { data: tokenData, error: tokenError } = await supabase
         .from('payment_tokens')
         .select('merchant_id, expires_at')
@@ -45,17 +44,16 @@ function CheckoutContent() {
         return;
       }
 
-      // Verifye si token an ekspire
       if (new Date(tokenData.expires_at) < new Date()) {
-        setError('Token ekspire. Tanpri jenere yon nouvo QR kòd.');
+        setError('Token ekspire.');
         setLoading(false);
         return;
       }
 
-      // Chaje enfòmasyon machann nan
+      // Chache enfòmasyon machann nan (ak api_key)
       const { data: merchantData, error: merchantError } = await supabase
         .from('profiles')
-        .select('business_name, full_name')
+        .select('id, api_key, business_name, full_name')
         .eq('id', tokenData.merchant_id)
         .single();
 
@@ -72,7 +70,6 @@ function CheckoutContent() {
     validateToken();
   }, [token, supabase]);
 
-  // Fòma nimewo kat
   const formatCardNumber = (value: string) => {
     const v = value.replace(/\D/g, '');
     const parts = [];
@@ -82,7 +79,6 @@ function CheckoutContent() {
     return parts.join(' ');
   };
 
-  // Fòma dat ekspirasyon
   const formatExpiry = (value: string) => {
     const v = value.replace(/\D/g, '');
     if (v.length >= 2) {
@@ -91,63 +87,76 @@ function CheckoutContent() {
     return v;
   };
 
-  // Validasyon anvan voye
-  const validateForm = () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      setError("Antre yon montan ki valab.");
-      return false;
-    }
-    const cleanCard = cardNumber.replace(/\s/g, "");
-    if (!/^\d{13,19}$/.test(cleanCard)) {
-      setError("Nimewo kat la pa valab (13-19 chif).");
-      return false;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-      setError("Dat ekspirasyon dwe fòma MM/AA.");
-      return false;
-    }
-    if (!/^\d{3,4}$/.test(cardCvv)) {
-      setError("Kòd CVV dwe 3 oubyen 4 chif.");
-      return false;
-    }
-    return true;
-  };
-
-  // Soumèt peman an
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+
+    if (!amount || parseFloat(amount) <= 0) {
+      setError('Antre yon montan ki valab.');
+      return;
+    }
+    const cleanCard = cardNumber.replace(/\s/g, '');
+    if (!/^\d{13,19}$/.test(cleanCard)) {
+      setError('Nimewo kat la pa valab (13-19 chif).');
+      return;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
+      setError('Dat ekspirasyon dwe fòma MM/AA.');
+      return;
+    }
+    if (!/^\d{3,4}$/.test(cardCvv)) {
+      setError('Kòd CVV dwe 3 oubyen 4 chif.');
+      return;
+    }
 
     setProcessing(true);
-    setError("");
+    setError('');
 
+    // Payload la dwe gen merchant_id = api_key
     const payload = {
-      merchant_id: merchant?.id, // ou dwe jwenn id machann nan nan merchantData
+      merchant_id: merchant.api_key,  // SA A SE KLE API A, PA ID LA!
       amount: parseFloat(amount),
-      currency: "HTG",
-      card_number: cardNumber.replace(/\s/g, ""),
+      currency: 'HTG',
+      card_number: cleanCard,
       card_expiry: cardExpiry,
       card_cvv: cardCvv,
+      metadata: {
+        platform: 'qr',
+        token: token
+      }
     };
 
     try {
-      const res = await fetch("https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        // Redireksyon sou paj success
-        window.location.href = `/success?id=${data.transaction_id}&amount=${amount}`;
-      } else {
-        setError(data.message || "Peman an echwe. Tanpri eseye ankò.");
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Repons pa OK:', res.status, text);
+        try {
+          const json = JSON.parse(text);
+          setError(json.message || 'Erè inatandi.');
+        } catch {
+          setError('Sèvè reponn ak kòd ' + res.status);
+        }
+        setProcessing(false);
+        return;
       }
-    } catch (err) {
-      setError("Erè koneksyon. Tcheke entènèt ou epi eseye ankò.");
-    } finally {
+
+      const data = await res.json();
+      if (data.success) {
+        router.push(`/checkout/success?id=${data.transaction_id}&amount=${amount}`);
+      } else {
+        setError(data.message || 'Peman an echwe.');
+        setProcessing(false);
+      }
+    } catch (err: any) {
+      console.error('Fetch error:', err);
+      setError('Erè koneksyon. Tcheke entènèt ou epi eseye ankò.');
       setProcessing(false);
     }
   };
@@ -180,12 +189,11 @@ function CheckoutContent() {
             Peye <span className="text-red-600">HATEX</span>
           </h1>
           <p className="text-gray-400 mt-2">
-            Machann: <span className="text-white font-bold">{merchant?.business_name || merchant?.full_name}</span>
+            Machann: <span className="text-white font-bold">{merchant?.business_name || merchant?.full_name || 'Machann'}</span>
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 shadow-2xl">
-          {/* Montan */}
           <div className="mb-5">
             <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider">
               Montan (HTG)
@@ -202,7 +210,6 @@ function CheckoutContent() {
             />
           </div>
 
-          {/* Nimewo kat */}
           <div className="mb-5">
             <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
               <CreditCard size={16} className="text-red-600" /> Nimewo kat
@@ -218,7 +225,6 @@ function CheckoutContent() {
             />
           </div>
 
-          {/* Dat ekspirasyon ak CVV */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
@@ -250,7 +256,6 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* Mesaj erè */}
           {error && (
             <div className="bg-red-600/20 border border-red-600/30 rounded-xl p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -258,13 +263,12 @@ function CheckoutContent() {
             </div>
           )}
 
-          {/* Bouton peye */}
           <button
             type="submit"
             disabled={processing}
             className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            {processing ? "Ap trete..." : "Peye kounye a"}
+            {processing ? 'Ap trete...' : 'Peye kounye a'}
           </button>
 
           <p className="text-xs text-gray-500 text-center mt-4">
@@ -276,7 +280,6 @@ function CheckoutContent() {
   );
 }
 
-// Paj prensipal la vlope ak Suspense
 export default function CheckoutPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center text-white">Chajman...</div>}>
