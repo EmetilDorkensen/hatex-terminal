@@ -17,7 +17,7 @@ import {
   PlusCircle, List, Grid, Search, Calendar,
   DownloadCloud, UploadCloud, Key, Shield, Link,
   Smartphone, Monitor, Server, Cloud, DownloadIcon,
-  ShoppingBag, PenTool, Chrome, Wifi, Image
+  ShoppingBag, PenTool, Chrome, Wifi, Image, QrCode
 } from 'lucide-react';
 
 // Konpozan QR (itilize qrcode pou desine canvas)
@@ -58,7 +58,6 @@ export default function TerminalPage() {
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [businessName, setBusinessName] = useState('');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedApiKey, setCopiedApiKey] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -173,11 +172,13 @@ export default function TerminalPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Verifye tip fichye
     if (!file.type.startsWith('image/')) {
-      alert('Tanpri chwazi yon fichye imaj.');
+      alert('Tanpri chwazi yon fichye imaj (JPEG, PNG, etc.)');
       return;
     }
 
+    // Verifye gwosè (maks 2MB)
     if (file.size > 2 * 1024 * 1024) {
       alert('Imaj la twò gwo. Maks 2MB.');
       return;
@@ -186,16 +187,30 @@ export default function TerminalPage() {
     setUploadingLogo(true);
 
     try {
-      // Jenere yon non inik pou fichye a
-      const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${profile.id}-${Date.now()}.${fileExt}`;
+      // Jenere yon non inik (senp, san karaktè espesyal)
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
+
+      console.log('🔼 Ap telechaje:', fileName);
 
       // Telechaje nan Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        if (uploadError.message.includes('bucket')) {
+          alert('Bucket "avatars" pa egziste. Tanpri kreye l nan Supabase Storage.');
+        } else {
+          alert('Erè pandan telechajman: ' + uploadError.message);
+        }
+        setUploadingLogo(false);
+        return;
+      }
 
       // Jwenn URL piblik la
       const { data: urlData } = supabase.storage
@@ -203,6 +218,7 @@ export default function TerminalPage() {
         .getPublicUrl(fileName);
 
       const avatarUrl = urlData.publicUrl;
+      console.log('✅ URL jwenn:', avatarUrl);
 
       // Mete ajou pwofil la
       const { error: updateError } = await supabase
@@ -210,15 +226,24 @@ export default function TerminalPage() {
         .update({ avatar_url: avatarUrl })
         .eq('id', profile.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update profile error:', updateError);
+        alert('Erè pandan sove done pwofil la.');
+        setUploadingLogo(false);
+        return;
+      }
 
+      // Mete ajou eta lokal la
       setProfile({ ...profile, avatar_url: avatarUrl });
-      alert('Logo telechaje avèk siksè!');
+      alert('✅ Logo telechaje avèk siksè!');
+
     } catch (err: any) {
-      console.error('Error uploading logo:', err);
-      alert('Erè pandan telechajman. Tanpri eseye ankò.');
+      console.error('❌ Erè inatandi:', err);
+      alert('Erè inatandi. Tcheke konsola a pou plis detay.');
     } finally {
       setUploadingLogo(false);
+      // Netwaye input la pou ka re-telechaje menm fichye
+      e.target.value = '';
     }
   };
 
@@ -331,6 +356,46 @@ export default function TerminalPage() {
       invoiceCount: paidInvoices.length 
     };
   }, [transactions, invoices]);
+
+  // ============================================================
+  // STATISTIK ESPESYAL POU QR KÒD
+  // ============================================================
+  const qrTransactions = useMemo(() => {
+    return transactions.filter(tx => 
+      tx.type === 'SALE' && 
+      tx.status === 'success' && 
+      tx.metadata?.platform === 'qr'
+    );
+  }, [transactions]);
+
+  const qrStats = useMemo(() => {
+    const now = new Date();
+    const today = now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const total = qrTransactions.reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
+    
+    const thisMonth = qrTransactions
+      .filter(tx => new Date(tx.created_at).getMonth() === now.getMonth())
+      .reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
+    
+    const todayTotal = qrTransactions
+      .filter(tx => new Date(tx.created_at).toDateString() === today)
+      .reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
+    
+    const last24h = qrTransactions
+      .filter(tx => new Date(tx.created_at) >= yesterday)
+      .reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
+
+    return {
+      total,
+      thisMonth,
+      today: todayTotal,
+      last24h,
+      count: qrTransactions.length
+    };
+  }, [qrTransactions]);
 
   const filteredInvoices = useMemo(() => {
     let filtered = [...invoices];
@@ -1074,71 +1139,113 @@ Vèsyon 2.0 - Fòmilè kat entegre
           )}
         </div>
 
-        {/* Revenue Table */}
+        {/* Revenue Table - QR Payments */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden">
-          <div className="p-8 border-b border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="p-8 border-b border-white/5">
+            <div className="flex items-center gap-4 mb-8">
               <div className="bg-red-600/10 p-4 rounded-3xl">
-                <BarChart3 className="text-red-600 w-5 h-5" />
+                <QrCode className="text-red-600 w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest">Tablo Revni</h3>
-                <p className="text-[9px] text-zinc-500 font-bold mt-0.5">SDK + Invoice konbine</p>
+                <h3 className="text-lg font-black uppercase tracking-widest">Peman QR Kòd</h3>
+                <p className="text-[10px] text-zinc-500 font-bold">Revni an tan reyèl</p>
               </div>
             </div>
-            <button
-              onClick={handleSyncBalance}
-              disabled={syncing}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase transition-all active:scale-95"
-            >
-              {syncing ? <RefreshCw className="animate-spin" size={13} /> : <Wallet size={13} />}
-              Vire nan Wallet
-            </button>
-          </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-white/5">
-            {[
-              { label: 'Total SDK', val: earnings.sdkTotal, icon: <Zap size={15} />, sub: `${earnings.sdkCount} vant`, color: 'text-blue-400' },
-              { label: 'Total Invoice', val: earnings.invoiceTotal, icon: <Mail size={15} />, sub: `${earnings.invoiceCount} peye`, color: 'text-emerald-400' },
-              { label: 'Mwa sa a', val: earnings.thisMonth, icon: <TrendingUp size={15} />, sub: 'Revni kourann', color: 'text-amber-400' },
-              { label: 'Gran Total', val: earnings.total, icon: <DollarSign size={15} />, sub: 'Pou senkronize', color: 'text-red-400' },
-            ].map((s) => (
-              <div key={s.label} className="p-6">
-                <div className={`flex items-center gap-2 mb-3 ${s.color}`}>
-                  {s.icon}
-                  <span className="text-[9px] font-black uppercase tracking-wider">{s.label}</span>
+            {/* 4 Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Total QR */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-blue-400 mb-2">
+                  <DollarSign size={16} />
+                  <span className="text-[9px] font-black uppercase">Total QR</span>
                 </div>
-                <div className="text-2xl font-black italic">{s.val.toLocaleString()}</div>
-                <div className="text-[9px] text-zinc-600 font-bold mt-1 uppercase">{s.sub} HTG</div>
+                <div className="text-2xl font-black text-white">
+                  {qrStats.total.toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
               </div>
-            ))}
+
+              {/* Mwa sa a */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                  <Calendar size={16} />
+                  <span className="text-[9px] font-black uppercase">Mwa sa a</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {qrStats.thisMonth.toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              {/* Jodi a */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-amber-400 mb-2">
+                  <Clock size={16} />
+                  <span className="text-[9px] font-black uppercase">Jodi a</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {qrStats.today.toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              {/* Dènye 24h */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-purple-400 mb-2">
+                  <TrendingUp size={16} />
+                  <span className="text-[9px] font-black uppercase">Dènye 24h</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {qrStats.last24h.toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+            </div>
           </div>
 
-          <div className="p-6 border-t border-white/5">
-            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Dènye Vant</p>
-            {recentSales.length > 0 ? (
+          {/* Lis dènye tranzaksyon QR */}
+          <div className="p-8 border-t border-white/5">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <History size={16} className="text-zinc-500" />
+                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                  Dènye Peman QR
+                </span>
+              </div>
+              <span className="text-[8px] bg-red-600/10 text-red-400 px-2 py-1 rounded-full font-black">
+                {qrStats.count} tranzaksyon
+              </span>
+            </div>
+
+            {qrTransactions.length > 0 ? (
               <div className="space-y-2">
-                {recentSales.slice(0, 5).map((sale, i) => {
-                  const initials = getInitials(sale.client);
-                  const colorCls = getInitialColor(sale.client);
+                {qrTransactions.slice(0, 5).map((tx: any) => {
+                  const customerName = tx.metadata?.customer_name || tx.metadata?.customer_display || 'Kliyan';
+                  const initials = getInitials(customerName);
+                  const colorCls = getInitialColor(customerName);
                   return (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                    <div key={tx.id} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-red-600/20 transition-all">
                       <div className={`w-9 h-9 ${colorCls} rounded-xl flex items-center justify-center font-black text-[10px] text-white flex-shrink-0`}>
                         {initials}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold text-white truncate">{sale.client}</p>
+                        <p className="text-[11px] font-bold text-white truncate">
+                          {customerName}
+                        </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${
-                            sale.source === 'SDK' ? 'bg-blue-600/20 text-blue-400' : 'bg-emerald-600/20 text-emerald-400'
-                          }`}>
-                            {sale.source}
+                          <span className="text-[8px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded-full font-black">
+                            QR
                           </span>
-                          <span className="text-[9px] text-zinc-600">{formatDate(sale.created_at)}</span>
+                          <span className="text-[9px] text-zinc-600">
+                            {formatDate(tx.created_at)}
+                          </span>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-black text-green-400">+{parseFloat(sale.amount).toLocaleString()}</div>
+                        <div className="text-sm font-black text-green-400">
+                          +{parseFloat(tx.amount).toLocaleString()}
+                        </div>
                         <div className="text-[8px] text-zinc-600 font-bold">HTG</div>
                       </div>
                       <ArrowUpRight size={13} className="text-zinc-700" />
@@ -1147,9 +1254,127 @@ Vèsyon 2.0 - Fòmilè kat entegre
                 })}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Package size={28} className="mx-auto mb-2 text-zinc-800" />
-                <p className="text-[10px] font-black uppercase text-zinc-700">Pa gen vant ankò</p>
+              <div className="text-center py-8 bg-black/20 rounded-2xl border border-dashed border-white/5">
+                <QrCode size={28} className="mx-auto mb-2 text-zinc-800" />
+                <p className="text-[10px] font-black uppercase text-zinc-700">Pa gen peman QR ankò</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Invoice Revenue Table */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden mt-8">
+          <div className="p-8 border-b border-white/5">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="bg-red-600/10 p-4 rounded-3xl">
+                <Mail className="text-red-600 w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase tracking-widest">Peman Fakti</h3>
+                <p className="text-[10px] text-zinc-500 font-bold">Revni an tan reyèl</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Total Invoice */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                  <DollarSign size={16} />
+                  <span className="text-[9px] font-black uppercase">Total Fakti</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {earnings.invoiceTotal.toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              {/* Konte peye */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                  <Mail size={16} />
+                  <span className="text-[9px] font-black uppercase">Peye</span>
+                </div>
+                <div className="text-2xl font-black text-white">{earnings.invoiceCount}</div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">fakti</div>
+              </div>
+
+              {/* Mwa sa a (invoice) */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                  <Calendar size={16} />
+                  <span className="text-[9px] font-black uppercase">Mwa sa a</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {(earnings.thisMonth - qrStats.thisMonth).toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              {/* Mwayèn */}
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                  <TrendingUp size={16} />
+                  <span className="text-[9px] font-black uppercase">Mwayèn</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {earnings.invoiceCount > 0 
+                    ? Math.round(earnings.invoiceTotal / earnings.invoiceCount).toLocaleString()
+                    : '0'}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG/fakti</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Lis dènye fakti */}
+          <div className="p-8 border-t border-white/5">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <History size={16} className="text-zinc-500" />
+                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                  Dènye Fakti
+                </span>
+              </div>
+              <span className="text-[8px] bg-emerald-600/10 text-emerald-400 px-2 py-1 rounded-full font-black">
+                {earnings.invoiceCount} fakti
+              </span>
+            </div>
+
+            {invoices.length > 0 ? (
+              <div className="space-y-2">
+                {invoices.slice(0, 5).map((inv: any) => (
+                  <div key={inv.id} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-emerald-600/20 transition-all">
+                    <div className={`w-9 h-9 ${
+                      inv.status === 'paid' ? 'bg-emerald-600' : 'bg-amber-600'
+                    } rounded-xl flex items-center justify-center font-black text-[10px] text-white flex-shrink-0`}>
+                      {inv.status === 'paid' ? '✓' : '⏳'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-white truncate">
+                        {inv.client_email || 'Kliyan'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[8px] bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full font-black">
+                          Fakti
+                        </span>
+                        <span className="text-[9px] text-zinc-600">
+                          {formatDate(inv.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-black text-green-400">
+                        {inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()}
+                      </div>
+                      <div className="text-[8px] text-zinc-600 font-bold">HTG</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-black/20 rounded-2xl border border-dashed border-white/5">
+                <Mail size={28} className="mx-auto mb-2 text-zinc-800" />
+                <p className="text-[10px] font-black uppercase text-zinc-700">Pa gen fakti ankò</p>
               </div>
             )}
           </div>
@@ -1803,7 +2028,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(profile?.id || '');
-                    alert('ID kopye! Pa pataje li ak pèsòn.');
+                    alert('ID kopye! Pa pataje li ak pèsonn.');
                   }}
                   className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
                 >

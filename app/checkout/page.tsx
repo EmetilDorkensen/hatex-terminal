@@ -32,48 +32,59 @@ function CheckoutContent() {
         setLoading(false);
         return;
       }
-
+  
       try {
         console.log('🔍 Verifikasyon token an:', token);
         
+        // 1. Tcheke token an
         const { data: tokenData, error: tokenError } = await supabase
           .from('payment_tokens')
           .select('merchant_id, expires_at')
           .eq('id', token)
           .single();
-
+  
+        console.log('📦 Token data:', tokenData);
+        console.log('❌ Token error:', tokenError);
+  
         if (tokenError || !tokenData) {
           setError('Token pa valid. Tanpri jenere yon nouvo QR kòd.');
           setLoading(false);
           return;
         }
-
+  
         if (new Date(tokenData.expires_at) < new Date()) {
           setError('Token ekspire. Tanpri jenere yon nouvo QR kòd.');
           setLoading(false);
           return;
         }
-
+  
+        console.log('✅ Token bon, merchant_id:', tokenData.merchant_id);
+  
+        // 2. Chache machann nan
         const { data: merchantData, error: merchantError } = await supabase
           .from('profiles')
           .select('id, api_key, business_name, full_name, avatar_url')
           .eq('id', tokenData.merchant_id)
           .single();
-
+  
+        console.log('📦 Merchant data:', merchantData);
+        console.log('❌ Merchant error:', merchantError);
+  
         if (merchantError || !merchantData) {
           setError('Machann pa jwenn. Kontakte sipò.');
           setLoading(false);
           return;
         }
-
+  
         setMerchant(merchantData);
       } catch (err) {
+        console.error('💥 Erè inatandi:', err);
         setError('Erè pandan verifikasyon. Tanpri eseye ankò.');
       } finally {
         setLoading(false);
       }
     }
-
+  
     validateToken();
   }, [token, supabase]);
 
