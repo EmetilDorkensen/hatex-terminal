@@ -17,7 +17,7 @@ import {
   PlusCircle, List, Grid, Search, Calendar,
   DownloadCloud, UploadCloud, Key, Shield, Link,
   Smartphone, Monitor, Server, Cloud, DownloadIcon,
-  ShoppingBag, PenTool, Chrome, Wifi
+  ShoppingBag, PenTool, Chrome, Wifi, Image
 } from 'lucide-react';
 
 // Konpozan QR (itilize qrcode pou desine canvas)
@@ -49,6 +49,7 @@ export default function TerminalPage() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [downloadingPlugin, setDownloadingPlugin] = useState<string | null>(null);
   const [generatingApiKey, setGeneratingApiKey] = useState(false);
   
@@ -57,6 +58,7 @@ export default function TerminalPage() {
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedApiKey, setCopiedApiKey] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -163,6 +165,62 @@ export default function TerminalPage() {
       setGeneratingApiKey(false);
     }
   }, [profile, supabase]);
+
+  // ============================================================
+  // FONKSYON POU TELECHAJE LOGO
+  // ============================================================
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Tanpri chwazi yon fichye imaj.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Imaj la twò gwo. Maks 2MB.');
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      // Jenere yon non inik pou fichye a
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${profile.id}-${Date.now()}.${fileExt}`;
+
+      // Telechaje nan Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Jwenn URL piblik la
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const avatarUrl = urlData.publicUrl;
+
+      // Mete ajou pwofil la
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      setProfile({ ...profile, avatar_url: avatarUrl });
+      alert('Logo telechaje avèk siksè!');
+    } catch (err: any) {
+      console.error('Error uploading logo:', err);
+      alert('Erè pandan telechajman. Tanpri eseye ankò.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   // ============================================================
   // INITIALIZATION
@@ -369,7 +427,6 @@ export default function TerminalPage() {
   // FONKSYON QR KÒD (ak token)
   const paymentUrl = useMemo(() => {
     if (!paymentToken) return '';
-    // Itilize NEXT_PUBLIC_SITE_URL si disponib, sinon itilize window.location.origin
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     return `${baseUrl}/checkout?token=${paymentToken}`;
   }, [paymentToken]);
@@ -917,6 +974,53 @@ Vèsyon 2.0 - Fòmilè kat entegre
                 placeholder="Non Legal Biznis Ou"
                 className="w-full bg-black/40 border border-white/10 py-6 pl-16 pr-6 rounded-3xl text-[14px] outline-none text-white italic focus:border-red-600/50 transition-all"
               />
+            </div>
+          </div>
+
+          {/* Logo biznis */}
+          <div className="mt-8 pt-8 border-t border-white/5">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-red-600/10 p-4 rounded-2xl">
+                <Image size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Logo Biznis</h4>
+                <p className="text-[9px] text-zinc-500 uppercase italic">JPEG, PNG, maks 2MB</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              {/* Preview logo */}
+              {profile?.avatar_url ? (
+                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-black/30 border border-white/10">
+                  <img 
+                    src={profile.avatar_url} 
+                    alt="Logo" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-zinc-900 flex items-center justify-center border border-white/10">
+                  <Image size={30} className="text-zinc-700" />
+                </div>
+              )}
+
+              {/* Bouton telechaje */}
+              <label className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 px-6 py-3 rounded-xl transition-all flex items-center gap-2">
+                {uploadingLogo ? (
+                  <RefreshCw size={16} className="animate-spin text-red-600" />
+                ) : (
+                  <Upload size={16} />
+                )}
+                <span className="text-[10px] font-black uppercase">Telechaje Logo</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleLogoUpload}
+                  disabled={uploadingLogo}
+                />
+              </label>
             </div>
           </div>
           
@@ -1699,7 +1803,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(profile?.id || '');
-                    alert('ID kopye! Pa pataje li ak pèsonn.');
+                    alert('ID kopye! Pa pataje li ak pèsòn.');
                   }}
                   className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
                 >

@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { CreditCard, Calendar, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { CreditCard, Calendar, Lock, AlertCircle, Loader2, Store, CheckSquare, Square } from 'lucide-react';
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -17,6 +17,7 @@ function CheckoutContent() {
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   const supabase = createBrowserClient(
@@ -24,7 +25,6 @@ function CheckoutContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Verifye token an lè paj la chaje
   useEffect(() => {
     async function validateToken() {
       if (!token) {
@@ -34,7 +34,8 @@ function CheckoutContent() {
       }
 
       try {
-        // 1. Tcheke si token an egziste epi pa ekspire
+        console.log('🔍 Verifikasyon token an:', token);
+        
         const { data: tokenData, error: tokenError } = await supabase
           .from('payment_tokens')
           .select('merchant_id, expires_at')
@@ -53,10 +54,9 @@ function CheckoutContent() {
           return;
         }
 
-        // 2. Chache enfòmasyon machann nan (ak api_key)
         const { data: merchantData, error: merchantError } = await supabase
           .from('profiles')
-          .select('id, api_key, business_name, full_name')
+          .select('id, api_key, business_name, full_name, avatar_url')
           .eq('id', tokenData.merchant_id)
           .single();
 
@@ -77,7 +77,6 @@ function CheckoutContent() {
     validateToken();
   }, [token, supabase]);
 
-  // Fòma nimewo kat
   const formatCardNumber = (value: string) => {
     const v = value.replace(/\D/g, '');
     const parts = [];
@@ -87,7 +86,6 @@ function CheckoutContent() {
     return parts.join(' ');
   };
 
-  // Fòma dat ekspirasyon
   const formatExpiry = (value: string) => {
     const v = value.replace(/\D/g, '');
     if (v.length >= 2) {
@@ -96,11 +94,9 @@ function CheckoutContent() {
     return v;
   };
 
-  // Soumèt peman an
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validasyon kote kliyan an
     if (!amount || parseFloat(amount) <= 0) {
       setError('Antre yon montan ki valab.');
       return;
@@ -122,7 +118,6 @@ function CheckoutContent() {
     setProcessing(true);
     setError('');
 
-    // Payload la dwe gen merchant_id = api_key (se sa Edge Function an ap chache)
     const payload = {
       merchant_id: merchant.api_key,
       amount: parseFloat(amount),
@@ -134,6 +129,8 @@ function CheckoutContent() {
         platform: 'qr',
         token: token,
         merchant_name: merchant.business_name || merchant.full_name,
+        merchant_logo: merchant.avatar_url,
+        save_card: saveCard,
       },
     };
 
@@ -145,37 +142,39 @@ function CheckoutContent() {
       });
 
       const responseText = await res.text();
-      console.log('Repons Edge Function:', res.status, responseText);
 
       if (!res.ok) {
         let errorMsg = 'Erè kominikasyon ak sèvè peman.';
         try {
           const errorData = JSON.parse(responseText);
           errorMsg = errorData.message || errorMsg;
-        } catch {
-          // Si se pa JSON, itilize mesaj default
-        }
+        } catch {}
         setError(errorMsg);
         setProcessing(false);
         return;
       }
 
-      const data = JSON.parse(responseText);
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        setError('Repons envalid soti nan sèvè peman.');
+        setProcessing(false);
+        return;
+      }
+
       if (data.success) {
-        // Redirije sou paj siksè a ak bon paramèt
-        router.push(`/checkout/success?id=${data.transaction_id}&amount=${amount}`);
+        router.push(`/checkout/success?id=${data.transaction_id}`);
       } else {
         setError(data.message || 'Peman an echwe.');
         setProcessing(false);
       }
     } catch (err: any) {
-      console.error('Fetch error:', err);
       setError('Erè koneksyon. Tcheke entènèt ou epi eseye ankò.');
       setProcessing(false);
     }
   };
 
-  // Eta loading
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
@@ -187,7 +186,6 @@ function CheckoutContent() {
     );
   }
 
-  // Si gen erè (token pa bon, elatriye)
   if (error && !merchant) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center p-4">
@@ -206,21 +204,31 @@ function CheckoutContent() {
     );
   }
 
-  // Afichaj fòmilè a
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
+          {/* Logo machann nan */}
+          {merchant?.avatar_url && (
+            <div className="flex justify-center mb-4">
+              <img 
+                src={merchant.avatar_url} 
+                alt={merchant.business_name || merchant.full_name}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-red-600/30"
+              />
+            </div>
+          )}
+          
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">
             Peye <span className="text-red-600">HATEX</span>
           </h1>
-          <p className="text-gray-400 mt-2">
-            Machann: <span className="text-white font-bold">{merchant?.business_name || merchant?.full_name || 'Machann'}</span>
+          <p className="text-gray-400 mt-2 flex items-center justify-center gap-2">
+            <Store size={16} className="text-red-600" />
+            <span className="text-white font-bold">{merchant?.business_name || merchant?.full_name || 'Machann'}</span>
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 shadow-2xl">
-          {/* Montan */}
           <div className="mb-5">
             <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider">
               Montan (HTG)
@@ -237,7 +245,6 @@ function CheckoutContent() {
             />
           </div>
 
-          {/* Nimewo kat */}
           <div className="mb-5">
             <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
               <CreditCard size={16} className="text-red-600" /> Nimewo kat
@@ -253,7 +260,6 @@ function CheckoutContent() {
             />
           </div>
 
-          {/* Dat ekspirasyon ak CVV */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
@@ -285,7 +291,22 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* Mesaj erè (si genyen) */}
+          {/* Opsyon sonje kat la */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => setSaveCard(!saveCard)}
+              className="flex items-center gap-2 text-gray-300 hover:text-white transition"
+            >
+              {saveCard ? (
+                <CheckSquare className="w-5 h-5 text-red-600" />
+              ) : (
+                <Square className="w-5 h-5 text-gray-500" />
+              )}
+              <span className="text-sm">Sonje enfòmasyon kat sa pou pwochen fwa</span>
+            </button>
+          </div>
+
           {error && (
             <div className="bg-red-600/20 border border-red-600/30 rounded-xl p-3 mb-4 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -293,7 +314,6 @@ function CheckoutContent() {
             </div>
           )}
 
-          {/* Bouton peye */}
           <button
             type="submit"
             disabled={processing}
@@ -318,7 +338,6 @@ function CheckoutContent() {
   );
 }
 
-// Wrapper ak Suspense pou useSearchParams
 export default function CheckoutPage() {
   return (
     <Suspense fallback={

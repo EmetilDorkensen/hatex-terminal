@@ -2,20 +2,18 @@
 
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { CheckCircle2, ShoppingBag, ShieldCheck, Hash, ArrowRight, Download, FileText, Calendar, User, Mail, Phone } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
+import { CheckCircle2, ShoppingBag, ShieldCheck, Hash, Calendar, Download, Store, User, Mail, Phone } from 'lucide-react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  
-  const transactionId = searchParams.get('id') || searchParams.get('transaction_id') || '';
-  const amountParam = searchParams.get('amount') || "0";
+  const transactionId = searchParams.get('id');
   
   const [transaction, setTransaction] = useState<any>(null);
   const [merchant, setMerchant] = useState<any>(null);
+  const [payer, setPayer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -24,7 +22,6 @@ function SuccessContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Chaje done tranzaksyon an depi nan baz done
   useEffect(() => {
     async function loadTransaction() {
       if (!transactionId) {
@@ -34,7 +31,7 @@ function SuccessContent() {
       }
 
       try {
-        // 1. Chache tranzaksyon an
+        // 1. Chache tranzaksyon an (SALE)
         const { data: tx, error: txError } = await supabase
           .from('transactions')
           .select('*')
@@ -49,20 +46,30 @@ function SuccessContent() {
 
         setTransaction(tx);
 
-        // 2. Chache enfòmasyon machann nan (moun ki resevwa lajan an)
-        if (tx.user_id) {
-          const { data: prof, error: profError } = await supabase
-            .from('profiles')
-            .select('business_name, full_name, email, phone')
-            .eq('id', tx.user_id)
-            .single();
+        // 2. Chache enfòmasyon machann nan
+        const { data: merch, error: merchError } = await supabase
+          .from('profiles')
+          .select('id, full_name, business_name, email, phone, avatar_url')
+          .eq('id', tx.user_id)
+          .single();
 
-          if (!profError && prof) {
-            setMerchant(prof);
-          }
+        if (!merchError && merch) {
+          setMerchant(merch);
         }
+
+        // 3. Chache enfòmasyon moun k ap peye a (nan metadata)
+        if (tx.metadata?.customer_name) {
+          setPayer({ full_name: tx.metadata.customer_name });
+        } else if (tx.metadata?.customer_id) {
+          const { data: payerData } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', tx.metadata.customer_id)
+            .single();
+          if (payerData) setPayer(payerData);
+        }
+
       } catch (err) {
-        console.error('Error loading transaction:', err);
         setError('Erè pandan chajman done.');
       } finally {
         setLoading(false);
@@ -72,23 +79,37 @@ function SuccessContent() {
     loadTransaction();
   }, [transactionId, supabase]);
 
-  // Fonksyon pou jenere resi an PDF
-  const downloadReceipt = () => {
-    if (!transaction) return;
+  const downloadReceipt = async () => {
+    if (!transaction || !merchant) return;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    // Logo si disponib
+    if (merchant.avatar_url) {
+      try {
+        const response = await fetch(merchant.avatar_url);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onload = () => {
+          const logoData = reader.result as string;
+          doc.addImage(logoData, 'PNG', 20, 20, 30, 30);
+        };
+      } catch (e) {
+        console.error('Impossible de charger le logo:', e);
+      }
+    }
+
     // Tit
     doc.setFontSize(22);
-    doc.setTextColor(230, 46, 4); // #e62e04
+    doc.setTextColor(230, 46, 4);
     doc.text('HATEX', pageWidth / 2, 30, { align: 'center' });
 
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
     doc.text('Reçu de paiement', pageWidth / 2, 45, { align: 'center' });
 
-    // Liy separe
     doc.setDrawColor(200, 200, 200);
     doc.line(20, 55, pageWidth - 20, 55);
 
@@ -99,9 +120,8 @@ function SuccessContent() {
     const details = [
       ['ID tranzaksyon:', transaction.id],
       ['Dat:', new Date(transaction.created_at).toLocaleString('fr-HT')],
-      ['Montan:', `${Number(transaction.amount).toLocaleString()} HTG`],
-      ['Estati:', transaction.status === 'success' ? 'Rezilta' : transaction.status],
-      ['Tip:', transaction.type === 'SALE' ? 'Vant' : 'Acha'],
+      ['Montan:', `${transaction.amount.toLocaleString()} HTG`],
+      ['Estati:', 'Rezilta'],
     ];
 
     let y = 70;
@@ -112,63 +132,48 @@ function SuccessContent() {
     });
 
     // Enfòmasyon machann
-    if (merchant) {
+    y += 10;
+    doc.setFontSize(14);
+    doc.setTextColor(230, 46, 4);
+    doc.text('Marchand', 25, y);
+    y += 8;
+    doc.setFontSize(11);
+    doc.setTextColor(60, 60, 60);
+    
+    const merchantLines = [
+      `Nom: ${merchant.business_name || merchant.full_name || 'Marchand'}`,
+      `Email: ${merchant.email || 'Non disponible'}`,
+      `Tél: ${merchant.phone || 'Non disponible'}`,
+    ];
+    merchantLines.forEach(line => {
+      doc.text(line, 25, y);
+      y += 6;
+    });
+
+    // Enfòmasyon kliyan
+    if (payer) {
       y += 10;
       doc.setFontSize(14);
       doc.setTextColor(230, 46, 4);
-      doc.text('Machand', 25, y);
+      doc.text('Client', 25, y);
       y += 8;
       doc.setFontSize(11);
       doc.setTextColor(60, 60, 60);
-      
-      const merchantLines = [
-        `Non: ${merchant.business_name || merchant.full_name || 'Machand'}`,
-        `Imèl: ${merchant.email || 'Pa disponib'}`,
-        `Telefòn: ${merchant.phone || 'Pa disponib'}`,
-      ];
-      merchantLines.forEach(line => {
-        doc.text(line, 25, y);
-        y += 6;
-      });
-    }
-
-    // Metadata si genyen
-    if (transaction.metadata && Object.keys(transaction.metadata).length > 0) {
-      y += 10;
-      doc.setFontSize(12);
-      doc.setTextColor(230, 46, 4);
-      doc.text('Metadone', 25, y);
-      y += 8;
-      doc.setFontSize(10);
-      doc.setTextColor(80, 80, 80);
-      
-      Object.entries(transaction.metadata).forEach(([key, value]) => {
-        if (typeof value === 'object') {
-          doc.text(`${key}: ${JSON.stringify(value).substring(0, 60)}`, 25, y);
-        } else {
-          doc.text(`${key}: ${value}`, 25, y);
-        }
-        y += 5;
-        if (y > 270) {
-          doc.addPage();
-          y = 20;
-        }
-      });
+      doc.text(`Nom: ${payer.full_name || ''}`, 25, y);
     }
 
     // Pye paj
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text('Reçu sa a valab kòm prèv peman. Mesi pou konfyans ou.', pageWidth / 2, 285, { align: 'center' });
+    doc.text('Ce reçu est valable comme preuve de paiement.', pageWidth / 2, 285, { align: 'center' });
 
-    // Anrejistre PDF la
     doc.save(`hatex-recu-${transaction.id.slice(0,8)}.pdf`);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#06070d] flex items-center justify-center">
-        <div className="text-green-500 font-black animate-pulse text-xl">Chajman done yo...</div>
+        <div className="text-green-500 font-black animate-pulse text-xl">Chargement...</div>
       </div>
     );
   }
@@ -177,38 +182,34 @@ function SuccessContent() {
     return (
       <div className="min-h-screen bg-[#06070d] flex items-center justify-center p-6">
         <div className="bg-red-600/10 border border-red-600/30 p-10 rounded-[3rem] text-center max-w-md">
-          <h2 className="text-2xl font-black text-red-500 mb-4">Erè</h2>
-          <p className="text-zinc-400">{error || 'Tranzaksyon pa jwenn.'}</p>
+          <h2 className="text-2xl font-black text-red-500 mb-4">Erreur</h2>
+          <p className="text-zinc-400">{error || 'Transaction non trouvée.'}</p>
         </div>
       </div>
     );
   }
 
-  const amount = transaction.amount || parseFloat(amountParam) || 0;
-
   return (
-    <div className="min-h-screen bg-[#06070d] flex items-center justify-center p-6 selection:bg-green-500/30">
+    <div className="min-h-screen bg-[#06070d] flex items-center justify-center p-6">
       <div className="w-full max-w-[600px] bg-[#0d0e1a] p-10 md:p-14 rounded-[4rem] border border-white/5 shadow-2xl relative overflow-hidden italic text-white">
-        
-        {/* GLOW EFFECT */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-green-600/10 blur-[100px] rounded-full"></div>
         
         <div className="relative z-10 text-center">
           <div className="flex justify-center mb-8">
-            <div className="bg-green-500/10 p-6 rounded-[2.5rem] border border-green-500/20 animate-in zoom-in duration-500">
+            <div className="bg-green-500/10 p-6 rounded-[2.5rem] border border-green-500/20">
               <CheckCircle2 className="text-green-500 w-16 h-16 stroke-[1.5px]" />
             </div>
           </div>
 
           <h1 className="text-4xl font-black uppercase tracking-tighter mb-2 italic">Merci ! ✅</h1>
-          <p className="text-zinc-500 text-[10px] font-bold uppercase mb-12 tracking-[0.4em] opacity-60">Transaction complétée avec succès</p>
+          <p className="text-zinc-500 text-[10px] font-bold uppercase mb-12 tracking-[0.4em]">Transaction complétée</p>
 
           {/* RECU BOX */}
-          <div className="bg-zinc-900/40 p-10 rounded-[3rem] mb-10 border border-white/5 relative">
+          <div className="bg-zinc-900/40 p-10 rounded-[3rem] mb-10 border border-white/5">
             <div className="flex justify-between items-center mb-8 pb-8 border-b border-white/5">
-              <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">Montant Payé</span>
+              <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">Montant payé</span>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-black text-white italic">{amount.toLocaleString()}</span>
+                <span className="text-4xl font-black text-white italic">{transaction.amount.toLocaleString()}</span>
                 <span className="text-xs font-black text-green-500 uppercase">HTG</span>
               </div>
             </div>
@@ -216,26 +217,16 @@ function SuccessContent() {
             <div className="space-y-5 text-left">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2 text-zinc-500">
-                  <ShieldCheck size={14} />
-                  <span className="text-[10px] font-black uppercase">Transaction ID</span>
+                  <Hash size={14} />
+                  <span className="text-[10px] font-black uppercase">Transaction</span>
                 </div>
-                <span className="text-[10px] font-mono text-white opacity-70">{transaction.id}</span>
+                <span className="text-[10px] font-mono text-white opacity-70">{transaction.id.slice(0, 12)}...</span>
               </div>
               
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2 text-zinc-500">
-                  <Hash size={14} />
-                  <span className="text-[10px] font-black uppercase">Référence lòd</span>
-                </div>
-                <span className="text-[10px] font-black text-white">
-                  {transaction.metadata?.order_id || transaction.order_id || 'N/A'}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2 text-zinc-500">
                   <Calendar size={14} />
-                  <span className="text-[10px] font-black uppercase">Dat</span>
+                  <span className="text-[10px] font-black uppercase">Date</span>
                 </div>
                 <span className="text-[10px] font-black text-white">
                   {new Date(transaction.created_at).toLocaleString('fr-HT')}
@@ -244,15 +235,33 @@ function SuccessContent() {
             </div>
           </div>
 
-          {/* Enfòmasyon machann si disponib */}
+          {/* Enfòmasyon machann ak logo */}
           {merchant && (
             <div className="bg-zinc-900/20 p-6 rounded-3xl mb-10 text-left">
-              <h3 className="text-[10px] font-black text-zinc-500 uppercase mb-4 tracking-widest flex items-center gap-2">
-                <User size={14} /> Machand
-              </h3>
-              <p className="text-sm font-bold text-white mb-2">{merchant.business_name || merchant.full_name}</p>
+              <div className="flex items-center gap-4 mb-4">
+                {merchant.avatar_url ? (
+                  <img 
+                    src={merchant.avatar_url} 
+                    alt={merchant.business_name || merchant.full_name}
+                    className="w-12 h-12 rounded-xl object-cover border border-white/10"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center">
+                    <Store size={20} className="text-zinc-500" />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                    Marchand
+                  </h3>
+                  <p className="text-sm font-bold text-white">
+                    {merchant.business_name || merchant.full_name}
+                  </p>
+                </div>
+              </div>
+              
               {merchant.email && (
-                <p className="text-[9px] text-zinc-400 flex items-center gap-2 mt-1">
+                <p className="text-[9px] text-zinc-400 flex items-center gap-2 mt-2">
                   <Mail size={12} /> {merchant.email}
                 </p>
               )}
@@ -264,27 +273,37 @@ function SuccessContent() {
             </div>
           )}
 
+          {/* Enfòmasyon kliyan si disponib */}
+          {payer && (
+            <div className="bg-zinc-900/20 p-6 rounded-3xl mb-10 text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <User size={14} className="text-zinc-500" />
+                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Client</h3>
+              </div>
+              <p className="text-sm font-bold text-white">{payer.full_name}</p>
+            </div>
+          )}
+
           {/* FOOTER MESSAGE */}
           <div className="bg-green-500/5 p-6 rounded-3xl border border-green-500/10 mb-10">
-            <p className="text-[10px] text-green-500 font-bold uppercase leading-relaxed tracking-tight">
-              Votre paiement a été vérifié. Les détails ont été enregistrés dans votre historique et celui du marchand. 
-              {transaction.metadata?.order_id && ` Lòd #${transaction.metadata.order_id} konfime.`}
+            <p className="text-[10px] text-green-500 font-bold uppercase leading-relaxed">
+              Votre paiement a été vérifié. Les détails ont été enregistrés dans votre historique et celui du marchand.
             </p>
           </div>
 
-          {/* BOUTON TELECHAJMAN RESI */}
+          {/* BOUTON RESI */}
           <button
             onClick={downloadReceipt}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-6 rounded-[2.2rem] font-black text-[12px] uppercase flex items-center justify-center gap-4 transition-all active:scale-[0.98] shadow-2xl mb-4"
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-6 rounded-[2.2rem] font-black text-[12px] uppercase flex items-center justify-center gap-4 transition-all mb-4"
           >
-            <Download size={18} /> Telechaje resi
+            <Download size={18} /> Télécharger reçu
           </button>
 
           <button 
             onClick={() => router.push('/')}
-            className="w-full bg-white text-black py-7 rounded-[2.2rem] font-black text-[12px] uppercase flex items-center justify-center gap-4 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-2xl"
+            className="w-full bg-white text-black py-7 rounded-[2.2rem] font-black text-[12px] uppercase flex items-center justify-center gap-4 hover:bg-zinc-200 transition-all"
           >
-            <ShoppingBag size={18} /> Retour au Portail
+            <ShoppingBag size={18} /> Retour à l'accueil
           </button>
 
           <p className="mt-14 text-[8px] text-zinc-800 font-black uppercase tracking-[0.6em] opacity-50">
@@ -298,7 +317,7 @@ function SuccessContent() {
 
 export default function SuccessPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#06070d] flex items-center justify-center text-green-500 font-black animate-pulse">FINALISATION...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#06070d] flex items-center justify-center text-green-500 font-black">Chargement...</div>}>
       <SuccessContent />
     </Suspense>
   );
