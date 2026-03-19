@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { CreditCard, Calendar, Lock, AlertCircle, Loader2, Store, CheckSquare, Square } from 'lucide-react';
+import { CreditCard, Calendar, Lock, AlertCircle, Loader2, Store, CheckSquare, Square, History } from 'lucide-react';
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -19,12 +19,26 @@ function CheckoutContent() {
   const [cardCvv, setCardCvv] = useState('');
   const [saveCard, setSaveCard] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [savedCards, setSavedCards] = useState<any[]>([]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  // Load saved cards from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('hatex_saved_cards');
+    if (stored) {
+      try {
+        setSavedCards(JSON.parse(stored));
+      } catch (e) {
+        console.error('Error parsing saved cards:', e);
+      }
+    }
+  }, []);
+
+  // Token validation
   useEffect(() => {
     async function validateToken() {
       if (!token) {
@@ -36,7 +50,6 @@ function CheckoutContent() {
       try {
         console.log('🔍 Verifikasyon token an:', token);
         
-        // 1. Tcheke token an
         const { data: tokenData, error: tokenError } = await supabase
           .from('payment_tokens')
           .select('merchant_id, expires_at')
@@ -60,7 +73,6 @@ function CheckoutContent() {
   
         console.log('✅ Token bon, merchant_id:', tokenData.merchant_id);
   
-        // 2. Chache machann nan
         const { data: merchantData, error: merchantError } = await supabase
           .from('profiles')
           .select('id, api_key, business_name, full_name, avatar_url')
@@ -105,6 +117,14 @@ function CheckoutContent() {
     return v;
   };
 
+  // Load a saved card (only for display – never auto-fill full number or CVV)
+  const loadSavedCard = (last4: string) => {
+    // In a real secure implementation, you would have a token from your payment processor
+    // Here, we just show an example – never store full PAN or CVV client-side!
+    alert(`Demo: Sèvi ak kat ki fini pa ${last4}. Tanpri antre CVV la ankò pou sekirite.`);
+    // You could pre-fill the last 4 digits for display, but never the full number
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -142,6 +162,7 @@ function CheckoutContent() {
         merchant_name: merchant.business_name || merchant.full_name,
         merchant_logo: merchant.avatar_url,
         save_card: saveCard,
+        card_last4: cleanCard.slice(-4), // Store only last 4 for reference
       },
     };
 
@@ -175,6 +196,20 @@ function CheckoutContent() {
       }
 
       if (data.success) {
+        // If user wants to save card, store only last 4 digits and expiry (no CVV!)
+        if (saveCard) {
+          const cardInfo = {
+            id: Date.now().toString(),
+            last4: cleanCard.slice(-4),
+            expiry: cardExpiry,
+            brand: 'Visa/MC', // You could detect card type
+          };
+          const updated = [...savedCards, cardInfo].slice(-3); // Keep only last 3
+          localStorage.setItem('hatex_saved_cards', JSON.stringify(updated));
+          setSavedCards(updated);
+        }
+
+        // REDIREKSYON AN – SA A ENPÒTAN!
         router.push(`/checkout/success?id=${data.transaction_id}`);
       } else {
         setError(data.message || 'Peman an echwe.');
@@ -239,6 +274,34 @@ function CheckoutContent() {
           </p>
         </div>
 
+        {/* Saved cards section (if any) */}
+        {savedCards.length > 0 && (
+          <div className="mb-6 bg-white/5 rounded-xl p-4 border border-white/10">
+            <div className="flex items-center gap-2 mb-3">
+              <History size={16} className="text-zinc-500" />
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider">Kat itilize avan</span>
+            </div>
+            <div className="space-y-2">
+              {savedCards.map((card) => (
+                <button
+                  key={card.id}
+                  onClick={() => loadSavedCard(card.last4)}
+                  className="w-full flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/5 hover:border-red-600/30 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <CreditCard size={16} className="text-red-600" />
+                    <span className="text-sm text-white">•••• {card.last4}</span>
+                  </div>
+                  <span className="text-[9px] text-zinc-500">{card.expiry}</span>
+                </button>
+              ))}
+              <p className="text-[8px] text-zinc-600 mt-2 text-center">
+                Pou sekirite, ou dwe antre CVV la chak fwa.
+              </p>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 shadow-2xl">
           <div className="mb-5">
             <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider">
@@ -302,7 +365,7 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* Opsyon sonje kat la */}
+          {/* Opsyon sonje kat la (sèlman dènye 4 chif) */}
           <div className="mb-6">
             <button
               type="button"
@@ -314,8 +377,11 @@ function CheckoutContent() {
               ) : (
                 <Square className="w-5 h-5 text-gray-500" />
               )}
-              <span className="text-sm">Sonje enfòmasyon kat sa pou pwochen fwa</span>
+              <span className="text-sm">Sonje kat sa pou pwochen fwa (sèlman dènye 4 chif)</span>
             </button>
+            <p className="text-[8px] text-zinc-600 mt-1">
+              CVV pap janm estoke. Ou dwe antre l chak fwa.
+            </p>
           </div>
 
           {error && (
