@@ -27,8 +27,6 @@ export default function TransactionsPage() {
           .order('created_at', { ascending: false });
 
         if (!error) {
-          // Nou filtre pou retire vye kopi tranzaksyon manyèl yo si yo te egziste nan baz la
-          // Nou sèlman kite sa ki gen yon description ki kòmanse ak "TRANSFÈ" oswa lòt kalite yo
           setTransactions(data || []);
         }
       }
@@ -37,18 +35,29 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [supabase]);
 
-  // FONKSYON POU KACHE MITAN EMAIL LA (dor.....@gmail.com)
   const maskEmail = (email: string) => {
     if (!email || !email.includes('@')) return "";
     const [name, domain] = email.split('@');
-    // Si se yon email sistèm oswa li twò kout, nou pa maske l menm jan an
     if (name.length <= 3) return `${name}...@${domain}`;
     return `${name.substring(0, 3)}.....@${domain}`;
   };
 
+  // FONKSYON POU DESKRIPSYON KI PRIYORIZE NON BIZNIS LA
+  const getDynamicDescription = (t: any) => {
+    // Si se yon LAVANT (pou machann nan)
+    if (t.type === 'SALE') {
+      return `VANT BAY ${t.metadata?.customer_name || 'KLIYAN'}`;
+    }
+    // Si se yon ACHA (pou kliyan an)
+    if (t.type === 'PAYMENT') {
+      // Isit la nou pran non biznis la ki nan metadata a
+      const businessName = t.metadata?.merchant_name || 'BIZNIS';
+      return `ACHA NAN ${businessName.toUpperCase()}`;
+    }
+    return t.description || t.type;
+  };
+
   const filteredTransactions = transactions.filter(t => {
-    // Sekirite: Nou retire tranzaksyon ki gen deskripsyon "Voye bay..." oswa "Resevwa nan men yon zanmi" 
-    // paske se yo ki te konn fè doub la. Nou sèlman gade sa RPC a kreye.
     const isManualOldRecord = t.description?.includes("Voye bay") || t.description?.includes("Resevwa nan men yon zanmi");
     if (isManualOldRecord && t.type === 'TRANSFER') return false;
 
@@ -56,7 +65,7 @@ export default function TransactionsPage() {
     if (activeTab === 'DEPO') return t.type === 'DEPOSIT';
     if (activeTab === 'TRANSFER') return t.type === 'P2P' || t.type === 'TRANSFER';
     if (activeTab === 'RETRÈ') return t.type === 'WITHDRAWAL';
-    if (activeTab === 'KAT') return t.type === 'CARD_RECHARGE' || t.type === 'PAYMENT';
+    if (activeTab === 'KAT') return t.type === 'CARD_RECHARGE' || t.type === 'PAYMENT' || t.type === 'SALE';
     return true;
   });
 
@@ -73,6 +82,7 @@ export default function TransactionsPage() {
       case 'WITHDRAWAL': return '📤';
       case 'CARD_RECHARGE': return '💳';
       case 'PAYMENT': return '🛍️';
+      case 'SALE': return '💰';
       case 'P2P': return '🔄';
       case 'TRANSFER': return '🔄';
       default: return amount > 0 ? '➕' : '➖';
@@ -81,7 +91,6 @@ export default function TransactionsPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic pb-24">
-      {/* HEADER */}
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => router.back()} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800 active:scale-95">
           <span className="text-xl">←</span>
@@ -89,7 +98,6 @@ export default function TransactionsPage() {
         <h1 className="text-lg font-black uppercase tracking-widest text-red-600">Istorik</h1>
       </div>
 
-      {/* TABS */}
       <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar">
         {tabs.map((tab) => (
           <button
@@ -124,16 +132,16 @@ export default function TransactionsPage() {
                     {getIcon(t.type, t.amount)}
                   </div>
                   <div>
-                    {/* NON KLIYAN AN ANLE */}
                     <h3 className="text-[11px] font-black uppercase tracking-tight text-zinc-100">
-                      {t.description}
+                      {getDynamicDescription(t)}
                     </h3>
-                    {/* EMAIL LA TOUT PITI ANBA L */}
-                    {t.user_email && (
-                      <p className="text-[9px] text-zinc-500 font-bold lowercase mt-0.5">
-                        {maskEmail(t.user_email)}
-                      </p>
-                    )}
+                    
+                    <p className="text-[9px] text-zinc-500 font-bold lowercase mt-0.5">
+                      {t.type === 'SALE' 
+                        ? (t.metadata?.customer_email ? maskEmail(t.metadata.customer_email) : 'Kliyan Hatex') 
+                        : (t.metadata?.merchant_email ? maskEmail(t.metadata.merchant_email) : maskEmail(t.user_email))}
+                    </p>
+
                     <p className="text-[9px] text-zinc-600 font-bold mt-1 uppercase">
                       {formatDate(t.created_at)} • 
                       <span className={['success', 'approved', 'completed'].includes(t.status) ? 'text-green-500' : 'text-orange-500'}> {t.status}</span>
@@ -147,7 +155,7 @@ export default function TransactionsPage() {
                     <span className="text-[8px] ml-1">HTG</span>
                   </p>
                   <p className="text-[7px] text-zinc-700 font-black uppercase tracking-widest mt-1">
-                    {t.type === 'P2P' ? 'TRANSFER' : t.type}
+                    {t.type === 'SALE' ? 'LAVANT' : (t.type === 'PAYMENT' ? 'ACHA' : t.type)}
                   </p>
                 </div>
               </div>
