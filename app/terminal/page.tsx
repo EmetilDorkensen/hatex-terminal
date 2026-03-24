@@ -1851,37 +1851,43 @@ Vèsyon 2.0 - Fòmilè kat entegre
                   </div>
 
                   <div className="text-right flex-shrink-0">
-                    <div className="text-lg font-black italic text-green-400">
-                      {parseFloat(inv.amount).toLocaleString()} HTG
-                    </div>
-                    <div className="flex items-center gap-2 justify-end mt-2">
-                      {inv.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => handleMarkInvoiceAsPaid(inv.id)}
-                            className="p-2 bg-green-600/20 rounded-xl hover:bg-green-600/40 transition-all"
-                            title="Make as paid"
-                          >
-                            <CheckSquare size={14} className="text-green-400" />
-                          </button>
-                          <button
-                            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/pay/${inv.id}`)}
-                            className="p-2 bg-blue-600/20 rounded-xl hover:bg-blue-600/40 transition-all"
-                            title="Copy payment link"
-                          >
-                            <Copy size={14} className="text-blue-400" />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleDeleteInvoice(inv.id)}
-                        className="p-2 bg-red-600/20 rounded-xl hover:bg-red-600/40 transition-all"
-                        title="Delete"
-                      >
-                        <Trash2 size={14} className="text-red-400" />
-                      </button>
-                    </div>
-                  </div>
+  <div className="text-lg font-black italic text-green-400">
+    {parseFloat(inv.amount).toLocaleString()} HTG
+  </div>
+  <div className="flex items-center gap-2 justify-end mt-2">
+    {inv.status === 'pending' && (
+      <>
+        <button
+          onClick={() => handleMarkInvoiceAsPaid(inv.id)}
+          className="p-2 bg-green-600/20 rounded-xl hover:bg-green-600/40 transition-all"
+          title="Make as paid"
+        >
+          <CheckSquare size={14} className="text-green-400" />
+        </button>
+
+        {/* NOUVO BOUTON KOPYE A KI KORIJE */}
+        <button
+          onClick={() => {
+            const paymentLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
+            navigator.clipboard.writeText(paymentLink);
+            alert("Lyen peman an kopye nan clipboard ou!");
+          }}
+          className="p-2 bg-blue-600/20 rounded-xl hover:bg-blue-600/40 transition-all"
+          title="Copy payment link"
+        >
+          <Copy size={14} className="text-blue-400" />
+        </button>
+      </>
+    )}
+    <button
+      onClick={() => handleDeleteInvoice(inv.id)}
+      className="p-2 bg-red-600/20 rounded-xl hover:bg-red-600/40 transition-all"
+      title="Delete"
+    >
+      <Trash2 size={14} className="text-red-400" />
+    </button>
+  </div>
+</div>
                 </div>
               </div>
             ))}
