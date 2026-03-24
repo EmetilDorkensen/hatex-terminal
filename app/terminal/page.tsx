@@ -358,45 +358,54 @@ export default function TerminalPage() {
   }, [transactions, invoices]);
 
   // ============================================================
-  // STATISTIK ESPESYAL POU QR KÒD
+  // STATISTIK ESPESYAL POU QR KÒD (KÒRIJE POU EDGE FUNCTION)
   // ============================================================
   const qrTransactions = useMemo(() => {
     return transactions.filter(tx => 
       tx.type === 'SALE' && 
       tx.status === 'success' && 
-      tx.metadata?.platform === 'qr'
+      // Lojik sa a tcheke ni nouvo metòd la, ni ansyen an, ni deskripsyon an pou sekirite
+      (
+        tx.metadata?.payment_method === 'qrcode' || 
+        tx.metadata?.platform === 'qr' || 
+        tx.description?.toLowerCase().includes('qr')
+      )
     );
   }, [transactions]);
 
   const qrStats = useMemo(() => {
     const now = new Date();
-    const today = now.toDateString();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const todayStr = now.toDateString();
+    
+    // Kalkile limit 24h la (sa gen 24h presizeman)
+    const last24hLimit = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
     const total = qrTransactions.reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
     
     const thisMonth = qrTransactions
-      .filter(tx => new Date(tx.created_at).getMonth() === now.getMonth())
+      .filter(tx => new Date(tx.created_at).getMonth() === now.getMonth() && new Date(tx.created_at).getFullYear() === now.getFullYear())
       .reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
     
     const todayTotal = qrTransactions
-      .filter(tx => new Date(tx.created_at).toDateString() === today)
+      .filter(tx => new Date(tx.created_at).toDateString() === todayStr)
       .reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
     
-    const last24h = qrTransactions
-      .filter(tx => new Date(tx.created_at) >= yesterday)
+    const last24hTotal = qrTransactions
+      .filter(tx => new Date(tx.created_at) >= last24hLimit)
       .reduce((s, tx) => s + (parseFloat(tx.amount) || 0), 0);
 
     return {
       total,
       thisMonth,
       today: todayTotal,
-      last24h,
+      last24h: last24hTotal,
       count: qrTransactions.length
     };
   }, [qrTransactions]);
 
+  // ============================================================
+  // FILTRE INVOICES AK RECENT SALES (RETE MENM JAN)
+  // ============================================================
   const filteredInvoices = useMemo(() => {
     let filtered = [...invoices];
     
@@ -409,10 +418,10 @@ export default function TerminalPage() {
       const today = now.toDateString();
       filtered = filtered.filter(inv => new Date(inv.created_at).toDateString() === today);
     } else if (dateRange === 'week') {
-      const weekAgo = new Date(now.setDate(now.getDate() - 7));
+      const weekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
       filtered = filtered.filter(inv => new Date(inv.created_at) >= weekAgo);
     } else if (dateRange === 'month') {
-      const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
+      const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
       filtered = filtered.filter(inv => new Date(inv.created_at) >= monthAgo);
     }
     
@@ -432,8 +441,8 @@ export default function TerminalPage() {
       .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
       .map(tx => ({ 
         ...tx, 
-        source: 'SDK', 
-        client: tx.customer_name || tx.customer_email || 'Kliyan SDK' 
+        source: tx.metadata?.payment_method === 'qrcode' ? 'QR' : 'SDK', 
+        client: tx.metadata?.customer_name || tx.customer_name || tx.customer_email || 'Kliyan Hatex' 
       }));
       
     const inv = invoices
@@ -1139,128 +1148,129 @@ Vèsyon 2.0 - Fòmilè kat entegre
           )}
         </div>
 
-        {/* Revenue Table - QR Payments */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden">
-          <div className="p-8 border-b border-white/5">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="bg-red-600/10 p-4 rounded-3xl">
-                <QrCode className="text-red-600 w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black uppercase tracking-widest">Peman QR Kòd</h3>
-                <p className="text-[10px] text-zinc-500 font-bold">Revni an tan reyèl</p>
-              </div>
-            </div>
+{/* Revenue Table - QR Payments */}
+<div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden">
+  <div className="p-8 border-b border-white/5">
+    <div className="flex items-center gap-4 mb-8">
+      <div className="bg-red-600/10 p-4 rounded-3xl">
+        <QrCode className="text-red-600 w-6 h-6" />
+      </div>
+      <div>
+        <h3 className="text-lg font-black uppercase tracking-widest">Peman QR Kòd</h3>
+        <p className="text-[10px] text-zinc-500 font-bold italic">Revni an tan reyèl depi Edge Function</p>
+      </div>
+    </div>
 
-            {/* 4 Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Total QR */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-blue-400 mb-2">
-                  <DollarSign size={16} />
-                  <span className="text-[9px] font-black uppercase">Total QR</span>
-                </div>
-                <div className="text-2xl font-black text-white">
-                  {qrStats.total.toLocaleString()}
-                </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-              </div>
-
-              {/* Mwa sa a */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                  <Calendar size={16} />
-                  <span className="text-[9px] font-black uppercase">Mwa sa a</span>
-                </div>
-                <div className="text-2xl font-black text-white">
-                  {qrStats.thisMonth.toLocaleString()}
-                </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-              </div>
-
-              {/* Jodi a */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-amber-400 mb-2">
-                  <Clock size={16} />
-                  <span className="text-[9px] font-black uppercase">Jodi a</span>
-                </div>
-                <div className="text-2xl font-black text-white">
-                  {qrStats.today.toLocaleString()}
-                </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-              </div>
-
-              {/* Dènye 24h */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-purple-400 mb-2">
-                  <TrendingUp size={16} />
-                  <span className="text-[9px] font-black uppercase">Dènye 24h</span>
-                </div>
-                <div className="text-2xl font-black text-white">
-                  {qrStats.last24h.toLocaleString()}
-                </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lis dènye tranzaksyon QR */}
-          <div className="p-8 border-t border-white/5">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <History size={16} className="text-zinc-500" />
-                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
-                  Dènye Peman QR
-                </span>
-              </div>
-              <span className="text-[8px] bg-red-600/10 text-red-400 px-2 py-1 rounded-full font-black">
-                {qrStats.count} tranzaksyon
-              </span>
-            </div>
-
-            {qrTransactions.length > 0 ? (
-              <div className="space-y-2">
-                {qrTransactions.slice(0, 5).map((tx: any) => {
-                  const customerName = tx.metadata?.customer_name || tx.metadata?.customer_display || 'Kliyan';
-                  const initials = getInitials(customerName);
-                  const colorCls = getInitialColor(customerName);
-                  return (
-                    <div key={tx.id} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-red-600/20 transition-all">
-                      <div className={`w-9 h-9 ${colorCls} rounded-xl flex items-center justify-center font-black text-[10px] text-white flex-shrink-0`}>
-                        {initials}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold text-white truncate">
-                          {customerName}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[8px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded-full font-black">
-                            QR
-                          </span>
-                          <span className="text-[9px] text-zinc-600">
-                            {formatDate(tx.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-black text-green-400">
-                          +{parseFloat(tx.amount).toLocaleString()}
-                        </div>
-                        <div className="text-[8px] text-zinc-600 font-bold">HTG</div>
-                      </div>
-                      <ArrowUpRight size={13} className="text-zinc-700" />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-black/20 rounded-2xl border border-dashed border-white/5">
-                <QrCode size={28} className="mx-auto mb-2 text-zinc-800" />
-                <p className="text-[10px] font-black uppercase text-zinc-700">Pa gen peman QR ankò</p>
-              </div>
-            )}
-          </div>
+    {/* 4 Stats Cards */}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Total QR */}
+      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-2 text-blue-400 mb-2">
+          <DollarSign size={16} />
+          <span className="text-[9px] font-black uppercase">Total QR</span>
         </div>
+        <div className="text-2xl font-black text-white">
+          {qrStats.total.toLocaleString()}
+        </div>
+        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+      </div>
+
+      {/* Mwa sa a */}
+      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-2 text-emerald-400 mb-2">
+          <Calendar size={16} />
+          <span className="text-[9px] font-black uppercase">Mwa sa a</span>
+        </div>
+        <div className="text-2xl font-black text-white">
+          {qrStats.thisMonth.toLocaleString()}
+        </div>
+        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+      </div>
+
+      {/* Jodi a */}
+      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-2 text-amber-400 mb-2">
+          <Clock size={16} />
+          <span className="text-[9px] font-black uppercase">Jodi a</span>
+        </div>
+        <div className="text-2xl font-black text-white">
+          {qrStats.today.toLocaleString()}
+        </div>
+        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+      </div>
+
+      {/* Dènye 24h */}
+      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-2 text-purple-400 mb-2">
+          <TrendingUp size={16} />
+          <span className="text-[9px] font-black uppercase">Dènye 24h</span>
+        </div>
+        <div className="text-2xl font-black text-white">
+          {qrStats.last24h.toLocaleString()}
+        </div>
+        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+      </div>
+    </div>
+  </div>
+
+  {/* Lis dènye tranzaksyon QR */}
+  <div className="p-8 border-t border-white/5">
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-2">
+        <History size={16} className="text-zinc-500" />
+        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+          Dènye Peman QR
+        </span>
+      </div>
+      <span className="text-[8px] bg-red-600/10 text-red-400 px-2 py-1 rounded-full font-black uppercase">
+        {qrStats.count} tranzaksyon QR
+      </span>
+    </div>
+
+    {qrTransactions.length > 0 ? (
+      <div className="space-y-2">
+        {qrTransactions.slice(0, 5).map((tx: any) => {
+          {/* NOUVO: Nou rale non kliyan an nan metadata Edge Function nan */}
+          const customerName = tx.metadata?.customer_name || 'Kliyan Hatex';
+          const initials = customerName.substring(0, 2).toUpperCase();
+          
+          return (
+            <div key={tx.id} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-red-600/20 transition-all">
+              <div className="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center font-black text-[10px] text-zinc-400 flex-shrink-0">
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-white truncate uppercase italic">
+                  {customerName}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[8px] bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded-full font-black tracking-tighter">
+                    QR SCAN
+                  </span>
+                  <span className="text-[9px] text-zinc-600 font-bold">
+                    {new Date(tx.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-black text-green-400">
+                  +{parseFloat(tx.amount).toLocaleString()}
+                </div>
+                <div className="text-[8px] text-zinc-600 font-bold">HTG</div>
+              </div>
+              <ArrowUpRight size={13} className="text-zinc-700" />
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="text-center py-12 bg-black/20 rounded-[2.5rem] border border-dashed border-white/5">
+        <QrCode size={32} className="mx-auto mb-3 text-zinc-800 opacity-20" />
+        <p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest italic">Pa gen okenn vant QR detekte</p>
+      </div>
+    )}
+  </div>
+</div>
 
         {/* Invoice Revenue Table */}
         <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden mt-8">
