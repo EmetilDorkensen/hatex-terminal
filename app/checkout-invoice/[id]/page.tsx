@@ -47,14 +47,12 @@ export default function InvoiceCheckout() {
     e.preventDefault();
     setPayLoading(true);
     setMessage({ type: '', text: '' });
-
-    if (!cardInfo.cardNumber || !cardInfo.cardExpiry || !cardInfo.cardCvv) {
-      setMessage({ type: 'error', text: 'Tanpri ranpli tout enfòmasyon kat la.' });
-      setPayLoading(false);
-      return;
-    }
-
+  
+    // Netwaye nimewo kat la (retire espas si genyen)
+    const cleanCardNumber = cardInfo.cardNumber.replace(/\s+/g, '');
+  
     try {
+      // ITILIZE URL SA A KI PLI SEKIRIZE
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/pay-invoice`, {
         method: 'POST',
         headers: { 
@@ -63,21 +61,22 @@ export default function InvoiceCheckout() {
         },
         body: JSON.stringify({
           invoice_id: id,
-          card_number: cardInfo.cardNumber,
+          card_number: cleanCardNumber,
           card_cvv: cardInfo.cardCvv,
           card_expiry: cardInfo.cardExpiry
         }),
       });
-
+  
       const result = await response.json();
-
+  
       if (result.success) {
-        router.push(`/success?id=${result.transaction_id}&type=invoice`);
+        // Si sa mache, voye l sou paj siksè a
+        router.push(`/success?id=${result.transaction_id || id}&type=invoice`);
       } else {
         setMessage({ type: 'error', text: result.message || 'Peman an echwe.' });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'Erè koneksyon ak rezo a.' });
+      setMessage({ type: 'error', text: 'Erè koneksyon ak tèminal peman an.' });
     } finally {
       setPayLoading(false);
     }
