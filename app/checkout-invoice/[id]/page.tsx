@@ -29,10 +29,17 @@ export default function InvoiceCheckout() {
       console.log("ID w ap chèche a se:", id); // Verifye si ID a parèt nan konsòl la
   
       const { data, error } = await supabase
-        .from('invoices')
-        .select('*, profiles(business_name, full_name, avatar_url)')
-        .eq('id', id)
-        .single();
+      .from('invoices')
+      .select(`
+        *,
+        profiles:merchant_id (
+          business_name,
+          full_name,
+          avatar_url
+        )
+      `)
+      .eq('id', id)
+      .single();
   
       if (error) {
         console.error("Erè detaye Supabase:", error.message, error.details);
