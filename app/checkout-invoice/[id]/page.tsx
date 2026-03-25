@@ -26,29 +26,27 @@ export default function InvoiceCheckout() {
 
   useEffect(() => {
     async function getInvoice() {
-      console.log("ID w ap chèche a se:", id); // Verifye si ID a parèt nan konsòl la
-  
-      const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        profiles:merchant_id (
-          business_name,
-          full_name,
-          avatar_url
-        )
-      `)
-      .eq('id', id)
-      .single();
-  
-      if (error) {
-        console.error("Erè detaye Supabase:", error.message, error.details);
-        setMessage({ type: 'error', text: `Erè: ${error.message}` });
-      } else if (!data) {
-        setMessage({ type: 'error', text: 'Invoice sa a pa egziste nan baz done a.' });
-      } else {
-        setInvoice(data);
+      // Nou mande done yo nan de (2) etap pou n evite erè "Relationship not found"
+      const { data: invData, error: invError } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', id)
+        .single();
+    
+      if (invError || !invData) {
+        setMessage({ type: 'error', text: 'Invoice sa a pa egziste.' });
+        setLoading(false);
+        return;
       }
+    
+      // Koulye a nou rale pwofil machann nan separeman
+      const { data: profData } = await supabase
+        .from('profiles')
+        .select('business_name, full_name, avatar_url')
+        .eq('id', invData.merchant_id) // Oswa invData.user_id si se sa l rele
+        .single();
+    
+      setInvoice({ ...invData, profiles: profData });
       setLoading(false);
     }
     if (id) getInvoice();
