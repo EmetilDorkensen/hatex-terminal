@@ -26,21 +26,25 @@ export default function InvoiceCheckout() {
 
   useEffect(() => {
     async function getInvoice() {
-      // NOUVO: Nou ajoute "avatar_url" nan demann lan
+      console.log("ID w ap chèche a se:", id); // Verifye si ID a parèt nan konsòl la
+  
       const { data, error } = await supabase
         .from('invoices')
         .select('*, profiles(business_name, full_name, avatar_url)')
         .eq('id', id)
         .single();
-
-      if (error || !data) {
-        setMessage({ type: 'error', text: 'Enfòmasyon sa a pa egziste.' });
+  
+      if (error) {
+        console.error("Erè detaye Supabase:", error.message, error.details);
+        setMessage({ type: 'error', text: `Erè: ${error.message}` });
+      } else if (!data) {
+        setMessage({ type: 'error', text: 'Invoice sa a pa egziste nan baz done a.' });
       } else {
         setInvoice(data);
       }
       setLoading(false);
     }
-    getInvoice();
+    if (id) getInvoice();
   }, [id, supabase]);
 
   const handlePayment = async (e: React.FormEvent) => {
