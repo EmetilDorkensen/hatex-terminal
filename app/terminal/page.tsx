@@ -1148,6 +1148,36 @@ Vèsyon 2.0 - Fòmilè kat entegre
           )}
         </div>
 
+
+{/* BOUTON DASHBOARD KI PA BAY ERÈ */}
+<button
+  onClick={() => router.push('/dashboard/subscriptions')}
+  className="w-full bg-white text-black py-5 rounded-[2.2rem] font-black uppercase text-[11px] tracking-widest flex items-center justify-center gap-3 hover:bg-zinc-200 transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] group mt-6 active:scale-95"
+>
+  {/* Ikon Grid la (asire w ou gen LayoutGrid nan import ou) */}
+  <LayoutGrid size={18} className="text-red-600" />
+  
+  <span>Dashboard Abònman</span>
+
+  {/* Flèch sa a se yon SVG, li pap janm bay erè "ArrowRight not found" */}
+  <svg 
+    width="16" 
+    height="16" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="3" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className="group-hover:translate-x-1 transition-transform"
+  >
+    <path d="M5 12h14m-7-7 7 7-7 7"/>
+  </svg>
+</button>
+
+
+
+
 {/* Revenue Table - QR Payments */}
 <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden">
   <div className="p-8 border-b border-white/5">
