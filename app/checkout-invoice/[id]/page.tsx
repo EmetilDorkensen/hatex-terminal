@@ -24,9 +24,18 @@ export default function InvoiceCheckout() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  // Fonksyon pou fòmate dat MM/YY otomatikman
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ''); // Retire sa ki pa chif
+    if (value.length > 2) {
+      value = value.substring(0, 2) + '/' + value.substring(2, 4);
+    }
+    setCardInfo({ ...cardInfo, cardExpiry: value.substring(0, 5) });
+  };
+
   useEffect(() => {
     async function getInvoice() {
-      // Nou mande done yo nan de (2) etap pou n evite erè "Relationship not found"
+      // 1. Rale Invoice la
       const { data: invData, error: invError } = await supabase
         .from('invoices')
         .select('*')
@@ -39,11 +48,11 @@ export default function InvoiceCheckout() {
         return;
       }
     
-      // Koulye a nou rale pwofil machann nan separeman
+      // 2. Rale pwofil machann nan ak owner_id (jan nou te wè nan SQL la)
       const { data: profData } = await supabase
         .from('profiles')
         .select('business_name, full_name, avatar_url')
-        .eq('id', invData.merchant_id) // Oswa invData.user_id si se sa l rele
+        .eq('id', invData.owner_id) // Nou sèvi ak owner_id isit la
         .single();
     
       setInvoice({ ...invData, profiles: profData });
@@ -57,11 +66,9 @@ export default function InvoiceCheckout() {
     setPayLoading(true);
     setMessage({ type: '', text: '' });
   
-    // Netwaye nimewo kat la (retire espas si genyen)
     const cleanCardNumber = cardInfo.cardNumber.replace(/\s+/g, '');
   
     try {
-      // ITILIZE URL SA A KI PLI SEKIRIZE
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/pay-invoice`, {
         method: 'POST',
         headers: { 
@@ -72,15 +79,15 @@ export default function InvoiceCheckout() {
           invoice_id: id,
           card_number: cleanCardNumber,
           card_cvv: cardInfo.cardCvv,
-          card_expiry: cardInfo.cardExpiry
+          card_expiry: cardInfo.cardExpiry // Sa ap voye l ak slach la (egz: 01/30)
         }),
       });
   
       const result = await response.json();
   
       if (result.success) {
-        // Si sa mache, voye l sou paj siksè a
-        router.push(`/success?id=${result.transaction_id || id}&type=invoice`);
+        // Redireksyon sou paj siksè ki anndan folder checkout-invoice la
+        router.push(`/checkout-invoice/success?id=${id}`);
       } else {
         setMessage({ type: 'error', text: result.message || 'Peman an echwe.' });
       }
@@ -97,35 +104,28 @@ export default function InvoiceCheckout() {
     </div>
   );
 
-  if (!invoice) return (
-    <div className="min-h-screen bg-[#06070d] flex items-center justify-center text-white p-4">
-      <div className="bg-[#0d0e1a] p-8 rounded-[2rem] border border-white/5 text-center">
-        <AlertCircle className="text-red-500 mx-auto mb-4 w-12 h-12" />
-        <p className="font-black italic uppercase text-lg text-zinc-400">{message.text || 'Invoice pa jwenn'}</p>
-      </div>
-    </div>
-  );
-
-  const merchantName = invoice.profiles?.business_name || invoice.profiles?.full_name;
-  const merchantLogo = invoice.profiles?.avatar_url;
+  const merchantName = invoice?.profiles?.business_name || invoice?.profiles?.full_name || "Boutik Machann";
+  const merchantLogo = invoice?.profiles?.avatar_url;
 
   return (
     <div className="min-h-screen bg-[#06070d] text-white p-4 flex items-center justify-center italic">
       <div className="w-full max-w-[500px] bg-[#0d0e1a] border border-white/5 rounded-[3rem] p-8 shadow-2xl relative">
         <div className="text-center mb-6">
           
-          {/* NOUVO: Afichaj Logo Machann nan oswa ikon default la si l pa gen logo */}
-          {merchantLogo ? (
-            <img 
-              src={merchantLogo} 
-              alt={merchantName} 
-              className="w-20 h-20 rounded-3xl object-cover mx-auto mb-4 border-2 border-white/10 shadow-lg"
-            />
-          ) : (
-            <div className="bg-red-600/10 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-red-600/20 shadow-lg">
-              <Receipt className="text-red-600 w-10 h-10" />
-            </div>
-          )}
+          {/* Afichaj Logo ak Non Boutik */}
+          <div className="relative w-24 h-24 mx-auto mb-4">
+            {merchantLogo ? (
+              <img 
+                src={merchantLogo} 
+                alt={merchantName} 
+                className="w-full h-full rounded-[2rem] object-cover border-2 border-white/10 shadow-lg"
+              />
+            ) : (
+              <div className="bg-red-600/10 w-full h-full rounded-[2rem] flex items-center justify-center border border-red-600/20 shadow-lg">
+                <Store className="text-red-600 w-10 h-10" />
+              </div>
+            )}
+          </div>
 
           <h1 className="text-2xl font-black uppercase tracking-tighter text-white">{merchantName}</h1>
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Invoice #{invoice.id.split('-')[0]}</p>
@@ -150,51 +150,51 @@ export default function InvoiceCheckout() {
         </div>
 
         {invoice.status === 'paid' ? (
-          <div className="bg-green-600/10 border border-green-600/20 p-6 rounded-[1.5rem] text-center">
+          <div className="bg-green-600/10 border border-green-600/20 p-6 rounded-[1.5rem] text-center cursor-pointer" onClick={() => router.push(`/checkout-invoice/success?id=${id}`)}>
             <ShieldCheck className="text-green-500 mx-auto mb-2" size={32} />
-            <h3 className="text-green-500 font-black uppercase text-sm">Invoice sa a te deja peye</h3>
+            <h3 className="text-green-500 font-black uppercase text-sm">Peman deja fèt. Klike pou wè resi a.</h3>
           </div>
         ) : (
           <form onSubmit={handlePayment} className="space-y-4">
             <div>
-              <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2">Nimewo Kat</label>
+              <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2 ml-2">Nimewo Kat</label>
               <input 
                 type="text" 
                 maxLength={19}
-                className="w-full bg-black/50 border border-white/10 rounded-2xl px-5 py-4 text-sm font-black text-white outline-none focus:border-red-600 transition-all"
+                className="w-full bg-black/50 border border-white/10 rounded-2xl px-5 py-4 text-sm font-black text-white outline-none focus:border-red-600 transition-all shadow-inner"
                 placeholder="0000 0000 0000 0000"
                 value={cardInfo.cardNumber}
-                onChange={(e) => setCardInfo({...cardInfo, cardNumber: e.target.value})}
+                onChange={(e) => setCardInfo({...cardInfo, cardNumber: e.target.value.replace(/[^\d ]/g, '')})}
               />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2">Dat Eksp. (MM/YY)</label>
+                <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2 ml-2">Dat Eksp. (MM/YY)</label>
                 <input 
                   type="text" 
                   maxLength={5}
                   className="w-full bg-black/50 border border-white/10 rounded-2xl px-5 py-4 text-sm font-black text-white outline-none focus:border-red-600 transition-all"
-                  placeholder="12/26"
+                  placeholder="MM/YY"
                   value={cardInfo.cardExpiry}
-                  onChange={(e) => setCardInfo({...cardInfo, cardExpiry: e.target.value})}
+                  onChange={handleExpiryChange}
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2">CVV</label>
+                <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2 ml-2">CVV</label>
                 <input 
                   type="password" 
                   maxLength={4}
                   className="w-full bg-black/50 border border-white/10 rounded-2xl px-5 py-4 text-sm font-black text-white outline-none focus:border-red-600 transition-all tracking-widest"
                   placeholder="•••"
                   value={cardInfo.cardCvv}
-                  onChange={(e) => setCardInfo({...cardInfo, cardCvv: e.target.value})}
+                  onChange={(e) => setCardInfo({...cardInfo, cardCvv: e.target.value.replace(/\D/g, '')})}
                 />
               </div>
             </div>
 
             {message.text && (
-              <div className="p-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 bg-red-600/10 border border-red-600/20 text-red-500">
+              <div className="p-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 bg-red-600/10 border border-red-600/20 text-red-500 animate-pulse">
                 <AlertCircle size={16} /> {message.text}
               </div>
             )}
@@ -202,7 +202,7 @@ export default function InvoiceCheckout() {
             <button
               type="submit"
               disabled={payLoading}
-              className="w-full bg-white hover:bg-zinc-200 text-black py-5 rounded-[1.8rem] font-black text-xs uppercase transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
+              className="w-full bg-white hover:bg-zinc-200 text-black py-5 rounded-[1.8rem] font-black text-xs uppercase transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4 shadow-xl active:scale-95"
             >
               {payLoading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
               Peye {invoice.amount.toLocaleString()} HTG
