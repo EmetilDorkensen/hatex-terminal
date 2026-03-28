@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { 
   Users, CreditCard, LayoutGrid, Plus, 
   ExternalLink, Trash2, Loader2, MoreVertical,
-  TrendingUp, Calendar, Search
+  TrendingUp, Calendar, Search, ShieldCheck 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -25,15 +25,25 @@ export default function SubscriptionsDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Rale tout pwodwi machann nan kreye
+      // 1. Rale tout pwodwi machann nan
       const { data: productsData } = await supabase
         .from('products')
         .select('*')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      // 2. Rale estatistik abònman yo (Simulation pou kounye a)
-      // Nan yon etap avanse, nou pral konte sa ki nan tab 'subscriptions' la
+      // 2. Rale Estatistik reyèl pou ranplase "0" yo
+      const { data: subsData } = await supabase
+        .from('subscriptions')
+        .select('amount, status')
+        .eq('merchant_id', user.id);
+
+      if (subsData) {
+        const active = subsData.filter(s => s.status === 'completed' || s.status === 'pending_escrow').length;
+        const revenue = subsData.reduce((acc, curr) => acc + curr.amount, 0);
+        setStats({ total_revenue: revenue, active_subs: active });
+      }
+
       setProducts(productsData || []);
       setLoading(false);
     }
@@ -51,35 +61,45 @@ export default function SubscriptionsDashboard() {
     <div className="min-h-screen bg-[#06070d] text-white p-6 md:p-10 italic font-medium">
       <div className="max-w-7xl mx-auto space-y-10">
         
-        {/* HEADER AK STATS */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* HEADER AK BOUTON YO */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-10">
           <div>
             <h1 className="text-4xl font-black uppercase tracking-tighter italic">
               Dashboard <span className="text-red-600">Abònman</span>
             </h1>
-            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-2">
+            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-2 font-black">
               Jere tout sèvis rekirant ou yo yon sèl kote
             </p>
           </div>
           
-          <button 
-            onClick={() => router.push('/dashboard/subscriptions/new')}
-            className="bg-white text-black px-8 py-4 rounded-[1.8rem] font-black uppercase text-[10px] flex items-center gap-3 hover:bg-zinc-200 transition-all shadow-xl self-start"
-          >
-            <Plus size={18} /> Kreye Nivo
-          </button>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* BOUTON ESCROW (H-PAY SHIELD) */}
+            <button 
+              onClick={() => router.push('/dashboard/escrow')}
+              className="bg-orange-500/10 border border-orange-500/20 text-orange-500 px-6 py-4 rounded-[1.8rem] font-black uppercase text-[10px] flex items-center gap-3 hover:bg-orange-500 hover:text-white transition-all shadow-xl"
+            >
+              <ShieldCheck size={18} /> Kòb Bloke (Escrow)
+            </button>
+
+            <button 
+              onClick={() => router.push('/dashboard/subscriptions/new')}
+              className="bg-white text-black px-8 py-4 rounded-[1.8rem] font-black uppercase text-[10px] flex items-center gap-3 hover:bg-zinc-200 transition-all shadow-xl"
+            >
+              <Plus size={18} /> Kreye Nivo
+            </button>
+          </div>
         </div>
 
         {/* KAT STATISTIK YO */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-[#0d0e1a] border border-white/5 p-8 rounded-[2.5rem] relative overflow-hidden group">
             <TrendingUp className="absolute -right-4 -bottom-4 text-red-600/10 w-32 h-32 group-hover:scale-110 transition-transform" />
-            <p className="text-[10px] text-zinc-500 font-black uppercase mb-2">Revni Estimé (Mwa)</p>
-            <h3 className="text-3xl font-black italic">0.00 <span className="text-sm text-red-600">HTG</span></h3>
+            <p className="text-[10px] text-zinc-500 font-black uppercase mb-2">Total Revenu</p>
+            <h3 className="text-3xl font-black italic">{stats.total_revenue.toLocaleString()} <span className="text-sm text-red-600">HTG</span></h3>
           </div>
           <div className="bg-[#0d0e1a] border border-white/5 p-8 rounded-[2.5rem]">
             <p className="text-[10px] text-zinc-500 font-black uppercase mb-2">Kliyan Aktif</p>
-            <h3 className="text-3xl font-black italic">0 <span className="text-sm text-red-600">Moun</span></h3>
+            <h3 className="text-3xl font-black italic">{stats.active_subs} <span className="text-sm text-red-600">Moun</span></h3>
           </div>
           <div className="bg-[#0d0e1a] border border-white/5 p-8 rounded-[2.5rem]">
             <p className="text-[10px] text-zinc-500 font-black uppercase mb-2">Pwodwi sou Mache a</p>
@@ -111,7 +131,7 @@ export default function SubscriptionsDashboard() {
               {products.map((product) => (
                 <div key={product.id} className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-red-600/30 transition-all shadow-2xl">
                   {/* Foto a */}
-                  <div className="h-40 bg-zinc-900 relative">
+                  <div className="h-40 bg-zinc-900 relative overflow-hidden">
                     {product.image_url ? (
                       <img src={product.image_url} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
@@ -139,11 +159,13 @@ export default function SubscriptionsDashboard() {
                       </div>
                     </div>
 
+                    {/* Aksyon yo */}
                     <div className="flex gap-2">
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}/subscribe/${product.id}`);
-                          alert("Lyen kopye!");
+                          const url = `${window.location.origin}/subscribe/${product.id}`;
+                          navigator.clipboard.writeText(url);
+                          alert("Lyen kopye nan clipboard!");
                         }}
                         className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-colors border border-white/5"
                       >
