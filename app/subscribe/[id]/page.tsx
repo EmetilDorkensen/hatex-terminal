@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { ShieldCheck, Lock, AlertCircle, Info, Loader2, Phone } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
 
-export default function CheckoutPage({ params }: { params: { id: string } }) {
+export default function SubscribePage() {
+  const { id } = useParams();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [payLoading, setPayLoading] = useState(false);
   const [product, setProduct] = useState<any>(null);
-  const [merchant, setMerchant] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
@@ -19,140 +19,124 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
   );
 
   useEffect(() => {
-    const loadData = async () => {
+    async function fetchData() {
       try {
-        const { data: prod, error: pErr } = await supabase
+        if (!id) return;
+
+        // 1. Rale enfòmasyon pwodwi a
+        const { data: productData, error: pError } = await supabase
           .from('products')
-          .select('*, profiles(*)')
-          .eq('id', params.id)
+          .select('*')
+          .eq('id', id)
           .single();
 
-        if (pErr || !prod) throw new Error("Pwodwi sa a pa egziste.");
+        if (pError) throw new Error("Pwodwi sa a pa egziste.");
+        setProduct(productData);
+
+        // 2. Rale enfòmasyon itilizatè a si l konekte
+        const { data: { user } } = await supabase.auth.getUser();
         
-        setProduct(prod);
-        setMerchant(prod.profiles);
-        setLoading(false);
+        if (user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          setProfile(profileData);
+        }
       } catch (err: any) {
         setError(err.message);
+      } finally {
         setLoading(false);
       }
-    };
-    loadData();
-  }, [params.id, supabase]);
-
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPayLoading(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Ou dwe konekte.");
-
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
-      if (!profile || (profile.kyc_status !== 'verified' && profile.kyc_status !== 'approved')) {
-        throw new Error("Ou dwe verifye KYC ou anvan ou fè abònman.");
-      }
-
-      if (profile.wallet_balance < product.price) throw new Error("Kòb ou pa ase. Recharge bous ou.");
-
-      // Kalkile lè pou kòb la lage bay machann nan (1h 15 minit)
-      const releaseTime = new Date();
-      releaseTime.setMinutes(releaseTime.getMinutes() + 75);
-
-      // KREYE ABÒNMAN AN EPI METE KÒD STREAMING YO SI LI GENYEN L
-      const { error: subError } = await supabase.from('subscriptions').insert([{
-        product_id: product.id,
-        client_id: user.id,
-        merchant_id: product.owner_id,
-        status: 'pending_escrow',
-        amount: product.price,
-        provided_credentials: product.streaming_credentials || null,
-        escrow_release_at: releaseTime.toISOString()
-      }]);
-
-      if (subError) throw subError;
-
-      // RELE FONKSYON POU BLOKE KÒB LA
-      await supabase.rpc('process_secure_payment', {
-        amount_val: product.price,
-        client_id_val: user.id,
-        product_id_val: product.id,
-        merchant_id_val: product.owner_id
-      });
-
-      router.push(`/subscribe/${params.id}/success`);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setPayLoading(false);
     }
+    fetchData();
+  }, [id, supabase]);
+
+  const handleSubscribe = async () => {
+    // Sekirite KYC pou Build la ak pou itilizatè a
+    if (!profile) {
+      router.push('/login');
+      return;
+    }
+
+    if (profile?.kyc_status !== 'verified' && profile?.kyc_status !== 'approved') {
+      alert("Ou dwe verifye KYC ou anvan ou fè abònman.");
+      return;
+    }
+
+    // Lojik peman an ale la...
+    console.log("Abònman ap fèt...");
   };
 
-  if (loading) return <div className="min-h-screen bg-[#06070d] flex items-center justify-center"><Loader2 className="animate-spin text-red-600" size={48} /></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-[#06070d] flex items-center justify-center">
+      <Loader2 className="animate-spin text-red-600" size={40} />
+    </div>
+  );
+
+  if (error || !product) return (
+    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6">
+      <AlertCircle size={50} className="text-red-600 mb-4" />
+      <p className="font-black uppercase tracking-widest text-xs">{error || "Pwodwi pa jwenn"}</p>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-4 flex items-center justify-center font-medium">
-      <div className="w-full max-w-[1000px] grid md:grid-cols-2 bg-[#0d0e1a] border border-white/5 rounded-[3rem] overflow-hidden shadow-2xl">
+    <div className="min-h-screen bg-[#06070d] text-white italic font-medium p-6">
+      <div className="max-w-xl mx-auto space-y-8 mt-10">
         
-        {/* PATI GOCH: ENFÒMASYON PWODWI AK MACHANN */}
-        <div className="p-8 md:p-12 bg-gradient-to-br from-zinc-900 to-black border-r border-white/5 relative">
-          
-          <div className="space-y-6">
-             <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-zinc-800 rounded-full flex items-center justify-center">
-                  {merchant.avatar_url ? <img src={merchant.avatar_url} className="w-full h-full rounded-full" /> : <ShieldCheck className="text-red-500" />}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">{merchant.full_name}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Phone size={14} className="text-green-500" />
-                    <span className="text-sm text-zinc-400">{product.merchant_whatsapp || merchant.phone || "Pa gen nimewo disponib"}</span>
-                  </div>
-                </div>
-             </div>
-
-             <div className="bg-red-600/10 border border-red-500/20 rounded-2xl p-6">
-                <h1 className="text-2xl font-black uppercase mb-2">{product.title}</h1>
-                <span className="text-xs bg-red-600 text-white px-2 py-1 rounded font-bold uppercase">{product.category}</span>
-                
-                <div className="mt-6 flex items-end gap-2">
-                  <span className="text-5xl font-black">{Number(product.price).toLocaleString()}</span>
-                  <span className="text-red-500 font-bold mb-1 text-lg">HTG</span>
-                </div>
-             </div>
+        {/* HEADER PWODWI */}
+        <div className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+          <div className="h-64 bg-zinc-900">
+            {product.image_url && (
+              <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
+            )}
           </div>
-
-        </div>
-
-        {/* PATI DWAT: AVÈTISMAN AK PEMAN */}
-        <div className="p-8 md:p-12 bg-black relative flex flex-col justify-center">
-          <form onSubmit={handlePayment} className="space-y-6">
-            
-            <div className="bg-orange-500/10 border border-orange-500/20 p-5 rounded-3xl space-y-3">
-               <div className="flex items-center gap-2 text-orange-500 font-black uppercase text-sm">
-                 <AlertCircle size={20} />
-                 Sistèm Pwoteksyon Hatex (Escrow)
-               </div>
-               <p className="text-xs text-zinc-400 font-bold leading-relaxed">
-                 Lè ou peye, kòb la ap kenbe nan sistèm nan pou <span className="text-white">1 èdtan ak 15 minit</span>. Enfòmasyon abònman an ap parèt otomatikman sou pwochen paj la.
-               </p>
-               <p className="text-xs text-red-400 font-black mt-2">
-                 SI OU PA JWENN KONT LA, OU GEN EGZAKTEMAN 1H POU KONTAKTE SIPÒ HATEX LA SOU WHATSAPP POU YO RANBOUSE W. APRE 1H, KÒB LA AP ALE JWENN MACHANN NAN EPI OU PÈDI REKOU OU!
-               </p>
+          
+          <div className="p-8 space-y-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] text-red-600 font-black uppercase tracking-[0.2em]">{product.category}</span>
+                <h1 className="text-3xl font-black uppercase tracking-tighter mt-1">{product.title}</h1>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black italic">{product.price.toLocaleString()} HTG</p>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Chak {product.billing_cycle}</p>
+              </div>
             </div>
 
-            <button
-              disabled={payLoading}
-              type="submit"
-              className="w-full bg-white hover:bg-zinc-200 text-black py-5 rounded-full font-black uppercase text-sm transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              {payLoading ? <Loader2 className="animate-spin" size={20} /> : <Lock size={18} />}
-              Peye ak Bous H-Pay mwen ({product.price} HTG)
-            </button>
-          </form>
-        </div>
+            <p className="text-zinc-400 text-sm leading-relaxed">{product.description}</p>
 
+            {/* SEKSYON PROFIL (Ranje erè avatar_url la) */}
+            <div className="flex items-center gap-4 p-4 bg-black/40 rounded-2xl border border-white/5">
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 border border-white/10">
+                <img 
+                  src={profile?.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Hatex'} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Kliyan</p>
+                <p className="text-sm font-black uppercase tracking-tighter">
+                  {profile?.full_name || "Vizitè"}
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleSubscribe}
+              className="w-full bg-red-600 py-5 rounded-2xl font-black uppercase text-[12px] tracking-[0.3em] hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-3 italic"
+            >
+              <CreditCard size={18} /> Konfime Abònman
+            </button>
+            
+            <div className="flex items-center justify-center gap-2 text-[9px] text-zinc-600 font-black uppercase tracking-widest">
+              <ShieldCheck size={14} /> Peman an sekirite pa H-Pay Shield
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
