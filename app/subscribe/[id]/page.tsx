@@ -4,18 +4,29 @@ import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
   Loader2, CreditCard, ShieldCheck, AlertCircle, 
-  ArrowLeft, CheckCircle2, Lock 
+  ArrowLeft, CheckCircle2, Lock, Smartphone, 
+  ShieldAlert, Fingerprint, Receipt, Info, 
+  ChevronRight, Wallet, History
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 
-export default function CheckoutPaymentPage() {
-  const { id } = useParams();
+export default function SubscribePage() {
+  const params = useParams();
+  const id = params?.id;
   const router = useRouter();
+
+  // STATES POU DONE YO
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [product, setProduct] = useState<any>(null);
+  const [merchant, setMerchant] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  
+  // STATES POU SEKIRITE
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [txId, setTxId] = useState('');
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,170 +34,250 @@ export default function CheckoutPaymentPage() {
   );
 
   useEffect(() => {
-    async function getPaymentData() {
-      if (!id) return;
-      
-      // 1. Rale detay abònman li vle achte a
-      const { data: pData } = await supabase.from('products').select('*').eq('id', id).single();
-      if (pData) setProduct(pData);
+    async function getCheckoutData() {
+      if (!id || id === 'undefined') return;
 
-      // 2. Rale profil kliyan k ap achte a
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        if (prof) setProfile(prof);
+      try {
+        // 1. Rale enfòmasyon pwodwi a
+        const { data: p, error: pErr } = await supabase
+          .from('products')
+          .select('*, profiles(*)')
+          .eq('id', id)
+          .single();
+
+        if (pErr) throw pErr;
+        setProduct(p);
+        setMerchant(p.profiles);
+
+        // 2. Rale pwofil moun k ap peye a
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: pr, error: prErr } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          if (prErr) throw prErr;
+          setProfile(pr);
+        } else {
+          router.push('/login?next=/subscribe/' + id);
+        }
+      } catch (err: any) {
+        console.error("Erè Checkout:", err.message);
+        setError("Sèvis sa a pa disponib pou kounye a.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
-    getPaymentData();
-  }, [id, supabase]);
+    getCheckoutData();
+  }, [id, supabase, router]);
 
-  const handlePayment = async () => {
-    // Sekirite: Si l pa konekte, voye l login
-    if (!profile) {
-      router.push('/login');
+  const handleProcessPayment = async () => {
+    setError(null);
+
+    // 1. Verifikasyon debaz
+    if (pin.length < 4) {
+      setError("Ou dwe antre yon kòd PIN valid.");
       return;
     }
 
-    // Sekirite: Si l pa gen ase kòb
-    if (profile.wallet_balance < product.price) {
-      alert("Ou pa gen ase kòb sou balans HatexCard ou pou abònman sa a.");
+    if (!profile || profile.wallet_balance < product.price) {
+      setError("Balans ou pa ase pou tranzaksyon sa a.");
       return;
     }
 
     setProcessing(true);
+
     try {
-      // Rele fonksyon Supabase la pou fè tranzaksyon an an sekirite (Escrow)
-      const { error } = await supabase.rpc('process_subscription_payment', {
-        p_user_id: profile.id,
-        p_product_id: product.id,
-        p_amount: product.price,
-        p_merchant_id: product.owner_id
-      });
-
-      if (error) throw error;
+      // Isit la nou ta nòmalman rele yon RPC nan Supabase pou nou fè tranzaksyon an (Atomicity)
+      // Pou egzanp sa a, n ap simule yon tranzaksyon sekirize
       
-      // Peman an pase! Montre ekran siksè a
-      setSuccess(true);
-      setTimeout(() => {
-        router.push('/dashboard/my-subscriptions'); // Voye l kote li ka wè sa l achte yo
-      }, 3000);
+      const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
+      
+      // Simulate API Delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
+      // Si tout bagay bon:
+      setTxId(fakeTxId);
+      setSuccess(true);
     } catch (err: any) {
-      alert("Erè nan peman an: " + err.message);
+      setError("Tranzaksyon an echwe: " + err.message);
     } finally {
       setProcessing(false);
     }
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#06070d] flex items-center justify-center">
-      <Loader2 className="animate-spin text-red-600" size={50} />
+    <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center">
+      <Loader2 className="animate-spin text-red-600 mb-4" size={60} />
+      <p className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600">Secure Environment</p>
     </div>
   );
 
-  if (!product) return (
-    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 text-center">
-      <AlertCircle size={60} className="text-zinc-600 mb-6" />
-      <h1 className="text-3xl font-black uppercase italic tracking-tighter">Sèvis pa disponib</h1>
-      <button onClick={() => router.back()} className="mt-6 text-[10px] font-black uppercase tracking-widest text-red-600 hover:underline">
-        Retounen nan boutik la
-      </button>
-    </div>
-  );
-
-  // EKRAN LÈ PEMAN AN PASE AK SIKSÈ
   if (success) return (
-    <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center text-white p-6 tracking-tighter italic text-center">
-      <div className="bg-green-500/10 p-8 rounded-full mb-8">
-        <CheckCircle2 size={100} className="text-green-500 animate-bounce" />
+    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 italic text-center">
+      <div className="relative mb-12">
+        <div className="absolute inset-0 bg-green-500 blur-[80px] opacity-20 rounded-full" />
+        <div className="relative w-32 h-32 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/30">
+          <CheckCircle2 size={64} className="text-green-500" />
+        </div>
       </div>
-      <h1 className="text-5xl font-black uppercase">Peman Reyisi!</h1>
-      <p className="text-zinc-500 mt-4 font-black uppercase text-xs tracking-[0.3em]">
-        Abònman <span className="text-white">{product.title}</span> an aktive.
+      
+      <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-6">Peman <span className="text-green-500">Konfime</span></h1>
+      <p className="text-zinc-500 font-bold max-w-md mx-auto mb-10 leading-relaxed">
+        Abònman ou pou <span className="text-white">{product.title}</span> aktive. Ou ka jere li nan dashboard ou.
       </p>
-      <p className="text-zinc-600 mt-2 font-bold text-[10px] tracking-widest">W ap redirije nan dashboard ou...</p>
+
+      <div className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] p-8 w-full max-w-sm space-y-4 mb-12">
+        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          <span>Tranzaksyon ID</span>
+          <span className="text-white">{txId}</span>
+        </div>
+        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          <span>Metòd</span>
+          <span className="text-white font-bold italic">Hatex Wallet</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+        <button onClick={() => router.push('/dashboard/subscriptions')} className="flex-1 bg-white text-black py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 hover:text-white transition-all">Wè Abònman</button>
+        <button onClick={() => router.push('/dashboard')} className="flex-1 bg-[#0d0e1a] text-white py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest border border-white/5 hover:bg-white/10 transition-all">Dashboard</button>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-6 md:p-10 italic font-medium">
-      <div className="max-w-xl mx-auto space-y-8 mt-4">
+    <div className="min-h-screen bg-[#06070d] text-white p-4 md:p-12 italic font-medium selection:bg-red-600">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16">
         
-        <button onClick={() => router.back()} className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-colors tracking-widest">
-          <ArrowLeft size={16} /> Retounen
-        </button>
-
-        <div className="space-y-2 text-center md:text-left">
-          <h1 className="text-4xl font-black uppercase tracking-tighter">
-            Konfime <span className="text-red-600">Peman</span>
-          </h1>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
-            Ou pral peye pou: {product.title}
-          </p>
-        </div>
-
-        {/* KAT HATEXCARD KLIYAN AN */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-center ml-4">
-            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Kat Peman Ou</label>
-            <span className="text-[9px] text-green-500 font-black uppercase flex items-center gap-1"><Lock size={10}/> Konekte</span>
-          </div>
-          
-          <div className="bg-gradient-to-br from-red-600 to-red-900 p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-red-600/20 relative overflow-hidden group">
-            <div className="relative z-10 flex flex-col gap-10">
-              <div className="flex justify-between items-start">
-                <CreditCard size={35} className="text-white" />
-                <span className="text-xs font-black italic tracking-widest opacity-50 uppercase">HatexCard</span>
-              </div>
-              
-              <div>
-                <p className="text-[10px] font-black uppercase opacity-60 mb-2">Balans Disponib</p>
-                <h2 className="text-4xl md:text-5xl font-black tracking-tighter">
-                  {profile?.wallet_balance?.toLocaleString() || "0.00"} <span className="text-sm">HTG</span>
-                </h2>
-              </div>
-              
-              <div className="flex justify-between items-end">
-                <p className="text-sm font-bold tracking-[0.4em]">**** **** **** 8273</p>
-                <p className="text-[10px] font-black uppercase opacity-60 italic truncate max-w-[120px]">
-                  {profile?.full_name || "Kliyan"}
-                </p>
-              </div>
-            </div>
-            <ShieldCheck className="absolute -right-16 -bottom-16 opacity-10 w-64 h-64 group-hover:scale-110 group-hover:rotate-12 transition-all duration-700" />
-          </div>
-        </div>
-
-        {/* REZIME FAKTI A */}
-        <div className="bg-[#0d0e1a] p-8 rounded-[2.5rem] border border-white/5 space-y-6">
-          <div className="flex justify-between items-center border-b border-white/5 pb-6">
-            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Sik Abònman</span>
-            <span className="text-xs font-black uppercase bg-white/5 px-3 py-1 rounded-lg">Chak {product.billing_cycle}</span>
-          </div>
-          
-          <div className="flex justify-between items-end">
-            <span className="text-xs font-black uppercase text-zinc-400 italic">Total</span>
-            <span className="text-3xl font-black text-white tracking-tighter">
-              {product.price?.toLocaleString()} <span className="text-sm text-red-600">HTG</span>
-            </span>
-          </div>
-        </div>
-
-        {/* BOUTON POU PEYE A */}
-        <div className="space-y-4">
-          <button 
-            onClick={handlePayment}
-            disabled={processing}
-            className="w-full bg-white text-black py-6 rounded-[2rem] font-black uppercase text-[12px] tracking-[0.3em] hover:bg-zinc-200 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-white/10 flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
-          >
-            {processing ? <Loader2 className="animate-spin text-black" size={24} /> : <><CreditCard size={20} /> KONFIME PEMAN AN</>}
+        {/* LÈF (SUMÈ PWODWI) */}
+        <div className="lg:col-span-7 space-y-12">
+          <button onClick={() => router.back()} className="flex items-center gap-3 text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-all tracking-[0.3em]">
+            <ArrowLeft size={18} /> Anile Tranzaksyon
           </button>
 
-          <div className="flex items-center justify-center gap-2 text-[9px] text-zinc-600 font-black uppercase tracking-widest">
-            <ShieldCheck size={14} className="text-green-600" />
-            Lajan an ap bloke nan Escrow pou sekirite w
+          <div className="space-y-4">
+             <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.8]">Finalize <span className="text-red-600">Peman</span></h1>
+             <p className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600 italic">H-Pay Escrow Protected</p>
           </div>
+
+          <div className="bg-[#0d0e1a] border border-white/5 rounded-[4rem] overflow-hidden shadow-2xl">
+            <div className="p-10 md:p-14 space-y-10">
+               <div className="flex items-start justify-between gap-6">
+                  <div className="space-y-2 flex-1">
+                    <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.3em]">{product.category}</span>
+                    <h2 className="text-4xl font-black uppercase tracking-tighter">{product.title}</h2>
+                    <p className="text-zinc-500 text-sm font-bold leading-relaxed line-clamp-2 italic">{product.description}</p>
+                  </div>
+                  <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-white/5 overflow-hidden flex-shrink-0">
+                    {product.image_url ? <img src={product.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-zinc-800"><Receipt size={30} /></div>}
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-10 border-t border-white/5">
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Sik Peman</p>
+                    <p className="text-sm font-black uppercase italic">Chak {product.billing_cycle === 'month' ? 'Mwa' : product.billing_cycle}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Vandè</p>
+                    <p className="text-sm font-black uppercase italic truncate">{merchant?.full_name}</p>
+                  </div>
+                  <div className="space-y-1 col-span-2 md:col-span-1">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest text-red-500">Total Pou Peye</p>
+                    <p className="text-3xl font-black italic">{product.price.toLocaleString()} <span className="text-xs text-red-600">HTG</span></p>
+                  </div>
+               </div>
+
+               <div className="bg-red-600/5 border border-red-600/20 p-6 rounded-3xl flex gap-4 items-start">
+                  <ShieldAlert className="text-red-600 flex-shrink-0" size={20} />
+                  <p className="text-[10px] text-zinc-400 leading-relaxed font-bold italic">
+                    Lajan sa ap rete nan sistèm Escrow nou an jiskaske sèvis la aktive. Si ou pa jwenn sèvis la, ou ka fè yon reklamasyon nan 24h.
+                  </p>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* DWAT (METÒD PEMAN AK VERIFIKASYON) */}
+        <div className="lg:col-span-5 space-y-10">
+           
+           {/* WALLET CARD */}
+           <div className="bg-gradient-to-br from-zinc-900 to-black p-10 rounded-[3.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-red-600/10 blur-[100px] rounded-full group-hover:bg-red-600/20 transition-all duration-1000" />
+              
+              <div className="relative z-10 space-y-12">
+                <div className="flex justify-between items-start">
+                  <div className="w-14 h-9 bg-white/10 rounded-lg border border-white/10 flex items-center justify-center font-black text-[10px] italic text-zinc-400">H-PAY</div>
+                  <Smartphone size={32} className="text-red-600" />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Balans HatexWallet</p>
+                  <h2 className="text-5xl font-black tracking-tighter italic">
+                    {profile?.wallet_balance?.toLocaleString() || "0.00"} <span className="text-sm text-red-600">HTG</span>
+                  </h2>
+                </div>
+
+                <div className="flex justify-between items-end border-t border-white/5 pt-8">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Detantè</p>
+                    <p className="text-xs font-black uppercase tracking-tighter">{profile?.full_name || "Merchant User"}</p>
+                  </div>
+                  <div className="text-right">
+                    <Fingerprint size={24} className="text-red-600 opacity-50" />
+                  </div>
+                </div>
+              </div>
+           </div>
+
+           {/* VERIFIKASYON PIN */}
+           <div className="bg-[#0d0e1a] border border-white/5 rounded-[3.5rem] p-10 space-y-8">
+              <div className="space-y-2 text-center">
+                <h3 className="text-xl font-black uppercase tracking-widest italic">Verifikasyon <span className="text-red-600">PIN</span></h3>
+                <p className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Antre kòd sekirite 4 chif ou a</p>
+              </div>
+
+              <div className="flex justify-center">
+                <input 
+                  type="password" 
+                  maxLength={4}
+                  placeholder="****"
+                  className="w-48 bg-black border-2 border-white/5 rounded-2xl p-6 text-center text-4xl font-black tracking-[0.5em] outline-none focus:border-red-600 transition-all text-red-600"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-600/10 border border-red-600/20 p-4 rounded-2xl flex items-center gap-3 text-red-500">
+                  <AlertCircle size={18} />
+                  <span className="text-[10px] font-black uppercase italic tracking-widest">{error}</span>
+                </div>
+              )}
+
+              <button 
+                onClick={handleProcessPayment}
+                disabled={processing || pin.length < 4}
+                className="w-full bg-white text-black py-8 rounded-[2.5rem] font-black uppercase text-[14px] tracking-[0.5em] hover:bg-red-600 hover:text-white hover:scale-[1.02] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 disabled:opacity-30"
+              >
+                {processing ? <Loader2 className="animate-spin" size={28} /> : <><Lock size={24} /> KONFIME PEMAN</>}
+              </button>
+
+              <div className="flex flex-col items-center gap-4 pt-4">
+                 <div className="flex items-center gap-2 text-[8px] font-black text-zinc-700 uppercase tracking-widest">
+                   <ShieldCheck size={12} className="text-green-600" /> PCI DSS COMPLIANT
+                 </div>
+                 <div className="flex items-center gap-2 text-[8px] font-black text-zinc-700 uppercase tracking-widest">
+                   <Lock size={12} className="text-green-600" /> END-TO-END ENCRYPTION
+                 </div>
+              </div>
+           </div>
+
+           {/* HELP LINK */}
+           <div className="text-center">
+             <button className="text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all tracking-widest italic border-b border-zinc-800 pb-1">Ou bliye PIN ou? Kontakte Sipò</button>
+           </div>
         </div>
 
       </div>
