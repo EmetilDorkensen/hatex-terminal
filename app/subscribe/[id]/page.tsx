@@ -1,28 +1,17 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { 
-  Loader2, CreditCard, ShieldCheck, Calendar, 
-  Info, CheckCircle2, Lock, AlertCircle, Store
-} from 'lucide-react';
+import { ShieldCheck, Lock, AlertCircle, Info, Loader2, Phone } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-export default function SubscriptionCheckout() {
-  const { id } = useParams();
+export default function CheckoutPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  
-  const [product, setProduct] = useState<any>(null);
-  const [merchant, setMerchant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [payLoading, setPayLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const [cardInfo, setCardInfo] = useState({
-    number: '',
-    expiry: '',
-    cvv: ''
-  });
+  const [product, setProduct] = useState<any>(null);
+  const [merchant, setMerchant] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,176 +19,138 @@ export default function SubscriptionCheckout() {
   );
 
   useEffect(() => {
-    async function getProductData() {
-      // 1. Rale detay Pwodwi a
-      const { data: prodData, error: prodError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', id)
-        .single();
+    const loadData = async () => {
+      try {
+        const { data: prod, error: pErr } = await supabase
+          .from('products')
+          .select('*, profiles(*)')
+          .eq('id', params.id)
+          .single();
 
-      if (prodError || !prodData) {
-        setError("Abònman sa a pa egziste.");
+        if (pErr || !prod) throw new Error("Pwodwi sa a pa egziste.");
+        
+        setProduct(prod);
+        setMerchant(prod.profiles);
         setLoading(false);
-        return;
+      } catch (err: any) {
+        setError(err.message);
+        setLoading(false);
       }
-
-      // 2. Rale detay Machann nan
-      const { data: profData } = await supabase
-        .from('profiles')
-        .select('business_name, full_name, avatar_url')
-        .eq('id', prodData.owner_id)
-        .single();
-
-      setProduct(prodData);
-      setMerchant(profData);
-      setLoading(false);
-    }
-
-    if (id) getProductData();
-  }, [id, supabase]);
+    };
+    loadData();
+  }, [params.id, supabase]);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setPayLoading(true);
-    // Isit la nou pral konekte ak Edge Function pou aktive abònman an
-    // Pou kounye a nou simulation siksè a
-    setTimeout(() => {
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Ou dwe konekte.");
+
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+      if (!profile || (profile.kyc_status !== 'verified' && profile.kyc_status !== 'approved')) {
+        throw new Error("Ou dwe verifye KYC ou anvan ou fè abònman.");
+      }
+
+      if (profile.wallet_balance < product.price) throw new Error("Kòb ou pa ase. Recharge bous ou.");
+
+      // Kalkile lè pou kòb la lage bay machann nan (1h 15 minit)
+      const releaseTime = new Date();
+      releaseTime.setMinutes(releaseTime.getMinutes() + 75);
+
+      // KREYE ABÒNMAN AN EPI METE KÒD STREAMING YO SI LI GENYEN L
+      const { error: subError } = await supabase.from('subscriptions').insert([{
+        product_id: product.id,
+        client_id: user.id,
+        merchant_id: product.owner_id,
+        status: 'pending_escrow',
+        amount: product.price,
+        provided_credentials: product.streaming_credentials || null,
+        escrow_release_at: releaseTime.toISOString()
+      }]);
+
+      if (subError) throw subError;
+
+      // RELE FONKSYON POU BLOKE KÒB LA
+      await supabase.rpc('process_secure_payment', {
+        amount_val: product.price,
+        client_id_val: user.id,
+        product_id_val: product.id,
+        merchant_id_val: product.owner_id
+      });
+
+      router.push(`/subscribe/${params.id}/success`);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
       setPayLoading(false);
-      alert("Abònman aktive ak siksè!");
-    }, 2000);
+    }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center italic text-white font-black uppercase tracking-widest">
-      <Loader2 className="animate-spin mb-4 text-red-600" size={48} />
-      <span>Preparasyon Paj Peman...</span>
-    </div>
-  );
-
-  if (error) return (
-    <div className="min-h-screen bg-[#06070d] flex items-center justify-center p-6">
-      <div className="bg-red-600/10 border border-red-600/20 p-10 rounded-[3rem] text-center max-w-md">
-        <AlertCircle className="text-red-600 mx-auto mb-4" size={50} />
-        <p className="text-white font-black uppercase text-sm">{error}</p>
-      </div>
-    </div>
-  );
+  if (loading) return <div className="min-h-screen bg-[#06070d] flex items-center justify-center"><Loader2 className="animate-spin text-red-600" size={48} /></div>;
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-4 flex items-center justify-center italic font-medium">
-      <div className="w-full max-w-[900px] grid md:grid-cols-2 bg-[#0d0e1a] border border-white/5 rounded-[4rem] overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.8)]">
+    <div className="min-h-screen bg-[#06070d] text-white p-4 flex items-center justify-center font-medium">
+      <div className="w-full max-w-[1000px] grid md:grid-cols-2 bg-[#0d0e1a] border border-white/5 rounded-[3rem] overflow-hidden shadow-2xl">
         
-        {/* PATI GOCH: REZIME PWODWI A */}
-        <div className="p-10 md:p-14 bg-gradient-to-br from-red-600/10 to-transparent flex flex-col justify-between border-r border-white/5">
-          <div className="space-y-8">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 shadow-xl">
-                {merchant?.avatar_url ? (
-                  <img src={merchant.avatar_url} className="w-full h-full object-cover rounded-2xl" />
-                ) : (
-                  <Store className="text-red-600" size={24} />
-                )}
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Machann</p>
-                <h3 className="text-lg font-black uppercase tracking-tighter">{merchant?.business_name || merchant?.full_name}</h3>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {product.image_url && (
-                <div className="h-48 w-full rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl">
-                  <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
+        {/* PATI GOCH: ENFÒMASYON PWODWI AK MACHANN */}
+        <div className="p-8 md:p-12 bg-gradient-to-br from-zinc-900 to-black border-r border-white/5 relative">
+          
+          <div className="space-y-6">
+             <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-zinc-800 rounded-full flex items-center justify-center">
+                  {merchant.avatar_url ? <img src={merchant.avatar_url} className="w-full h-full rounded-full" /> : <ShieldCheck className="text-red-500" />}
                 </div>
-              )}
-              <div>
-                <span className="text-[9px] bg-red-600/20 text-red-500 px-3 py-1 rounded-full font-black uppercase tracking-widest">{product.category}</span>
-                <h1 className="text-3xl font-black uppercase tracking-tighter mt-3 leading-none">{product.title}</h1>
-                <p className="text-zinc-500 text-xs font-bold mt-4 leading-relaxed">{product.description}</p>
-              </div>
-            </div>
+                <div>
+                  <h3 className="text-xl font-bold">{merchant.full_name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Phone size={14} className="text-green-500" />
+                    <span className="text-sm text-zinc-400">{product.merchant_whatsapp || merchant.phone || "Pa gen nimewo disponib"}</span>
+                  </div>
+                </div>
+             </div>
+
+             <div className="bg-red-600/10 border border-red-500/20 rounded-2xl p-6">
+                <h1 className="text-2xl font-black uppercase mb-2">{product.title}</h1>
+                <span className="text-xs bg-red-600 text-white px-2 py-1 rounded font-bold uppercase">{product.category}</span>
+                
+                <div className="mt-6 flex items-end gap-2">
+                  <span className="text-5xl font-black">{Number(product.price).toLocaleString()}</span>
+                  <span className="text-red-500 font-bold mb-1 text-lg">HTG</span>
+                </div>
+             </div>
           </div>
 
-          <div className="pt-10 border-t border-white/5 space-y-2">
-            <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">Plan Abònman</p>
-            <div className="flex items-end gap-2">
-               <span className="text-5xl font-black">{product.price.toLocaleString()}</span>
-               <span className="text-red-600 font-black mb-1 italic uppercase tracking-tighter text-lg">HTG / {product.billing_cycle === 'month' ? 'Mwa' : product.billing_cycle}</span>
-            </div>
-          </div>
         </div>
 
-        {/* PATI DWAT: FÒM PEMAN YO */}
-        <div className="p-10 md:p-14 bg-black/40 relative">
-          <div className="relative z-10 space-y-8">
-            <div className="flex items-center gap-3 border-b border-white/5 pb-6">
-               <ShieldCheck size={20} className="text-green-500" />
-               <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest italic">Peman Sekirize (AES-256)</p>
+        {/* PATI DWAT: AVÈTISMAN AK PEMAN */}
+        <div className="p-8 md:p-12 bg-black relative flex flex-col justify-center">
+          <form onSubmit={handlePayment} className="space-y-6">
+            
+            <div className="bg-orange-500/10 border border-orange-500/20 p-5 rounded-3xl space-y-3">
+               <div className="flex items-center gap-2 text-orange-500 font-black uppercase text-sm">
+                 <AlertCircle size={20} />
+                 Sistèm Pwoteksyon Hatex (Escrow)
+               </div>
+               <p className="text-xs text-zinc-400 font-bold leading-relaxed">
+                 Lè ou peye, kòb la ap kenbe nan sistèm nan pou <span className="text-white">1 èdtan ak 15 minit</span>. Enfòmasyon abònman an ap parèt otomatikman sou pwochen paj la.
+               </p>
+               <p className="text-xs text-red-400 font-black mt-2">
+                 SI OU PA JWENN KONT LA, OU GEN EGZAKTEMAN 1H POU KONTAKTE SIPÒ HATEX LA SOU WHATSAPP POU YO RANBOUSE W. APRE 1H, KÒB LA AP ALE JWENN MACHANN NAN EPI OU PÈDI REKOU OU!
+               </p>
             </div>
 
-            <form onSubmit={handlePayment} className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] text-zinc-500 font-black uppercase mb-2 block ml-4 tracking-widest">Nimewo Kat H-Pay</label>
-                  <input 
-                    required
-                    type="text" 
-                    placeholder="0000 0000 0000 0000"
-                    className="w-full bg-white/5 border border-white/10 rounded-[1.8rem] px-6 py-5 text-sm font-black text-white outline-none focus:border-red-600 transition-all placeholder:text-zinc-800"
-                    value={cardInfo.number}
-                    onChange={(e) => setCardInfo({...cardInfo, number: e.target.value})}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] text-zinc-500 font-black uppercase mb-2 block ml-4 tracking-widest text-center">Ekspirasyon</label>
-                    <input 
-                      required
-                      type="text" 
-                      placeholder="MM/YY"
-                      className="w-full bg-white/5 border border-white/10 rounded-[1.8rem] px-6 py-5 text-sm font-black text-white outline-none focus:border-red-600 transition-all text-center"
-                      value={cardInfo.expiry}
-                      onChange={(e) => setCardInfo({...cardInfo, expiry: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-zinc-500 font-black uppercase mb-2 block ml-4 tracking-widest text-center">CVV</label>
-                    <input 
-                      required
-                      type="password" 
-                      placeholder="•••"
-                      className="w-full bg-white/5 border border-white/10 rounded-[1.8rem] px-6 py-5 text-sm font-black text-white outline-none focus:border-red-600 transition-all text-center"
-                      value={cardInfo.cvv}
-                      onChange={(e) => setCardInfo({...cardInfo, cvv: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-red-600/5 p-5 rounded-3xl border border-red-600/10 space-y-2">
-                 <p className="text-[9px] text-zinc-400 font-bold uppercase leading-tight italic flex items-center gap-2">
-                   <Info size={12} className="text-red-600" /> Atansyon: Ou pral debite otomatikman chak {product.billing_cycle === 'month' ? 'mwa' : product.billing_cycle}. Ou ka anile abònman sa a nenpòt lè nan dashboard ou.
-                 </p>
-              </div>
-
-              <button
-                disabled={payLoading}
-                type="submit"
-                className="w-full bg-white hover:bg-zinc-200 text-black py-6 rounded-[2.2rem] font-black uppercase text-[12px] tracking-tighter transition-all flex items-center justify-center gap-3 shadow-2xl disabled:opacity-50"
-              >
-                {payLoading ? <Loader2 className="animate-spin" size={20} /> : <Lock size={18} />}
-                Kòmanse Abònman an
-              </button>
-            </form>
-
-            <div className="flex items-center justify-center gap-6 opacity-30">
-               <div className="h-[1px] bg-white/20 flex-1"></div>
-               <CheckCircle2 size={16} />
-               <div className="h-[1px] bg-white/20 flex-1"></div>
-            </div>
-          </div>
+            <button
+              disabled={payLoading}
+              type="submit"
+              className="w-full bg-white hover:bg-zinc-200 text-black py-5 rounded-full font-black uppercase text-sm transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {payLoading ? <Loader2 className="animate-spin" size={20} /> : <Lock size={18} />}
+              Peye ak Bous H-Pay mwen ({product.price} HTG)
+            </button>
+          </form>
         </div>
 
       </div>
