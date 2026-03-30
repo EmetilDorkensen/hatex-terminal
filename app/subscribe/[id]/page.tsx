@@ -4,15 +4,14 @@ import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
   Loader2, CreditCard, ShieldCheck, AlertCircle, 
-  ArrowLeft, CheckCircle2, Lock, Smartphone, 
-  ShieldAlert, Fingerprint, Receipt, Info, 
-  ChevronRight, Wallet, History
+  ArrowLeft, CheckCircle2, Lock, ShieldAlert, 
+  Receipt, Phone, CalendarIcon, Hash
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function SubscribePage() {
   const params = useParams();
-  const id = params?.id;
+  const rawId = params?.id as string;
   const router = useRouter();
 
   // STATES POU DONE YO
@@ -20,10 +19,13 @@ export default function SubscribePage() {
   const [processing, setProcessing] = useState(false);
   const [product, setProduct] = useState<any>(null);
   const [merchant, setMerchant] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
   
-  // STATES POU SEKIRITE
-  const [pin, setPin] = useState('');
+  // STATES POU KAT KREDI KLIYAN AN
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [txId, setTxId] = useState('');
@@ -35,73 +37,87 @@ export default function SubscribePage() {
 
   useEffect(() => {
     async function getCheckoutData() {
-      if (!id || id === 'undefined') return;
+      if (!rawId || rawId === 'undefined') {
+        setError("Lyen sa a pa valid.");
+        setLoading(false);
+        return;
+      }
 
       try {
-        // 1. Rale enfòmasyon pwodwi a
+        // 1. DEKRIPTE ID A (Paske nou te kripte l ak btoa)
+        let decodedId = '';
+        try {
+          decodedId = atob(decodeURIComponent(rawId));
+        } catch (e) {
+          throw new Error("Lyen abònman an kòronpi oswa li pa bon ankò.");
+        }
+
+        // 2. Rale enfòmasyon pwodwi a ak machann nan
         const { data: p, error: pErr } = await supabase
           .from('products')
           .select('*, profiles(*)')
-          .eq('id', id)
+          .eq('id', decodedId)
           .single();
 
-        if (pErr) throw pErr;
+        if (pErr || !p) throw new Error("Sèvis sa a pa disponib oswa li efase.");
+        
         setProduct(p);
         setMerchant(p.profiles);
 
-        // 2. Rale pwofil moun k ap peye a
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: pr, error: prErr } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          if (prErr) throw prErr;
-          setProfile(pr);
-        } else {
-          router.push('/login?next=/subscribe/' + id);
-        }
       } catch (err: any) {
-        console.error("Erè Checkout:", err.message);
-        setError("Sèvis sa a pa disponib pou kounye a.");
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     }
     getCheckoutData();
-  }, [id, supabase, router]);
+  }, [rawId, supabase]);
 
-  const handleProcessPayment = async () => {
+  // FÒMATE NIMEWO KAT LA POU L PRAN ESPAS CHAK 4 CHIF
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 16) value = value.slice(0, 16);
+    const formatted = value.replace(/(\d{4})/g, '$1 ').trim();
+    setCardNumber(formatted);
+  };
+
+  // FÒMATE DAT EXPIRASYON AN (MM/YY)
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 4) value = value.slice(0, 4);
+    if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    setExpiry(value);
+  };
+
+  const handleProcessPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
 
-    // 1. Verifikasyon debaz
-    if (pin.length < 4) {
-      setError("Ou dwe antre yon kòd PIN valid.");
-      return;
+    // Validasyon senp sou kat la
+    if (cardNumber.replace(/\s/g, '').length !== 16) {
+      return setError("Nimewo kat la dwe gen 16 chif.");
     }
-
-    if (!profile || profile.wallet_balance < product.price) {
-      setError("Balans ou pa ase pou tranzaksyon sa a.");
-      return;
+    if (expiry.length !== 5) {
+      return setError("Dat ekspirasyon an pa valid (MM/YY).");
+    }
+    if (cvv.length < 3) {
+      return setError("CVV a dwe gen 3 oswa 4 chif.");
+    }
+    if (!cardName.trim()) {
+      return setError("Ou dwe mete non ki sou kat la.");
     }
 
     setProcessing(true);
 
     try {
-      // Isit la nou ta nòmalman rele yon RPC nan Supabase pou nou fè tranzaksyon an (Atomicity)
-      // Pou egzanp sa a, n ap simule yon tranzaksyon sekirize
-      
+      // Isit la H-Pay ta rele API Bank la, n ap simule pwosesis la ak Escrow
       const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
-      
-      // Simulate API Delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 3000)); 
 
-      // Si tout bagay bon:
       setTxId(fakeTxId);
       setSuccess(true);
     } catch (err: any) {
-      setError("Tranzaksyon an echwe: " + err.message);
+      setError("Tranzaksyon an echwe: Bank ou a refize peman an.");
     } finally {
       setProcessing(false);
     }
@@ -109,177 +125,228 @@ export default function SubscribePage() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center">
-      <Loader2 className="animate-spin text-red-600 mb-4" size={60} />
-      <p className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600">Secure Environment</p>
+      <Loader2 className="animate-spin text-red-600 mb-4 w-12 h-12 md:w-16 md:h-16" />
+      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600 animate-pulse text-center px-4">Loading Secure Checkout...</p>
+    </div>
+  );
+
+  if (error && !product) return (
+    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 text-center">
+      <AlertCircle className="text-red-600 mb-6 w-16 h-16 md:w-20 md:h-20" />
+      <h1 className="text-2xl md:text-4xl font-black uppercase italic tracking-tighter max-w-lg">{error}</h1>
+      <button onClick={() => router.push('/')} className="mt-8 bg-white text-black px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all">Retounen Lakay</button>
     </div>
   );
 
   if (success) return (
-    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 italic text-center">
-      <div className="relative mb-12">
-        <div className="absolute inset-0 bg-green-500 blur-[80px] opacity-20 rounded-full" />
-        <div className="relative w-32 h-32 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/30">
-          <CheckCircle2 size={64} className="text-green-500" />
+    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 italic text-center selection:bg-red-600">
+      <div className="relative mb-8 md:mb-12">
+        <div className="absolute inset-0 bg-green-500 blur-[60px] md:blur-[80px] opacity-20 rounded-full" />
+        <div className="relative w-24 h-24 md:w-32 md:h-32 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/30">
+          <CheckCircle2 className="text-green-500 w-12 h-12 md:w-16 md:h-16" />
         </div>
       </div>
       
-      <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-6">Peman <span className="text-green-500">Konfime</span></h1>
-      <p className="text-zinc-500 font-bold max-w-md mx-auto mb-10 leading-relaxed">
-        Abònman ou pou <span className="text-white">{product.title}</span> aktive. Ou ka jere li nan dashboard ou.
+      <h1 className="text-5xl sm:text-6xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-4 md:mb-6">Peman <span className="text-green-500">Siksè</span></h1>
+      <p className="text-zinc-500 text-sm md:text-base font-bold max-w-md mx-auto mb-8 md:mb-10 leading-relaxed px-4">
+        Abònman ou pou <span className="text-white">{product.title}</span> kòmanse! Yon resi ap voye ba ou.
       </p>
 
-      <div className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] p-8 w-full max-w-sm space-y-4 mb-12">
-        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
+      <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 w-full max-w-sm space-y-4 mb-10 md:mb-12 shadow-2xl">
+        <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500">
           <span>Tranzaksyon ID</span>
           <span className="text-white">{txId}</span>
         </div>
-        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
-          <span>Metòd</span>
-          <span className="text-white font-bold italic">Hatex Wallet</span>
+        <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          <span>Vandè</span>
+          <span className="text-white font-bold italic truncate ml-4">{merchant?.full_name}</span>
         </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <button onClick={() => router.push('/dashboard/subscriptions')} className="flex-1 bg-white text-black py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 hover:text-white transition-all">Wè Abònman</button>
-        <button onClick={() => router.push('/dashboard')} className="flex-1 bg-[#0d0e1a] text-white py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest border border-white/5 hover:bg-white/10 transition-all">Dashboard</button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-4 md:p-12 italic font-medium selection:bg-red-600">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16">
+    <div className="min-h-screen bg-[#06070d] text-white p-4 sm:p-6 md:p-12 italic font-medium selection:bg-red-600">
+      <div className="max-w-6xl mx-auto space-y-8 md:space-y-12">
         
-        {/* LÈF (SUMÈ PWODWI) */}
-        <div className="lg:col-span-7 space-y-12">
-          <button onClick={() => router.back()} className="flex items-center gap-3 text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-all tracking-[0.3em]">
-            <ArrowLeft size={18} /> Anile Tranzaksyon
-          </button>
+        {/* HEADER RETOUNEN */}
+        <button onClick={() => router.back()} className="flex items-center gap-2 md:gap-3 text-[10px] md:text-[12px] font-black uppercase text-zinc-500 hover:text-white transition-all tracking-[0.3em]">
+          <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" /> ANILE ACHAT LA
+        </button>
 
-          <div className="space-y-4">
-             <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.8]">Finalize <span className="text-red-600">Peman</span></h1>
-             <p className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600 italic">H-Pay Escrow Protected</p>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+          
+          {/* LÈF: ENFÒMASYON BIZNIS & PWODWI (RESPONSIF) */}
+          <div className="lg:col-span-6 space-y-6 md:space-y-10 order-2 lg:order-1">
+            
+            <div className="space-y-2 md:space-y-4 text-center lg:text-left">
+               <h1 className="text-4xl sm:text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.85]">Checkout <span className="text-red-600">Sekirize</span></h1>
+            </div>
 
-          <div className="bg-[#0d0e1a] border border-white/5 rounded-[4rem] overflow-hidden shadow-2xl">
-            <div className="p-10 md:p-14 space-y-10">
-               <div className="flex items-start justify-between gap-6">
-                  <div className="space-y-2 flex-1">
-                    <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.3em]">{product.category}</span>
-                    <h2 className="text-4xl font-black uppercase tracking-tighter">{product.title}</h2>
-                    <p className="text-zinc-500 text-sm font-bold leading-relaxed line-clamp-2 italic">{product.description}</p>
-                  </div>
-                  <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-white/5 overflow-hidden flex-shrink-0">
-                    {product.image_url ? <img src={product.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-zinc-800"><Receipt size={30} /></div>}
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-10 border-t border-white/5">
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Sik Peman</p>
-                    <p className="text-sm font-black uppercase italic">Chak {product.billing_cycle === 'month' ? 'Mwa' : product.billing_cycle}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Vandè</p>
-                    <p className="text-sm font-black uppercase italic truncate">{merchant?.full_name}</p>
-                  </div>
-                  <div className="space-y-1 col-span-2 md:col-span-1">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest text-red-500">Total Pou Peye</p>
-                    <p className="text-3xl font-black italic">{product.price.toLocaleString()} <span className="text-xs text-red-600">HTG</span></p>
-                  </div>
-               </div>
-
-               <div className="bg-red-600/5 border border-red-600/20 p-6 rounded-3xl flex gap-4 items-start">
-                  <ShieldAlert className="text-red-600 flex-shrink-0" size={20} />
-                  <p className="text-[10px] text-zinc-400 leading-relaxed font-bold italic">
-                    Lajan sa ap rete nan sistèm Escrow nou an jiskaske sèvis la aktive. Si ou pa jwenn sèvis la, ou ka fè yon reklamasyon nan 24h.
-                  </p>
+            {/* KAT BIZNIS MACHANN NAN */}
+            <div className="bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-[50px] rounded-full" />
+               <div className="relative z-10 flex items-center gap-4 md:gap-6">
+                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-black border-2 border-white/10 overflow-hidden shrink-0">
+                   <img src={merchant?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${merchant?.full_name}`} alt="Logo" className="w-full h-full object-cover" />
+                 </div>
+                 <div className="flex-1">
+                   <div className="flex items-center gap-2 text-green-500 mb-1">
+                     <ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                     <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest">Sètifye H-Pay</span>
+                   </div>
+                   <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter truncate">{merchant?.full_name || "Biznis San Non"}</h2>
+                   
+                   {/* KONTAK BIZNIS LA */}
+                   {product?.contact_phone && (
+                     <div className="flex items-center gap-2 mt-3 text-zinc-400 bg-white/5 w-fit px-3 md:px-4 py-1.5 md:py-2 rounded-xl">
+                       <Phone className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                       <span className="text-[10px] md:text-[11px] font-bold tracking-widest">{product.contact_phone}</span>
+                     </div>
+                   )}
+                 </div>
                </div>
             </div>
-          </div>
-        </div>
 
-        {/* DWAT (METÒD PEMAN AK VERIFIKASYON) */}
-        <div className="lg:col-span-5 space-y-10">
-           
-           {/* WALLET CARD */}
-           <div className="bg-gradient-to-br from-zinc-900 to-black p-10 rounded-[3.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
-              <div className="absolute -top-20 -right-20 w-64 h-64 bg-red-600/10 blur-[100px] rounded-full group-hover:bg-red-600/20 transition-all duration-1000" />
-              
-              <div className="relative z-10 space-y-12">
-                <div className="flex justify-between items-start">
-                  <div className="w-14 h-9 bg-white/10 rounded-lg border border-white/10 flex items-center justify-center font-black text-[10px] italic text-zinc-400">H-PAY</div>
-                  <Smartphone size={32} className="text-red-600" />
-                </div>
+            {/* DETAY PWODWI K AP ACHTE A */}
+            <div className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 space-y-6 md:space-y-8">
+               <div className="flex items-start gap-4 md:gap-6">
+                 <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-zinc-900 border border-white/5 overflow-hidden shrink-0">
+                   {product?.image_url ? (
+                     <img src={product.image_url} className="w-full h-full object-cover" alt="Product" />
+                   ) : (
+                     <div className="w-full h-full flex items-center justify-center text-zinc-800"><Receipt className="w-8 h-8 md:w-10 md:h-10" /></div>
+                   )}
+                 </div>
+                 <div className="flex-1 space-y-2">
+                   <span className="text-[9px] md:text-[10px] text-red-500 font-black uppercase tracking-[0.3em]">{product?.category}</span>
+                   <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-tight">{product?.title}</h3>
+                   <p className="text-[10px] md:text-xs font-black uppercase text-zinc-500 bg-black/40 w-fit px-3 py-1 rounded-lg">Chak {product?.billing_cycle}</p>
+                 </div>
+               </div>
 
-                <div className="space-y-2">
-                  <p className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Balans HatexWallet</p>
-                  <h2 className="text-5xl font-black tracking-tighter italic">
-                    {profile?.wallet_balance?.toLocaleString() || "0.00"} <span className="text-sm text-red-600">HTG</span>
-                  </h2>
-                </div>
-
-                <div className="flex justify-between items-end border-t border-white/5 pt-8">
+               <div className="pt-6 md:pt-8 border-t border-white/5 flex justify-between items-end">
                   <div className="space-y-1">
-                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Detantè</p>
-                    <p className="text-xs font-black uppercase tracking-tighter">{profile?.full_name || "Merchant User"}</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-zinc-600 uppercase tracking-widest">Total Pou Peye</p>
                   </div>
-                  <div className="text-right">
-                    <Fingerprint size={24} className="text-red-600 opacity-50" />
+                  <div className="text-right flex items-end gap-2">
+                    <p className="text-4xl md:text-5xl font-black italic tracking-tighter">{product?.price?.toLocaleString()}</p>
+                    <p className="text-sm md:text-base text-red-600 font-black uppercase mb-1 md:mb-2">HTG</p>
                   </div>
+               </div>
+            </div>
+
+            {/* GARANTI ESCROW */}
+            <div className="bg-red-600/5 border border-red-600/20 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex gap-4 items-start">
+               <ShieldAlert className="w-5 h-5 md:w-6 md:h-6 text-red-600 shrink-0" />
+               <p className="text-[10px] md:text-[11px] text-zinc-400 leading-relaxed font-bold italic">
+                 <span className="text-white block mb-1 uppercase font-black">Garanti H-Pay Escrow</span>
+                 Lajan ou an sekirite nèt. Li p ap ale sou kont vandè a toutotan ou pa konfime ou resevwa sèvis la kòrèkteman nan espas 24 èdtan.
+               </p>
+            </div>
+          </div>
+
+          {/* DWAT: FÒMILÈ KAT KREDI (PEMAN AN) */}
+          <div className="lg:col-span-6 order-1 lg:order-2">
+            <div className="bg-[#0d0e1a] p-6 sm:p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl relative">
+              
+              <div className="flex items-center justify-between mb-8 md:mb-10">
+                <h3 className="text-xl md:text-2xl font-black uppercase tracking-tighter italic">Peye ak Kat</h3>
+                <div className="flex gap-2">
+                   <div className="w-8 h-5 bg-zinc-800 rounded flex items-center justify-center text-[6px] font-black italic">VISA</div>
+                   <div className="w-8 h-5 bg-zinc-800 rounded flex items-center justify-center text-[6px] font-black italic">MC</div>
                 </div>
               </div>
-           </div>
 
-           {/* VERIFIKASYON PIN */}
-           <div className="bg-[#0d0e1a] border border-white/5 rounded-[3.5rem] p-10 space-y-8">
-              <div className="space-y-2 text-center">
-                <h3 className="text-xl font-black uppercase tracking-widest italic">Verifikasyon <span className="text-red-600">PIN</span></h3>
-                <p className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Antre kòd sekirite 4 chif ou a</p>
-              </div>
-
-              <div className="flex justify-center">
-                <input 
-                  type="password" 
-                  maxLength={4}
-                  placeholder="****"
-                  className="w-48 bg-black border-2 border-white/5 rounded-2xl p-6 text-center text-4xl font-black tracking-[0.5em] outline-none focus:border-red-600 transition-all text-red-600"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-600/10 border border-red-600/20 p-4 rounded-2xl flex items-center gap-3 text-red-500">
-                  <AlertCircle size={18} />
-                  <span className="text-[10px] font-black uppercase italic tracking-widest">{error}</span>
+              <form onSubmit={handleProcessPayment} className="space-y-6 md:space-y-8">
+                {/* Non sou Kat la */}
+                <div className="space-y-3">
+                  <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">Non sou Kat la</label>
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="Jean Dupont"
+                    className="w-full bg-black/40 border border-white/10 rounded-[2rem] p-5 md:p-6 text-sm font-bold uppercase outline-none focus:border-red-600 transition-all placeholder:text-zinc-700"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                  />
                 </div>
-              )}
 
-              <button 
-                onClick={handleProcessPayment}
-                disabled={processing || pin.length < 4}
-                className="w-full bg-white text-black py-8 rounded-[2.5rem] font-black uppercase text-[14px] tracking-[0.5em] hover:bg-red-600 hover:text-white hover:scale-[1.02] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 disabled:opacity-30"
-              >
-                {processing ? <Loader2 className="animate-spin" size={28} /> : <><Lock size={24} /> KONFIME PEMAN</>}
-              </button>
+                {/* Nimewo Kat */}
+                <div className="space-y-3">
+                  <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">Nimewo Kat la</label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-5 md:left-6 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4 md:w-5 md:h-5" />
+                    <input 
+                      required 
+                      type="text" 
+                      placeholder="0000 0000 0000 0000"
+                      className="w-full bg-black/40 border border-white/10 rounded-[2rem] pl-14 md:pl-16 pr-6 py-5 md:py-6 text-base md:text-lg font-black tracking-[0.2em] outline-none focus:border-red-600 transition-all text-white placeholder:text-zinc-800"
+                      value={cardNumber}
+                      onChange={handleCardNumberChange}
+                    />
+                  </div>
+                </div>
 
-              <div className="flex flex-col items-center gap-4 pt-4">
-                 <div className="flex items-center gap-2 text-[8px] font-black text-zinc-700 uppercase tracking-widest">
-                   <ShieldCheck size={12} className="text-green-600" /> PCI DSS COMPLIANT
-                 </div>
-                 <div className="flex items-center gap-2 text-[8px] font-black text-zinc-700 uppercase tracking-widest">
-                   <Lock size={12} className="text-green-600" /> END-TO-END ENCRYPTION
-                 </div>
-              </div>
-           </div>
+                {/* Date & CVV */}
+                <div className="grid grid-cols-2 gap-4 md:gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">Ekspire</label>
+                    <div className="relative">
+                      <CalendarIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4 md:w-5 md:h-5" />
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="MM/YY"
+                        className="w-full bg-black/40 border border-white/10 rounded-[2rem] pl-12 md:pl-14 pr-4 py-5 md:py-6 text-sm md:text-base font-black tracking-widest outline-none focus:border-red-600 transition-all placeholder:text-zinc-800"
+                        value={expiry}
+                        onChange={handleExpiryChange}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">CVV</label>
+                    <div className="relative">
+                      <Hash className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4 md:w-5 md:h-5" />
+                      <input 
+                        required 
+                        type="password" 
+                        maxLength={4}
+                        placeholder="123"
+                        className="w-full bg-black/40 border border-white/10 rounded-[2rem] pl-12 md:pl-14 pr-4 py-5 md:py-6 text-sm md:text-base font-black tracking-widest outline-none focus:border-red-600 transition-all placeholder:text-zinc-800"
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-           {/* HELP LINK */}
-           <div className="text-center">
-             <button className="text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all tracking-widest italic border-b border-zinc-800 pb-1">Ou bliye PIN ou? Kontakte Sipò</button>
-           </div>
+                {/* Error Box */}
+                {error && (
+                  <div className="bg-red-600/10 border border-red-600/20 p-4 md:p-5 rounded-2xl flex items-center gap-3 text-red-500">
+                    <AlertCircle className="w-[18px] h-[18px] shrink-0" />
+                    <span className="text-[9px] md:text-[10px] font-black uppercase italic tracking-widest leading-relaxed">{error}</span>
+                  </div>
+                )}
+
+                <button 
+                  type="submit"
+                  disabled={processing}
+                  className="w-full bg-red-600 py-6 md:py-8 rounded-[2rem] md:rounded-[3rem] font-black uppercase text-[12px] md:text-[14px] tracking-[0.4em] hover:bg-red-700 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-red-600/20 flex items-center justify-center gap-3 md:gap-4 disabled:opacity-50 disabled:hover:scale-100 mt-4 md:mt-8"
+                >
+                  {processing ? <Loader2 className="animate-spin w-6 h-6" /> : <><Lock className="w-5 h-5 md:w-6 md:h-6" /> PEYE KOUNYE A</>}
+                </button>
+
+                <div className="flex flex-col items-center gap-2 md:gap-3 pt-4 md:pt-6">
+                   <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black text-zinc-600 uppercase tracking-widest">
+                     <Lock className="w-3 h-3 text-green-600" /> SSL ENCRYPTED PAYMENT
+                   </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
         </div>
-
       </div>
     </div>
   );
