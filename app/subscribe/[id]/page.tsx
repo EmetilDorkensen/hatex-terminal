@@ -93,7 +93,7 @@ export default function SubscribePage() {
     e.preventDefault();
     setError(null);
 
-    // 1. Validasyon fòma vizyèl
+    // Validasyon
     if (cardNumber.replace(/\s/g, '').length !== 16) return setError("Nimewo kat la dwe gen 16 chif.");
     if (expiry.length !== 5) return setError("Dat ekspirasyon an pa valid (MM/YY).");
     if (cvv.length < 3) return setError("CVV a dwe gen 3 oswa 4 chif.");
@@ -104,82 +104,67 @@ export default function SubscribePage() {
     try {
       const cleanCard = cardNumber.replace(/\s/g, '');
 
-      // 2. VERIFIKASYON BAZ DONE (Chache kat kliyan an nan tab profiles la)
+      // 1. Chache pwofil kliyan an
       const { data: clientProfile, error: cardErr } = await supabase
         .from('profiles') 
-        .select('id, card_balance, is_activated, full_name') // Nou rale full_name lan pou n ka rache l
+        .select('id, card_balance, is_activated, full_name') 
         .eq('card_number', cleanCard)
         .eq('cvv', cvv)
         .eq('exp_date', expiry)
         .single();
 
-      // Si l pa jwenn pwofil kliyan an ak enfòmasyon sa yo
-      if (cardErr || !clientProfile) {
-        throw new Error("Kat sa a pa anrejistre nan sistèm H-Pay oswa enfòmasyon yo pa bon.");
-      }
-
-      // Si kont kliyan an pa aktive
-      if (clientProfile.is_activated === false) {
-        throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
-      }
-
-      // Si kat la pa gen ase kòb sou li
-      if (clientProfile.card_balance < product.price) {
-        throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
-      }
+      if (cardErr || !clientProfile) throw new Error("Kat sa a pa anrejistre nan sistèm H-Pay oswa enfòmasyon yo pa bon.");
+      if (clientProfile.is_activated === false) throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
+      if (clientProfile.card_balance < product.price) throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
 
       // ==========================================
-      // 3. EGZEKITE TRANZAKSYON AN (Transfè Kòb ak Istorik)
+      // 2. TRANZAKSYON KÒB LA
       // ==========================================
 
-      // A) Rache non kliyan an pou fè fòma EME... DOR...
+      // A) Rache non kliyan an (EME... DOR...)
       const nameParts = (clientProfile.full_name || '').trim().split(/\s+/);
       const firstName = nameParts[0] ? nameParts[0].substring(0, 3).toUpperCase() : 'KLI';
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].substring(0, 3).toUpperCase() : 'YAN';
       const maskedName = `${firstName}... ${lastName}...`;
 
-      // B) Dedwi kòb sou kat kliyan an
-      const { error: deductErr } = await supabase
-        .from('profiles')
-        .update({ card_balance: clientProfile.card_balance - product.price })
-        .eq('id', clientProfile.id);
-      
+      // Kalkile nouvo balans yo pou nou ka mete yo nan istorik la
+      const clientNewBalance = clientProfile.card_balance - product.price;
+      const newMerchantBalance = (merchant.wallet_balance || 0) + product.price;
+
+      // B) Mete baz done a ajou pou kliyan an (retire kòb) ak machann nan (ajoute kòb)
+      const { error: deductErr } = await supabase.from('profiles').update({ card_balance: clientNewBalance }).eq('id', clientProfile.id);
       if (deductErr) throw new Error("Te gen yon pwoblèm nan retire kòb la sou kat ou.");
 
-      // C) Ajoute kòb la sou bous (wallet) machann nan
-      const newMerchantBalance = (merchant.wallet_balance || 0) + product.price;
-      const { error: addErr } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: newMerchantBalance })
-        .eq('id', merchant.id);
-
+      const { error: addErr } = await supabase.from('profiles').update({ wallet_balance: newMerchantBalance }).eq('id', merchant.id);
       if (addErr) throw new Error("Te gen yon pwoblèm nan transfere kòb la bay machann nan.");
 
-      // D) Anrejistre ISTORIK yo nan tab 'transactions' la
+      // C) Anrejistre ISTORIK la egzakteman menm jan ak tab transactions ou a
       const { error: txErr } = await supabase
         .from('transactions')
         .insert([
           // Mesaj pou Machann nan
           {
-            profile_id: merchant.id,
+            user_id: merchant.id,
             amount: product.price,
-            type: 'credit', // Lajan antre
-            description: `Ou vann yon abònman ak ${maskedName}`,
-            status: 'completed'
+            type: 'credit', 
+            status: 'completed',
+            reference: `Ou vann yon abònman ak ${maskedName}`,
+            balance_after: newMerchantBalance
           },
           // Mesaj pou Kliyan an
           {
-            profile_id: clientProfile.id,
+            user_id: clientProfile.id,
             amount: product.price,
-            type: 'debit', // Lajan soti
-            description: `Ou sot peye yon abònman nan men ${merchant.business_name || 'Biznis San Non'}`,
-            status: 'completed'
+            type: 'debit', 
+            status: 'completed',
+            reference: `Ou sot peye yon abònman nan men ${merchant.business_name || 'Biznis San Non'}`,
+            balance_after: clientNewBalance
           }
         ]);
 
-      if (txErr) console.error("Erè nan anrejistreman istorik la:", txErr); // Nou p'ap bloke peman an nèt si istorik la pa pase, men nou log li.
+      if (txErr) console.error("Erè nan anrejistreman istorik la:", txErr); 
 
-      // Jenere ID Tranzaksyon an epi montre siksè
+      // Jenere ID Tranzaksyon an ak afiche ekran siksè a
       const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
       setTxId(fakeTxId);
       setSuccess(true);
@@ -191,6 +176,9 @@ export default function SubscribePage() {
     }
   };
 
+  // ==========================================
+  // EKRAN LOADING
+  // ==========================================
   if (loading) return (
     <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center">
       <Loader2 className="animate-spin text-red-600 mb-4 w-12 h-12 md:w-16 md:h-16" />
@@ -198,6 +186,9 @@ export default function SubscribePage() {
     </div>
   );
 
+  // ==========================================
+  // EKRAN ERÈ
+  // ==========================================
   if (error && !product) return (
     <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 text-center">
       <AlertCircle className="text-red-600 mb-6 w-16 h-16 md:w-20 md:h-20" />
@@ -207,13 +198,11 @@ export default function SubscribePage() {
   );
 
   // ==========================================
-  // EKRAN SIKSÈ & RESI WHATSAPP LA
+  // EKRAN SIKSÈ & RESI WHATSAPP
   // ==========================================
   if (success) {
     const formattedPhone = product?.contact_phone?.replace(/[^0-9+]/g, '') || '';
-    
     const whatsappMessage = `Bonjou *${merchant?.business_name || "Biznis San Non"}*! Mwen sot peye pou abònman: *${product?.title}*.\n\n💰 *Kantite:* ${product?.price} HTG\n🆔 *ID Tranzaksyon:* ${txId}\n\nTanpri verifye peman m nan epi banm aksè a. Mèsi!`;
-    
     const whatsappLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(whatsappMessage)}`;
 
     return (
