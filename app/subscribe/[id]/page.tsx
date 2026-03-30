@@ -87,7 +87,7 @@ export default function SubscribePage() {
   };
 
   // ==========================================
-  // LOJIK ENTELIJAN VERIFIKASYON KAT (PROFILE TAB)
+  // LOJIK ENTELIJAN VERIFIKASYON KAT & TRANZAKSYON
   // ==========================================
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,10 +104,10 @@ export default function SubscribePage() {
     try {
       const cleanCard = cardNumber.replace(/\s/g, '');
 
-      // 2. VERIFIKASYON BAZ DONE (Chache kat la anndan tab profiles H-Pay la)
+      // 2. VERIFIKASYON BAZ DONE (Chache kat kliyan an nan tab profiles la)
       const { data: clientProfile, error: cardErr } = await supabase
         .from('profiles') 
-        .select('id, card_balance, is_activated')
+        .select('id, card_balance, is_activated, full_name') // Nou rale full_name lan pou n ka rache l
         .eq('card_number', cleanCard)
         .eq('cvv', cvv)
         .eq('exp_date', expiry)
@@ -128,12 +128,59 @@ export default function SubscribePage() {
         throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
       }
 
-      // (Tranzaksyon an fèt isit la: ou ta dedwi card_balance kliyan an epi ajoute sou wallet_balance machann nan)
-      // Nou jenere yon ID tranzaksyon fo pou demonstrasyon an
-      const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
-      
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
+      // ==========================================
+      // 3. EGZEKITE TRANZAKSYON AN (Transfè Kòb ak Istorik)
+      // ==========================================
 
+      // A) Rache non kliyan an pou fè fòma EME... DOR...
+      const nameParts = (clientProfile.full_name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] ? nameParts[0].substring(0, 3).toUpperCase() : 'KLI';
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].substring(0, 3).toUpperCase() : 'YAN';
+      const maskedName = `${firstName}... ${lastName}...`;
+
+      // B) Dedwi kòb sou kat kliyan an
+      const { error: deductErr } = await supabase
+        .from('profiles')
+        .update({ card_balance: clientProfile.card_balance - product.price })
+        .eq('id', clientProfile.id);
+      
+      if (deductErr) throw new Error("Te gen yon pwoblèm nan retire kòb la sou kat ou.");
+
+      // C) Ajoute kòb la sou bous (wallet) machann nan
+      const newMerchantBalance = (merchant.wallet_balance || 0) + product.price;
+      const { error: addErr } = await supabase
+        .from('profiles')
+        .update({ wallet_balance: newMerchantBalance })
+        .eq('id', merchant.id);
+
+      if (addErr) throw new Error("Te gen yon pwoblèm nan transfere kòb la bay machann nan.");
+
+      // D) Anrejistre ISTORIK yo nan tab 'transactions' la
+      const { error: txErr } = await supabase
+        .from('transactions')
+        .insert([
+          // Mesaj pou Machann nan
+          {
+            profile_id: merchant.id,
+            amount: product.price,
+            type: 'credit', // Lajan antre
+            description: `Ou vann yon abònman ak ${maskedName}`,
+            status: 'completed'
+          },
+          // Mesaj pou Kliyan an
+          {
+            profile_id: clientProfile.id,
+            amount: product.price,
+            type: 'debit', // Lajan soti
+            description: `Ou sot peye yon abònman nan men ${merchant.business_name || 'Biznis San Non'}`,
+            status: 'completed'
+          }
+        ]);
+
+      if (txErr) console.error("Erè nan anrejistreman istorik la:", txErr); // Nou p'ap bloke peman an nèt si istorik la pa pase, men nou log li.
+
+      // Jenere ID Tranzaksyon an epi montre siksè
+      const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
       setTxId(fakeTxId);
       setSuccess(true);
       
@@ -234,7 +281,7 @@ export default function SubscribePage() {
                <h1 className="text-4xl sm:text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.85]">Checkout <span className="text-red-600">Sekirize</span></h1>
             </div>
 
-            {/* KAT BIZNIS MACHANN NAN (BUSINESS NAME + LOGO) */}
+            {/* KAT BIZNIS MACHANN NAN (BUSINESS NAME + LOGO SELMAN) */}
             <div className="bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-[50px] rounded-full" />
                <div className="relative z-10 flex items-center gap-4 md:gap-6">
