@@ -37,7 +37,7 @@ export default function SubscriptionsDashboard() {
         .eq('id', user.id)
         .single();
 
-      if (profile?.kyc_status !== 'verified') {
+      if (profile?.kyc_status !== 'approved') {
         setKycApproved(false);
         setLoading(false);
         return; 
@@ -45,7 +45,7 @@ export default function SubscriptionsDashboard() {
 
       setKycApproved(true);
 
-      // 2. Rale pwodwi yo (Sèlman si KYC a verifye)
+      // 2. Rale pwodwi yo (Sèlman si KYC a approved)
       const { data: productsData } = await supabase
         .from('products')
         .select('*')
@@ -89,11 +89,12 @@ export default function SubscriptionsDashboard() {
       
       <h1 className="text-4xl md:text-6xl lg:text-8xl font-black uppercase tracking-tighter italic leading-none mb-6">Aksè <span className="text-red-600">Refize</span></h1>
       <p className="text-zinc-500 text-sm md:text-base font-bold max-w-lg mx-auto mb-10 leading-relaxed italic border-l-4 border-red-600/20 pl-4">
-        Ou pa ka jere oswa kreye abònman paske kont ou poko verifye. Konfòme ak règleman H-Pay yo (KYC) pou w ka vann sèvis ou yo.
+        Ou pa ka jere oswa kreye abònman paske kont ou poko apwouve. Konfòme ak règleman H-Pay yo (KYC) pou w ka vann sèvis ou yo.
       </p>
 
+      {/* BOUTON KORIJE A KI VOYE DIRÈK SOU /kyc */}
       <button 
-        onClick={() => router.push('/dashboard/kyc')} 
+        onClick={() => router.push('/kyc')} 
         className="bg-white text-black px-10 py-5 md:px-14 md:py-6 rounded-full font-black uppercase text-[10px] md:text-[12px] tracking-[0.4em] hover:scale-105 transition-all shadow-[0_20px_50px_-15px_rgba(255,255,255,0.3)] flex items-center gap-3"
       >
         <ShieldCheck className="w-5 h-5" /> Verifye Idantite w
@@ -179,7 +180,6 @@ export default function SubscriptionsDashboard() {
 
           {products.length === 0 ? (
             <div className="bg-[#0d0e1a] border border-white/5 rounded-[3rem] md:rounded-[4rem] p-12 md:p-24 text-center">
-              {/* KORIJE IKÒN NAN ISIT LA */}
               <LayoutGrid className="mx-auto text-zinc-800 mb-6 w-16 h-16 md:w-20 md:h-20" />
               <p className="text-zinc-500 font-black uppercase text-[10px] md:text-[12px] tracking-[0.4em]">Ou poko kreye okenn abònman</p>
             </div>
@@ -194,7 +194,6 @@ export default function SubscriptionsDashboard() {
                       <img src={product.image_url} alt={product.title} className="w-full h-full object-cover opacity-70 group-hover:scale-110 group-hover:opacity-100 transition-all duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-zinc-800">
-                         {/* KORIJE LÒT IKÒN NAN ISIT LA TOU */}
                          <LayoutGrid className="w-10 h-10 md:w-12 md:h-12" />
                       </div>
                     )}
