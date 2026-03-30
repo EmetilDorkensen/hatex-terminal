@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { 
   Loader2, CreditCard, ShieldCheck, AlertCircle, 
   ArrowLeft, CheckCircle2, Lock, ShieldAlert, 
-  Receipt, Phone, CalendarIcon, Hash
+  Receipt, Phone, CalendarIcon, Hash, MessageCircle
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -26,6 +26,7 @@ export default function SubscribePage() {
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
 
+  // STATES POU PEMAN AN AK RESI A
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [txId, setTxId] = useState('');
@@ -44,7 +45,6 @@ export default function SubscribePage() {
       }
 
       try {
-        // 1. DEKRIPTE ID A (Paske nou te kripte l ak btoa)
         let decodedId = '';
         try {
           decodedId = atob(decodeURIComponent(rawId));
@@ -52,7 +52,6 @@ export default function SubscribePage() {
           throw new Error("Lyen abònman an kòronpi oswa li pa bon ankò.");
         }
 
-        // 2. Rale enfòmasyon pwodwi a ak machann nan
         const { data: p, error: pErr } = await supabase
           .from('products')
           .select('*, profiles(*)')
@@ -73,7 +72,6 @@ export default function SubscribePage() {
     getCheckoutData();
   }, [rawId, supabase]);
 
-  // FÒMATE NIMEWO KAT LA POU L PRAN ESPAS CHAK 4 CHIF
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length > 16) value = value.slice(0, 16);
@@ -81,7 +79,6 @@ export default function SubscribePage() {
     setCardNumber(formatted);
   };
 
-  // FÒMATE DAT EXPIRASYON AN (MM/YY)
   const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length > 4) value = value.slice(0, 4);
@@ -89,35 +86,59 @@ export default function SubscribePage() {
     setExpiry(value);
   };
 
+  // ==========================================
+  // LOJIK ENTELIJAN VERIFIKASYON KAT (PROFILE TAB)
+  // ==========================================
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validasyon senp sou kat la
-    if (cardNumber.replace(/\s/g, '').length !== 16) {
-      return setError("Nimewo kat la dwe gen 16 chif.");
-    }
-    if (expiry.length !== 5) {
-      return setError("Dat ekspirasyon an pa valid (MM/YY).");
-    }
-    if (cvv.length < 3) {
-      return setError("CVV a dwe gen 3 oswa 4 chif.");
-    }
-    if (!cardName.trim()) {
-      return setError("Ou dwe mete non ki sou kat la.");
-    }
+    // 1. Validasyon fòma vizyèl
+    if (cardNumber.replace(/\s/g, '').length !== 16) return setError("Nimewo kat la dwe gen 16 chif.");
+    if (expiry.length !== 5) return setError("Dat ekspirasyon an pa valid (MM/YY).");
+    if (cvv.length < 3) return setError("CVV a dwe gen 3 oswa 4 chif.");
+    if (!cardName.trim()) return setError("Ou dwe mete non ki sou kat la.");
 
     setProcessing(true);
 
     try {
-      // Isit la H-Pay ta rele API Bank la, n ap simule pwosesis la ak Escrow
+      const cleanCard = cardNumber.replace(/\s/g, '');
+
+      // 2. VERIFIKASYON BAZ DONE (Chache kat la anndan tab profiles H-Pay la)
+      const { data: clientProfile, error: cardErr } = await supabase
+        .from('profiles') 
+        .select('id, card_balance, is_activated')
+        .eq('card_number', cleanCard)
+        .eq('cvv', cvv)
+        .eq('exp_date', expiry)
+        .single();
+
+      // Si l pa jwenn pwofil kliyan an ak enfòmasyon sa yo
+      if (cardErr || !clientProfile) {
+        throw new Error("Kat sa a pa anrejistre nan sistèm H-Pay oswa enfòmasyon yo pa bon.");
+      }
+
+      // Si kont kliyan an pa aktive
+      if (clientProfile.is_activated === false) {
+        throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
+      }
+
+      // Si kat la pa gen ase kòb sou li
+      if (clientProfile.card_balance < product.price) {
+        throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
+      }
+
+      // (Tranzaksyon an fèt isit la: ou ta dedwi card_balance kliyan an epi ajoute sou wallet_balance machann nan)
+      // Nou jenere yon ID tranzaksyon fo pou demonstrasyon an
       const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
-      await new Promise(resolve => setTimeout(resolve, 3000)); 
+      
+      await new Promise(resolve => setTimeout(resolve, 2000)); 
 
       setTxId(fakeTxId);
       setSuccess(true);
+      
     } catch (err: any) {
-      setError("Tranzaksyon an echwe: Bank ou a refize peman an.");
+      setError(err.message);
     } finally {
       setProcessing(false);
     }
@@ -138,69 +159,104 @@ export default function SubscribePage() {
     </div>
   );
 
-  if (success) return (
-    <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 italic text-center selection:bg-red-600">
-      <div className="relative mb-8 md:mb-12">
-        <div className="absolute inset-0 bg-green-500 blur-[60px] md:blur-[80px] opacity-20 rounded-full" />
-        <div className="relative w-24 h-24 md:w-32 md:h-32 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/30">
-          <CheckCircle2 className="text-green-500 w-12 h-12 md:w-16 md:h-16" />
-        </div>
-      </div>
-      
-      <h1 className="text-5xl sm:text-6xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-4 md:mb-6">Peman <span className="text-green-500">Siksè</span></h1>
-      <p className="text-zinc-500 text-sm md:text-base font-bold max-w-md mx-auto mb-8 md:mb-10 leading-relaxed px-4">
-        Abònman ou pou <span className="text-white">{product.title}</span> kòmanse! Yon resi ap voye ba ou.
-      </p>
+  // ==========================================
+  // EKRAN SIKSÈ & RESI WHATSAPP LA
+  // ==========================================
+  if (success) {
+    const formattedPhone = product?.contact_phone?.replace(/[^0-9+]/g, '') || '';
+    
+    const whatsappMessage = `Bonjou *${merchant?.business_name || "Biznis San Non"}*! Mwen sot peye pou abònman: *${product?.title}*.\n\n💰 *Kantite:* ${product?.price} HTG\n🆔 *ID Tranzaksyon:* ${txId}\n\nTanpri verifye peman m nan epi banm aksè a. Mèsi!`;
+    
+    const whatsappLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(whatsappMessage)}`;
 
-      <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 w-full max-w-sm space-y-4 mb-10 md:mb-12 shadow-2xl">
-        <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500">
-          <span>Tranzaksyon ID</span>
-          <span className="text-white">{txId}</span>
+    return (
+      <div className="min-h-screen bg-[#06070d] text-white flex flex-col items-center justify-center p-6 italic text-center selection:bg-red-600">
+        <div className="relative mb-8 md:mb-12">
+          <div className="absolute inset-0 bg-green-500 blur-[60px] md:blur-[80px] opacity-20 rounded-full" />
+          <div className="relative w-24 h-24 md:w-32 md:h-32 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/30">
+            <CheckCircle2 className="text-green-500 w-12 h-12 md:w-16 md:h-16" />
+          </div>
         </div>
-        <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500">
-          <span>Vandè</span>
-          <span className="text-white font-bold italic truncate ml-4">{merchant?.full_name}</span>
-        </div>
-      </div>
-    </div>
-  );
+        
+        <h1 className="text-5xl sm:text-6xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-4 md:mb-6">Peman <span className="text-green-500">Siksè</span></h1>
+        <p className="text-zinc-500 text-sm md:text-base font-bold max-w-md mx-auto mb-8 md:mb-10 leading-relaxed px-4">
+          Abònman ou nan <span className="text-white">{merchant?.business_name || "Biznis la"}</span> pase ak siksè! Klike anba a pou voye resi a dirèk bay vandè a.
+        </p>
 
+        <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 w-full max-w-sm space-y-4 mb-8 md:mb-10 shadow-2xl text-left">
+          <div className="flex justify-between items-center text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 pb-4 mb-2">
+            <span>Vandè / Biznis</span>
+            <div className="flex items-center gap-2">
+              <img 
+                src={`https://api.dicebear.com/7.x/shapes/svg?seed=${merchant?.business_name || 'H-Pay'}`} 
+                alt="Logo" 
+                className="w-5 h-5 rounded-md object-cover"
+              />
+              <span className="text-white font-bold italic truncate">{merchant?.business_name || "Biznis San Non"}</span>
+            </div>
+          </div>
+          <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500">
+            <span>Tranzaksyon ID</span>
+            <span className="text-white">{txId}</span>
+          </div>
+          <div className="flex justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500 border-t border-white/5 pt-4">
+            <span>Montan Peye</span>
+            <span className="text-green-500 font-bold">{product?.price?.toLocaleString()} HTG</span>
+          </div>
+        </div>
+
+        <button 
+          onClick={() => window.open(whatsappLink, '_blank')}
+          className="w-full max-w-sm bg-green-500 text-black py-5 md:py-6 rounded-full font-black uppercase text-[10px] md:text-[12px] tracking-widest hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_-15px_rgba(34,197,94,0.4)] flex items-center justify-center gap-3 animate-pulse"
+        >
+          <MessageCircle className="w-5 h-5 md:w-6 md:h-6" /> Voye Resi a sou WhatsApp
+        </button>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // EKRAN PEMAN AN (PAJ PRINCIPAL CHECKOUT LA)
+  // ==========================================
   return (
     <div className="min-h-screen bg-[#06070d] text-white p-4 sm:p-6 md:p-12 italic font-medium selection:bg-red-600">
       <div className="max-w-6xl mx-auto space-y-8 md:space-y-12">
         
-        {/* HEADER RETOUNEN */}
         <button onClick={() => router.back()} className="flex items-center gap-2 md:gap-3 text-[10px] md:text-[12px] font-black uppercase text-zinc-500 hover:text-white transition-all tracking-[0.3em]">
           <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" /> ANILE ACHAT LA
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
           
-          {/* LÈF: ENFÒMASYON BIZNIS & PWODWI (RESPONSIF) */}
           <div className="lg:col-span-6 space-y-6 md:space-y-10 order-2 lg:order-1">
             
             <div className="space-y-2 md:space-y-4 text-center lg:text-left">
                <h1 className="text-4xl sm:text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.85]">Checkout <span className="text-red-600">Sekirize</span></h1>
             </div>
 
-            {/* KAT BIZNIS MACHANN NAN */}
+            {/* KAT BIZNIS MACHANN NAN (BUSINESS NAME + LOGO) */}
             <div className="bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-[50px] rounded-full" />
                <div className="relative z-10 flex items-center gap-4 md:gap-6">
                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-black border-2 border-white/10 overflow-hidden shrink-0">
-                   <img src={merchant?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${merchant?.full_name}`} alt="Logo" className="w-full h-full object-cover" />
+                   <img 
+                     src={`https://api.dicebear.com/7.x/shapes/svg?seed=${merchant?.business_name || 'H-Pay'}`} 
+                     alt="Business Logo" 
+                     className="w-full h-full object-cover" 
+                   />
                  </div>
                  <div className="flex-1">
                    <div className="flex items-center gap-2 text-green-500 mb-1">
                      <ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" />
                      <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest">Sètifye H-Pay</span>
                    </div>
-                   <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter truncate">{merchant?.full_name || "Biznis San Non"}</h2>
+                   <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter truncate">
+                     {merchant?.business_name || "Biznis San Non"}
+                   </h2>
                    
-                   {/* KONTAK BIZNIS LA */}
                    {product?.contact_phone && (
-                     <div className="flex items-center gap-2 mt-3 text-zinc-400 bg-white/5 w-fit px-3 md:px-4 py-1.5 md:py-2 rounded-xl">
-                       <Phone className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                     <div className="flex items-center gap-2 mt-3 text-zinc-400 bg-white/5 w-fit px-3 md:px-4 py-1.5 md:py-2 rounded-xl border border-white/5">
+                       <Phone className="w-3 h-3 md:w-3.5 md:h-3.5 text-green-500" />
                        <span className="text-[10px] md:text-[11px] font-bold tracking-widest">{product.contact_phone}</span>
                      </div>
                    )}
@@ -208,10 +264,9 @@ export default function SubscribePage() {
                </div>
             </div>
 
-            {/* DETAY PWODWI K AP ACHTE A */}
             <div className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 space-y-6 md:space-y-8">
                <div className="flex items-start gap-4 md:gap-6">
-                 <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-zinc-900 border border-white/5 overflow-hidden shrink-0">
+                 <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-zinc-900 border border-white/5 overflow-hidden shrink-0 relative">
                    {product?.image_url ? (
                      <img src={product.image_url} className="w-full h-full object-cover" alt="Product" />
                    ) : (
@@ -236,8 +291,7 @@ export default function SubscribePage() {
                </div>
             </div>
 
-            {/* GARANTI ESCROW */}
-            <div className="bg-red-600/5 border border-red-600/20 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex gap-4 items-start">
+            <div className="bg-red-600/5 border border-red-600/20 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex gap-4 items-start shadow-inner">
                <ShieldAlert className="w-5 h-5 md:w-6 md:h-6 text-red-600 shrink-0" />
                <p className="text-[10px] md:text-[11px] text-zinc-400 leading-relaxed font-bold italic">
                  <span className="text-white block mb-1 uppercase font-black">Garanti H-Pay Escrow</span>
@@ -246,7 +300,6 @@ export default function SubscribePage() {
             </div>
           </div>
 
-          {/* DWAT: FÒMILÈ KAT KREDI (PEMAN AN) */}
           <div className="lg:col-span-6 order-1 lg:order-2">
             <div className="bg-[#0d0e1a] p-6 sm:p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl relative">
               
@@ -259,7 +312,6 @@ export default function SubscribePage() {
               </div>
 
               <form onSubmit={handleProcessPayment} className="space-y-6 md:space-y-8">
-                {/* Non sou Kat la */}
                 <div className="space-y-3">
                   <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">Non sou Kat la</label>
                   <input 
@@ -272,7 +324,6 @@ export default function SubscribePage() {
                   />
                 </div>
 
-                {/* Nimewo Kat */}
                 <div className="space-y-3">
                   <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">Nimewo Kat la</label>
                   <div className="relative">
@@ -288,7 +339,6 @@ export default function SubscribePage() {
                   </div>
                 </div>
 
-                {/* Date & CVV */}
                 <div className="grid grid-cols-2 gap-4 md:gap-6">
                   <div className="space-y-3">
                     <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-4">Ekspire</label>
@@ -321,7 +371,6 @@ export default function SubscribePage() {
                   </div>
                 </div>
 
-                {/* Error Box */}
                 {error && (
                   <div className="bg-red-600/10 border border-red-600/20 p-4 md:p-5 rounded-2xl flex items-center gap-3 text-red-500">
                     <AlertCircle className="w-[18px] h-[18px] shrink-0" />
@@ -334,10 +383,10 @@ export default function SubscribePage() {
                   disabled={processing}
                   className="w-full bg-red-600 py-6 md:py-8 rounded-[2rem] md:rounded-[3rem] font-black uppercase text-[12px] md:text-[14px] tracking-[0.4em] hover:bg-red-700 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-red-600/20 flex items-center justify-center gap-3 md:gap-4 disabled:opacity-50 disabled:hover:scale-100 mt-4 md:mt-8"
                 >
-                  {processing ? <Loader2 className="animate-spin w-6 h-6" /> : <><Lock className="w-5 h-5 md:w-6 md:h-6" /> PEYE KOUNYE A</>}
+                  {processing ? <Loader2 className="animate-spin w-5 h-5 md:w-6 md:h-6" /> : <><Lock className="w-5 h-5 md:w-6 md:h-6" /> PEYE KOUNYE A</>}
                 </button>
 
-                <div className="flex flex-col items-center gap-2 md:gap-3 pt-4 md:pt-6">
+                <div className="flex flex-col items-center gap-2 md:gap-3 pt-4 md:pt-6 border-t border-white/5 mt-6">
                    <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black text-zinc-600 uppercase tracking-widest">
                      <Lock className="w-3 h-3 text-green-600" /> SSL ENCRYPTED PAYMENT
                    </div>

@@ -7,40 +7,41 @@ import {
   Globe, Lock, Zap, Star, LayoutGrid, CreditCard, Heart, 
   Gamepad2, Utensils, Wrench, Briefcase, Camera, Music, ShoppingBag,
   Plus, Trash2, Sparkles, ShieldCheck, ZapOff,
-  HelpCircle, Phone, LockKeyhole, Settings2
+  HelpCircle, Phone, LockKeyhole, UploadCloud
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-// LIS KATEGORI KONPLÈ AK DESKRIPSYON YO
 const CATEGORIES = [
-  { id: 'entertainment', name: 'Divertisman', icon: <Zap className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Netflix, IPTV, Streaming' },
-  { id: 'education', name: 'Edikasyon', icon: <Globe className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Kou anliy, Liv, Training' },
-  { id: 'software', name: 'Lojisyèl / SaaS', icon: <Lock className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Apps, Web Tools, Hosting' },
-  { id: 'gaming', name: 'Gaming / FiveM', icon: <Gamepad2 className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Servers, Coins, Skins' },
-  { id: 'nutrition', name: 'Sante & Nitrisyon', icon: <Utensils className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Pwoteyin, Rejim, Gym' },
-  { id: 'fitness', name: 'Fitness / Coach', icon: <Star className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Antrenman, Swivi pèsonèl' },
-  { id: 'content', name: 'Kreyasyon Kontni', icon: <Camera className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'OnlyFans, Patreon, VIP' },
-  { id: 'music', name: 'Mizik & Audio', icon: <Music className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Beats, Studio, Playlists' },
-  { id: 'professional', name: 'Sèvis Pwofesyonèl', icon: <Briefcase className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Konsiltasyon, Legal' },
-  { id: 'tools', name: 'Zouti Teknik', icon: <Wrench className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Reparasyon, Devlopman' },
-  { id: 'lifestyle', name: 'Style de Vi', icon: <Heart className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Fashion, Vwayaj, Evènman' },
-  { id: 'shopping', name: 'E-commerce', icon: <ShoppingBag className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Boutik anliy, Pwodwi fizik' },
-  { id: 'crypto', name: 'Trading / Crypto', icon: <ZapOff className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Signals, Kou Trading' },
-  { id: 'other', name: 'Lòt Sèvis', icon: <LayoutGrid className="w-4 h-4 md:w-5 md:h-5"/>, desc: 'Nenpòt lòt bagay' }
+  { id: 'entertainment', name: 'Divertisman', icon: <Zap className="w-5 h-5"/>, desc: 'Netflix, IPTV, Streaming' },
+  { id: 'education', name: 'Edikasyon', icon: <Globe className="w-5 h-5"/>, desc: 'Kou anliy, Liv, Training' },
+  { id: 'software', name: 'Lojisyèl / SaaS', icon: <Lock className="w-5 h-5"/>, desc: 'Apps, Web Tools, Hosting' },
+  { id: 'gaming', name: 'Gaming / FiveM', icon: <Gamepad2 className="w-5 h-5"/>, desc: 'Servers, Coins, Skins' },
+  { id: 'nutrition', name: 'Sante & Nitrisyon', icon: <Utensils className="w-5 h-5"/>, desc: 'Pwoteyin, Rejim, Gym' },
+  { id: 'fitness', name: 'Fitness / Coach', icon: <Star className="w-5 h-5"/>, desc: 'Antrenman, Swivi pèsonèl' },
+  { id: 'content', name: 'Kreyasyon Kontni', icon: <Camera className="w-5 h-5"/>, desc: 'OnlyFans, Patreon, VIP' },
+  { id: 'music', name: 'Mizik & Audio', icon: <Music className="w-5 h-5"/>, desc: 'Beats, Studio, Playlists' },
+  { id: 'professional', name: 'Sèvis Pwofesyonèl', icon: <Briefcase className="w-5 h-5"/>, desc: 'Konsiltasyon, Legal' },
+  { id: 'tools', name: 'Zouti Teknik', icon: <Wrench className="w-5 h-5"/>, desc: 'Reparasyon, Devlopman' },
+  { id: 'lifestyle', name: 'Style de Vi', icon: <Heart className="w-5 h-5"/>, desc: 'Fashion, Vwayaj, Evènman' },
+  { id: 'shopping', name: 'E-commerce', icon: <ShoppingBag className="w-5 h-5"/>, desc: 'Boutik anliy, Pwodwi fizik' },
+  { id: 'crypto', name: 'Trading / Crypto', icon: <ZapOff className="w-5 h-5"/>, desc: 'Signals, Kou Trading' },
+  { id: 'other', name: 'Lòt Sèvis', icon: <LayoutGrid className="w-5 h-5"/>, desc: 'Nenpòt lòt bagay' }
 ];
 
 export default function NewSubscriptionPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   
-  // DONE FÒMILÈ A AK TOUT OPSYON YO
+  // STATE POU FOTO NAN GALERI A
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
     category: 'entertainment',
     billing_cycle: 'month',
-    image_url: '',
     contact_phone: '',
     encrypt_price: false,
     features: ['', '', ''],
@@ -52,6 +53,15 @@ export default function NewSubscriptionPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  // FONKSYON LÈ MACHANN NAN CHWAZI FOTO A NAN GALERI A
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file)); // Montre foto a dirèk nan preview a
+    }
+  };
 
   const handleFeatureChange = (index: number, value: string) => {
     const newFeatures = [...formData.features];
@@ -76,7 +86,28 @@ export default function NewSubscriptionPage() {
       if (!user) throw new Error("Ou dwe konekte kòm machann");
 
       if (!formData.contact_phone || formData.contact_phone.length < 8) {
-          throw new Error("Ou dwe mete yon nimewo WhatsApp/Kontak valid (omwen 8 chif).");
+          throw new Error("Ou dwe mete yon nimewo WhatsApp/Kontak valid.");
+      }
+
+      let finalImageUrl = '';
+
+      // SI MACHANN NAN TE CHWAZI YON FOTO, VOYEL NAN SUPABASE STORAGE
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('products') // ⚠️ Asire w ou gen yon bucket ki rele 'products' anndan Supabase!
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw new Error("Erè nan chaje foto a. Tcheke si bucket 'products' la kreye nan Supabase.");
+
+        const { data: publicUrlData } = supabase.storage
+          .from('products')
+          .getPublicUrl(filePath);
+
+        finalImageUrl = publicUrlData.publicUrl;
       }
 
       const { error } = await supabase.from('products').insert([{
@@ -86,7 +117,7 @@ export default function NewSubscriptionPage() {
         price: parseFloat(formData.price || '0'),
         category: formData.category,
         billing_cycle: formData.billing_cycle,
-        image_url: formData.image_url,
+        image_url: finalImageUrl,
         features: formData.features.filter(f => f.trim() !== ''),
         trial_days: parseInt(formData.trial_days),
         contact_phone: formData.contact_phone,
@@ -113,7 +144,7 @@ export default function NewSubscriptionPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 border-b border-white/5 pb-8 md:pb-10">
           <div className="space-y-4 md:space-y-6">
             <button onClick={() => router.back()} className="flex items-center gap-2 md:gap-3 text-[10px] md:text-[12px] font-black uppercase text-zinc-500 hover:text-white transition-all tracking-[0.4em]">
-              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" /> ANILE KREYASYON AN
+              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" /> ANILE KREYASYON
             </button>
             <h1 className="text-4xl sm:text-6xl lg:text-8xl xl:text-9xl font-black uppercase italic tracking-tighter leading-[0.85] md:leading-[0.8]">
               PUBLISH <span className="text-red-600 block sm:inline">NEW</span>
@@ -121,50 +152,51 @@ export default function NewSubscriptionPage() {
           </div>
           <div className="flex flex-wrap gap-3 md:gap-4 bg-[#0d0e1a] p-3 md:p-4 rounded-2xl md:rounded-3xl border border-white/5 shadow-2xl w-full md:w-auto justify-center md:justify-end">
              <div className="px-4 md:px-8 py-2 md:py-3 bg-red-600 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-2 w-full sm:w-auto justify-center">
-               <ShieldCheck className="w-4 h-4" /> MERCHANT VERIFIED
-             </div>
-             <div className="px-4 md:px-8 py-2 md:py-3 bg-zinc-900 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500 border border-white/5 hidden sm:block">
-               H-PAY ENGINE V2
+               <ShieldCheck className="w-4 h-4" /> VERIFIED
              </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-20">
           
-          {/* FÒMILÈ A */}
           <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-12 md:space-y-20">
-            
-            {/* ETAP 1: IDANTITE AK FOTO */}
+            {/* ETAP 1 */}
             <section className="space-y-6 md:space-y-10">
               <div className="flex items-center gap-3 md:gap-5">
                 <span className="text-4xl md:text-6xl font-black text-red-600/20">01</span>
                 <h2 className="text-xl md:text-2xl font-black uppercase tracking-widest italic leading-tight">Idantite <span className="text-red-600">& Foto</span></h2>
               </div>
-              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-10">
                 <div className="space-y-3 md:space-y-4">
                   <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-600 ml-4 tracking-[0.2em]">Non Abònman an *</label>
-                  <input required type="text" placeholder="Ex: Premium VIP 4K" className="w-full bg-[#0d0e1a] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 text-sm outline-none focus:border-red-600 transition-all font-bold placeholder:text-zinc-800" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+                  <input required type="text" placeholder="Ex: Premium VIP" className="w-full bg-[#0d0e1a] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 text-sm outline-none focus:border-red-600 font-bold" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
                 </div>
+                
+                {/* UPLOAD FOTO NAN GALERI A */}
                 <div className="space-y-3 md:space-y-4">
-                  <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-600 ml-4 tracking-[0.2em]">Lyen Cover Image (Opsyonèl)</label>
-                  <input type="url" placeholder="https://..." className="w-full bg-[#0d0e1a] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 text-sm outline-none focus:border-red-600 transition-all font-bold placeholder:text-zinc-800" value={formData.image_url} onChange={(e) => setFormData({...formData, image_url: e.target.value})} />
+                  <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-600 ml-4 tracking-[0.2em]">Chwazi Foto nan Galeri *</label>
+                  <label className="flex flex-col items-center justify-center w-full h-full min-h-[100px] bg-[#0d0e1a] border-2 border-dashed border-white/10 rounded-[2rem] hover:border-red-600/50 transition-all cursor-pointer group p-4">
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} required />
+                    <UploadCloud className="text-zinc-500 mb-2 group-hover:text-red-500 transition-colors w-6 h-6 md:w-8 md:h-8" />
+                    <span className="text-[9px] md:text-[10px] font-black uppercase text-zinc-400 group-hover:text-white text-center">
+                      {imageFile ? <span className="text-green-500">Foto a chwazi ✓</span> : 'Klike isit la pou w chèche'}
+                    </span>
+                  </label>
                 </div>
               </div>
 
               <div className="space-y-3 md:space-y-4">
                 <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-600 ml-4 tracking-[0.2em]">Deskripsyon Detaye</label>
-                <textarea rows={4} placeholder="Poukisa kliyan an dwe achte sa nan men w? Ekri yon bon deskripsyon ki kapte atansyon..." className="w-full bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 text-sm outline-none focus:border-red-600 transition-all resize-none font-medium leading-relaxed" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+                <textarea rows={5} placeholder="Poukisa kliyan an dwe achte sa?" className="w-full bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 text-sm outline-none focus:border-red-600 resize-none font-medium leading-relaxed" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
               </div>
             </section>
 
-            {/* ETAP 2: KATEGORI */}
+            {/* ETAP 2 */}
             <section className="space-y-6 md:space-y-10">
               <div className="flex items-center gap-3 md:gap-5">
                 <span className="text-4xl md:text-6xl font-black text-red-600/20">02</span>
                 <h2 className="text-xl md:text-2xl font-black uppercase tracking-widest italic leading-tight">Chwazi <span className="text-red-600">Kategori</span></h2>
               </div>
-              
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                 {CATEGORIES.map((cat) => (
                   <button key={cat.id} type="button" onClick={() => setFormData({...formData, category: cat.id})} className={`flex flex-col items-center justify-center text-center p-4 md:p-6 lg:p-8 rounded-[2rem] md:rounded-[3rem] border transition-all duration-300 group ${formData.category === cat.id ? 'border-red-600 bg-red-600 text-white scale-[1.02] shadow-xl shadow-red-600/20' : 'border-white/5 bg-[#0d0e1a] text-zinc-600 hover:border-white/10'}`}>
@@ -177,7 +209,7 @@ export default function NewSubscriptionPage() {
               </div>
             </section>
 
-            {/* ETAP 3: TARIF, KONTAK & SEKIRITE */}
+            {/* ETAP 3 */}
             <section className="space-y-6 md:space-y-10">
               <div className="flex items-center gap-3 md:gap-5">
                 <span className="text-4xl md:text-6xl font-black text-red-600/20">03</span>
@@ -207,19 +239,20 @@ export default function NewSubscriptionPage() {
                 </div>
               </div>
 
-              {/* KONTAK AK SEKIRITE (NOUVO) */}
+              {/* KONTAK AK SEKIRITE */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 bg-black/40 p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
                 <div className="space-y-3 md:space-y-4">
                   <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-600 ml-4 tracking-[0.2em] flex items-center gap-2">
-                    <Phone className="text-red-600 w-3.5 h-3.5 md:w-4 md:h-4" /> WhatsApp / Telefòn *
+                    <Phone className="w-4 h-4 text-red-600" /> WhatsApp / Telefòn *
                   </label>
+                  {/* NIMEWO A OBLIGATWA */}
                   <input required type="tel" placeholder="+509..." className="w-full bg-[#0d0e1a] border border-white/5 rounded-[2rem] p-5 md:p-6 text-sm font-bold outline-none focus:border-red-600 transition-all placeholder:text-zinc-700" value={formData.contact_phone} onChange={(e) => setFormData({...formData, contact_phone: e.target.value})} />
-                  <p className="text-[8px] text-zinc-500 italic ml-4">Obligatwa pou kliyan ka kontakte w.</p>
+                  <p className="text-[8px] text-zinc-500 italic ml-4">Mete kòd peyi a (+509). Li obligatwa pou resi WhatsApp la.</p>
                 </div>
                 
                 <div className="space-y-3 md:space-y-4 flex flex-col justify-center">
                   <label className="text-[9px] md:text-[10px] font-black uppercase text-zinc-600 ml-4 tracking-[0.2em] flex items-center gap-2">
-                    <LockKeyhole className="text-green-500 w-3.5 h-3.5 md:w-4 md:h-4" /> Opsyon Sekirite
+                    <LockKeyhole className="w-4 h-4 text-green-500" /> Opsyon Sekirite
                   </label>
                   <label className="flex items-center gap-4 cursor-pointer p-5 md:p-6 rounded-[2rem] bg-[#0d0e1a] border border-white/5 hover:border-red-600/50 transition-all">
                     <input type="checkbox" className="w-5 h-5 accent-red-600 rounded-md" checked={formData.encrypt_price} onChange={(e) => setFormData({...formData, encrypt_price: e.target.checked})} />
@@ -255,68 +288,43 @@ export default function NewSubscriptionPage() {
             </button>
           </form>
 
-          {/* PREVIEW FIXED (DWAT) */}
+          {/* PREVIEW FIXED */}
           <div className="xl:col-span-5 relative order-first xl:order-last mb-10 xl:mb-0">
             <div className="xl:sticky xl:top-12 space-y-6 md:space-y-10">
               <div className="flex items-center justify-center gap-3 md:gap-4 text-zinc-700">
                 <div className="h-[1px] w-8 md:w-12 bg-zinc-800" />
-                <h3 className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.5em] italic text-center">Storefront Preview <br className="sm:hidden"/>(Mobil & Desktop)</h3>
+                <h3 className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.5em] italic text-center">Storefront Preview</h3>
                 <div className="h-[1px] w-8 md:w-12 bg-zinc-800" />
               </div>
               
               <div className="bg-[#0d0e1a] border border-white/5 rounded-[3rem] md:rounded-[5rem] overflow-hidden shadow-2xl group border-b-[8px] md:border-b-[12px] border-b-red-600 relative">
-                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
                 
                 <div className="h-[250px] sm:h-[350px] md:h-[450px] bg-zinc-900 relative">
-                  {formData.image_url ? (
-                    <img src={formData.image_url} alt="Preview" className="w-full h-full object-cover group-hover:scale-110 transition-all duration-[2000ms]" />
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover group-hover:scale-110 transition-all duration-[2000ms]" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-zinc-800 gap-4 md:gap-6">
-                      <ImageIcon strokeWidth={1} className="opacity-20 w-16 h-16 md:w-[100px] md:h-[100px]" />
+                      <ImageIcon strokeWidth={1} className="opacity-20 w-16 h-16 md:w-24 md:h-24" />
                       <p className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.5em] opacity-40">Awaiting Banner</p>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e1a] via-[#0d0e1a]/20 to-transparent" />
                   
-                  {/* Badges nan preview */}
                   <div className="absolute top-6 md:top-12 left-6 md:left-12 flex flex-col gap-2 md:gap-3">
                     <div className="bg-black/60 backdrop-blur-xl px-4 md:px-6 py-2 md:py-3 rounded-full text-[8px] md:text-[10px] font-black uppercase italic border border-white/10 shadow-2xl w-fit">
                       {formData.billing_cycle === 'month' ? 'Plan Mensyèl' : formData.billing_cycle === 'year' ? 'Plan Anyèl' : 'Abònman'}
                     </div>
-                    {parseInt(formData.trial_days) > 0 && (
-                      <div className="bg-red-600 px-4 md:px-6 py-2 md:py-3 rounded-full text-[8px] md:text-[10px] font-black uppercase italic shadow-2xl animate-pulse w-fit">
-                        {formData.trial_days} JOU TRIAL
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 <div className="p-8 sm:p-10 md:p-16 space-y-8 md:space-y-12 relative z-10 -mt-10 sm:-mt-16 md:mt-0">
                   <div className="space-y-3 md:space-y-5">
-                    <div className="flex items-center gap-2 md:gap-3 text-red-500">
-                       <Sparkles fill="currentColor" className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                       <span className="text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em]">{formData.category}</span>
-                    </div>
                     <h2 className="text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tighter leading-none break-words">{formData.title || "TIT SÈVIS OU"}</h2>
                   </div>
 
-                  <p className="text-zinc-500 text-xs sm:text-sm md:text-base font-bold leading-relaxed line-clamp-3 md:line-clamp-4 italic border-l-2 md:border-l-4 border-red-600/20 pl-4 md:pl-6">
+                  <p className="text-zinc-500 text-xs sm:text-sm md:text-base font-bold leading-relaxed line-clamp-3 italic border-l-2 md:border-l-4 border-red-600/20 pl-4 md:pl-6">
                     {formData.description || "Deskripsyon an ap parèt isit la pou kliyan ou yo."}
                   </p>
-
-                  <div className="space-y-3 md:space-y-5">
-                    {formData.features.filter(f => f !== '').slice(0, 3).map((f, i) => (
-                      <div key={i} className="flex items-center gap-3 md:gap-4 text-white text-[10px] md:text-[12px] font-black uppercase italic">
-                        <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-600/20 flex items-center justify-center border border-red-600/30 shrink-0">
-                          <CheckCircle2 className="text-red-600 w-3 h-3 md:w-3.5 md:h-3.5" />
-                        </div>
-                        <span className="truncate">{f}</span>
-                      </div>
-                    ))}
-                    {formData.features.filter(f => f !== '').length > 3 && (
-                       <p className="text-[9px] text-zinc-500 italic pl-10">+ lòt benefis...</p>
-                    )}
-                  </div>
 
                   <div className="bg-black/60 backdrop-blur-3xl p-8 md:p-12 rounded-[2.5rem] md:rounded-[4rem] border border-white/5 flex flex-col gap-2 md:gap-3 shadow-inner">
                     <span className="text-[8px] md:text-[10px] font-black uppercase text-zinc-600 tracking-[0.2em] md:tracking-[0.4em]">Net Payable Amount</span>
@@ -326,29 +334,7 @@ export default function NewSubscriptionPage() {
                     </div>
                   </div>
 
-                  {/* INFO KONTAK NAN PREVIEW */}
-                  {formData.contact_phone && (
-                     <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/10">
-                        <Phone className="text-green-500 w-3.5 h-3.5 md:w-4 md:h-4" />
-                        <span className="text-[10px] font-black text-zinc-400">Kontak: {formData.contact_phone}</span>
-                     </div>
-                  )}
-
-                  <div className="flex flex-col items-center gap-4 md:gap-6 pt-6 md:pt-10 border-t border-white/5">
-                     <div className="flex items-center gap-2 md:gap-3 text-[8px] md:text-[10px] text-zinc-700 font-black uppercase tracking-[0.2em] md:tracking-[0.4em] text-center">
-                        <ShieldCheck className="text-green-600 w-4 h-4 md:w-5 md:h-5" /> SECURED BY H-PAY ESCROW
-                     </div>
-                  </div>
                 </div>
-              </div>
-
-              {/* TIPS KACHE SOU TELEFÒN POU PA PRAN ESPAS */}
-              <div className="hidden sm:flex bg-red-600/5 border border-red-600/10 p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] gap-4 md:gap-6 items-start">
-                 <HelpCircle className="text-red-600 shrink-0 w-5 h-5 md:w-6 md:h-6" />
-                 <p className="text-[9px] md:text-[10px] text-zinc-500 leading-relaxed font-bold italic">
-                   <span className="text-white block mb-1 uppercase">Pro Tip:</span>
-                   Mete yon bon imaj ak yon nimewo WhatsApp valid pou kliyan yo fè w konfyans pi vit. Lè "Kripte Pri" aktive, URL la ap kache detay yo.
-                 </p>
               </div>
             </div>
           </div>
