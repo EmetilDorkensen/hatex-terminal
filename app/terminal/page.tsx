@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 // Konpozan QR (itilize qrcode pou desine canvas)
-const QRCodeComponent = ({ value, size = 200 }: { value: string; size?: number }) => {
+const QRCodeComponent = ({ value, size = 150 }: { value: string; size?: number }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const QRCodeComponent = ({ value, size = 200 }: { value: string; size?: number }
     }
   }, [value, size]);
 
-  return <canvas ref={canvasRef} width={size} height={size} />;
+  return <canvas ref={canvasRef} width={size} height={size} className="mx-auto" />;
 };
 
 export default function TerminalPage() {
@@ -544,9 +544,7 @@ export default function TerminalPage() {
   "version": "2.0.0"
 }`;
 
-      const hostingerCode = `<!-- HATEX Payments for Hostinger/Horizon - Vèsyon 2.0 (Fòmilè entegre) -->
-<!-- Merchant ID: ${profile.api_key} -->
-<script>
+      const hostingerCode = `<script>
 (function() {
   const MERCHANT_ID = '${profile.api_key}';
   const RATE = 136;
@@ -957,81 +955,81 @@ Vèsyon 2.0 - Fòmilè kat entegre
   };
 
   // ============================================================
-  // RENDER FUNCTIONS
+  // RENDER FUNCTIONS (Responsive UI Adjustments)
   // ============================================================
   const renderHeader = () => (
-    <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 border-b border-white/5 pb-4 md:pb-6 gap-4">
       <div className="flex flex-col">
-        <h1 className="text-3xl font-black uppercase italic tracking-tighter">
+        <h1 className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter">
           {profile?.business_name || 'Hatex Terminal'}<span className="text-red-600">.</span>
         </h1>
         <div className="flex items-center gap-2 mt-1">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em]">
+          <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse"></span>
+          <span className="text-[8px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em]">
             {profile?.kyc_status === 'approved' ? 'KYC Verified' : 'KYC Pending'}
           </span>
         </div>
       </div>
-      <div className="flex gap-3">
+      <div className="flex gap-2 md:gap-3 flex-wrap w-full md:w-auto">
         <button
           onClick={() => setMode('dashboard')}
-          className={`px-5 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${
+          className={`flex-1 md:flex-none px-3 py-2 md:px-5 md:py-3 rounded-xl md:rounded-2xl flex items-center justify-center gap-1 md:gap-2 border border-white/5 transition-all font-black text-[8px] md:text-[10px] uppercase ${
             mode === 'dashboard' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
           }`}
         >
-          <LayoutGrid size={15} /> Dashboard
+          <LayoutGrid size={14} className="md:w-[15px] md:h-[15px]" /> <span className="hidden md:inline">Dashboard</span>
         </button>
         <button
           onClick={() => setMode('plugins')}
-          className={`px-5 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${
+          className={`flex-1 md:flex-none px-3 py-2 md:px-5 md:py-3 rounded-xl md:rounded-2xl flex items-center justify-center gap-1 md:gap-2 border border-white/5 transition-all font-black text-[8px] md:text-[10px] uppercase ${
             mode === 'plugins' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
           }`}
         >
-          <DownloadCloud size={15} /> Plugins
+          <DownloadCloud size={14} className="md:w-[15px] md:h-[15px]" /> <span className="hidden md:inline">Plugins</span>
         </button>
         <button
           onClick={() => { setMode('invoices'); setSubMode('list'); }}
-          className={`px-5 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${
+          className={`flex-1 md:flex-none px-3 py-2 md:px-5 md:py-3 rounded-xl md:rounded-2xl flex items-center justify-center gap-1 md:gap-2 border border-white/5 transition-all font-black text-[8px] md:text-[10px] uppercase ${
             mode === 'invoices' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
           }`}
         >
-          <FileText size={15} /> Invoices
+          <FileText size={14} className="md:w-[15px] md:h-[15px]" /> <span className="hidden md:inline">Invoices</span>
         </button>
         <button
           onClick={() => setMode('transactions')}
-          className={`px-5 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${
+          className={`flex-1 md:flex-none px-3 py-2 md:px-5 md:py-3 rounded-xl md:rounded-2xl flex items-center justify-center gap-1 md:gap-2 border border-white/5 transition-all font-black text-[8px] md:text-[10px] uppercase ${
             mode === 'transactions' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
           }`}
         >
-          <History size={15} /> Transactions
+          <History size={14} className="md:w-[15px] md:h-[15px]" /> <span className="hidden md:inline">Transaksyon</span>
         </button>
         <button
           onClick={() => setMode('settings')}
-          className={`px-5 py-3 rounded-2xl flex items-center gap-2 border border-white/5 transition-all font-black text-[10px] uppercase ${
+          className={`flex-1 md:flex-none px-3 py-2 md:px-5 md:py-3 rounded-xl md:rounded-2xl flex items-center justify-center gap-1 md:gap-2 border border-white/5 transition-all font-black text-[8px] md:text-[10px] uppercase ${
             mode === 'settings' ? 'bg-red-600 shadow-xl scale-105' : 'bg-zinc-900/50 hover:bg-zinc-900'
           }`}
         >
-          <Settings size={15} /> Settings
+          <Settings size={14} className="md:w-[15px] md:h-[15px]" /> <span className="hidden md:inline">Settings</span>
         </button>
       </div>
     </div>
   );
 
   const renderDashboard = () => (
-    <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="lg:col-span-8 space-y-8">
+    <div className="grid lg:grid-cols-12 gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="lg:col-span-8 space-y-6 md:space-y-8">
         {/* Merchant Identity */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-20 transition-opacity">
-            <ShieldCheck size={110} className="text-red-600" />
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-6 md:p-10 opacity-5 group-hover:opacity-20 transition-opacity">
+            <ShieldCheck size={80} className="md:w-[110px] md:h-[110px] text-red-600" />
           </div>
-          <div className="flex items-center gap-4 mb-8">
-            <div className="bg-red-600/10 p-4 rounded-3xl">
-              <Lock className="text-red-600 w-6 h-6" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 md:mb-8">
+            <div className="bg-red-600/10 p-3 md:p-4 rounded-2xl md:rounded-3xl">
+              <Lock className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase tracking-widest">Merchant Identity</h3>
-              <p className="text-[10px] text-zinc-500 font-bold">
+              <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Merchant Identity</h3>
+              <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold">
                 Konfigire pwofil biznis piblik ou
               </p>
             </div>
@@ -1039,34 +1037,36 @@ Vèsyon 2.0 - Fòmilè kat entegre
           
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <User className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-600" size={17} />
+              <User className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-zinc-600" size={15} />
               <input
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 readOnly={!!profile?.business_name}
                 placeholder="Non Legal Biznis Ou"
-                className="w-full bg-black/40 border border-white/10 py-6 pl-16 pr-6 rounded-3xl text-[14px] outline-none text-white italic focus:border-red-600/50 transition-all"
+                className="w-full bg-black/40 border border-white/10 py-4 md:py-6 pl-12 md:pl-16 pr-4 md:pr-6 rounded-2xl md:rounded-3xl text-xs md:text-[14px] outline-none text-white italic focus:border-red-600/50 transition-all"
               />
             </div>
           </div>
 
           {/* Logo biznis */}
-          <div className="mt-8 pt-8 border-t border-white/5">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="bg-red-600/10 p-4 rounded-2xl">
-                <Image size={20} className="text-red-600" />
-              </div>
-              <div>
-                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Logo Biznis</h4>
-                <p className="text-[9px] text-zinc-500 uppercase italic">JPEG, PNG, maks 2MB</p>
+          <div className="mt-6 pt-6 md:mt-8 md:pt-8 border-t border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-2xl">
+                  <Image size={16} className="md:w-5 md:h-5 text-red-600" />
+                </div>
+                <div>
+                  <h4 className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-wider">Logo Biznis</h4>
+                  <p className="text-[8px] md:text-[9px] text-zinc-500 uppercase italic">JPEG, PNG, maks 2MB</p>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
               {/* Preview logo */}
               {profile?.avatar_url ? (
-                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-black/30 border border-white/10">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl overflow-hidden bg-black/30 border border-white/10 shrink-0">
                   <img 
                     src={profile.avatar_url} 
                     alt="Logo" 
@@ -1074,19 +1074,19 @@ Vèsyon 2.0 - Fòmilè kat entegre
                   />
                 </div>
               ) : (
-                <div className="w-20 h-20 rounded-2xl bg-zinc-900 flex items-center justify-center border border-white/10">
-                  <Image size={30} className="text-zinc-700" />
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-zinc-900 flex items-center justify-center border border-white/10 shrink-0">
+                  <Image size={24} className="md:w-[30px] md:h-[30px] text-zinc-700" />
                 </div>
               )}
 
               {/* Bouton telechaje */}
-              <label className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 px-6 py-3 rounded-xl transition-all flex items-center gap-2">
+              <label className="cursor-pointer w-full sm:w-auto bg-zinc-900 hover:bg-zinc-800 border border-white/10 px-4 md:px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-center">
                 {uploadingLogo ? (
-                  <RefreshCw size={16} className="animate-spin text-red-600" />
+                  <RefreshCw size={14} className="animate-spin text-red-600" />
                 ) : (
-                  <Upload size={16} />
+                  <Upload size={14} />
                 )}
-                <span className="text-[10px] font-black uppercase">Telechaje Logo</span>
+                <span className="text-[9px] md:text-[10px] font-black uppercase">Telechaje Logo</span>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -1098,49 +1098,51 @@ Vèsyon 2.0 - Fòmilè kat entegre
             </div>
           </div>
           
-          <div className="mt-10 pt-10 border-t border-white/5 grid grid-cols-2 gap-6">
-            <div className="flex items-center gap-4">
-              <div className="bg-zinc-900 p-4 rounded-2xl">
-                <FileText className="text-zinc-500 w-5 h-5" />
+          <div className="mt-8 pt-8 md:mt-10 md:pt-10 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+            <div className="flex items-center gap-3 md:gap-4 p-3 md:p-0 bg-black/20 md:bg-transparent rounded-2xl md:rounded-none border md:border-none border-white/5">
+              <div className="bg-zinc-900 p-3 md:p-4 rounded-xl md:rounded-2xl">
+                <FileText className="text-zinc-500 w-4 h-4 md:w-5 md:h-5" />
               </div>
-              <div>
-                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Manyèl KYC</h4>
-                <p className="text-[9px] text-zinc-500 uppercase italic">Dokiman PDF</p>
+              <div className="flex-1">
+                <h4 className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-wider">Manyèl KYC</h4>
+                <p className="text-[8px] md:text-[9px] text-zinc-500 uppercase italic">Dokiman PDF</p>
               </div>
-              <label className="ml-auto cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 p-4 rounded-2xl transition-all">
-                {uploadingPdf ? <RefreshCw size={16} className="animate-spin text-red-600" /> : <Upload size={16} />}
+              <label className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-white/10 p-3 md:p-4 rounded-xl md:rounded-2xl transition-all flex-shrink-0">
+                {uploadingPdf ? <RefreshCw size={14} className="animate-spin text-red-600" /> : <Upload size={14} className="md:w-4 md:h-4" />}
                 <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} disabled={uploadingPdf} />
               </label>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="bg-zinc-900 p-4 rounded-2xl">
-                <Globe className="text-zinc-500 w-5 h-5" />
+            <div className="flex items-center gap-3 md:gap-4 p-3 md:p-0 bg-black/20 md:bg-transparent rounded-2xl md:rounded-none border md:border-none border-white/5">
+              <div className="bg-zinc-900 p-3 md:p-4 rounded-xl md:rounded-2xl">
+                <Globe className="text-zinc-500 w-4 h-4 md:w-5 md:h-5" />
               </div>
               <div>
-                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">Gateway Status</h4>
-                <span className="text-[9px] text-green-500 font-black uppercase">Aktif & Online</span>
+                <h4 className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-wider">Gateway Status</h4>
+                <span className="text-[8px] md:text-[9px] text-green-500 font-black uppercase">Aktif & Online</span>
               </div>
             </div>
           </div>
 
           {/* Seksyon QR Kòd la (si KYC apwouve) */}
           {profile?.kyc_status === 'approved' && (
-            <div className="mt-10 pt-10 border-t border-white/5">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[11px] font-black text-white uppercase tracking-wider">QR Kòd Peman</h4>
+            <div className="mt-8 pt-8 md:mt-10 md:pt-10 border-t border-white/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h4 className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-wider text-center sm:text-left">QR Kòd Peman</h4>
                 <button
                   onClick={downloadQR}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase transition-all"
+                  className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 md:py-2.5 rounded-xl font-black text-[9px] md:text-[10px] uppercase transition-all w-full sm:w-auto"
                 >
-                  <Download size={14} /> Telechaje QR
+                  <Download size={12} className="md:w-3.5 md:h-3.5" /> Telechaje QR
                 </button>
               </div>
-              <div className="flex flex-col items-center bg-black/20 p-6 rounded-3xl" id="hatex-qr-code">
-                <QRCodeComponent value={paymentUrl} size={200} />
-                <p className="text-[9px] text-zinc-500 mt-4 break-all max-w-xs text-center">
+              <div className="flex flex-col items-center bg-black/20 p-4 md:p-6 rounded-2xl md:rounded-3xl" id="hatex-qr-code">
+                <div className="bg-white p-2 rounded-xl">
+                  <QRCodeComponent value={paymentUrl} size={130} />
+                </div>
+                <p className="text-[8px] md:text-[9px] text-zinc-500 mt-3 md:mt-4 break-all w-full max-w-[250px] text-center truncate">
                   {paymentUrl}
                 </p>
-                <p className="text-[9px] text-zinc-600 mt-2">
+                <p className="text-[8px] md:text-[9px] text-zinc-600 mt-1 md:mt-2 text-center">
                   Skane sa a pou peye dirèkteman nan kont ou.
                 </p>
               </div>
@@ -1148,234 +1150,216 @@ Vèsyon 2.0 - Fòmilè kat entegre
           )}
         </div>
 
+        {/* BOUTON DASHBOARD ABÒNMAN */}
+        <button
+          onClick={() => router.push('/dashboard/subscriptions')}
+          className="w-full bg-white text-black py-4 md:py-5 rounded-[2rem] md:rounded-[2.2rem] font-black uppercase text-[10px] md:text-[11px] tracking-widest flex items-center justify-center gap-2 md:gap-3 hover:bg-zinc-200 transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] group active:scale-95"
+        >
+          <LayoutGrid size={16} className="md:w-[18px] md:h-[18px] text-red-600" />
+          <span>Dashboard Abònman</span>
+          <svg 
+            width="14" 
+            height="14" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="3" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            className="group-hover:translate-x-1 transition-transform md:w-4 md:h-4"
+          >
+            <path d="M5 12h14m-7-7 7 7-7 7"/>
+          </svg>
+        </button>
 
-{/* BOUTON DASHBOARD KI PA BAY ERÈ */}
-<button
-  onClick={() => router.push('/dashboard/subscriptions')}
-  className="w-full bg-white text-black py-5 rounded-[2.2rem] font-black uppercase text-[11px] tracking-widest flex items-center justify-center gap-3 hover:bg-zinc-200 transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] group mt-6 active:scale-95"
->
-  {/* Ikon Grid la (asire w ou gen LayoutGrid nan import ou) */}
-  <LayoutGrid size={18} className="text-red-600" />
-  
-  <span>Dashboard Abònman</span>
-
-  {/* Flèch sa a se yon SVG, li pap janm bay erè "ArrowRight not found" */}
-  <svg 
-    width="16" 
-    height="16" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="3" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className="group-hover:translate-x-1 transition-transform"
-  >
-    <path d="M5 12h14m-7-7 7 7-7 7"/>
-  </svg>
-</button>
-
-
-
-
-{/* Revenue Table - QR Payments */}
-<div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden">
-  <div className="p-8 border-b border-white/5">
-    <div className="flex items-center gap-4 mb-8">
-      <div className="bg-red-600/10 p-4 rounded-3xl">
-        <QrCode className="text-red-600 w-6 h-6" />
-      </div>
-      <div>
-        <h3 className="text-lg font-black uppercase tracking-widest">Peman QR Kòd</h3>
-        <p className="text-[10px] text-zinc-500 font-bold italic">Revni an tan reyèl depi Edge Function</p>
-      </div>
-    </div>
-
-    {/* 4 Stats Cards */}
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {/* Total QR */}
-      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-        <div className="flex items-center gap-2 text-blue-400 mb-2">
-          <DollarSign size={16} />
-          <span className="text-[9px] font-black uppercase">Total QR</span>
-        </div>
-        <div className="text-2xl font-black text-white">
-          {qrStats.total.toLocaleString()}
-        </div>
-        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-      </div>
-
-      {/* Mwa sa a */}
-      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-        <div className="flex items-center gap-2 text-emerald-400 mb-2">
-          <Calendar size={16} />
-          <span className="text-[9px] font-black uppercase">Mwa sa a</span>
-        </div>
-        <div className="text-2xl font-black text-white">
-          {qrStats.thisMonth.toLocaleString()}
-        </div>
-        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-      </div>
-
-      {/* Jodi a */}
-      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-        <div className="flex items-center gap-2 text-amber-400 mb-2">
-          <Clock size={16} />
-          <span className="text-[9px] font-black uppercase">Jodi a</span>
-        </div>
-        <div className="text-2xl font-black text-white">
-          {qrStats.today.toLocaleString()}
-        </div>
-        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-      </div>
-
-      {/* Dènye 24h */}
-      <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-        <div className="flex items-center gap-2 text-purple-400 mb-2">
-          <TrendingUp size={16} />
-          <span className="text-[9px] font-black uppercase">Dènye 24h</span>
-        </div>
-        <div className="text-2xl font-black text-white">
-          {qrStats.last24h.toLocaleString()}
-        </div>
-        <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
-      </div>
-    </div>
-  </div>
-
-  {/* Lis dènye tranzaksyon QR */}
-  <div className="p-8 border-t border-white/5">
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-2">
-        <History size={16} className="text-zinc-500" />
-        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
-          Dènye Peman QR
-        </span>
-      </div>
-      <span className="text-[8px] bg-red-600/10 text-red-400 px-2 py-1 rounded-full font-black uppercase">
-        {qrStats.count} tranzaksyon QR
-      </span>
-    </div>
-
-    {qrTransactions.length > 0 ? (
-      <div className="space-y-2">
-        {qrTransactions.slice(0, 5).map((tx: any) => {
-          {/* NOUVO: Nou rale non kliyan an nan metadata Edge Function nan */}
-          const customerName = tx.metadata?.customer_name || 'Kliyan Hatex';
-          const initials = customerName.substring(0, 2).toUpperCase();
-          
-          return (
-            <div key={tx.id} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-red-600/20 transition-all">
-              <div className="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center font-black text-[10px] text-zinc-400 flex-shrink-0">
-                {initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-white truncate uppercase italic">
-                  {customerName}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[8px] bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded-full font-black tracking-tighter">
-                    QR SCAN
-                  </span>
-                  <span className="text-[9px] text-zinc-600 font-bold">
-                    {new Date(tx.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-black text-green-400">
-                  +{parseFloat(tx.amount).toLocaleString()}
-                </div>
-                <div className="text-[8px] text-zinc-600 font-bold">HTG</div>
-              </div>
-              <ArrowUpRight size={13} className="text-zinc-700" />
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="text-center py-12 bg-black/20 rounded-[2.5rem] border border-dashed border-white/5">
-        <QrCode size={32} className="mx-auto mb-3 text-zinc-800 opacity-20" />
-        <p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest italic">Pa gen okenn vant QR detekte</p>
-      </div>
-    )}
-  </div>
-</div>
-
-        {/* Invoice Revenue Table */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3.5rem] overflow-hidden mt-8">
-          <div className="p-8 border-b border-white/5">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="bg-red-600/10 p-4 rounded-3xl">
-                <Mail className="text-red-600 w-6 h-6" />
+        {/* Revenue Table - QR Payments */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden">
+          <div className="p-6 md:p-8 border-b border-white/5">
+            <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+              <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-3xl">
+                <QrCode className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase tracking-widest">Peman Fakti</h3>
-                <p className="text-[10px] text-zinc-500 font-bold">Revni an tan reyèl</p>
+                <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Peman QR Kòd</h3>
+                <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold italic">Revni an tan reyèl</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Total Invoice */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                  <DollarSign size={16} />
-                  <span className="text-[9px] font-black uppercase">Total Fakti</span>
+            {/* 4 Stats Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-blue-400 mb-1 md:mb-2">
+                  <DollarSign size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Total QR</span>
                 </div>
-                <div className="text-2xl font-black text-white">
+                <div className="text-lg md:text-2xl font-black text-white truncate">
+                  {qrStats.total.toLocaleString()}
+                </div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
+                  <Calendar size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Mwa sa a</span>
+                </div>
+                <div className="text-lg md:text-2xl font-black text-white truncate">
+                  {qrStats.thisMonth.toLocaleString()}
+                </div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-amber-400 mb-1 md:mb-2">
+                  <Clock size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Jodi a</span>
+                </div>
+                <div className="text-lg md:text-2xl font-black text-white truncate">
+                  {qrStats.today.toLocaleString()}
+                </div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-purple-400 mb-1 md:mb-2">
+                  <TrendingUp size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Dènye 24h</span>
+                </div>
+                <div className="text-lg md:text-2xl font-black text-white truncate">
+                  {qrStats.last24h.toLocaleString()}
+                </div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Lis dènye tranzaksyon QR */}
+          <div className="p-6 md:p-8 border-t border-white/5">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <div className="flex items-center gap-2">
+                <History size={14} className="text-zinc-500 md:w-4 md:h-4" />
+                <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] truncate max-w-[100px] sm:max-w-none">
+                  Dènye Peman QR
+                </span>
+              </div>
+              <span className="text-[7px] md:text-[8px] bg-red-600/10 text-red-400 px-2 py-1 rounded-full font-black uppercase">
+                {qrStats.count} tranzaksyon QR
+              </span>
+            </div>
+
+            {qrTransactions.length > 0 ? (
+              <div className="space-y-2">
+                {qrTransactions.slice(0, 5).map((tx: any) => {
+                  const customerName = tx.metadata?.customer_name || 'Kliyan Hatex';
+                  const initials = customerName.substring(0, 2).toUpperCase();
+                  
+                  return (
+                    <div key={tx.id} className="flex items-center gap-2 md:gap-3 p-3 bg-black/30 rounded-xl md:rounded-2xl border border-white/5 hover:border-red-600/20 transition-all">
+                      <div className="w-8 h-8 md:w-9 md:h-9 bg-zinc-800 rounded-lg md:rounded-xl flex items-center justify-center font-black text-[9px] md:text-[10px] text-zinc-400 flex-shrink-0">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] md:text-[11px] font-bold text-white truncate uppercase italic">
+                          {customerName}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mt-0.5">
+                          <span className="text-[7px] md:text-[8px] bg-blue-600/20 text-blue-400 px-1.5 py-0.5 rounded-full font-black tracking-tighter">
+                            QR SCAN
+                          </span>
+                          <span className="text-[8px] md:text-[9px] text-zinc-600 font-bold truncate">
+                            {new Date(tx.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right pl-2">
+                        <div className="text-xs md:text-sm font-black text-green-400">
+                          +{parseFloat(tx.amount).toLocaleString()}
+                        </div>
+                        <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold">HTG</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 md:py-12 bg-black/20 rounded-2xl md:rounded-[2.5rem] border border-dashed border-white/5">
+                <QrCode size={24} className="mx-auto mb-2 md:mb-3 text-zinc-800 opacity-20 md:w-8 md:h-8" />
+                <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-700 tracking-widest italic">Pa gen okenn vant QR detekte</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Invoice Revenue Table */}
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden mt-6 md:mt-8">
+          <div className="p-6 md:p-8 border-b border-white/5">
+            <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+              <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-3xl">
+                <Mail className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
+              </div>
+              <div>
+                <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Peman Fakti</h3>
+                <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold">Revni an tan reyèl</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
+                  <DollarSign size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Total Fakti</span>
+                </div>
+                <div className="text-lg md:text-2xl font-black text-white truncate">
                   {earnings.invoiceTotal.toLocaleString()}
                 </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
               </div>
 
-              {/* Konte peye */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                  <Mail size={16} />
-                  <span className="text-[9px] font-black uppercase">Peye</span>
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
+                  <Mail size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Peye</span>
                 </div>
-                <div className="text-2xl font-black text-white">{earnings.invoiceCount}</div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">fakti</div>
+                <div className="text-lg md:text-2xl font-black text-white truncate">{earnings.invoiceCount}</div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">fakti</div>
               </div>
 
-              {/* Mwa sa a (invoice) */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                  <Calendar size={16} />
-                  <span className="text-[9px] font-black uppercase">Mwa sa a</span>
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
+                  <Calendar size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Mwa sa a</span>
                 </div>
-                <div className="text-2xl font-black text-white">
+                <div className="text-lg md:text-2xl font-black text-white truncate">
                   {(earnings.thisMonth - qrStats.thisMonth).toLocaleString()}
                 </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
               </div>
 
-              {/* Mwayèn */}
-              <div className="bg-black/40 p-5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                  <TrendingUp size={16} />
-                  <span className="text-[9px] font-black uppercase">Mwayèn</span>
+              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
+                  <TrendingUp size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase">Mwayèn</span>
                 </div>
-                <div className="text-2xl font-black text-white">
+                <div className="text-lg md:text-2xl font-black text-white truncate">
                   {earnings.invoiceCount > 0 
                     ? Math.round(earnings.invoiceTotal / earnings.invoiceCount).toLocaleString()
                     : '0'}
                 </div>
-                <div className="text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG/fakti</div>
+                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG/fak</div>
               </div>
             </div>
           </div>
 
           {/* Lis dènye fakti */}
-          <div className="p-8 border-t border-white/5">
-            <div className="flex items-center justify-between mb-6">
+          <div className="p-6 md:p-8 border-t border-white/5">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
               <div className="flex items-center gap-2">
-                <History size={16} className="text-zinc-500" />
-                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                <History size={14} className="text-zinc-500 md:w-4 md:h-4" />
+                <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] truncate max-w-[100px] sm:max-w-none">
                   Dènye Fakti
                 </span>
               </div>
-              <span className="text-[8px] bg-emerald-600/10 text-emerald-400 px-2 py-1 rounded-full font-black">
+              <span className="text-[7px] md:text-[8px] bg-emerald-600/10 text-emerald-400 px-2 py-1 rounded-full font-black uppercase">
                 {earnings.invoiceCount} fakti
               </span>
             </div>
@@ -1383,38 +1367,64 @@ Vèsyon 2.0 - Fòmilè kat entegre
             {invoices.length > 0 ? (
               <div className="space-y-2">
                 {invoices.slice(0, 5).map((inv: any) => (
-                  <div key={inv.id} className="flex items-center gap-3 p-3 bg-black/30 rounded-2xl border border-white/5 hover:border-emerald-600/20 transition-all">
-                    <div className={`w-9 h-9 ${
-                      inv.status === 'paid' ? 'bg-emerald-600' : 'bg-amber-600'
-                    } rounded-xl flex items-center justify-center font-black text-[10px] text-white flex-shrink-0`}>
-                      {inv.status === 'paid' ? '✓' : '⏳'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-bold text-white truncate">
-                        {inv.client_email || 'Kliyan'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[8px] bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full font-black">
-                          Fakti
-                        </span>
-                        <span className="text-[9px] text-zinc-600">
-                          {formatDate(inv.created_at)}
-                        </span>
+                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 md:p-4 bg-black/30 rounded-xl md:rounded-2xl border border-white/5 hover:border-emerald-600/20 transition-all">
+                    <div className="flex items-center gap-3 w-full sm:w-auto flex-1 min-w-0">
+                      <div className={`w-8 h-8 md:w-9 md:h-9 ${
+                        inv.status === 'paid' ? 'bg-emerald-600' : 
+                        inv.status === 'pending' ? 'bg-amber-600' : 'bg-red-600'
+                      } rounded-lg md:rounded-xl flex items-center justify-center font-black text-[9px] md:text-[10px] text-white flex-shrink-0`}>
+                        {inv.status === 'paid' ? '✓' : inv.status === 'pending' ? '⏳' : '✗'}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] md:text-[11px] font-bold text-white truncate">
+                          {inv.client_email || 'Kliyan'}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mt-0.5">
+                          <span className="text-[7px] md:text-[8px] bg-emerald-600/20 text-emerald-400 px-1.5 py-0.5 rounded-full font-black">
+                            Fakti
+                          </span>
+                          <span className="text-[8px] md:text-[9px] text-zinc-600">
+                            {formatDate(inv.created_at)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-black text-green-400">
-                        {inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()}
+
+                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto mt-2 sm:mt-0 pl-11 sm:pl-0 border-t border-white/5 sm:border-none pt-2 sm:pt-0">
+                      <div className="text-left sm:text-right mr-4 sm:mr-0 sm:ml-4 flex-shrink-0">
+                         <div className="text-xs md:text-sm font-black text-green-400">
+                           {inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()} HTG
+                         </div>
                       </div>
-                      <div className="text-[8px] text-zinc-600 font-bold">HTG</div>
+                      
+                      <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
+                        {inv.status === 'pending' && (
+                          <>
+                            <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-1.5 md:p-2 bg-green-600/20 rounded-lg md:rounded-xl hover:bg-green-600/40 transition-all" title="Make as paid">
+                              <CheckSquare size={12} className="text-green-400 md:w-3.5 md:h-3.5" />
+                            </button>
+                            <button onClick={() => {
+                                const paymentLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
+                                navigator.clipboard.writeText(paymentLink);
+                                alert("Lyen peman an kopye nan clipboard ou!");
+                              }} className="p-1.5 md:p-2 bg-blue-600/20 rounded-lg md:rounded-xl hover:bg-blue-600/40 transition-all" title="Copy payment link">
+                              <Copy size={12} className="text-blue-400 md:w-3.5 md:h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <button onClick={() => handleDeleteInvoice(inv.id)} className="p-1.5 md:p-2 bg-red-600/20 rounded-lg md:rounded-xl hover:bg-red-600/40 transition-all" title="Delete">
+                          <Trash2 size={12} className="text-red-400 md:w-3.5 md:h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 bg-black/20 rounded-2xl border border-dashed border-white/5">
-                <Mail size={28} className="mx-auto mb-2 text-zinc-800" />
-                <p className="text-[10px] font-black uppercase text-zinc-700">Pa gen fakti ankò</p>
+              <div className="text-center py-6 md:py-8 bg-black/20 rounded-xl md:rounded-2xl border border-dashed border-white/5">
+                <Mail size={20} className="mx-auto mb-2 text-zinc-800 md:w-7 md:h-7" />
+                <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-700">Pa gen fakti ankò</p>
               </div>
             )}
           </div>
@@ -1422,26 +1432,26 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
         {/* QUICK ACTIONS */}
         {profile?.business_name ? (
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
             {[
-              { icon: <Code className="text-red-600 w-7 h-7" />, label: 'Hostinger Plugin', sub: 'Kòd pou site Hostinger', action: () => setMode('plugins') },
-              { icon: <FileText className="text-red-600 w-7 h-7" />, label: 'Smart Invoice', sub: 'Voye fakti bay kliyan', action: () => { setMode('invoices'); setSubMode('create'); } },
+              { icon: <Code className="text-red-600 w-6 h-6 md:w-7 md:h-7" />, label: 'Hostinger Plugin', sub: 'Kòd pou site Hostinger', action: () => setMode('plugins') },
+              { icon: <FileText className="text-red-600 w-6 h-6 md:w-7 md:h-7" />, label: 'Smart Invoice', sub: 'Voye fakti bay kliyan', action: () => { setMode('invoices'); setSubMode('create'); } },
             ].map((a) => (
-              <button key={a.label} onClick={a.action} className="bg-zinc-900/30 p-12 rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden">
+              <button key={a.label} onClick={a.action} className="bg-zinc-900/30 p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] border border-white/5 flex flex-col items-center justify-center gap-3 md:gap-5 hover:bg-red-600/10 hover:border-red-600/20 transition-all group relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-red-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="bg-zinc-950 p-6 rounded-3xl group-hover:scale-110 transition-transform">{a.icon}</div>
+                <div className="bg-zinc-950 p-4 md:p-6 rounded-2xl md:rounded-3xl group-hover:scale-110 transition-transform">{a.icon}</div>
                 <div className="text-center">
-                  <span className="text-[12px] font-black uppercase italic block">{a.label}</span>
-                  <span className="text-[8px] text-zinc-500 uppercase font-bold mt-1 block">{a.sub}</span>
+                  <span className="text-[10px] md:text-[12px] font-black uppercase italic block">{a.label}</span>
+                  <span className="text-[7px] md:text-[8px] text-zinc-500 uppercase font-bold mt-1 block">{a.sub}</span>
                 </div>
               </button>
             ))}
           </div>
         ) : (
-          <div className="bg-red-600/5 border border-red-600/20 p-12 rounded-[4rem] text-center">
-            <AlertTriangle className="text-red-600 w-12 h-12 mx-auto mb-6" />
-            <h4 className="text-sm font-black uppercase text-red-500 mb-2 italic">Aksyon limite</h4>
-            <p className="text-[11px] text-red-500/60 max-w-sm mx-auto leading-relaxed">
+          <div className="bg-red-600/5 border border-red-600/20 p-8 md:p-12 rounded-[2.5rem] md:rounded-[4rem] text-center mt-6 md:mt-8">
+            <AlertTriangle className="text-red-600 w-8 h-8 md:w-12 md:h-12 mx-auto mb-4 md:mb-6" />
+            <h4 className="text-xs md:text-sm font-black uppercase text-red-500 mb-2 italic">Aksyon limite</h4>
+            <p className="text-[9px] md:text-[11px] text-red-500/60 max-w-sm mx-auto leading-relaxed">
               Ou dwe lye biznis ou an anvan ou ka jwenn aksè nan Plugins ak Invoices.
             </p>
           </div>
@@ -1451,59 +1461,43 @@ Vèsyon 2.0 - Fòmilè kat entegre
       {/* ── SIDEBAR ── */}
       <div className="lg:col-span-4 space-y-6">
         {/* Balans */}
-        <div className="bg-white text-black p-8 rounded-[3.5rem] shadow-2xl shadow-red-600/10">
-          <div className="flex justify-between items-start mb-5">
-            <div className="bg-black text-white p-4 rounded-2xl"><Wallet size={18} /></div>
+        <div className="bg-white text-black p-6 md:p-8 rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl shadow-red-600/10">
+          <div className="flex justify-between items-start mb-4 md:mb-5">
+            <div className="bg-black text-white p-3 md:p-4 rounded-xl md:rounded-2xl"><Wallet size={16} className="md:w-[18px] md:h-[18px]" /></div>
             <div className="text-right">
-              <p className="text-[9px] font-black uppercase tracking-widest opacity-40">Balans Wallet</p>
-              <h2 className="text-3xl font-black italic tracking-tighter mt-1">
-                {profile?.balance?.toLocaleString() || '0'}<span className="text-[12px] ml-1">HTG</span>
+              <p className="text-[8px] md:text-[9px] font-black uppercase tracking-widest opacity-40">Balans Wallet</p>
+              <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter mt-1 truncate max-w-[150px] md:max-w-[200px]">
+                {profile?.balance?.toLocaleString() || '0'}<span className="text-[10px] md:text-[12px] ml-1">HTG</span>
               </h2>
             </div>
           </div>
-          <div className="bg-zinc-50 rounded-2xl p-4 mb-4">
-            <p className="text-[9px] font-black uppercase text-zinc-400 mb-2">An Atant pou Senkronize</p>
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-black text-red-600">{earnings.total.toLocaleString()} HTG</span>
-              <span className="text-[8px] bg-red-100 text-red-600 font-black px-2 py-1 rounded-full">DISPONIB</span>
+          <div className="bg-zinc-50 rounded-xl md:rounded-2xl p-3 md:p-4 mb-4">
+            <p className="text-[8px] md:text-[9px] font-black uppercase text-zinc-400 mb-1.5 md:mb-2">An Atant pou Senkronize</p>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-sm md:text-lg font-black text-red-600 truncate">{earnings.total.toLocaleString()} HTG</span>
+              <span className="text-[7px] md:text-[8px] bg-red-100 text-red-600 font-black px-1.5 md:px-2 py-1 rounded-full flex-shrink-0">DISPONIB</span>
             </div>
           </div>
-          <button onClick={handleSyncBalance} disabled={syncing || earnings.total <= 0} className="w-full bg-black hover:bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-[10px] transition-all flex items-center justify-center gap-2 disabled:opacity-40">
-            {syncing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+          <button onClick={handleSyncBalance} disabled={syncing || earnings.total <= 0} className="w-full bg-black hover:bg-red-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] transition-all flex items-center justify-center gap-2 disabled:opacity-40">
+            {syncing ? <RefreshCw className="animate-spin" size={12} /> : <RefreshCw size={12} className="md:w-3.5 md:h-3.5" />}
             Senkronize {earnings.total > 0 ? earnings.total.toLocaleString() + ' HTG' : ''}
           </button>
         </div>
 
         {/* Node Config */}
-        <div className="bg-zinc-900/30 border border-white/5 p-7 rounded-[3rem]">
-          <h3 className="text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-zinc-500">Konfigirasyon</h3>
-          <div className="space-y-3">
+        <div className="bg-zinc-900/30 border border-white/5 p-5 md:p-7 rounded-[2rem] md:rounded-[3rem]">
+          <h3 className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] mb-3 md:mb-4 text-zinc-500">Konfigirasyon</h3>
+          <div className="space-y-2 md:space-y-3">
             {[
-              { 
-                label: 'Merchant ID', 
-                val: (profile?.id?.slice(0, 8) || '—') + '...', 
-                color: 'text-red-500' 
-              },
-              { 
-                label: 'KYC Status', 
-                val: profile?.kyc_status || 'pending', 
-                color: profile?.kyc_status === 'approved' ? 'text-green-500' : 'text-orange-500' 
-              },
-              { 
-                label: 'API Key', 
-                val: profile?.api_key ? profile.api_key.slice(0, 8) + '...' : 'Pa genyen',
-                color: profile?.api_key ? 'text-blue-400' : 'text-zinc-500'
-              },
-              { 
-                label: 'Revni Mwa a', 
-                val: formatCurrency(earnings.thisMonth), 
-                color: 'text-emerald-400' 
-              },
+              { label: 'Merchant ID', val: (profile?.id?.slice(0, 8) || '—') + '...', color: 'text-red-500' },
+              { label: 'KYC Status', val: profile?.kyc_status || 'pending', color: profile?.kyc_status === 'approved' ? 'text-green-500' : 'text-orange-500' },
+              { label: 'API Key', val: profile?.api_key ? profile.api_key.slice(0, 8) + '...' : 'Pa genyen', color: profile?.api_key ? 'text-blue-400' : 'text-zinc-500' },
+              { label: 'Revni Mwa a', val: formatCurrency(earnings.thisMonth), color: 'text-emerald-400' },
             ].map((item) => (
-              <div key={item.label} className="flex justify-between items-center p-4 bg-black/40 rounded-2xl border border-white/5">
-                <span className="text-[9px] font-bold text-zinc-400">{item.label}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[9px] font-black uppercase ${item.color}`}>{item.val}</span>
+              <div key={item.label} className="flex justify-between items-center p-3 md:p-4 bg-black/40 rounded-xl md:rounded-2xl border border-white/5">
+                <span className="text-[8px] md:text-[9px] font-bold text-zinc-400 truncate mr-2">{item.label}</span>
+                <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
+                  <span className={`text-[8px] md:text-[9px] font-black uppercase ${item.color}`}>{item.val}</span>
                   {item.label === 'API Key' && profile?.api_key && (
                     <button
                       onClick={() => {
@@ -1511,10 +1505,9 @@ Vèsyon 2.0 - Fòmilè kat entegre
                         setCopiedApiKey(true);
                         setTimeout(() => setCopiedApiKey(false), 2000);
                       }}
-                      className="p-1 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
-                      title="Kopye kle API"
+                      className="p-1 md:p-1.5 bg-zinc-800 rounded-md md:rounded-lg hover:bg-zinc-700 transition-colors"
                     >
-                      {copiedApiKey ? <CheckCircle2 size={12} className="text-green-400" /> : <Copy size={12} className="text-zinc-400" />}
+                      {copiedApiKey ? <CheckCircle2 size={10} className="text-green-400 md:w-3 md:h-3" /> : <Copy size={10} className="text-zinc-400 md:w-3 md:h-3" />}
                     </button>
                   )}
                   {item.label === 'Merchant ID' && (
@@ -1523,34 +1516,33 @@ Vèsyon 2.0 - Fòmilè kat entegre
                         navigator.clipboard.writeText(profile?.id || '');
                         alert('ID kopye! Pa pataje li ak pèsòn.');
                       }}
-                      className="p-1 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
-                      title="Kopye ID"
+                      className="p-1 md:p-1.5 bg-zinc-800 rounded-md md:rounded-lg hover:bg-zinc-700 transition-colors"
                     >
-                      <Copy size={12} className="text-zinc-400" />
+                      <Copy size={10} className="text-zinc-400 md:w-3 md:h-3" />
                     </button>
                   )}
                 </div>
               </div>
             ))}
-            <div className="mt-2 p-3 bg-red-600/10 border border-red-600/20 rounded-2xl">
-              <p className="text-[8px] text-red-400 font-bold uppercase tracking-wider text-center">
-                ⚠️ Pa janm pataje ID ou oswa kle API ak pèsonn
+            <div className="mt-2 p-2 md:p-3 bg-red-600/10 border border-red-600/20 rounded-xl md:rounded-2xl">
+              <p className="text-[7px] md:text-[8px] text-red-400 font-bold uppercase tracking-wider text-center">
+                ⚠️ Pa janm pataje ID ou oswa kle API
               </p>
             </div>
           </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-zinc-900/30 border border-white/5 p-7 rounded-[3rem]">
-          <h3 className="text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-zinc-500">Estatistik rapid</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-black/40 p-4 rounded-2xl text-center">
-              <p className="text-[9px] text-zinc-500 font-bold">Total tranzaksyon</p>
-              <p className="text-lg font-black text-white">{transactions.length}</p>
+        <div className="bg-zinc-900/30 border border-white/5 p-5 md:p-7 rounded-[2rem] md:rounded-[3rem]">
+          <h3 className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] mb-3 md:mb-4 text-zinc-500">Estatistik rapid</h3>
+          <div className="grid grid-cols-2 gap-2 md:gap-3">
+            <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl text-center border border-white/5">
+              <p className="text-[8px] md:text-[9px] text-zinc-500 font-bold">Total tranzaksyon</p>
+              <p className="text-base md:text-lg font-black text-white mt-0.5">{transactions.length}</p>
             </div>
-            <div className="bg-black/40 p-4 rounded-2xl text-center">
-              <p className="text-[9px] text-zinc-500 font-bold">Fakti yo</p>
-              <p className="text-lg font-black text-white">{invoices.length}</p>
+            <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl text-center border border-white/5">
+              <p className="text-[8px] md:text-[9px] text-zinc-500 font-bold">Fakti yo</p>
+              <p className="text-base md:text-lg font-black text-white mt-0.5">{invoices.length}</p>
             </div>
           </div>
         </div>
@@ -1560,36 +1552,36 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
   const renderPlugins = () => (
     <div className="max-w-5xl mx-auto animate-in fade-in zoom-in-95 duration-500">
-      <div className="flex items-center justify-between mb-8">
-        <button onClick={() => setMode('dashboard')} className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all">
-          <ArrowLeft size={20} />
+      <div className="flex items-center justify-between mb-6 md:mb-8">
+        <button onClick={() => setMode('dashboard')} className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all">
+          <ArrowLeft size={16} className="md:w-5 md:h-5" />
         </button>
-        <h2 className="text-xl font-black uppercase italic tracking-widest">Plugins & Entegrasyon</h2>
-        <div className="w-12" />
+        <h2 className="text-lg md:text-xl font-black uppercase italic tracking-widest text-center">Plugins & Entegrasyon</h2>
+        <div className="w-10 md:w-12" />
       </div>
 
       {/* YouTube Tutorial */}
-      <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[3rem] overflow-hidden mb-8">
-        <div className="p-7 border-b border-white/5 flex items-center justify-between">
+      <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2rem] md:rounded-[3rem] overflow-hidden mb-6 md:mb-8">
+        <div className="p-5 md:p-7 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="bg-red-600/10 p-3 rounded-2xl">
-              <Youtube className="text-red-600 w-5 h-5" />
+            <div className="bg-red-600/10 p-2 md:p-3 rounded-xl md:rounded-2xl shrink-0">
+              <Youtube className="text-red-600 w-4 h-4 md:w-5 md:h-5" />
             </div>
             <div>
-              <h3 className="text-[13px] font-black uppercase tracking-widest">Videyo Tutoryèl</h3>
-              <p className="text-[9px] text-zinc-500 font-bold mt-0.5">Aprann kijan pou enstale plugins yo</p>
+              <h3 className="text-[11px] md:text-[13px] font-black uppercase tracking-widest">Videyo Tutoryèl</h3>
+              <p className="text-[8px] md:text-[9px] text-zinc-500 font-bold mt-0.5">Aprann kijan pou enstale plugins yo</p>
             </div>
           </div>
           <button
             onClick={() => setShowVideo(!showVideo)}
-            className="px-4 py-2 bg-zinc-900 rounded-xl font-black text-[10px] uppercase hover:bg-zinc-800 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2 bg-zinc-900 rounded-lg md:rounded-xl font-black text-[9px] md:text-[10px] uppercase hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
           >
-            <Play size={12} /> {showVideo ? 'Kache' : 'Wè'}
+            <Play size={10} className="md:w-3 md:h-3" /> {showVideo ? 'Kache' : 'Wè'}
           </button>
         </div>
 
         {showVideo && youtubeUrl && getYoutubeEmbedUrl(youtubeUrl) ? (
-          <div className="aspect-video">
+          <div className="aspect-video w-full">
             <iframe
               src={getYoutubeEmbedUrl(youtubeUrl)}
               className="w-full h-full"
@@ -1598,23 +1590,23 @@ Vèsyon 2.0 - Fòmilè kat entegre
             />
           </div>
         ) : showVideo && !youtubeUrl ? (
-          <div className="p-10 text-center text-zinc-600">
-            <Youtube size={40} className="mx-auto mb-4 opacity-20" />
-            <p className="text-[11px] font-bold uppercase">Pa gen URL videyo. Ajoute l anba.</p>
+          <div className="p-6 md:p-10 text-center text-zinc-600">
+            <Youtube size={30} className="md:w-10 md:h-10 mx-auto mb-3 md:mb-4 opacity-20" />
+            <p className="text-[9px] md:text-[11px] font-bold uppercase">Pa gen URL videyo. Ajoute l anba.</p>
           </div>
         ) : null}
 
-        <div className="p-6 flex gap-3">
+        <div className="p-4 md:p-6 flex flex-col sm:flex-row gap-3">
           <input
             type="url"
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
-            className="flex-1 bg-black/40 border border-white/10 py-4 px-5 rounded-2xl text-[13px] outline-none text-white focus:border-red-600/50 transition-all"
+            placeholder="https://youtube.com/watch?v=..."
+            className="flex-1 bg-black/40 border border-white/10 py-3 md:py-4 px-4 md:px-5 rounded-xl md:rounded-2xl text-[11px] md:text-[13px] outline-none text-white focus:border-red-600/50 transition-all"
           />
           <button
             onClick={saveYoutubeUrl}
-            className="px-6 py-4 bg-red-600 hover:bg-red-700 text-white font-black text-[11px] uppercase rounded-2xl transition-all"
+            className="w-full sm:w-auto px-6 py-3 md:py-4 bg-red-600 hover:bg-red-700 text-white font-black text-[9px] md:text-[11px] uppercase rounded-xl md:rounded-2xl transition-all"
           >
             Sove
           </button>
@@ -1623,49 +1615,44 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
       {/* KYC Warning */}
       {profile?.kyc_status !== 'approved' && (
-        <div className="bg-amber-600/20 border border-amber-600/30 p-8 rounded-[3rem] mb-8 text-center">
-          <AlertTriangle className="text-amber-500 w-12 h-12 mx-auto mb-4" />
-          <h3 className="text-lg font-black text-amber-500 mb-2">KYC poko apwouve</h3>
-          <p className="text-amber-400/80 max-w-lg mx-auto">
+        <div className="bg-amber-600/20 border border-amber-600/30 p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] mb-6 md:mb-8 text-center">
+          <AlertTriangle className="text-amber-500 w-8 h-8 md:w-12 md:h-12 mx-auto mb-3 md:mb-4" />
+          <h3 className="text-base md:text-lg font-black text-amber-500 mb-2">KYC poko apwouve</h3>
+          <p className="text-[10px] md:text-xs text-amber-400/80 max-w-lg mx-auto">
             Ou dwe tann apwobasyon KYC ou anvan ou ka telechaje plugins yo.
             Tanpri verifye imèl ou regilyèman pou konfimasyon.
           </p>
         </div>
       )}
 
-      {/* Platform Cards - ONLY HOSTINGER */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Hostinger / Horizon */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-8 rounded-[3rem] hover:border-red-600/30 transition-all">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="bg-orange-600/20 p-4 rounded-2xl">
-              <Wifi className="text-orange-400 w-8 h-8" />
+      {/* Platform Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] hover:border-red-600/30 transition-all flex flex-col h-full">
+          <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
+            <div className="bg-orange-600/20 p-3 md:p-4 rounded-xl md:rounded-2xl shrink-0">
+              <Wifi className="text-orange-400 w-6 h-6 md:w-8 md:h-8" />
             </div>
             <div>
-              <h3 className="text-xl font-black">Hostinger / Horizon</h3>
-              <p className="text-zinc-500 text-sm">Embed Code</p>
+              <h3 className="text-base md:text-xl font-black">Hostinger / Horizon</h3>
+              <p className="text-zinc-500 text-xs md:text-sm">Embed Code</p>
             </div>
           </div>
           
-          <p className="text-zinc-400 text-sm mb-6">
+          <p className="text-zinc-400 text-[10px] md:text-sm mb-6 flex-grow">
             Kòd pou kole nan sit ou. Vèsyon 2.0 ak fòmilè kat entegre.
           </p>
           
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-zinc-600">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-auto pt-4 border-t border-white/5">
+            <div className="text-[10px] md:text-xs text-zinc-600 flex sm:flex-col gap-2 sm:gap-0">
               <span className="block">Vèsyon: 2.0.0</span>
-              <span className="block">Fòmilè entegre</span>
+              <span className="hidden sm:block">Fòmilè entegre</span>
             </div>
             <button
               onClick={generateHostingerPlugin}
               disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key}
-              className="px-6 py-3 bg-red-600 rounded-xl font-black text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-red-600 rounded-xl font-black text-[10px] md:text-sm uppercase hover:bg-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {downloadingPlugin === 'hostinger' ? (
-                <RefreshCw size={16} className="animate-spin" />
-              ) : (
-                <DownloadIcon size={16} />
-              )}
+              {downloadingPlugin === 'hostinger' ? <RefreshCw size={14} className="animate-spin md:w-4 md:h-4" /> : <DownloadIcon size={14} className="md:w-4 md:h-4" />}
               {downloadingPlugin === 'hostinger' ? 'Ap jenere...' : 'Telechaje ZIP'}
             </button>
           </div>
@@ -1673,24 +1660,24 @@ Vèsyon 2.0 - Fòmilè kat entegre
       </div>
 
       {/* Enstriksyon */}
-      <div className="bg-zinc-900/30 border border-white/5 p-8 rounded-[3rem] mt-8">
-        <h3 className="text-lg font-black mb-4">📋 Enstriksyon enstalasyon</h3>
-        <div className="space-y-4 text-zinc-300 text-sm">
-          <div className="flex gap-3">
-            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">1</div>
-            <p><span className="text-white font-bold">Telechaje</span> fichye ZIP ki koresponn ak platform ou a.</p>
+      <div className="bg-zinc-900/30 border border-white/5 p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] mt-6 md:mt-8">
+        <h3 className="text-base md:text-lg font-black mb-4">📋 Enstriksyon</h3>
+        <div className="space-y-3 md:space-y-4 text-zinc-300 text-[10px] md:text-sm">
+          <div className="flex gap-2 md:gap-3 items-start">
+            <div className="w-5 h-5 md:w-6 md:h-6 bg-red-600 rounded-full flex items-center justify-center text-[9px] md:text-xs font-black shrink-0 mt-0.5">1</div>
+            <p className="leading-relaxed"><span className="text-white font-bold">Telechaje</span> fichye ZIP ki koresponn ak platform ou a.</p>
           </div>
-          <div className="flex gap-3">
-            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">2</div>
-            <p><span className="text-white font-bold">Enstale</span> plugin an selon enstriksyon yo.</p>
+          <div className="flex gap-2 md:gap-3 items-start">
+            <div className="w-5 h-5 md:w-6 md:h-6 bg-red-600 rounded-full flex items-center justify-center text-[9px] md:text-xs font-black shrink-0 mt-0.5">2</div>
+            <p className="leading-relaxed"><span className="text-white font-bold">Enstale</span> plugin an selon enstriksyon yo.</p>
           </div>
-          <div className="flex gap-3">
-            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">3</div>
-            <p><span className="text-white font-bold">Fòmilè kat la</span> ap parèt dirèkteman sou paj checkout la.</p>
+          <div className="flex gap-2 md:gap-3 items-start">
+            <div className="w-5 h-5 md:w-6 md:h-6 bg-red-600 rounded-full flex items-center justify-center text-[9px] md:text-xs font-black shrink-0 mt-0.5">3</div>
+            <p className="leading-relaxed"><span className="text-white font-bold">Fòmilè kat la</span> ap parèt dirèkteman sou paj checkout la.</p>
           </div>
-          <div className="flex gap-3">
-            <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">4</div>
-            <p><span className="text-white font-bold">Pa gen redireksyon</span> – tout bagay fèt sou menm paj la.</p>
+          <div className="flex gap-2 md:gap-3 items-start">
+            <div className="w-5 h-5 md:w-6 md:h-6 bg-red-600 rounded-full flex items-center justify-center text-[9px] md:text-xs font-black shrink-0 mt-0.5">4</div>
+            <p className="leading-relaxed"><span className="text-white font-bold">Pa gen redireksyon</span> – tout bagay fèt sou menm paj la.</p>
           </div>
         </div>
       </div>
@@ -1701,52 +1688,52 @@ Vèsyon 2.0 - Fòmilè kat entegre
     if (subMode === 'create') {
       return (
         <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-right-8 duration-500">
-          <div className="flex items-center justify-between mb-10">
-            <button onClick={() => setSubMode('list')} className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all">
-              <ArrowLeft size={20} />
+          <div className="flex items-center justify-between mb-6 md:mb-10">
+            <button onClick={() => setSubMode('list')} className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all">
+              <ArrowLeft size={16} className="md:w-5 md:h-5" />
             </button>
-            <h2 className="text-xl font-black uppercase italic tracking-widest">Nouvo Smart Invoice</h2>
-            <div className="w-12" />
+            <h2 className="text-base md:text-xl font-black uppercase italic tracking-widest text-center flex-1">Nouvo Smart Invoice</h2>
+            <div className="w-10 md:w-12 shrink-0" />
           </div>
           
-          <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/10 p-12 rounded-[4rem] space-y-8">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
+          <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/10 p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] space-y-6 md:space-y-8 shadow-2xl">
+            <div className="space-y-2 md:space-y-3">
+              <label className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">
                 Montan an (HTG)
               </label>
               <input
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-black/50 border border-white/10 p-8 rounded-3xl text-3xl font-black italic outline-none focus:border-red-600/50 transition-all"
+                className="w-full bg-black/50 border border-white/10 p-6 md:p-8 rounded-2xl md:rounded-3xl text-2xl md:text-3xl font-black italic outline-none focus:border-red-600/50 transition-all"
                 placeholder="0.00"
               />
             </div>
             
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
+            <div className="space-y-2 md:space-y-3">
+              <label className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">
                 Email Kliyan
               </label>
               <div className="relative">
-                <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-600" size={17} />
+                <Mail className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4 md:w-[17px] md:h-[17px]" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 py-6 pl-16 pr-6 rounded-3xl text-sm italic outline-none focus:border-red-600/50"
+                  className="w-full bg-black/50 border border-white/10 py-5 md:py-6 pl-12 md:pl-16 pr-4 md:pr-6 rounded-2xl md:rounded-3xl text-xs md:text-sm italic outline-none focus:border-red-600/50 transition-all"
                   placeholder="kliyan@gmail.com"
                 />
               </div>
             </div>
             
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
+            <div className="space-y-2 md:space-y-3">
+              <label className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">
                 Deskripsyon (Opsyonèl)
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-black/50 border border-white/10 p-8 rounded-3xl text-sm italic outline-none focus:border-red-600/50 h-32"
+                className="w-full bg-black/50 border border-white/10 p-5 md:p-8 rounded-2xl md:rounded-3xl text-xs md:text-sm italic outline-none focus:border-red-600/50 h-24 md:h-32 transition-all resize-none"
                 placeholder="Kisa kliyan an ap achte?"
               />
             </div>
@@ -1754,7 +1741,7 @@ Vèsyon 2.0 - Fòmilè kat entegre
             <button
               onClick={handleCreateInvoice}
               disabled={loading}
-              className="w-full bg-red-600 hover:bg-white hover:text-black py-8 rounded-[2rem] font-black uppercase italic text-lg shadow-2xl shadow-red-600/20 transition-all active:scale-95"
+              className="w-full bg-red-600 hover:bg-white hover:text-black py-5 md:py-8 rounded-full md:rounded-[2rem] font-black uppercase italic text-[11px] md:text-lg shadow-2xl shadow-red-600/20 transition-all active:scale-95"
             >
               {loading ? 'Ap kreye...' : 'Jenere Lyen & Voye Email'}
             </button>
@@ -1765,29 +1752,31 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
     return (
       <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-        <div className="flex items-center justify-between mb-10">
-          <button onClick={() => setMode('dashboard')} className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all">
-            <ArrowLeft size={20} />
-          </button>
-          <h2 className="text-xl font-black uppercase italic tracking-widest">Jesyon Fakti (Invoices)</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 md:mb-10 gap-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMode('dashboard')} className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all shrink-0">
+              <ArrowLeft size={16} className="md:w-5 md:h-5" />
+            </button>
+            <h2 className="text-lg md:text-xl font-black uppercase italic tracking-widest">Fakti (Invoices)</h2>
+          </div>
           <button
             onClick={() => setSubMode('create')}
-            className="p-4 bg-red-600 rounded-2xl hover:bg-red-700 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto p-3 md:p-4 bg-red-600 rounded-xl md:rounded-2xl hover:bg-red-700 transition-all flex items-center justify-center gap-2"
           >
-            <PlusCircle size={20} />
-            <span className="text-[10px] font-black uppercase">Nouvo fakti</span>
+            <PlusCircle size={16} className="md:w-5 md:h-5" />
+            <span className="text-[9px] md:text-[10px] font-black uppercase">Nouvo fakti</span>
           </button>
         </div>
 
         {/* Filters */}
-        <div className="bg-zinc-900/30 border border-white/5 p-6 rounded-[2rem] mb-8">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2 bg-black/40 p-2 rounded-xl">
-              <Calendar size={16} className="text-zinc-500" />
+        <div className="bg-zinc-900/30 border border-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2rem] mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 md:gap-4">
+            <div className="flex items-center gap-2 bg-black/40 p-2 md:p-3 rounded-lg md:rounded-xl flex-1 sm:flex-none">
+              <Calendar size={14} className="text-zinc-500 md:w-4 md:h-4" />
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value as any)}
-                className="bg-transparent text-[11px] font-bold text-white outline-none"
+                className="bg-transparent text-[10px] md:text-[11px] font-bold text-white outline-none w-full"
               >
                 <option value="all">Tout tan</option>
                 <option value="today">Jodi a</option>
@@ -1796,12 +1785,12 @@ Vèsyon 2.0 - Fòmilè kat entegre
               </select>
             </div>
 
-            <div className="flex items-center gap-2 bg-black/40 p-2 rounded-xl">
-              <Filter size={16} className="text-zinc-500" />
+            <div className="flex items-center gap-2 bg-black/40 p-2 md:p-3 rounded-lg md:rounded-xl flex-1 sm:flex-none">
+              <Filter size={14} className="text-zinc-500 md:w-4 md:h-4" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent text-[11px] font-bold text-white outline-none"
+                className="bg-transparent text-[10px] md:text-[11px] font-bold text-white outline-none w-full"
               >
                 <option value="all">Tout estati</option>
                 <option value="pending">An atant</option>
@@ -1810,14 +1799,14 @@ Vèsyon 2.0 - Fòmilè kat entegre
               </select>
             </div>
 
-            <div className="flex-1 flex items-center gap-2 bg-black/40 p-2 rounded-xl">
-              <Search size={16} className="text-zinc-500" />
+            <div className="w-full sm:flex-1 flex items-center gap-2 bg-black/40 p-2 md:p-3 rounded-lg md:rounded-xl">
+              <Search size={14} className="text-zinc-500 md:w-4 md:h-4" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Chèche pa email oswa deskripsyon..."
-                className="bg-transparent text-[11px] font-bold text-white outline-none w-full"
+                placeholder="Chèche pa email..."
+                className="bg-transparent text-[10px] md:text-[11px] font-bold text-white outline-none w-full"
               />
             </div>
           </div>
@@ -1825,12 +1814,12 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
         {/* Invoice List */}
         {filteredInvoices.length === 0 ? (
-          <div className="text-center py-40 bg-zinc-900/10 rounded-[4rem] border border-dashed border-white/5">
-            <FileText className="w-16 h-16 text-zinc-800 mx-auto mb-6" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Pa gen fakti pou kounye a</p>
+          <div className="text-center py-20 md:py-40 bg-zinc-900/10 rounded-[2rem] md:rounded-[4rem] border border-dashed border-white/5">
+            <FileText className="w-12 h-12 md:w-16 md:h-16 text-zinc-800 mx-auto mb-4 md:mb-6" />
+            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-600">Pa gen fakti pou kounye a</p>
             <button
               onClick={() => setSubMode('create')}
-              className="mt-6 px-8 py-4 bg-red-600 rounded-2xl text-white font-black text-[10px] uppercase hover:bg-red-700 transition-all"
+              className="mt-4 md:mt-6 px-6 py-3 md:px-8 md:py-4 bg-red-600 rounded-xl md:rounded-2xl text-white font-black text-[9px] md:text-[10px] uppercase hover:bg-red-700 transition-all"
             >
               Kreye premye fakti
             </button>
@@ -1840,22 +1829,22 @@ Vèsyon 2.0 - Fòmilè kat entegre
             {filteredInvoices.map((inv) => (
               <div
                 key={inv.id}
-                className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] hover:border-red-600/20 transition-all"
+                className="bg-[#0d0e1a] border border-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] hover:border-red-600/20 transition-all"
               >
-                <div className="flex flex-wrap items-center gap-5">
-                  <div className={`w-12 h-12 ${
-                    inv.status === 'paid' ? 'bg-green-600' : 
-                    inv.status === 'pending' ? 'bg-amber-600' : 'bg-red-600'
-                  } rounded-2xl flex items-center justify-center font-black text-[11px] text-white flex-shrink-0`}>
-                    {inv.status === 'paid' ? '✓' : inv.status === 'pending' ? '⏳' : '✗'}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-black uppercase italic text-sm text-white truncate">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-5">
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className={`w-10 h-10 md:w-12 md:h-12 ${
+                      inv.status === 'paid' ? 'bg-green-600' : 
+                      inv.status === 'pending' ? 'bg-amber-600' : 'bg-red-600'
+                    } rounded-xl md:rounded-2xl flex items-center justify-center font-black text-[10px] md:text-[11px] text-white flex-shrink-0`}>
+                      {inv.status === 'paid' ? '✓' : inv.status === 'pending' ? '⏳' : '✗'}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0 sm:hidden">
+                      <h4 className="font-black uppercase italic text-xs text-white truncate">
                         Fakti #{inv.id.slice(0, 8)}
                       </h4>
-                      <span className={`text-[7px] font-black uppercase px-2 py-1 rounded-full ${
+                      <span className={`text-[6px] font-black uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${
                         inv.status === 'paid' ? 'bg-green-500/15 text-green-400' :
                         inv.status === 'pending' ? 'bg-amber-500/15 text-amber-400' :
                         'bg-red-500/15 text-red-400'
@@ -1863,61 +1852,73 @@ Vèsyon 2.0 - Fòmilè kat entegre
                         {inv.status === 'paid' ? 'Peye' : inv.status === 'pending' ? 'An atant' : 'Anile'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[9px] font-bold text-zinc-600 truncate max-w-[200px]">
+                  </div>
+
+                  <div className="flex-1 min-w-0 hidden sm:block">
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-black uppercase italic text-xs md:text-sm text-white truncate">
+                        Fakti #{inv.id.slice(0, 8)}
+                      </h4>
+                      <span className={`text-[6px] md:text-[7px] font-black uppercase px-2 py-1 rounded-full ${
+                        inv.status === 'paid' ? 'bg-green-500/15 text-green-400' :
+                        inv.status === 'pending' ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-red-500/15 text-red-400'
+                      }`}>
+                        {inv.status === 'paid' ? 'Peye' : inv.status === 'pending' ? 'An atant' : 'Anile'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
+                      <span className="text-[8px] md:text-[9px] font-bold text-zinc-600 truncate max-w-[150px] md:max-w-[200px]">
                         {inv.client_email}
                       </span>
-                      <span className="text-[9px] text-zinc-700">·</span>
-                      <span className="text-[9px] text-zinc-600">{formatDate(inv.created_at)}</span>
-                      {inv.description && (
-                        <>
-                          <span className="text-[9px] text-zinc-700">·</span>
-                          <span className="text-[9px] text-zinc-400 truncate max-w-[200px]">
-                            {inv.description}
-                          </span>
-                        </>
-                      )}
+                      <span className="text-[8px] md:text-[9px] text-zinc-700">·</span>
+                      <span className="text-[8px] md:text-[9px] text-zinc-600">{formatDate(inv.created_at)}</span>
                     </div>
                   </div>
 
-                  <div className="text-right flex-shrink-0">
-  <div className="text-lg font-black italic text-green-400">
-    {parseFloat(inv.amount).toLocaleString()} HTG
-  </div>
-  <div className="flex items-center gap-2 justify-end mt-2">
-    {inv.status === 'pending' && (
-      <>
-        <button
-          onClick={() => handleMarkInvoiceAsPaid(inv.id)}
-          className="p-2 bg-green-600/20 rounded-xl hover:bg-green-600/40 transition-all"
-          title="Make as paid"
-        >
-          <CheckSquare size={14} className="text-green-400" />
-        </button>
+                  {/* Mobil View Info */}
+                  <div className="sm:hidden flex flex-col gap-1 border-t border-white/5 pt-2 mt-1">
+                     <span className="text-[9px] font-bold text-zinc-400 truncate">{inv.client_email}</span>
+                     <span className="text-[8px] text-zinc-600">{formatDate(inv.created_at)}</span>
+                  </div>
 
-        {/* NOUVO BOUTON KOPYE A KI KORIJE */}
-        <button
-          onClick={() => {
-            const paymentLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
-            navigator.clipboard.writeText(paymentLink);
-            alert("Lyen peman an kopye nan clipboard ou!");
-          }}
-          className="p-2 bg-blue-600/20 rounded-xl hover:bg-blue-600/40 transition-all"
-          title="Copy payment link"
-        >
-          <Copy size={14} className="text-blue-400" />
-        </button>
-      </>
-    )}
-    <button
-      onClick={() => handleDeleteInvoice(inv.id)}
-      className="p-2 bg-red-600/20 rounded-xl hover:bg-red-600/40 transition-all"
-      title="Delete"
-    >
-      <Trash2 size={14} className="text-red-400" />
-    </button>
-  </div>
-</div>
+                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t border-white/5 sm:border-none pt-3 sm:pt-0 mt-2 sm:mt-0">
+                    <div className="text-base md:text-lg font-black italic text-green-400">
+                      {parseFloat(inv.amount).toLocaleString()} HTG
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 md:gap-2 justify-end sm:ml-4">
+                      {inv.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleMarkInvoiceAsPaid(inv.id)}
+                            className="p-1.5 md:p-2 bg-green-600/20 rounded-lg md:rounded-xl hover:bg-green-600/40 transition-all"
+                            title="Make as paid"
+                          >
+                            <CheckSquare size={14} className="text-green-400 md:w-3.5 md:h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              const paymentLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
+                              navigator.clipboard.writeText(paymentLink);
+                              alert("Lyen peman an kopye nan clipboard ou!");
+                            }}
+                            className="p-1.5 md:p-2 bg-blue-600/20 rounded-lg md:rounded-xl hover:bg-blue-600/40 transition-all"
+                            title="Copy payment link"
+                          >
+                            <Copy size={14} className="text-blue-400 md:w-3.5 md:h-3.5" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDeleteInvoice(inv.id)}
+                        className="p-1.5 md:p-2 bg-red-600/20 rounded-lg md:rounded-xl hover:bg-red-600/40 transition-all"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} className="text-red-400 md:w-3.5 md:h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1929,26 +1930,28 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
   const renderTransactions = () => (
     <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-      <div className="flex items-center justify-between mb-10">
-        <button onClick={() => setMode('dashboard')} className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all">
-          <ArrowLeft size={20} />
-        </button>
-        <h2 className="text-xl font-black uppercase italic tracking-widest">Jounal Tranzaksyon</h2>
-        <div className="flex gap-2">
-          <button className="p-4 bg-zinc-900 rounded-2xl hover:bg-white hover:text-black transition-all">
-            <Filter size={17} />
+      <div className="flex items-center justify-between mb-6 md:mb-10">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setMode('dashboard')} className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all shrink-0">
+            <ArrowLeft size={16} className="md:w-5 md:h-5" />
           </button>
-          <button className="p-4 bg-zinc-900 rounded-2xl hover:bg-white hover:text-black transition-all">
-            <Download size={17} />
+          <h2 className="text-lg md:text-xl font-black uppercase italic tracking-widest truncate">Jounal Tranzaksyon</h2>
+        </div>
+        <div className="flex gap-1.5 md:gap-2">
+          <button className="p-2.5 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-white hover:text-black transition-all">
+            <Filter size={14} className="md:w-[17px] md:h-[17px]" />
+          </button>
+          <button className="p-2.5 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-white hover:text-black transition-all">
+            <Download size={14} className="md:w-[17px] md:h-[17px]" />
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-8">
+      <div className="flex overflow-x-auto pb-2 gap-2 mb-6 md:mb-8 scrollbar-hide">
         {['Tout', 'SDK', 'Invoice'].map((tab) => (
           <button
             key={tab}
-            className="px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase bg-zinc-900/50 border border-white/5 hover:border-red-600/30 transition-all text-zinc-400 hover:text-white"
+            className="px-4 py-2 md:px-5 md:py-2.5 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase bg-zinc-900/50 border border-white/5 hover:border-red-600/30 transition-all text-zinc-400 hover:text-white whitespace-nowrap"
           >
             {tab}
           </button>
@@ -1962,49 +1965,70 @@ Vèsyon 2.0 - Fòmilè kat entegre
             const initials = getInitials(client);
             const colorCls = getInitialColor(client);
             return (
-              <div key={i} className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2.5rem] flex items-center gap-5 hover:border-red-600/20 transition-all">
-                <div className={`w-12 h-12 ${colorCls} rounded-2xl flex items-center justify-center font-black text-[11px] text-white flex-shrink-0`}>
-                  {initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <h4 className="font-black uppercase italic text-sm text-white truncate">
+              <div key={i} className="bg-[#0d0e1a] border border-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] hover:border-red-600/20 transition-all flex flex-col sm:flex-row sm:items-center gap-4">
+                
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className={`w-10 h-10 md:w-12 md:h-12 ${colorCls} rounded-xl md:rounded-2xl flex items-center justify-center font-black text-[10px] md:text-[11px] text-white flex-shrink-0`}>
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0 sm:hidden">
+                    <h4 className="font-black uppercase italic text-xs text-white truncate">
                       {(tx as any).type || 'PÈMAN'}
                     </h4>
-                    <span className={`text-[7px] font-black uppercase px-2 py-1 rounded-full ${
+                    <span className={`text-[6px] font-black uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${
                       tx.source === 'Invoice' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'
                     }`}>
                       {tx.source}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[9px] font-bold text-zinc-600 truncate max-w-[180px]">{client}</span>
-                    <span className="text-[9px] text-zinc-700">·</span>
-                    <span className="text-[9px] text-zinc-600">{formatDate(tx.created_at)}</span>
-                    <span className="text-[9px] text-zinc-700">·</span>
-                    <span className="text-[8px] font-bold text-zinc-700">#{tx.id?.slice(0, 6)}</span>
-                  </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-black italic text-green-400">
-                    +{parseFloat(tx.amount).toLocaleString()}
-                  </div>
-                  <div className="flex items-center gap-2 justify-end mt-1">
-                    <span className="text-[8px] text-zinc-600">HTG</span>
-                    <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-full ${
-                      tx.status === 'success' || tx.status === 'paid' ? 'bg-green-500/15 text-green-500' : 'bg-amber-500/15 text-amber-500'
+
+                <div className="flex-1 min-w-0 hidden sm:block">
+                  <div className="flex items-center gap-3">
+                    <h4 className="font-black uppercase italic text-xs md:text-sm text-white truncate">
+                      {(tx as any).type || 'PÈMAN'}
+                    </h4>
+                    <span className={`text-[6px] md:text-[7px] font-black uppercase px-2 py-1 rounded-full ${
+                      tx.source === 'Invoice' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'
                     }`}>
-                      {tx.status}
+                      {tx.source}
                     </span>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
+                    <span className="text-[8px] md:text-[9px] font-bold text-zinc-600 truncate max-w-[150px] md:max-w-[180px]">{client}</span>
+                    <span className="text-[8px] md:text-[9px] text-zinc-700">·</span>
+                    <span className="text-[8px] md:text-[9px] text-zinc-600">{formatDate(tx.created_at)}</span>
+                    <span className="text-[8px] md:text-[9px] text-zinc-700">·</span>
+                    <span className="text-[7px] md:text-[8px] font-bold text-zinc-700">#{tx.id?.slice(0, 6)}</span>
+                  </div>
+                </div>
+
+                {/* Mobil View Info */}
+                <div className="sm:hidden flex flex-col gap-1 border-t border-white/5 pt-2">
+                   <span className="text-[9px] font-bold text-zinc-400 truncate">{client}</span>
+                   <div className="flex justify-between">
+                     <span className="text-[8px] text-zinc-600">{formatDate(tx.created_at)}</span>
+                     <span className="text-[7px] font-bold text-zinc-700">#{tx.id?.slice(0, 6)}</span>
+                   </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t border-white/5 sm:border-none pt-3 sm:pt-0 mt-1 sm:mt-0">
+                  <div className="text-base md:text-lg font-black italic text-green-400">
+                    +{parseFloat(tx.amount).toLocaleString()} <span className="text-[8px] text-zinc-600 ml-1">HTG</span>
+                  </div>
+                  <span className={`sm:ml-3 text-[6px] md:text-[7px] font-black uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${
+                    tx.status === 'success' || tx.status === 'paid' ? 'bg-green-500/15 text-green-500' : 'bg-amber-500/15 text-amber-500'
+                  }`}>
+                    {tx.status}
+                  </span>
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="text-center py-40 bg-zinc-900/10 rounded-[4rem] border border-dashed border-white/5">
-            <Package className="w-16 h-16 text-zinc-800 mx-auto mb-6" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Pa gen tranzaksyon ankò.</p>
+          <div className="text-center py-20 md:py-40 bg-zinc-900/10 rounded-[2rem] md:rounded-[4rem] border border-dashed border-white/5">
+            <Package className="w-12 h-12 md:w-16 md:h-16 text-zinc-800 mx-auto mb-4 md:mb-6" />
+            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-600">Pa gen tranzaksyon ankò.</p>
           </div>
         )}
       </div>
@@ -2013,89 +2037,75 @@ Vèsyon 2.0 - Fòmilè kat entegre
 
   const renderSettings = () => (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-      <div className="flex items-center justify-between mb-10">
-        <button onClick={() => setMode('dashboard')} className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all">
-          <ArrowLeft size={20} />
+      <div className="flex items-center justify-between mb-6 md:mb-10">
+        <button onClick={() => setMode('dashboard')} className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all shrink-0">
+          <ArrowLeft size={16} className="md:w-5 md:h-5" />
         </button>
-        <h2 className="text-xl font-black uppercase italic tracking-widest">Anviwònman Terminal</h2>
-        <div className="w-12" />
+        <h2 className="text-lg md:text-xl font-black uppercase italic tracking-widest truncate">Anviwònman</h2>
+        <div className="w-10 md:w-12 shrink-0" />
       </div>
 
-      <div className="grid gap-8">
+      <div className="grid gap-6 md:gap-8">
         {/* Profile Settings */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem]">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="bg-red-600/10 p-4 rounded-3xl">
-              <User className="text-red-600 w-6 h-6" />
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem]">
+          <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+            <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-3xl">
+              <User className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase tracking-widest">Pwofil pèsonèl</h3>
-              <p className="text-[10px] text-zinc-500 font-bold">Modifye enfòmasyon pèsonèl ou</p>
+              <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Pwofil pèsonèl</h3>
+              <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold">Modifye enfòmasyon w yo</p>
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
-                Non biznis
-              </label>
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">Non biznis</label>
               <input
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 readOnly={!!profile?.business_name}
-                className="w-full bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm outline-none focus:border-red-600/50 transition-all mt-2"
+                className="w-full bg-black/40 border border-white/10 py-3 md:py-4 px-4 md:px-6 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none focus:border-red-600/50 transition-all mt-1 md:mt-2"
               />
-              {profile?.business_name && (
-                <p className="text-[8px] text-red-400 mt-1">Non biznis pa ka modifye apre anrejistreman.</p>
-              )}
             </div>
-
             <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
-                Email
-              </label>
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">Email</label>
               <input
                 type="email"
                 value={profile?.email || ''}
                 readOnly
-                className="w-full bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm outline-none mt-2 opacity-50"
+                className="w-full bg-black/40 border border-white/10 py-3 md:py-4 px-4 md:px-6 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none mt-1 md:mt-2 opacity-50"
               />
             </div>
-
             <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
-                ID machann
-              </label>
-              <div className="flex items-center gap-3 mt-2">
-                <code className="flex-1 bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm font-mono">
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">ID machann</label>
+              <div className="flex items-center gap-2 md:gap-3 mt-1 md:mt-2">
+                <code className="flex-1 bg-black/40 border border-white/10 py-3 md:py-4 px-4 md:px-6 rounded-xl md:rounded-2xl text-xs md:text-sm font-mono truncate">
                   {profile?.id ? profile.id.slice(0, 8) + '...' : '...'}
                 </code>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(profile?.id || '');
-                    alert('ID kopye! Pa pataje li ak pèsonn.');
+                    alert('ID kopye!');
                   }}
-                  className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
+                  className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all shrink-0"
                 >
-                  <Copy size={16} />
+                  <Copy size={14} className="md:w-4 md:h-4" />
                 </button>
               </div>
             </div>
-
             <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
-                Kle API
-              </label>
-              <div className="flex items-center gap-3 mt-2">
-                <code className="flex-1 bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm font-mono">
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">Kle API</label>
+              <div className="flex items-center gap-2 md:gap-3 mt-1 md:mt-2">
+                <code className="flex-1 bg-black/40 border border-white/10 py-3 md:py-4 px-4 md:px-6 rounded-xl md:rounded-2xl text-xs md:text-sm font-mono truncate">
                   {profile?.api_key ? profile.api_key.slice(0, 8) + '...' : (generatingApiKey ? 'Ap jenere...' : 'Pa genyen')}
                 </code>
                 {!profile?.api_key && profile?.kyc_status === 'approved' && (
                   <button
                     onClick={generateApiKey}
                     disabled={generatingApiKey}
-                    className="px-4 py-2 bg-red-600 rounded-xl text-white font-black text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40"
+                    className="px-3 py-2 md:px-4 md:py-2 bg-red-600 rounded-lg md:rounded-xl text-white font-black text-[8px] md:text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40 shrink-0"
                   >
                     {generatingApiKey ? 'Ap jenere...' : 'Jenere Kle'}
                   </button>
@@ -2106,20 +2116,19 @@ Vèsyon 2.0 - Fòmilè kat entegre
                       navigator.clipboard.writeText(profile.api_key);
                       alert('Kle API kopye!');
                     }}
-                    className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
+                    className="p-3 md:p-4 bg-zinc-900 rounded-xl md:rounded-2xl hover:bg-red-600 transition-all shrink-0"
                   >
-                    <Copy size={16} />
+                    <Copy size={14} className="md:w-4 md:h-4" />
                   </button>
                 )}
               </div>
-              <p className="text-[8px] text-red-400 mt-1">⚠️ Pa janm pataje kle API sa a. Se tankou modpas ou.</p>
             </div>
 
             {!profile?.business_name && (
               <button
                 onClick={updateBusinessName}
                 disabled={!businessName || loading}
-                className="px-8 py-4 bg-red-600 rounded-2xl text-white font-black text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40"
+                className="w-full md:w-auto px-6 md:px-8 py-3 md:py-4 bg-red-600 rounded-xl md:rounded-2xl text-white font-black text-[9px] md:text-[10px] uppercase hover:bg-red-700 transition-all disabled:opacity-40 mt-4"
               >
                 {loading ? 'Ap anrejistre...' : 'Anrejistre non biznis'}
               </button>
@@ -2128,51 +2137,20 @@ Vèsyon 2.0 - Fòmilè kat entegre
         </div>
 
         {/* Security Settings */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem]">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="bg-red-600/10 p-4 rounded-3xl">
-              <Shield className="text-red-600 w-6 h-6" />
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem]">
+          <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+            <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-3xl">
+              <Shield className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase tracking-widest">Sekirite</h3>
-              <p className="text-[10px] text-zinc-500 font-bold">Jere kle API ak webhooks</p>
+              <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Sekirite</h3>
+              <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold">Jere webhook</p>
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
-                Kle API (pou entegrasyon)
-              </label>
-              <div className="flex items-center gap-3 mt-2">
-                <code className="flex-1 bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm font-mono">
-                  {profile?.api_key || (generatingApiKey ? 'Ap jenere...' : 'sk_live_...')}
-                </code>
-                <button
-                  onClick={generateApiKey}
-                  disabled={generatingApiKey || !profile?.api_key}
-                  className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
-                  title="Jenere nouvo kle API"
-                >
-                  <RefreshCw size={16} className={generatingApiKey ? 'animate-spin' : ''} />
-                </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(profile?.api_key || '');
-                    alert('API key copied!');
-                  }}
-                  disabled={!profile?.api_key}
-                  className="p-4 bg-zinc-900 rounded-2xl hover:bg-red-600 transition-all"
-                >
-                  <Copy size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">
-                Webhook URL (kote pou voye notifikasyon)
-              </label>
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 md:ml-4">Webhook URL</label>
               <input
                 type="url"
                 value={profile?.webhook_url || ''}
@@ -2182,37 +2160,9 @@ Vèsyon 2.0 - Fòmilè kat entegre
                   setProfile({ ...profile, webhook_url: newUrl });
                 }}
                 placeholder="https://monsite.com/webhook"
-                className="w-full bg-black/40 border border-white/10 py-4 px-6 rounded-2xl text-sm outline-none focus:border-red-600/50 transition-all mt-2"
+                className="w-full bg-black/40 border border-white/10 py-3 md:py-4 px-4 md:px-6 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none focus:border-red-600/50 transition-all mt-1 md:mt-2"
               />
             </div>
-          </div>
-        </div>
-
-        {/* Notification Settings */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-10 rounded-[3.5rem]">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="bg-red-600/10 p-4 rounded-3xl">
-              <Bell className="text-red-600 w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black uppercase tracking-widest">Notifikasyon</h3>
-              <p className="text-[10px] text-zinc-500 font-bold">Konfigire fason ou vle resevwa alèt</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-white/5">
-              <span className="text-[11px] font-bold">Resevwa imèl pou chak peman</span>
-              <input type="checkbox" className="w-5 h-5 accent-red-600" defaultChecked />
-            </label>
-            <label className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-white/5">
-              <span className="text-[11px] font-bold">Resevwa SMS pou chak peman</span>
-              <input type="checkbox" className="w-5 h-5 accent-red-600" />
-            </label>
-            <label className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-white/5">
-              <span className="text-[11px] font-bold">Resevwa notifikasyon pou fakti ki peye</span>
-              <input type="checkbox" className="w-5 h-5 accent-red-600" defaultChecked />
-            </label>
           </div>
         </div>
       </div>
@@ -2223,21 +2173,23 @@ Vèsyon 2.0 - Fòmilè kat entegre
   // MAIN RENDER
   // ============================================================
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans selection:bg-red-600/30">
+    <div className="min-h-screen bg-[#0a0b14] text-white p-3 sm:p-4 md:p-6 font-sans selection:bg-red-600/30">
       {renderHeader()}
 
       {loading && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
-          <RefreshCw size={36} className="text-red-600 animate-spin" />
-          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading Terminal...</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 md:gap-4">
+          <RefreshCw size={24} className="text-red-600 animate-spin md:w-[36px] md:h-[36px]" />
+          <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading Terminal...</p>
         </div>
       )}
 
-      {mode === 'dashboard' && renderDashboard()}
-      {mode === 'plugins' && renderPlugins()}
-      {mode === 'invoices' && renderInvoices()}
-      {mode === 'transactions' && renderTransactions()}
-      {mode === 'settings' && renderSettings()}
+      <div className="pb-10 md:pb-0">
+        {mode === 'dashboard' && renderDashboard()}
+        {mode === 'plugins' && renderPlugins()}
+        {mode === 'invoices' && renderInvoices()}
+        {mode === 'transactions' && renderTransactions()}
+        {mode === 'settings' && renderSettings()}
+      </div>
     </div>
   );
 }

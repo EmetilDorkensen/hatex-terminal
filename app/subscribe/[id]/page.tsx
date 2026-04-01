@@ -121,7 +121,7 @@ export default function SubscribePage() {
       // 2. TRANZAKSYON KÒB LA
       // ==========================================
 
-      // A) Rache non kliyan an (EME... DOR...)
+      // A) Rache non kliyan an (EME... DOR...) pou pwoteje idantite l
       const nameParts = (clientProfile.full_name || '').trim().split(/\s+/);
       const firstName = nameParts[0] ? nameParts[0].substring(0, 3).toUpperCase() : 'KLI';
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].substring(0, 3).toUpperCase() : 'YAN';
@@ -138,26 +138,26 @@ export default function SubscribePage() {
       const { error: addErr } = await supabase.from('profiles').update({ wallet_balance: newMerchantBalance }).eq('id', merchant.id);
       if (addErr) throw new Error("Te gen yon pwoblèm nan transfere kòb la bay machann nan.");
 
-      // C) Anrejistre ISTORIK la egzakteman menm jan ak tab transactions ou a
+      // C) Anrejistre ISTORIK la ak BÈL MESAJ POU MACHANN AK KLIYAN AN
       const { error: txErr } = await supabase
         .from('transactions')
         .insert([
-          // Mesaj pou Machann nan
+          // Mesaj kap parèt nan istorik Machann nan
           {
             user_id: merchant.id,
             amount: product.price,
             type: 'credit', 
             status: 'completed',
-            reference: `Ou vann yon abònman ak ${maskedName}`,
+            reference: `Abònman: ${product.title} - Kliyan: ${maskedName}`, 
             balance_after: newMerchantBalance
           },
-          // Mesaj pou Kliyan an
+          // Mesaj kap parèt nan istorik Kliyan an
           {
             user_id: clientProfile.id,
             amount: product.price,
             type: 'debit', 
             status: 'completed',
-            reference: `Ou sot peye yon abònman nan men ${merchant.business_name || 'Biznis San Non'}`,
+            reference: `Abònman: ${product.title} - Peye a: ${merchant.business_name || 'Biznis San Non'}`,
             balance_after: clientNewBalance
           }
         ]);
@@ -224,7 +224,7 @@ export default function SubscribePage() {
             <span>Vandè / Biznis</span>
             <div className="flex items-center gap-2">
               <img 
-                src={`https://api.dicebear.com/7.x/shapes/svg?seed=${merchant?.business_name || 'H-Pay'}`} 
+                src={merchant?.logo_url || merchant?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant?.business_name || 'H-Pay')}&background=27272a&color=fff&bold=true`}
                 alt="Logo" 
                 className="w-5 h-5 rounded-md object-cover"
               />
@@ -276,7 +276,7 @@ export default function SubscribePage() {
                <div className="relative z-10 flex items-center gap-4 md:gap-6">
                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-black border-2 border-white/10 overflow-hidden shrink-0">
                    <img 
-                     src={`https://api.dicebear.com/7.x/shapes/svg?seed=${merchant?.business_name || 'H-Pay'}`} 
+                     src={merchant?.logo_url || merchant?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(merchant?.business_name || 'H-Pay')}&background=27272a&color=fff&bold=true`}
                      alt="Business Logo" 
                      className="w-full h-full object-cover" 
                    />
@@ -342,8 +342,8 @@ export default function SubscribePage() {
               <div className="flex items-center justify-between mb-8 md:mb-10">
                 <h3 className="text-xl md:text-2xl font-black uppercase tracking-tighter italic">Peye ak Kat</h3>
                 <div className="flex gap-2">
-                   <div className="w-8 h-5 bg-zinc-800 rounded flex items-center justify-center text-[6px] font-black italic">VISA</div>
-                   <div className="w-8 h-5 bg-zinc-800 rounded flex items-center justify-center text-[6px] font-black italic">MC</div>
+                   <div className="w-8 h-5 bg-zinc-800 rounded flex items-center justify-center text-[6px] font-black italic">HatexCard</div>
+                   <div className="w-8 h-5 bg-zinc-800 rounded flex items-center justify-center text-[6px] font-black italic"></div>
                 </div>
               </div>
 

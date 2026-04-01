@@ -52,15 +52,20 @@ export default function SubscriptionsDashboard() {
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      // 3. Rale Estatistik reyèl yo
-      const { data: subsData } = await supabase
-        .from('subscriptions')
-        .select('amount, status')
-        .eq('merchant_id', user.id);
+      // 3. Rale Estatistik reyèl yo (Lojik Entelijan ki konekte ak peman yo)
+      // Nou al chache tout lajan ki antre (credit) nan kont machann nan ki pase ak siksè
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('type', 'credit')
+        .eq('status', 'completed');
 
-      if (subsData) {
-        const active = subsData.filter(s => s.status === 'completed' || s.status === 'pending_escrow').length;
-        const revenue = subsData.reduce((acc, curr) => acc + curr.amount, 0);
+      if (txData) {
+        // Kantite tranzaksyon kote moun peye a reprezante kantite fwa moun abòne
+        const active = txData.length; 
+        // Nou fè total tout kòb ki antre yo
+        const revenue = txData.reduce((acc, curr) => acc + Number(curr.amount), 0);
         setStats({ total_revenue: revenue, active_subs: active });
       }
 
@@ -70,6 +75,30 @@ export default function SubscriptionsDashboard() {
 
     fetchDashboardData();
   }, [supabase, router]);
+
+  // ==========================================
+  // FONKSYON POU EFASE YON PWODWI/ABÒNMAN
+  // ==========================================
+  const handleDeleteProduct = async (productId: string) => {
+    const isConfirmed = window.confirm("Èske w vrèman vle efase abònman sa a? Tout done ki gen rapò avè l ap pèdi.");
+    if (!isConfirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      // Retire pwodwi a sou ekran an otomatikman san rafrechi paj la
+      setProducts(products.filter(p => p.id !== productId));
+      alert("Abònman an efase avèk siksè!");
+      
+    } catch (err: any) {
+      alert("Te gen yon erè lè n ap efase abònman an: " + err.message);
+    }
+  };
 
   if (loading) return (
     <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center">
@@ -194,7 +223,7 @@ export default function SubscriptionsDashboard() {
                       <img src={product.image_url} alt={product.title} className="w-full h-full object-cover opacity-70 group-hover:scale-110 group-hover:opacity-100 transition-all duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-zinc-800">
-                         <LayoutGrid className="w-10 h-10 md:w-12 md:h-12" />
+                        <LayoutGrid className="w-10 h-10 md:w-12 md:h-12" />
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e1a] to-transparent opacity-90" />
@@ -235,7 +264,11 @@ export default function SubscriptionsDashboard() {
                         <ExternalLink className="w-4 h-4" /> Kopye Lyen
                       </button>
                       
-                      <button className="p-4 md:p-5 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white rounded-2xl md:rounded-[1.5rem] transition-all duration-300 border border-red-600/10 shrink-0 shadow-lg">
+                      {/* BOUTON EFASE (DELETE) A KONEKTE LA */}
+                      <button 
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="p-4 md:p-5 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white rounded-2xl md:rounded-[1.5rem] transition-all duration-300 border border-red-600/10 shrink-0 shadow-lg"
+                      >
                         <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                       </button>
                     </div>
