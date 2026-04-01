@@ -86,7 +86,7 @@ export default function SubscribePage() {
     setExpiry(value);
   };
 
-  // ==========================================
+// ==========================================
   // LOJIK ENTELIJAN VERIFIKASYON KAT & TRANZAKSYON
   // ==========================================
   const handleProcessPayment = async (e: React.FormEvent) => {
@@ -144,13 +144,11 @@ export default function SubscribePage() {
       const { error: txErr } = await supabase
         .from('transactions')
         .insert([
-          // -----------------------------------------------------------------
-          // 1. MESAJ KAP PARÈT NAN ISTORIK MACHANN NAN (Kòb la antre: Pozitif)
-          // -----------------------------------------------------------------
+          // ... (Mesaj machann nan)
           {
             user_id: merchant.id,
-            amount: product.price, // Pozitif
-            type: 'SUBSCRIPTION', // Konekte dirèk ak Tab "ABÒNMAN" nan paj istorik la
+            amount: product.price, 
+            type: 'SUBSCRIPTION', 
             status: 'completed',
             reference: `${fakeTxId}-M`,
             balance_after: newMerchantBalance,
@@ -159,16 +157,13 @@ export default function SubscribePage() {
               plan_name: product.title,
               customer_name: maskedName,
               customer_email: clientProfile.email || '',
-              // Sistèm nan otomatikman mete mesaj sa kòm yon nòt ki soti nan bò kliyan an
               customer_message: `Peman abònman an fèt ak siksè. Kòb la debite sou kat la kòrèkteman.` 
             }
           },
-          // -----------------------------------------------------------------
-          // 2. MESAJ KAP PARÈT NAN ISTORIK KLIYAN AN (Kòb la soti: Negatif)
-          // -----------------------------------------------------------------
+          // ... (Mesaj kliyan an)
           {
             user_id: clientProfile.id,
-            amount: -product.price, // Mwen mete l negatif (-) pou l parèt antanke yon depans sou kont kliyan an
+            amount: -product.price, 
             type: 'SUBSCRIPTION', 
             status: 'completed',
             reference: `${fakeTxId}-C`,
@@ -177,13 +172,34 @@ export default function SubscribePage() {
               is_subscription: true,
               plan_name: product.title,
               merchant_name: merchant.business_name || 'Biznis San Non',
-              // Sistèm nan otomatikman kite yon mesaj remèsiman nan non machann nan
               merchant_message: `Mèsi paske w abòne! Peman ${product.price} HTG a byen resevwa epi plan ou an aktive.`
             }
           }
         ]);
 
       if (txErr) console.error("Erè nan anrejistreman istorik la:", txErr); 
+
+      // ==========================================
+      // 3. ANREJISTRE ABÒNMAN AN NAN TAB ESPESYAL LA 
+      // ==========================================
+      const { error: subErr } = await supabase
+        .from('subscriptions_history')
+        .insert({
+          merchant_id: merchant.id,
+          client_id: clientProfile.id,
+          client_email: clientProfile.email || 'Pa gen imèl',
+          client_name: clientProfile.full_name || 'Kliyan Hatex',
+          shop_name: merchant.business_name || 'Biznis San Non',
+          plan_name: product.title,
+          amount: product.price,
+          status: 'success'
+        });
+
+      if (subErr) {
+        console.error("Erè pandan anrejistreman espesyal abònman an:", subErr);
+      } else {
+        console.log("✅ Abònman an byen anrejistre nan baz done a pou toulède!");
+      }
 
       // Jenere ID Tranzaksyon an ak afiche ekran siksè a
       setTxId(fakeTxId);
@@ -195,7 +211,6 @@ export default function SubscribePage() {
       setProcessing(false);
     }
   };
-
   // ==========================================
   // EKRAN LOADING
   // ==========================================
