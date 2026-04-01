@@ -1,21 +1,15 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { 
-  Calendar, 
-  XCircle, 
-  AlertTriangle, 
-  Loader2, 
-  CreditCard,
-  History,
-  ShieldOff
-} from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldCheck, XCircle, AlertTriangle, RefreshCcw, CheckCircle2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-export default function MySubscriptions() {
+export default function MySubscriptionsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,138 +17,171 @@ export default function MySubscriptions() {
   );
 
   useEffect(() => {
-    fetchMySubs();
-  }, []);
+    async function fetchMySubscriptions() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
 
-  async function fetchMySubs() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+      // Rale tout tranzaksyon kote kliyan an te peye pou yon abònman (amount < 0)
+      const { data: txData, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('type', 'SUBSCRIPTION')
+        .lt('amount', 0) // Sèlman kòb ki soti yo (debi)
+        .order('created_at', { ascending: false });
 
-    // Rale abònman yo ak tout detay pwodwi a (JOIN)
-    const { data } = await supabase
-      .from('subscriptions')
-      .select(`
-        *,
-        products (
-          title,
-          price,
-          billing_cycle,
-          image_url,
-          category
-        )
-      `)
-      .eq('client_id', user.id)
-      .eq('status', 'active');
-
-    setSubscriptions(data || []);
-    setLoading(false);
-  }
-
-  const handleCancel = async (subId: string) => {
-    const confirmCancel = confirm("Èske ou sèten ou vle anile abònman sa a? Ou pap debite ankò.");
-    if (!confirmCancel) return;
-
-    setCancellingId(subId);
-    
-    // Mete estati a sou 'cancelled'
-    const { error } = await supabase
-      .from('subscriptions')
-      .update({ 
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString() 
-      })
-      .eq('id', subId);
-
-    if (!error) {
-      setSubscriptions(subscriptions.filter(s => s.id !== subId));
-      alert("Abònman anile ak siksè.");
+      if (!error && txData) {
+        // Filtre pou jwenn sèlman dènye peman pou chak plan inik
+        const uniqueSubs = new Map();
+        txData.forEach(tx => {
+          const planName = tx.metadata?.plan_name;
+          // Nou pran sèlman dènye tranzaksyon ki fèt pou plan sa
+          if (planName && !uniqueSubs.has(planName)) {
+            uniqueSubs.set(planName, tx);
+          }
+        });
+        setSubscriptions(Array.from(uniqueSubs.values()));
+      }
+      setLoading(false);
     }
-    setCancellingId(null);
+    fetchMySubscriptions();
+  }, [supabase, router]);
+
+  // FONKSYON POU ANILE ABÒNMAN AN
+  const handleCancelSubscription = async (tx: any) => {
+    const isConfirmed = window.confirm(`Èske w sèten ou vle anile abònman "${tx.metadata?.plan_name}" nan ${tx.metadata?.merchant_name}? Yo pap koupe kòb sou kat ou ankò pou sèvis sa a.`);
+    if (!isConfirmed) return;
+
+    setProcessingId(tx.id);
+
+    try {
+      // Nou ajoute estati "cancelled" nan metadata a
+      const newMetadata = { 
+        ...tx.metadata, 
+        status: 'cancelled', 
+        cancelled_at: new Date().toISOString() 
+      };
+
+      const { error } = await supabase
+        .from('transactions')
+        .update({ metadata: newMetadata })
+        .eq('id', tx.id);
+
+      if (error) throw error;
+
+      // Mete UI a ajou san rafrechi paj la
+      setSubscriptions(subscriptions.map(s => 
+        s.id === tx.id ? { ...s, metadata: newMetadata } : s
+      ));
+      
+    } catch (err: any) {
+      alert("Erè lè n ap anile abònman an: " + err.message);
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#06070d] flex items-center justify-center">
-      <Loader2 className="animate-spin text-red-600" size={40} />
+    <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center">
+      <Loader2 className="animate-spin text-red-600 mb-4 w-12 h-12" />
+      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 animate-pulse">Chaje Abònman yo...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-6 md:p-12 italic font-medium">
-      <div className="max-w-5xl mx-auto space-y-10">
+    <div className="min-h-screen bg-[#06070d] text-white p-4 sm:p-6 md:p-10 italic font-medium selection:bg-red-600 pb-24">
+      <div className="max-w-5xl mx-auto space-y-8 md:space-y-12">
         
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter italic">
-            Mes <span className="text-red-600">Abonnements</span>
-          </h1>
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-2 flex items-center gap-2">
-            <History size={12} /> Jere peman otomatik ou yo
-          </p>
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
+          <div className="space-y-2 text-center md:text-left">
+            <button onClick={() => router.back()} className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-all tracking-[0.3em] mb-4 mx-auto md:mx-0">
+              <ArrowLeft className="w-4 h-4" /> RETOUNEN
+            </button>
+            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter italic leading-none">
+              Abònman <span className="text-red-600">Mwen Yo</span>
+            </h1>
+            <p className="text-zinc-500 text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] mt-2">
+              Jere ak anile sèvis ou peye chak mwa yo
+            </p>
+          </div>
         </div>
 
+        {/* LIS ABÒNMAN KLIYAN AN */}
         {subscriptions.length === 0 ? (
-          <div className="bg-[#0d0e1a] border border-white/5 rounded-[3rem] p-20 text-center space-y-4">
-            <ShieldOff className="mx-auto text-zinc-800" size={60} />
-            <p className="text-zinc-600 font-black uppercase text-[10px]">Ou pa gen okenn abònman aktif pou kounye a.</p>
+          <div className="bg-[#0d0e1a] border border-white/5 rounded-[3rem] p-12 md:p-24 text-center shadow-2xl">
+            <RefreshCcw className="mx-auto text-zinc-800 mb-6 w-16 h-16" />
+            <p className="text-zinc-500 font-black uppercase text-[10px] md:text-[12px] tracking-[0.4em]">Ou pa gen okenn abònman aktif</p>
           </div>
         ) : (
-          <div className="grid gap-6">
-            {subscriptions.map((sub) => (
-              <div key={sub.id} className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-red-600/20 transition-all">
-                
-                {/* ENFO PWODWI */}
-                <div className="flex items-center gap-6 w-full md:w-auto">
-                  <div className="w-20 h-20 bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 flex-shrink-0">
-                    <img 
-                      src={sub.products.image_url || "/api/placeholder/80/80"} 
-                      className="w-full h-full object-cover"
-                      alt=""
-                    />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {subscriptions.map((tx) => {
+              const isCancelled = tx.metadata?.status === 'cancelled';
+              const planName = tx.metadata?.plan_name || 'Abònman';
+              const merchantName = tx.metadata?.merchant_name || 'Biznis';
+              const amount = Math.abs(tx.amount).toLocaleString();
+
+              return (
+                <div key={tx.id} className={`bg-[#0d0e1a] border ${isCancelled ? 'border-zinc-800 opacity-70' : 'border-white/5 hover:border-red-600/30'} rounded-[2.5rem] p-6 md:p-8 transition-all duration-300 shadow-2xl relative overflow-hidden flex flex-col`}>
+                  
+                  {/* Badge Status */}
+                  <div className={`absolute top-6 right-6 px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 ${isCancelled ? 'bg-zinc-900 text-zinc-500' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>
+                    {isCancelled ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                    {isCancelled ? 'Anile' : 'Aktif'}
                   </div>
-                  <div>
-                    <span className="text-[9px] text-red-600 font-black uppercase tracking-widest">{sub.products.category}</span>
-                    <h3 className="text-xl font-black uppercase tracking-tighter">{sub.products.title}</h3>
-                    <div className="flex items-center gap-4 mt-2">
-                      <p className="text-xs font-bold text-white italic">{sub.products.price} HTG <span className="text-[9px] text-zinc-500">/ {sub.products.billing_cycle}</span></p>
-                      <div className="h-1 w-1 bg-zinc-700 rounded-full"></div>
-                      <p className="text-[10px] text-green-500 font-black uppercase flex items-center gap-1">
-                        <CreditCard size={10} /> Aktif
-                      </p>
+
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isCancelled ? 'bg-zinc-900 text-zinc-600' : 'bg-red-600/10 text-red-500 border border-red-600/20'}`}>
+                      <RefreshCcw className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-black uppercase tracking-tighter truncate max-w-[200px]">{planName}</h3>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Nan: {merchantName}</p>
                     </div>
                   </div>
+
+                  <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Dènye Peman</span>
+                      <span className="text-[10px] font-bold text-white">{new Date(tx.created_at).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Montan</span>
+                      <span className="text-sm font-black text-white">{amount} HTG</span>
+                    </div>
+                  </div>
+
+                  {/* Bouton Anile a */}
+                  <div className="mt-auto">
+                    {isCancelled ? (
+                      <div className="w-full bg-zinc-900 text-zinc-600 py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest text-center border border-white/5 flex items-center justify-center gap-2">
+                        <AlertTriangle className="w-4 h-4" /> Abònman sa anile
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => handleCancelSubscription(tx)}
+                        disabled={processingId === tx.id}
+                        className="w-full bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 border border-red-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {processingId === tx.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4" /> Anile Abònman an
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
                 </div>
-
-                {/* DAT PWOKSENN PEMAN */}
-                <div className="bg-black/40 px-6 py-4 rounded-2xl border border-white/5 text-center md:text-left min-w-[180px]">
-                  <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Pwochen Debid</p>
-                  <p className="text-[11px] font-black uppercase flex items-center justify-center md:justify-start gap-2 text-zinc-300">
-                    <Calendar size={14} className="text-red-600" />
-                    {new Date(sub.next_billing_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </p>
-                </div>
-
-                {/* BOUTON ANILE */}
-                <button
-                  disabled={cancellingId === sub.id}
-                  onClick={() => handleCancel(sub.id)}
-                  className="bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center gap-2 border border-red-600/20 group disabled:opacity-50"
-                >
-                  {cancellingId === sub.id ? <Loader2 className="animate-spin" size={16} /> : <XCircle size={16} />}
-                  Anile
-                </button>
-
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-
-        {/* TI KONSÈY SEKIRITE */}
-        <div className="p-6 bg-yellow-600/5 border border-yellow-600/10 rounded-[2rem] flex items-start gap-4">
-          <AlertTriangle className="text-yellow-600 flex-shrink-0" size={20} />
-          <p className="text-[10px] text-zinc-500 font-bold leading-relaxed uppercase italic">
-            Lè ou anile yon abònman, li sispann debite kòb sou balans ou imedyatman. Si ou gen pwoblèm ak yon machann, kontakte sipò H-Pay la.
-          </p>
-        </div>
-
       </div>
     </div>
   );

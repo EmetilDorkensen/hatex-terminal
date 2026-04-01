@@ -107,7 +107,7 @@ export default function SubscribePage() {
       // 1. Chache pwofil kliyan an
       const { data: clientProfile, error: cardErr } = await supabase
         .from('profiles') 
-        .select('id, card_balance, is_activated, full_name') 
+        .select('id, card_balance, is_activated, full_name, email') 
         .eq('card_number', cleanCard)
         .eq('cvv', cvv)
         .eq('exp_date', expiry)
@@ -138,34 +138,54 @@ export default function SubscribePage() {
       const { error: addErr } = await supabase.from('profiles').update({ wallet_balance: newMerchantBalance }).eq('id', merchant.id);
       if (addErr) throw new Error("Te gen yon pwoblèm nan transfere kòb la bay machann nan.");
 
-      // C) Anrejistre ISTORIK la ak BÈL MESAJ POU MACHANN AK KLIYAN AN
+      // C) Anrejistre ISTORIK la ak BÈL MESAJ POU MACHANN AK KLIYAN AN NAN METADATA
+      const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
+
       const { error: txErr } = await supabase
         .from('transactions')
         .insert([
-          // Mesaj kap parèt nan istorik Machann nan
+          // -----------------------------------------------------------------
+          // 1. MESAJ KAP PARÈT NAN ISTORIK MACHANN NAN (Kòb la antre: Pozitif)
+          // -----------------------------------------------------------------
           {
             user_id: merchant.id,
-            amount: product.price,
-            type: 'credit', 
+            amount: product.price, // Pozitif
+            type: 'SUBSCRIPTION', // Konekte dirèk ak Tab "ABÒNMAN" nan paj istorik la
             status: 'completed',
-            reference: `Abònman: ${product.title} - Kliyan: ${maskedName}`, 
-            balance_after: newMerchantBalance
+            reference: `${fakeTxId}-M`,
+            balance_after: newMerchantBalance,
+            metadata: {
+              is_subscription: true,
+              plan_name: product.title,
+              customer_name: maskedName,
+              customer_email: clientProfile.email || '',
+              // Sistèm nan otomatikman mete mesaj sa kòm yon nòt ki soti nan bò kliyan an
+              customer_message: `Peman abònman an fèt ak siksè. Kòb la debite sou kat la kòrèkteman.` 
+            }
           },
-          // Mesaj kap parèt nan istorik Kliyan an
+          // -----------------------------------------------------------------
+          // 2. MESAJ KAP PARÈT NAN ISTORIK KLIYAN AN (Kòb la soti: Negatif)
+          // -----------------------------------------------------------------
           {
             user_id: clientProfile.id,
-            amount: product.price,
-            type: 'debit', 
+            amount: -product.price, // Mwen mete l negatif (-) pou l parèt antanke yon depans sou kont kliyan an
+            type: 'SUBSCRIPTION', 
             status: 'completed',
-            reference: `Abònman: ${product.title} - Peye a: ${merchant.business_name || 'Biznis San Non'}`,
-            balance_after: clientNewBalance
+            reference: `${fakeTxId}-C`,
+            balance_after: clientNewBalance,
+            metadata: {
+              is_subscription: true,
+              plan_name: product.title,
+              merchant_name: merchant.business_name || 'Biznis San Non',
+              // Sistèm nan otomatikman kite yon mesaj remèsiman nan non machann nan
+              merchant_message: `Mèsi paske w abòne! Peman ${product.price} HTG a byen resevwa epi plan ou an aktive.`
+            }
           }
         ]);
 
       if (txErr) console.error("Erè nan anrejistreman istorik la:", txErr); 
 
       // Jenere ID Tranzaksyon an ak afiche ekran siksè a
-      const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
       setTxId(fakeTxId);
       setSuccess(true);
       
@@ -270,7 +290,7 @@ export default function SubscribePage() {
                <h1 className="text-4xl sm:text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.85]">Checkout <span className="text-red-600">Sekirize</span></h1>
             </div>
 
-            {/* KAT BIZNIS MACHANN NAN (BUSINESS NAME + LOGO SELMAN) */}
+            {/* KAT BIZNIS MACHANN NAN */}
             <div className="bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl relative overflow-hidden group">
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-[50px] rounded-full" />
                <div className="relative z-10 flex items-center gap-4 md:gap-6">

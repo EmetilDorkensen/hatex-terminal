@@ -16,6 +16,9 @@ export default function SubscriptionsDashboard() {
   const [kycApproved, setKycApproved] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [stats, setStats] = useState({ total_revenue: 0, active_subs: 0 });
+  
+  // Nouvo state pou kenbe kantite abone pou chak pwodwi
+  const [subsCount, setSubsCount] = useState<Record<string, number>>({});
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,21 +55,36 @@ export default function SubscriptionsDashboard() {
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      // 3. Rale Estatistik reyèl yo (Lojik Entelijan ki konekte ak peman yo)
-      // Nou al chache tout lajan ki antre (credit) nan kont machann nan ki pase ak siksè
+      // 3. Rale Estatistik reyèl yo nan baz done a
+      // Nou chache sèlman tranzaksyon ABÒNMAN ki konplete
       const { data: txData } = await supabase
         .from('transactions')
-        .select('amount')
+        .select('amount, metadata')
         .eq('user_id', user.id)
-        .eq('type', 'credit')
+        .eq('type', 'SUBSCRIPTION')
         .eq('status', 'completed');
 
       if (txData) {
-        // Kantite tranzaksyon kote moun peye a reprezante kantite fwa moun abòne
-        const active = txData.length; 
-        // Nou fè total tout kòb ki antre yo
-        const revenue = txData.reduce((acc, curr) => acc + Number(curr.amount), 0);
+        // Nou filtre pou n pran sèlman kòb ki antre yo (pozitif)
+        const merchantIncomes = txData.filter(tx => Number(tx.amount) > 0);
+
+        // Kantite tranzaksyon pozitif yo reprezante kantite moun ki abòne
+        const active = merchantIncomes.length; 
+        
+        // Total tout kòb machann nan fè sou abònman yo
+        const revenue = merchantIncomes.reduce((acc, curr) => acc + Number(curr.amount), 0);
+        
         setStats({ total_revenue: revenue, active_subs: active });
+
+        // Lojik siplemantè: Kalkile konbyen abone chak plan genyen gras ak metadata a
+        const counts: Record<string, number> = {};
+        merchantIncomes.forEach(tx => {
+           const planName = tx.metadata?.plan_name;
+           if (planName) {
+             counts[planName] = (counts[planName] || 0) + 1;
+           }
+        });
+        setSubsCount(counts);
       }
 
       setProducts(productsData || []);
@@ -163,7 +181,7 @@ export default function SubscriptionsDashboard() {
           </div>
         </div>
 
-        {/* KAT STATISTIK YO */}
+        {/* KAT STATISTIK YO (KI KONEKTE AK BAZ DONE A KOUNYE A) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <div className="bg-[#0d0e1a] border border-white/5 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] relative overflow-hidden group shadow-2xl border-b-4 border-b-red-600">
             <TrendingUp className="absolute -right-4 -bottom-4 text-red-600/10 w-32 h-32 group-hover:scale-110 transition-transform duration-700" />
@@ -214,68 +232,76 @@ export default function SubscriptionsDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-              {products.map((product) => (
-                <div key={product.id} className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] md:rounded-[3rem] overflow-hidden group hover:border-red-600/40 transition-all duration-500 shadow-2xl flex flex-col h-full">
-                  
-                  {/* Foto a */}
-                  <div className="h-40 md:h-48 bg-zinc-900 relative overflow-hidden shrink-0">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.title} className="w-full h-full object-cover opacity-70 group-hover:scale-110 group-hover:opacity-100 transition-all duration-700" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-800">
-                        <LayoutGrid className="w-10 h-10 md:w-12 md:h-12" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e1a] to-transparent opacity-90" />
+              {products.map((product) => {
+                // Rale vrè kantite moun ki abòne nan pwodwi sa a
+                const aboneCount = subsCount[product.title] || 0;
+
+                return (
+                  <div key={product.id} className="bg-[#0d0e1a] border border-white/5 rounded-[2.5rem] md:rounded-[3rem] overflow-hidden group hover:border-red-600/40 transition-all duration-500 shadow-2xl flex flex-col h-full">
                     
-                    <div className="absolute top-4 right-4 md:top-5 md:right-5 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full text-[8px] md:text-[9px] font-black uppercase text-white border border-white/10 shadow-lg">
-                      Chak {product.billing_cycle === 'month' ? 'Mwa' : product.billing_cycle === 'day' ? 'Jou' : product.billing_cycle === 'week' ? 'Semèn' : 'Ane'}
-                    </div>
-                  </div>
-
-                  {/* Detay Pwodwi a */}
-                  <div className="p-6 md:p-8 flex flex-col flex-1 gap-5 -mt-10 relative z-10">
-                    <div className="flex-1">
-                      <span className="text-[8px] md:text-[9px] text-red-500 font-black uppercase tracking-[0.3em]">{product.category}</span>
-                      <h4 className="text-xl md:text-2xl font-black uppercase truncate mt-1 leading-tight">{product.title}</h4>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl md:rounded-[1.5rem] border border-white/5 mt-auto">
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <Users className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                        <span className="text-[9px] md:text-[10px] font-bold">0 Abone</span>
-                      </div>
-                      <div className="text-white font-black text-sm md:text-base tracking-tighter">
-                        {product.price.toLocaleString()} <span className="text-[9px] md:text-[10px] text-red-600">HTG</span>
-                      </div>
-                    </div>
-
-                    {/* Aksyon yo */}
-                    <div className="flex gap-3 pt-2">
-                      <button 
-                        onClick={() => {
-                          const encryptedId = btoa(product.id);
-                          const url = `${window.location.origin}/subscribe/${encryptedId}`;
-                          navigator.clipboard.writeText(url);
-                          alert("Lyen kripte a kopye avèk siksè!");
-                        }}
-                        className="flex-1 bg-white/5 hover:bg-red-600 text-white py-4 md:py-5 rounded-2xl md:rounded-[1.5rem] text-[9px] md:text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all duration-300 border border-white/5 hover:border-red-600 shadow-lg"
-                      >
-                        <ExternalLink className="w-4 h-4" /> Kopye Lyen
-                      </button>
+                    {/* Foto a */}
+                    <div className="h-40 md:h-48 bg-zinc-900 relative overflow-hidden shrink-0">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.title} className="w-full h-full object-cover opacity-70 group-hover:scale-110 group-hover:opacity-100 transition-all duration-700" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-800">
+                          <LayoutGrid className="w-10 h-10 md:w-12 md:h-12" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e1a] to-transparent opacity-90" />
                       
-                      {/* BOUTON EFASE (DELETE) A KONEKTE LA */}
-                      <button 
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="p-4 md:p-5 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white rounded-2xl md:rounded-[1.5rem] transition-all duration-300 border border-red-600/10 shrink-0 shadow-lg"
-                      >
-                        <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
+                      <div className="absolute top-4 right-4 md:top-5 md:right-5 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full text-[8px] md:text-[9px] font-black uppercase text-white border border-white/10 shadow-lg">
+                        Chak {product.billing_cycle === 'month' ? 'Mwa' : product.billing_cycle === 'day' ? 'Jou' : product.billing_cycle === 'week' ? 'Semèn' : 'Ane'}
+                      </div>
                     </div>
-                  </div>
 
-                </div>
-              ))}
+                    {/* Detay Pwodwi a */}
+                    <div className="p-6 md:p-8 flex flex-col flex-1 gap-5 -mt-10 relative z-10">
+                      <div className="flex-1">
+                        <span className="text-[8px] md:text-[9px] text-red-500 font-black uppercase tracking-[0.3em]">{product.category}</span>
+                        <h4 className="text-xl md:text-2xl font-black uppercase truncate mt-1 leading-tight">{product.title}</h4>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl md:rounded-[1.5rem] border border-white/5 mt-auto">
+                        <div className="flex items-center gap-2 text-zinc-400">
+                          <Users className={`w-3.5 h-3.5 md:w-4 md:h-4 ${aboneCount > 0 ? 'text-green-500' : ''}`} />
+                          {/* VRÈ KANTITE ABONE A AFIche LA */}
+                          <span className={`text-[9px] md:text-[10px] font-bold ${aboneCount > 0 ? 'text-green-500' : ''}`}>
+                            {aboneCount} Abone
+                          </span>
+                        </div>
+                        <div className="text-white font-black text-sm md:text-base tracking-tighter">
+                          {product.price.toLocaleString()} <span className="text-[9px] md:text-[10px] text-red-600">HTG</span>
+                        </div>
+                      </div>
+
+                      {/* Aksyon yo */}
+                      <div className="flex gap-3 pt-2">
+                        <button 
+                          onClick={() => {
+                            const encryptedId = btoa(product.id);
+                            const url = `${window.location.origin}/subscribe/${encryptedId}`;
+                            navigator.clipboard.writeText(url);
+                            alert("Lyen kripte a kopye avèk siksè!");
+                          }}
+                          className="flex-1 bg-white/5 hover:bg-red-600 text-white py-4 md:py-5 rounded-2xl md:rounded-[1.5rem] text-[9px] md:text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all duration-300 border border-white/5 hover:border-red-600 shadow-lg"
+                        >
+                          <ExternalLink className="w-4 h-4" /> Kopye Lyen
+                        </button>
+                        
+                        {/* BOUTON EFASE (DELETE) */}
+                        <button 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="p-4 md:p-5 bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white rounded-2xl md:rounded-[1.5rem] transition-all duration-300 border border-red-600/10 shrink-0 shadow-lg"
+                        >
+                          <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
