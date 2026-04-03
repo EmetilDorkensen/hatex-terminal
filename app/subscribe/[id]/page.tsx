@@ -138,69 +138,70 @@ export default function SubscribePage() {
       const { error: addErr } = await supabase.from('profiles').update({ wallet_balance: newMerchantBalance }).eq('id', merchant.id);
       if (addErr) throw new Error("Te gen yon pwoblèm nan transfere kòb la bay machann nan.");
 
-      // C) Anrejistre ISTORIK la ak BÈL MESAJ POU MACHANN AK KLIYAN AN NAN METADATA
-      const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
+// ============================================================
+// C) ANREJISTRE ISTORIK LA AK BÈL MESAJ POU TOU 2 MOUN YO
+// ============================================================
+const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
 
-      const { error: txErr } = await supabase
-        .from('transactions')
-        .insert([
-          // ... (Mesaj machann nan)
-          {
-            user_id: merchant.id,
-            amount: product.price, 
-            type: 'SUBSCRIPTION', 
-            status: 'completed',
-            reference: `${fakeTxId}-M`,
-            balance_after: newMerchantBalance,
-            metadata: {
-              is_subscription: true,
-              plan_name: product.title,
-              customer_name: maskedName,
-              customer_email: clientProfile.email || '',
-              customer_message: `Peman abònman an fèt ak siksè. Kòb la debite sou kat la kòrèkteman.` 
-            }
-          },
-          // ... (Mesaj kliyan an)
-          {
-            user_id: clientProfile.id,
-            amount: -product.price, 
-            type: 'SUBSCRIPTION', 
-            status: 'completed',
-            reference: `${fakeTxId}-C`,
-            balance_after: clientNewBalance,
-            metadata: {
-              is_subscription: true,
-              plan_name: product.title,
-              merchant_name: merchant.business_name || 'Biznis San Non',
-              merchant_message: `Mèsi paske w abòne! Peman ${product.price} HTG a byen resevwa epi plan ou an aktive.`
-            }
-          }
-        ]);
-
-      if (txErr) console.error("Erè nan anrejistreman istorik la:", txErr); 
-
-      // ==========================================
-      // 3. ANREJISTRE ABÒNMAN AN NAN TAB ESPESYAL LA 
-      // ==========================================
-      const { error: subErr } = await supabase
-        .from('subscriptions_history')
-        .insert({
-          merchant_id: merchant.id,
-          client_id: clientProfile.id,
-          client_email: clientProfile.email || 'Pa gen imèl',
-          client_name: clientProfile.full_name || 'Kliyan Hatex',
-          shop_name: merchant.business_name || 'Biznis San Non',
-          plan_name: product.title,
-          amount: product.price,
-          status: 'success'
-        });
-
-      if (subErr) {
-        console.error("Erè pandan anrejistreman espesyal abònman an:", subErr);
-      } else {
-        console.log("✅ Abònman an byen anrejistre nan baz done a pou toulède!");
+const { error: txErr } = await supabase
+  .from('transactions')
+  .insert([
+    // 1. MESAJ POU MACHANN NAN (Sa ap parèt nan Terminal la)
+    {
+      user_id: merchant.id,
+      amount: product.price, 
+      type: 'SALE',             // SALE pèmèt Dashboard la wè l
+      status: 'success',        // success pèmèt li pa kache
+      description: `Vant Abònman: ${product.title} (Kliyan: ${maskedName})`,
+      reference: `${fakeTxId}-M`,
+      metadata: {
+        customer_name: maskedName,
+        customer_email: clientProfile.email || '',
+        plan_name: product.title,
+        payment_method: 'card'
       }
+    },
+    // 2. MESAJ POU KLIYAN AN (Sa ap parèt nan app kliyan an)
+    {
+      user_id: clientProfile.id,
+      amount: -product.price,   // Negatif (-) paske se yon depans
+      type: 'PAYMENT',          
+      status: 'success',
+      description: `Peman Abònman: ${product.title} nan ${merchant.business_name || 'H-Pay Store'}`,
+      reference: `${fakeTxId}-C`,
+      metadata: {
+        merchant_name: merchant.business_name || 'Biznis San Non',
+        plan_name: product.title
+      }
+    }
+  ]);
 
+if (txErr) {
+  console.error("❌ Erè nan anrejistreman istorik tranzaksyon:", txErr); 
+} 
+
+// ============================================================
+// 3. ANREJISTRE TRAS ABÒNMAN AN (PÈMÈT WEBHOOK VOYE IMÈL)
+// ============================================================
+const { error: subErr } = await supabase
+  .from('subscriptions_history')
+  .insert({
+    merchant_id: merchant.id,
+    client_id: clientProfile.id,
+    client_email: clientProfile.email || 'Pa gen imèl',
+    client_name: clientProfile.full_name || 'Kliyan Hatex',
+    shop_name: merchant.business_name || 'Biznis San Non',
+    plan_name: product.title,
+    amount: product.price,
+    status: 'success'
+  });
+
+if (subErr) {
+  console.error("❌ Erè nan subscriptions_history:", subErr);
+} else {
+  // Sa a ap kouri sèlman si Sub la byen anrejistre
+  console.log("✅ Istorik ak Abònman anrejistre pafètman!");
+}
       // Jenere ID Tranzaksyon an ak afiche ekran siksè a
       setTxId(fakeTxId);
       setSuccess(true);
