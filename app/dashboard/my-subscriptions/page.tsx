@@ -24,23 +24,20 @@ export default function MySubscriptionsPage() {
         return;
       }
 
-      // Rale tout tranzaksyon kote kliyan an te peye pou yon abònman (amount < 0)
-      const { data: txData, error } = await supabase
-        .from('transactions')
+      // Rale abònman yo dirèkteman nan nouvo tab la
+      const { data: subData, error } = await supabase
+        .from('subscriptions_history')
         .select('*')
-        .eq('user_id', user.id)
-        .eq('type', 'SUBSCRIPTION')
-        .lt('amount', 0) // Sèlman kòb ki soti yo (debi)
+        .eq('client_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (!error && txData) {
-        // Filtre pou jwenn sèlman dènye peman pou chak plan inik
+      if (!error && subData) {
+        // Filtre pou jwenn sèlman dènye abònman pou chak plan nan chak boutik
         const uniqueSubs = new Map();
-        txData.forEach(tx => {
-          const planName = tx.metadata?.plan_name;
-          // Nou pran sèlman dènye tranzaksyon ki fèt pou plan sa
-          if (planName && !uniqueSubs.has(planName)) {
-            uniqueSubs.set(planName, tx);
+        subData.forEach(sub => {
+          const key = `${sub.plan_name}-${sub.shop_name}`;
+          if (!uniqueSubs.has(key)) {
+            uniqueSubs.set(key, sub);
           }
         });
         setSubscriptions(Array.from(uniqueSubs.values()));
@@ -51,31 +48,27 @@ export default function MySubscriptionsPage() {
   }, [supabase, router]);
 
   // FONKSYON POU ANILE ABÒNMAN AN
-  const handleCancelSubscription = async (tx: any) => {
-    const isConfirmed = window.confirm(`Èske w sèten ou vle anile abònman "${tx.metadata?.plan_name}" nan ${tx.metadata?.merchant_name}? Yo pap koupe kòb sou kat ou ankò pou sèvis sa a.`);
+  const handleCancelSubscription = async (sub: any) => {
+    const isConfirmed = window.confirm(`Èske w sèten ou vle anile abònman "${sub.plan_name}" nan ${sub.shop_name}? Yo pap koupe kòb sou kat ou ankò pou sèvis sa a.`);
     if (!isConfirmed) return;
 
-    setProcessingId(tx.id);
+    setProcessingId(sub.id);
 
     try {
-      // Nou ajoute estati "cancelled" nan metadata a
-      const newMetadata = { 
-        ...tx.metadata, 
-        status: 'cancelled', 
-        cancelled_at: new Date().toISOString() 
-      };
-
+      // Mete ajou estati abònman an nan tab la
       const { error } = await supabase
-        .from('transactions')
-        .update({ metadata: newMetadata })
-        .eq('id', tx.id);
+        .from('subscriptions_history')
+        .update({ status: 'cancelled' })
+        .eq('id', sub.id);
 
       if (error) throw error;
 
       // Mete UI a ajou san rafrechi paj la
       setSubscriptions(subscriptions.map(s => 
-        s.id === tx.id ? { ...s, metadata: newMetadata } : s
+        s.id === sub.id ? { ...s, status: 'cancelled' } : s
       ));
+      
+      alert("Abònman ou an anile avèk siksè. Ou p ap peye pou li ankò.");
       
     } catch (err: any) {
       alert("Erè lè n ap anile abònman an: " + err.message);
@@ -118,14 +111,14 @@ export default function MySubscriptionsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {subscriptions.map((tx) => {
-              const isCancelled = tx.metadata?.status === 'cancelled';
-              const planName = tx.metadata?.plan_name || 'Abònman';
-              const merchantName = tx.metadata?.merchant_name || 'Biznis';
-              const amount = Math.abs(tx.amount).toLocaleString();
+            {subscriptions.map((sub) => {
+              const isCancelled = sub.status === 'cancelled';
+              const planName = sub.plan_name || 'Abònman';
+              const merchantName = sub.shop_name || 'Biznis';
+              const amount = Math.abs(sub.amount).toLocaleString();
 
               return (
-                <div key={tx.id} className={`bg-[#0d0e1a] border ${isCancelled ? 'border-zinc-800 opacity-70' : 'border-white/5 hover:border-red-600/30'} rounded-[2.5rem] p-6 md:p-8 transition-all duration-300 shadow-2xl relative overflow-hidden flex flex-col`}>
+                <div key={sub.id} className={`bg-[#0d0e1a] border ${isCancelled ? 'border-zinc-800 opacity-70' : 'border-white/5 hover:border-red-600/30'} rounded-[2.5rem] p-6 md:p-8 transition-all duration-300 shadow-2xl relative overflow-hidden flex flex-col`}>
                   
                   {/* Badge Status */}
                   <div className={`absolute top-6 right-6 px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 ${isCancelled ? 'bg-zinc-900 text-zinc-500' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>
@@ -146,7 +139,7 @@ export default function MySubscriptionsPage() {
                   <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Dènye Peman</span>
-                      <span className="text-[10px] font-bold text-white">{new Date(tx.created_at).toLocaleDateString('fr-FR')}</span>
+                      <span className="text-[10px] font-bold text-white">{new Date(sub.created_at).toLocaleDateString('fr-HT')}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Montan</span>
@@ -162,11 +155,11 @@ export default function MySubscriptionsPage() {
                       </div>
                     ) : (
                       <button 
-                        onClick={() => handleCancelSubscription(tx)}
-                        disabled={processingId === tx.id}
+                        onClick={() => handleCancelSubscription(sub)}
+                        disabled={processingId === sub.id}
                         className="w-full bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 border border-red-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
                       >
-                        {processingId === tx.id ? (
+                        {processingId === sub.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <>
