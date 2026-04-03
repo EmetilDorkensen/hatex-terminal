@@ -144,37 +144,37 @@ export default function SubscribePage() {
 const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
 
 const { error: txErr } = await supabase
-  .from('transactions')
-  .insert([
-    // 1. MESAJ POU MACHANN NAN (Sa ap parèt nan Terminal la)
-    {
-      user_id: merchant.id,
-      amount: product.price, 
-      type: 'SALE',             // SALE pèmèt Dashboard la wè l
-      status: 'success',        // success pèmèt li pa kache
-      description: `Vant Abònman: ${product.title} (Kliyan: ${maskedName})`,
-      reference: `${fakeTxId}-M`,
-      metadata: {
-        customer_name: maskedName,
-        customer_email: clientProfile.email || '',
-        plan_name: product.title,
-        payment_method: 'card'
-      }
-    },
-    // 2. MESAJ POU KLIYAN AN (Sa ap parèt nan app kliyan an)
-    {
-      user_id: clientProfile.id,
-      amount: -product.price,   // Negatif (-) paske se yon depans
-      type: 'PAYMENT',          
-      status: 'success',
-      description: `Peman Abònman: ${product.title} nan ${merchant.business_name || 'H-Pay Store'}`,
-      reference: `${fakeTxId}-C`,
-      metadata: {
-        merchant_name: merchant.business_name || 'Biznis San Non',
-        plan_name: product.title
-      }
-    }
-  ]);
+        .from('transactions')
+        .insert([
+          // 1. MESAJ POU MACHANN NAN
+          {
+            user_id: merchant.id,
+            amount: product.price, 
+            type: 'SALE',             
+            status: 'success',        
+            description: `Vant Abònman: ${product.title} (Kliyan: ${maskedName})`,
+            reference_id: `${fakeTxId}-M`,  // <--- KORIJE LA A
+            metadata: {
+              customer_name: maskedName,
+              customer_email: clientProfile.email || '',
+              plan_name: product.title,
+              payment_method: 'card'
+            }
+          },
+          // 2. MESAJ POU KLIYAN AN
+          {
+            user_id: clientProfile.id,
+            amount: -product.price,   
+            type: 'PAYMENT',          
+            status: 'success',
+            description: `Peman Abònman: ${product.title} nan ${merchant.business_name || 'H-Pay Store'}`,
+            reference_id: `${fakeTxId}-C`,  // <--- KORIJE LA A
+            metadata: {
+              merchant_name: merchant.business_name || 'Biznis San Non',
+              plan_name: product.title
+            }
+          }
+        ]);
 
 if (txErr) {
   console.error("❌ Erè nan anrejistreman istorik tranzaksyon:", txErr); 

@@ -55,31 +55,32 @@ export default function SubscriptionsDashboard() {
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      // 3. Rale Estatistik reyèl yo nan baz done a
-      // Nou chache sèlman tranzaksyon ABÒNMAN ki konplete
-      const { data: txData } = await supabase
-        .from('transactions')
-        .select('amount, metadata')
-        .eq('user_id', user.id)
-        .eq('type', 'SUBSCRIPTION')
-        .eq('status', 'completed');
+      // ==========================================
+      // 3. RALE ESTATISTIK REYÈL YO NAN NOUVO TAB LA
+      // ==========================================
+      const { data: subData, error: subErr } = await supabase
+        .from('subscriptions_history')
+        .select('amount, plan_name')
+        .eq('merchant_id', user.id)
+        .eq('status', 'success');
 
-      if (txData) {
-        // Nou filtre pou n pran sèlman kòb ki antre yo (pozitif)
-        const merchantIncomes = txData.filter(tx => Number(tx.amount) > 0);
+      if (subErr) {
+        console.error("Erè nan chache estatistik abònman yo:", subErr);
+      }
 
-        // Kantite tranzaksyon pozitif yo reprezante kantite moun ki abòne
-        const active = merchantIncomes.length; 
+      if (subData) {
+        // Kantite abònman ki vann nèt (Kliyan Aktif)
+        const active = subData.length; 
         
-        // Total tout kòb machann nan fè sou abònman yo
-        const revenue = merchantIncomes.reduce((acc, curr) => acc + Number(curr.amount), 0);
+        // Total tout kòb machann nan fè sou abònman sa yo
+        const revenue = subData.reduce((acc, curr) => acc + Number(curr.amount), 0);
         
         setStats({ total_revenue: revenue, active_subs: active });
 
-        // Lojik siplemantè: Kalkile konbyen abone chak plan genyen gras ak metadata a
+        // Kalkile konbyen abone chak plan genyen gras ak non plan an
         const counts: Record<string, number> = {};
-        merchantIncomes.forEach(tx => {
-           const planName = tx.metadata?.plan_name;
+        subData.forEach(sub => {
+           const planName = sub.plan_name;
            if (planName) {
              counts[planName] = (counts[planName] || 0) + 1;
            }
