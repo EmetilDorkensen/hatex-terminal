@@ -265,26 +265,37 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Navigasyon anba (fixed) */}
-      <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/5 h-16 rounded-[2rem] flex justify-between items-center px-6 z-50 shadow-2xl">
-        <div className="flex flex-col items-center text-red-600">
-          <div className="w-1 h-1 bg-red-600 rounded-full mb-1"></div>
-          <span className="text-[8px] font-black uppercase">Akey</span>
+{/* Navigasyon anba (fixed) */}
+<div className="fixed bottom-4 md:bottom-6 left-3 right-3 sm:left-4 sm:right-4 max-w-lg mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/5 h-[4.5rem] rounded-[2rem] flex justify-around sm:justify-between items-center px-4 sm:px-8 z-50 shadow-2xl">
+        
+        {/* Akey */}
+        <div className="flex flex-col items-center text-red-600 cursor-pointer hover:scale-105 transition-all">
+          <div className="w-1.5 h-1.5 bg-red-600 rounded-full mb-1"></div>
+          <span className="text-[10px] sm:text-[11px] font-black uppercase">Akey</span>
         </div>
-        <div onClick={() => router.push('/kat')} className="flex flex-col items-center opacity-40">
-          <span className="text-[8px] font-black uppercase text-white">Kat</span>
+
+        {/* Kat */}
+        <div onClick={() => router.push('/kat')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
+          <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Kat</span>
         </div>
-        <div onClick={() => router.push('/terminal')} className="relative -mt-10">
-          <div className="bg-red-600 w-12 h-12 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-red-600/40 rotate-45">
-            <span className="text-xl font-black -rotate-45 text-white italic">T</span>
+
+        {/* Bouton T (Santral) */}
+        <div onClick={() => router.push('/terminal')} className="relative -mt-10 md:-mt-12 cursor-pointer hover:scale-105 transition-all">
+          <div className="bg-red-600 w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-red-600/40 rotate-45">
+            <span className="text-2xl font-black -rotate-45 text-white italic">T</span>
           </div>
         </div>
-        <div onClick={() => router.push('/transactions')} className="flex flex-col items-center opacity-40">
-          <span className="text-[8px] font-black uppercase text-white">Istorik</span>
+
+        {/* Istorik */}
+        <div onClick={() => router.push('/transactions')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
+          <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Istorik</span>
         </div>
-        <div onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login'; }} className="flex flex-col items-center opacity-40 cursor-pointer">
-          <span className="text-[8px] font-black uppercase text-red-400">Soti</span>
+
+        {/* Paramèt */}
+        <div onClick={() => router.push('/setting')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
+          <span className="text-[10px] sm:text-[11px] font-black uppercase text-red-400">Paramèt</span>
         </div>
+
       </div>
 
       <style jsx>{`
