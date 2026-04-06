@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [hasPin, setHasPin] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [isSavingPin, setIsSavingPin] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   
   const [notifications, setNotifications] = useState(true);
   const [selectedLang, setSelectedLang] = useState('HT'); // HT, EN, ES
@@ -47,16 +48,13 @@ export default function SettingsPage() {
       if (userProfile) {
         setProfile(userProfile);
         setPinEnabled(userProfile.pin_enabled || false);
-        setHasPin(!!userProfile.pin_code); // Tcheke si l gen yon PIN deja nan baz done a
+        setHasPin(!!userProfile.pin_code);
       }
       setLoading(false);
     }
     loadSettings();
   }, [supabase, router]);
 
-  // ==========================================
-  // FONKSYON POU KREYE PIN NAN
-  // ==========================================
   const handleSavePin = async () => {
     if (newPin.length !== 4) {
       alert("PIN lan dwe gen egzakteman 4 chif!");
@@ -80,9 +78,6 @@ export default function SettingsPage() {
     }
   };
 
-  // ==========================================
-  // FONKSYON POU VOYE IMÈL MODPAS LA (Otomatik)
-  // ==========================================
   const handleResetPassword = async () => {
     if (!user?.email) return;
     
@@ -90,7 +85,7 @@ export default function SettingsPage() {
     if (!isConfirmed) return;
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/update-password`, // Paj kote l ap chanje l la
+      redirectTo: `${window.location.origin}/update-password`,
     });
 
     if (error) {
@@ -101,8 +96,51 @@ export default function SettingsPage() {
   };
 
   // ==========================================
-  // LÒT FONKSYON YO
+  // FONKSYON POU VOYE IMÈL POU CHANJE PIN NAN
   // ==========================================
+  const handleResetPin = async () => {
+    if (!user?.email) return;
+    
+    const isConfirmed = window.confirm("Èske w vle nou voye yon lyen sekirize sou imèl ou pou w ka chanje PIN ou a?");
+    if (!isConfirmed) return;
+
+    setIsSendingEmail(true);
+
+    // Kreye lyen an. Piske n ap sèvi ak API ou a, nou pral voye lyen an dirèkteman.
+    const updateUrl = `${window.location.origin}/update-pin`;
+    const messageHtml = `
+      <p>Bonjou ${profile?.full_name || 'Kliyan'},</p>
+      <p>Ou te mande pou chanje kòd PIN HatexCard ou a. Si se ou vre, klike sou lyen anba a pou w modifye li:</p>
+      <p><a href="${updateUrl}" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 10px;">Chanje PIN Mwen</a></p>
+      <p>Si lyen an pa mache, kopye epi kole adrès sa a nan navigatè w la: ${updateUrl}</p>
+      <p>Si ou pa t mande chanjman sa a, tanpri inyore imèl sa a.</p>
+    `;
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          to: user.email, 
+          subject: "🔐 Chanje PIN HatexCard ou a", 
+          non: profile?.full_name || 'Kliyan', 
+          mesaj: messageHtml 
+        }),
+      });
+
+      if (response.ok) {
+        alert(`✅ Nou voye yon lyen sou imèl ou (${user.email}). Ale klike sou li pou w chanje PIN nan.`);
+      } else {
+        alert("Te gen yon pwoblèm nan voye imèl la. Eseye ankò pita.");
+      }
+    } catch (error) {
+      console.error("Erè:", error);
+      alert("Erè nan sistèm nan. Tanpri kontakte sipò a.");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const togglePin = async () => {
     if (!hasPin) {
       alert("Ou dwe kreye yon PIN anvan w ka aktive fonksyon sa a.");
@@ -206,19 +244,19 @@ export default function SettingsPage() {
                   </button>
                 </div>
 
-                {/* Bouton Modifye PIN */}
+                {/* Bouton Modifye PIN k ap voye imèl la */}
                 <div 
-                  onClick={() => alert("Pou sekirite w, tanpri kontakte sipò a sou WhatsApp oubyen Imèl pou yo voye lyen modifikasyon PIN nan ba ou dirèkteman.")}
+                  onClick={handleResetPin}
                   className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Edit2 className="w-5 h-5" /></div>
                     <div>
                       <h4 className="text-sm font-black uppercase tracking-wider">Modifye PIN nan</h4>
-                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Mande yon lyen pou chanje kòd PIN ou a</p>
+                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Klike pou n voye lyen an sou imèl ou</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-zinc-600" />
+                  {isSendingEmail ? <Loader2 className="w-5 h-5 animate-spin text-zinc-600" /> : <ChevronRight className="w-5 h-5 text-zinc-600" />}
                 </div>
               </>
             )}
@@ -291,7 +329,6 @@ export default function SettingsPage() {
           <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Sipò Kliyan</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {/* Bouton WhatsApp */}
             <a 
               href="https://wa.me/50937201241?text=Bonjou%20ekip%20H-Pay%2C%20mwen%20bezwen%20%C3%A8d%20ak%20kont%20mwen%20an."
               target="_blank"
@@ -307,7 +344,6 @@ export default function SettingsPage() {
               </div>
             </a>
 
-            {/* Bouton Imèl (Klèman klikab kounye a) */}
             <a 
               href="mailto:contact@hatexcard.com?subject=Demann%20Sipò%20H-Pay"
               className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer"
