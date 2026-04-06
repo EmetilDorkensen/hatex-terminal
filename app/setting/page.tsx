@@ -106,14 +106,22 @@ export default function SettingsPage() {
 
     setIsSendingEmail(true);
 
-    // Kreye lyen an. Piske n ap sèvi ak API ou a, nou pral voye lyen an dirèkteman.
     const updateUrl = `${window.location.origin}/update-pin`;
+    
+    // Mesaj la byen klè ak yon gwo bouton wouj
     const messageHtml = `
-      <p>Bonjou ${profile?.full_name || 'Kliyan'},</p>
-      <p>Ou te mande pou chanje kòd PIN HatexCard ou a. Si se ou vre, klike sou lyen anba a pou w modifye li:</p>
-      <p><a href="${updateUrl}" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 10px;">Chanje PIN Mwen</a></p>
-      <p>Si lyen an pa mache, kopye epi kole adrès sa a nan navigatè w la: ${updateUrl}</p>
-      <p>Si ou pa t mande chanjman sa a, tanpri inyore imèl sa a.</p>
+      <h3>Bonjou ${profile?.full_name || 'Kliyan'},</h3>
+      <p>Sa se yon mesaj sekirite pou kòd PIN 4 chif ou a.</p>
+      <p>Klike sou gwo bouton wouj ki anba a pou w kreye yon nouvo PIN:</p>
+      <br>
+      <a href="${updateUrl}" style="background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">CHANJE KÒD PIN MWEN AN</a>
+      <br><br>
+      <p>Si bouton an pa mache, kopye adrès sa a epi kole l nan navigatè (Chrome/Safari) w la:</p>
+      <p style="background-color: #f3f4f6; padding: 10px; border-radius: 5px; color: #000; font-family: monospace; word-break: break-all;">
+        ${updateUrl}
+      </p>
+      <br>
+      <p><i>Si ou pa t mande chanjman sa a, tanpri inyore imèl sa a.</i></p>
     `;
 
     try {
@@ -122,14 +130,14 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           to: user.email, 
-          subject: "🔐 Chanje PIN HatexCard ou a", 
+          subject: "🚨 KÒD PIN: Chanje PIN HatexCard ou a", 
           non: profile?.full_name || 'Kliyan', 
           mesaj: messageHtml 
         }),
       });
 
       if (response.ok) {
-        alert(`✅ Nou voye yon lyen sou imèl ou (${user.email}). Ale klike sou li pou w chanje PIN nan.`);
+        alert(`✅ Nou voye lyen PIN nan sou imèl ou (${user.email}). Ale klike sou li pou w chanje PIN nan.`);
       } else {
         alert("Te gen yon pwoblèm nan voye imèl la. Eseye ankò pita.");
       }
