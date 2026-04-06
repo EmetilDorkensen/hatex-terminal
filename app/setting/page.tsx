@@ -5,8 +5,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, User, ShieldCheck, Mail, MessageCircle, 
-  Smartphone, Lock, Bell, Globe, Info, LogOut, 
-  ChevronRight, CreditCard, Loader2, AlertTriangle, Key
+  Lock, Bell, Globe, Info, LogOut, 
+  ChevronRight, CreditCard, Loader2, AlertTriangle, Key, Edit2
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -15,10 +15,14 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
-  // States pou opsyon sekirite ak preferans yo
+  // States pou sekirite ak PIN
   const [pinEnabled, setPinEnabled] = useState(false);
-  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
+  const [hasPin, setHasPin] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [isSavingPin, setIsSavingPin] = useState(false);
+  
   const [notifications, setNotifications] = useState(true);
+  const [selectedLang, setSelectedLang] = useState('HT'); // HT, EN, ES
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,9 +46,8 @@ export default function SettingsPage() {
         
       if (userProfile) {
         setProfile(userProfile);
-        // Sipoze ou gen kolòn sa yo nan baz done a pou kenbe estati a
         setPinEnabled(userProfile.pin_enabled || false);
-        setTwoFaEnabled(userProfile.two_fa_enabled || false);
+        setHasPin(!!userProfile.pin_code); // Tcheke si l gen yon PIN deja nan baz done a
       }
       setLoading(false);
     }
@@ -52,22 +55,62 @@ export default function SettingsPage() {
   }, [supabase, router]);
 
   // ==========================================
-  // FONKSYON POU TOGGLE (Aktive/Dezaktive)
+  // FONKSYON POU KREYE PIN NAN
+  // ==========================================
+  const handleSavePin = async () => {
+    if (newPin.length !== 4) {
+      alert("PIN lan dwe gen egzakteman 4 chif!");
+      return;
+    }
+    setIsSavingPin(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ pin_code: newPin, pin_enabled: true })
+      .eq('id', user.id);
+
+    setIsSavingPin(false);
+
+    if (error) {
+      alert("Erè: " + error.message);
+    } else {
+      setHasPin(true);
+      setPinEnabled(true);
+      setNewPin('');
+      alert("PIN ou an anrejistre avèk siksè!");
+    }
+  };
+
+  // ==========================================
+  // FONKSYON POU VOYE IMÈL MODPAS LA (Otomatik)
+  // ==========================================
+  const handleResetPassword = async () => {
+    if (!user?.email) return;
+    
+    const isConfirmed = window.confirm("Èske w vle nou voye yon lyen sou imèl ou pou w chanje modpas ou a?");
+    if (!isConfirmed) return;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/update-password`, // Paj kote l ap chanje l la
+    });
+
+    if (error) {
+      alert("Erè lè n ap voye imèl la: " + error.message);
+    } else {
+      alert(`✅ Nou voye yon imèl bay ${user.email} pou w ka chanje modpas ou. Tanpri tcheke bwat lèt ou a.`);
+    }
+  };
+
+  // ==========================================
+  // LÒT FONKSYON YO
   // ==========================================
   const togglePin = async () => {
-    // La a ou ta ka louvri yon modal pou mande l tape 4 chif la anvan w aktive l
+    if (!hasPin) {
+      alert("Ou dwe kreye yon PIN anvan w ka aktive fonksyon sa a.");
+      return;
+    }
     const newState = !pinEnabled;
     setPinEnabled(newState);
     await supabase.from('profiles').update({ pin_enabled: newState }).eq('id', user?.id);
-    if (newState) alert("Sekirite PIN 4 chif aktive!");
-  };
-
-  const toggle2FA = async () => {
-    // La a ou ta dwe kòmanse pwosesis pou l skane QR kòd Google Authenticator la
-    const newState = !twoFaEnabled;
-    setTwoFaEnabled(newState);
-    await supabase.from('profiles').update({ two_fa_enabled: newState }).eq('id', user?.id);
-    if (newState) alert("Google Authenticator ap chaje...");
   };
 
   const handleLogout = async () => {
@@ -121,47 +164,72 @@ export default function SettingsPage() {
           <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Sekirite</h3>
           <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] overflow-hidden shadow-lg">
             
-            {/* PIN Code Toggle */}
-            <div className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Lock className="w-5 h-5" /></div>
-                <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Modpas PIN (4 chif)</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Mande PIN lè w ap louvri aplikasyon an</p>
+            {/* ZÒN POU METE/KREYE PIN NAN */}
+            {!hasPin ? (
+              <div className="p-5 md:p-6 border-b border-white/5 bg-red-600/5">
+                <h4 className="text-sm font-black uppercase tracking-wider mb-2 text-red-500">Kreye PIN 4 Chif ou</h4>
+                <p className="text-[10px] text-zinc-400 font-bold mb-4">Ou dwe kreye yon PIN pou w ka konekte rapid e pwoteje kòb ou.</p>
+                <div className="flex gap-3">
+                  <input 
+                    type="password" 
+                    maxLength={4}
+                    placeholder="••••"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                    className="bg-black border border-white/10 rounded-xl px-4 py-3 text-center tracking-[0.5em] font-black w-32 outline-none focus:border-red-600 transition-all"
+                  />
+                  <button 
+                    onClick={handleSavePin}
+                    disabled={isSavingPin || newPin.length !== 4}
+                    className="bg-red-600 text-white px-6 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50 hover:bg-red-700 transition-all"
+                  >
+                    {isSavingPin ? 'Ap Sove...' : 'Sove PIN'}
+                  </button>
                 </div>
               </div>
-              <button 
-                onClick={togglePin}
-                className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${pinEnabled ? 'bg-red-600' : 'bg-zinc-800'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${pinEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
-              </button>
-            </div>
-
-            {/* Google Authenticator Toggle */}
-            <div className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Smartphone className="w-5 h-5" /></div>
-                <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Google Authenticator</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Sekirite 2FA pou pwoteje kòb ou</p>
+            ) : (
+              <>
+                {/* Toggle pou limen/fèmen PIN nan */}
+                <div className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Lock className="w-5 h-5" /></div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wider">Modpas PIN (4 chif)</h4>
+                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Mande PIN lè w ap louvri aplikasyon an</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={togglePin}
+                    className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${pinEnabled ? 'bg-red-600' : 'bg-zinc-800'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${pinEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </button>
                 </div>
-              </div>
-              <button 
-                onClick={toggle2FA}
-                className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${twoFaEnabled ? 'bg-red-600' : 'bg-zinc-800'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${twoFaEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
-              </button>
-            </div>
 
-            {/* Modifye Modpas */}
-            <div className="flex items-center justify-between p-5 md:p-6 hover:bg-white/[0.02] transition-colors cursor-pointer">
+                {/* Bouton Modifye PIN */}
+                <div 
+                  onClick={() => alert("Pou sekirite w, tanpri kontakte sipò a sou WhatsApp oubyen Imèl pou yo voye lyen modifikasyon PIN nan ba ou dirèkteman.")}
+                  className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Edit2 className="w-5 h-5" /></div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wider">Modifye PIN nan</h4>
+                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Mande yon lyen pou chanje kòd PIN ou a</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-zinc-600" />
+                </div>
+              </>
+            )}
+
+            {/* Modifye Modpas (Voye Imèl otomatikman) */}
+            <div onClick={handleResetPassword} className="flex items-center justify-between p-5 md:p-6 hover:bg-white/[0.02] transition-colors cursor-pointer">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Key className="w-5 h-5" /></div>
                 <div>
                   <h4 className="text-sm font-black uppercase tracking-wider">Modifye Modpas</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Chanje modpas prensipal ou an</p>
+                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Klike pou n voye lyen an sou imèl ou</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-zinc-600" />
@@ -189,27 +257,32 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><CreditCard className="w-5 h-5" /></div>
-                <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Limit Tranzaksyon</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Gere limit kòb ou ka depanse</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-zinc-600" />
-            </div>
-
-            <div className="flex items-center justify-between p-5 md:p-6 hover:bg-white/[0.02] transition-colors cursor-pointer">
-              <div className="flex items-center gap-4">
+            {/* Opsyon Lang */}
+            <div className="p-5 md:p-6 hover:bg-white/[0.02] transition-colors">
+              <div className="flex items-center gap-4 mb-4">
                 <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Globe className="w-5 h-5" /></div>
                 <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Lang</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Kreyòl Ayisyen (HT)</p>
+                  <h4 className="text-sm font-black uppercase tracking-wider">Lang Aplikasyon an</h4>
+                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Chwazi lang ki pi bon pou ou a</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-zinc-600" />
+              
+              <div className="flex gap-2 bg-black p-1 rounded-xl border border-white/5">
+                <button 
+                  onClick={() => setSelectedLang('HT')}
+                  className={`flex-1 py-2 text-[10px] font-black tracking-widest rounded-lg transition-all ${selectedLang === 'HT' ? 'bg-red-600 text-white' : 'text-zinc-500 hover:text-white'}`}
+                >Kreyòl</button>
+                <button 
+                  onClick={() => setSelectedLang('EN')}
+                  className={`flex-1 py-2 text-[10px] font-black tracking-widest rounded-lg transition-all ${selectedLang === 'EN' ? 'bg-red-600 text-white' : 'text-zinc-500 hover:text-white'}`}
+                >English</button>
+                <button 
+                  onClick={() => setSelectedLang('ES')}
+                  className={`flex-1 py-2 text-[10px] font-black tracking-widest rounded-lg transition-all ${selectedLang === 'ES' ? 'bg-red-600 text-white' : 'text-zinc-500 hover:text-white'}`}
+                >Español</button>
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -219,9 +292,11 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             {/* Bouton WhatsApp */}
-            <button 
-              onClick={() => window.open('https://wa.me/50937201241?text=Bonjou%20ekip%20H-Pay%2C%20mwen%20bezwen%20%C3%A8d%20ak%20kont%20mwen%20an.', '_blank')}
-              className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group"
+            <a 
+              href="https://wa.me/50937201241?text=Bonjou%20ekip%20H-Pay%2C%20mwen%20bezwen%20%C3%A8d%20ak%20kont%20mwen%20an."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer"
             >
               <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <MessageCircle className="w-6 h-6 text-green-500" />
@@ -230,12 +305,12 @@ export default function SettingsPage() {
                 <span className="block text-sm font-black uppercase tracking-wider">WhatsApp</span>
                 <span className="block text-[10px] text-zinc-500 font-bold mt-1">+509 3720-1241</span>
               </div>
-            </button>
+            </a>
 
-            {/* Bouton Imèl */}
-            <button 
-              onClick={() => window.location.href = 'mailto:contact@hatexcard.com'}
-              className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group"
+            {/* Bouton Imèl (Klèman klikab kounye a) */}
+            <a 
+              href="mailto:contact@hatexcard.com?subject=Demann%20Sipò%20H-Pay"
+              className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer"
             >
               <div className="w-12 h-12 bg-red-600/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Mail className="w-6 h-6 text-red-500" />
@@ -244,7 +319,7 @@ export default function SettingsPage() {
                 <span className="block text-sm font-black uppercase tracking-wider">Imèl Sipò</span>
                 <span className="block text-[10px] text-zinc-500 font-bold mt-1">contact@hatexcard.com</span>
               </div>
-            </button>
+            </a>
 
           </div>
         </div>

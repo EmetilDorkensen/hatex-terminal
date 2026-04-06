@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { createBrowserClient } from '@supabase/ssr';
 
 export default function Login() {
+  const [loginMethod, setLoginMethod] = useState<'password' | 'pin'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -21,20 +23,72 @@ export default function Login() {
     setErrorMsg('');
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (loginMethod === 'password') {
+        // ==========================================
+        // 1. KONEKSYON AK MODPAS
+        // ==========================================
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      if (error) {
-        setErrorMsg("Email oswa Modpas pa bon. Verifye yo byen.");
-        setLoading(false);
-        return;
-      }
+        if (error) {
+          setErrorMsg("Email oswa Modpas pa bon. Verifye yo byen.");
+          setLoading(false);
+          return;
+        }
 
-      if (data?.user) {
-        // Sèvi ak replace epi fose yon refresh pou Middleware la wè nouvo Cookie a
-        window.location.href = '/dashboard';
+        if (data?.user) {
+          // VERIFYE SI KONT LAN TE SISPANDI ANVAN L ANTRE SOU DASHBOARD LA
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('account_status')
+            .eq('id', data.user.id)
+            .single();
+
+          if (profile?.account_status === 'suspended') {
+            await supabase.auth.signOut(); // Fout li deyò menm kote a!
+            setErrorMsg("Aksè Refize! Kont ou sispandi (Ou te rate PIN ou 4 fwa). Kontakte sipò a.");
+            setLoading(false);
+            return;
+          }
+
+          // Sèvi ak replace epi fose yon refresh pou Middleware la wè nouvo Cookie a
+          window.location.href = '/dashboard';
+        }
+
+      } else {
+        // ==========================================
+        // 2. KONEKSYON AK PIN (4 CHIF)
+        // ==========================================
+        if (pin.length !== 4) {
+          setErrorMsg("PIN lan dwe gen egzakteman 4 chif.");
+          setLoading(false);
+          return;
+        }
+
+        // Rele fonksyon entelijan nou kreye nan baz done a
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('verify_wallet_pin', {
+          p_email: email,
+          p_pin: pin
+        });
+
+        if (rpcErr) {
+          setErrorMsg("Gen yon pwoblèm nan verifye PIN ou an. Eseye ankò.");
+          setLoading(false);
+          return;
+        }
+
+        if (rpcData.success) {
+          // PIN lan bon e kont lan pa sispandi. 
+          // NÒT: Paske w itilize PIN olye de Modpas, fòk ou sonje Supabase Auth mande modpas pou l ba w yon vrè "Seksyon (Cookie)". 
+          // Nan yon E-wallet, si w vle konekte sèlman ak PIN, l ap pase la a.
+          window.location.href = '/dashboard';
+        } else {
+          // Afiche mesaj erè a ki soti dirèk nan baz done a (ex: "Ou rete 2 chans")
+          setErrorMsg(rpcData.message); 
+          setLoading(false);
+        }
       }
     } catch (err) {
       setErrorMsg("Gen yon pwoblèm rezo, eseye ankò.");
@@ -50,6 +104,24 @@ export default function Login() {
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold">Koneksyon Sekirize</p>
         </div>
 
+        {/* BOUTON POU CHWAZI KIJAN W AP KONEKTE A */}
+        <div className="flex bg-black p-1 rounded-2xl mb-8 border border-white/5">
+          <button 
+            type="button"
+            onClick={() => { setLoginMethod('password'); setErrorMsg(''); }}
+            className={`flex-1 py-3 text-[9px] font-black tracking-widest rounded-xl transition-all ${loginMethod === 'password' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Modpas
+          </button>
+          <button 
+            type="button"
+            onClick={() => { setLoginMethod('pin'); setErrorMsg(''); }}
+            className={`flex-1 py-3 text-[9px] font-black tracking-widest rounded-xl transition-all ${loginMethod === 'pin' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}
+          >
+            PIN 4 Chif
+          </button>
+        </div>
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2 text-left">
             <label className="text-[8px] text-zinc-600 ml-2">ADRÈS IMÈL</label>
@@ -63,28 +135,43 @@ export default function Login() {
             />
           </div>
 
-          <div className="space-y-2 text-left">
-            <label className="text-[8px] text-zinc-600 ml-2">MODPAS</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs"
-              required
-            />
-          </div>
+          {loginMethod === 'password' ? (
+            <div className="space-y-2 text-left animate-in fade-in zoom-in duration-300">
+              <label className="text-[8px] text-zinc-600 ml-2">MODPAS</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs tracking-widest"
+                required
+              />
+            </div>
+          ) : (
+            <div className="space-y-2 text-left animate-in fade-in zoom-in duration-300">
+              <label className="text-[8px] text-zinc-600 ml-2">KÒD PIN (4 CHIF)</label>
+              <input
+                type="password"
+                placeholder="••••"
+                maxLength={4}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} // Anpeche yo tape lèt
+                className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-black text-center text-2xl tracking-[1em]"
+                required
+              />
+            </div>
+          )}
 
           {errorMsg && (
-            <div className="bg-red-600/10 border border-red-600/20 p-4 rounded-xl">
-               <p className="text-red-500 text-[10px] font-black uppercase text-center">{errorMsg}</p>
+            <div className="bg-red-600/10 border border-red-600/20 p-4 rounded-xl mt-4">
+               <p className="text-red-500 text-[10px] font-black uppercase text-center leading-relaxed">{errorMsg}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 py-5 rounded-2xl font-black uppercase italic shadow-lg shadow-red-600/20 active:scale-95 transition-all text-sm mt-4 disabled:opacity-50"
+            className="w-full bg-red-600 py-5 rounded-2xl font-black uppercase italic shadow-lg shadow-red-600/20 active:scale-95 transition-all text-sm mt-6 disabled:opacity-50"
           >
             {loading ? "AP VERIFYE..." : "ANTRE NAN KONT MWEN"}
           </button>
