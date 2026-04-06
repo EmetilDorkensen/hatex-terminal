@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, User, ShieldCheck, Mail, MessageCircle, 
   Lock, Bell, Globe, Info, LogOut, 
-  ChevronRight, CreditCard, Loader2, AlertTriangle, Key, Edit2
+  ChevronRight, CreditCard, Loader2, AlertTriangle, Key, Edit2, X
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -18,10 +18,19 @@ export default function SettingsPage() {
   // States pou sekirite ak PIN
   const [pinEnabled, setPinEnabled] = useState(false);
   const [hasPin, setHasPin] = useState(false);
+  
+  // States pou KREYE PIN la premye fwa
   const [newPin, setNewPin] = useState('');
   const [isSavingPin, setIsSavingPin] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
   
+  // States pou MODIFYE PIN lan (Modal la)
+  const [showUpdatePinModal, setShowUpdatePinModal] = useState(false);
+  const [oldPinInput, setOldPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false);
+  const [updatePinError, setUpdatePinError] = useState('');
+  const [updatePinSuccess, setUpdatePinSuccess] = useState('');
+
   const [notifications, setNotifications] = useState(true);
   const [selectedLang, setSelectedLang] = useState('HT'); // HT, EN, ES
 
@@ -55,6 +64,9 @@ export default function SettingsPage() {
     loadSettings();
   }, [supabase, router]);
 
+  // ==========================================
+  // FONKSYON POU KREYE PREMYE PIN NAN
+  // ==========================================
   const handleSavePin = async () => {
     if (newPin.length !== 4) {
       alert("PIN lan dwe gen egzakteman 4 chif!");
@@ -78,6 +90,65 @@ export default function SettingsPage() {
     }
   };
 
+  // ==========================================
+  // FONKSYON POU MODIFYE PIN NAN (Anndan app la)
+  // ==========================================
+  const submitPinUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdatePinError('');
+    setUpdatePinSuccess('');
+
+    if (oldPinInput.length !== 4 || newPinInput.length !== 4) {
+      setUpdatePinError("Tanpri mete 4 chif pou tou de PIN yo.");
+      return;
+    }
+
+    setIsUpdatingPin(true);
+
+    try {
+      // Tcheke si ansyen PIN lan bon anvan
+      const { data: checkProfile, error: checkErr } = await supabase
+        .from('profiles')
+        .select('pin_code')
+        .eq('id', user.id)
+        .single();
+
+      if (checkErr || !checkProfile) throw new Error("Erè lè n ap verifye kont ou a.");
+
+      if (checkProfile.pin_code !== oldPinInput) {
+        setUpdatePinError("Ansyen PIN lan pa bon!");
+        setIsUpdatingPin(false);
+        return;
+      }
+
+      // Si l bon, anrejistre nouvo a
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ pin_code: newPinInput })
+        .eq('id', user.id);
+
+      if (updateErr) throw updateErr;
+
+      setUpdatePinSuccess("PIN ou an chanje avèk siksè!");
+      
+      // Fèmen modal la apre 1.5 segonn
+      setTimeout(() => {
+        setShowUpdatePinModal(false);
+        setOldPinInput('');
+        setNewPinInput('');
+        setUpdatePinSuccess('');
+      }, 1500);
+
+    } catch (err: any) {
+      setUpdatePinError(err.message || "Te gen yon pwoblèm. Eseye ankò.");
+    } finally {
+      setIsUpdatingPin(false);
+    }
+  };
+
+  // ==========================================
+  // VOYE IMÈL POU MODPAS LA SÈLMAN
+  // ==========================================
   const handleResetPassword = async () => {
     if (!user?.email) return;
     
@@ -92,61 +163,6 @@ export default function SettingsPage() {
       alert("Erè lè n ap voye imèl la: " + error.message);
     } else {
       alert(`✅ Nou voye yon imèl bay ${user.email} pou w ka chanje modpas ou. Tanpri tcheke bwat lèt ou a.`);
-    }
-  };
-
-  // ==========================================
-  // FONKSYON POU VOYE IMÈL POU CHANJE PIN NAN
-  // ==========================================
-  const handleResetPin = async () => {
-    if (!user?.email) return;
-    
-    const isConfirmed = window.confirm("Èske w vle nou voye yon lyen sekirize sou imèl ou pou w ka chanje PIN ou a?");
-    if (!isConfirmed) return;
-
-    setIsSendingEmail(true);
-
-    // Mwen mete vrè adrès sit ou a isit la pito
-    const updateUrl = `https://hatexcard.com/update-pin`;
-    
-    // Mesaj la byen klè ak yon gwo bouton wouj
-    const messageHtml = `
-      <h3>Bonjou ${profile?.full_name || 'Kliyan'},</h3>
-      <p>Sa se yon mesaj sekirite pou kòd PIN 4 chif ou a.</p>
-      <p>Klike sou gwo bouton wouj ki anba a pou w kreye yon nouvo PIN:</p>
-      <br>
-      <a href="${updateUrl}" style="background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">CHANJE KÒD PIN MWEN AN</a>
-      <br><br>
-      <p>⚠️ <b>TRÈ ENPÒTAN:</b> Pou sa mache san pwoblèm, tanpri <b>KOPYE adrès ki anba a epi KOLE L nan menm navigatè kote ou te gentan konekte sou kont ou an</b>:</p>
-      <p style="background-color: #f3f4f6; padding: 10px; border-radius: 5px; color: #000; font-family: monospace; word-break: break-all;">
-        ${updateUrl}
-      </p>
-      <br>
-      <p><i>Si ou pa t mande chanjman sa a, tanpri inyore imèl sa a.</i></p>
-    `;
-
-    try {
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          to: user.email, 
-          subject: "🚨 KÒD PIN: Chanje PIN HatexCard ou a", 
-          non: profile?.full_name || 'Kliyan', 
-          mesaj: messageHtml 
-        }),
-      });
-
-      if (response.ok) {
-        alert(`✅ Nou voye lyen PIN nan sou imèl ou (${user.email}). Tanpri kopye lyen an epi kole l nan menm navigatè a.`);
-      } else {
-        alert("Te gen yon pwoblèm nan voye imèl la. Eseye ankò pita.");
-      }
-    } catch (error) {
-      console.error("Erè:", error);
-      alert("Erè nan sistèm nan. Tanpri kontakte sipò a.");
-    } finally {
-      setIsSendingEmail(false);
     }
   };
 
@@ -177,7 +193,7 @@ export default function SettingsPage() {
   const initials = fullName.substring(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-4 sm:p-6 md:p-10 font-medium selection:bg-red-600 pb-24">
+    <div className="min-h-screen bg-[#06070d] text-white p-4 sm:p-6 md:p-10 font-medium selection:bg-red-600 pb-24 relative">
       <div className="max-w-3xl mx-auto space-y-8">
         
         {/* HEADER */}
@@ -211,7 +227,6 @@ export default function SettingsPage() {
           <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Sekirite</h3>
           <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] overflow-hidden shadow-lg">
             
-            {/* ZÒN POU METE/KREYE PIN NAN */}
             {!hasPin ? (
               <div className="p-5 md:p-6 border-b border-white/5 bg-red-600/5">
                 <h4 className="text-sm font-black uppercase tracking-wider mb-2 text-red-500">Kreye PIN 4 Chif ou</h4>
@@ -253,19 +268,19 @@ export default function SettingsPage() {
                   </button>
                 </div>
 
-                {/* Bouton Modifye PIN k ap voye imèl la */}
+                {/* Bouton Modifye PIN k ap louvri modal la */}
                 <div 
-                  onClick={handleResetPin}
+                  onClick={() => setShowUpdatePinModal(true)}
                   className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Edit2 className="w-5 h-5" /></div>
                     <div>
                       <h4 className="text-sm font-black uppercase tracking-wider">Modifye PIN nan</h4>
-                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Klike pou n voye lyen an sou imèl ou</p>
+                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Chanje kòd sekirite 4 chif ou a</p>
                     </div>
                   </div>
-                  {isSendingEmail ? <Loader2 className="w-5 h-5 animate-spin text-zinc-600" /> : <ChevronRight className="w-5 h-5 text-zinc-600" />}
+                  <ChevronRight className="w-5 h-5 text-zinc-600" />
                 </div>
               </>
             )}
@@ -284,7 +299,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 2. E-WALLET PREFERANS (Karakteristik Siplemantè) */}
+        {/* LÒT SEKSYON YO (Preferans, Sipò, About, Dekonekte) RETE MENM JAN AN */}
         <div className="space-y-4">
           <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Preferans E-Wallet</h3>
           <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] overflow-hidden shadow-lg">
@@ -304,7 +319,6 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            {/* Opsyon Lang */}
             <div className="p-5 md:p-6 hover:bg-white/[0.02] transition-colors">
               <div className="flex items-center gap-4 mb-4">
                 <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Globe className="w-5 h-5" /></div>
@@ -329,21 +343,13 @@ export default function SettingsPage() {
                 >Español</button>
               </div>
             </div>
-
           </div>
         </div>
 
-        {/* 3. SIPÒ AK KONTAK HATEX */}
         <div className="space-y-4">
           <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Sipò Kliyan</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            <a 
-              href="https://wa.me/50937201241?text=Bonjou%20ekip%20H-Pay%2C%20mwen%20bezwen%20%C3%A8d%20ak%20kont%20mwen%20an."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer"
-            >
+            <a href="https://wa.me/50937201241?text=Bonjou%20ekip%20H-Pay%2C%20mwen%20bezwen%20%C3%A8d%20ak%20kont%20mwen%20an." target="_blank" rel="noopener noreferrer" className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer">
               <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <MessageCircle className="w-6 h-6 text-green-500" />
               </div>
@@ -352,11 +358,7 @@ export default function SettingsPage() {
                 <span className="block text-[10px] text-zinc-500 font-bold mt-1">+509 3720-1241</span>
               </div>
             </a>
-
-            <a 
-              href="mailto:contact@hatexcard.com?subject=Demann%20Sipò%20H-Pay"
-              className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer"
-            >
+            <a href="mailto:contact@hatexcard.com?subject=Demann%20Sipò%20H-Pay" className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer">
               <div className="w-12 h-12 bg-red-600/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Mail className="w-6 h-6 text-red-500" />
               </div>
@@ -365,11 +367,9 @@ export default function SettingsPage() {
                 <span className="block text-[10px] text-zinc-500 font-bold mt-1">contact@hatexcard.com</span>
               </div>
             </a>
-
           </div>
         </div>
 
-        {/* 4. À PROPOS DE HATEXCARD */}
         <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] p-6 md:p-8 text-center italic relative overflow-hidden">
           <Info className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
           <h3 className="text-base font-black uppercase tracking-widest text-zinc-300">À propos de HatexCard / H-Pay</h3>
@@ -384,17 +384,81 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 5. ZÒN DANJE (Dekonekte) */}
         <div className="pt-6">
-          <button 
-            onClick={handleLogout}
-            className="w-full bg-red-600/10 hover:bg-red-600 border border-red-600/20 hover:border-red-600 text-red-500 hover:text-white py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest transition-all flex items-center justify-center gap-3"
-          >
+          <button onClick={handleLogout} className="w-full bg-red-600/10 hover:bg-red-600 border border-red-600/20 hover:border-red-600 text-red-500 hover:text-white py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest transition-all flex items-center justify-center gap-3">
             <LogOut className="w-5 h-5" /> Dekonekte Kont Mwen
           </button>
         </div>
 
       </div>
+
+      {/* ========================================== */}
+      {/* MODAL POU CHANJE PIN NAN */}
+      {/* ========================================== */}
+      {showUpdatePinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#0a0b14] border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 relative shadow-2xl animate-in fade-in zoom-in duration-200">
+            <button 
+              onClick={() => {
+                setShowUpdatePinModal(false);
+                setOldPinInput('');
+                setNewPinInput('');
+                setUpdatePinError('');
+                setUpdatePinSuccess('');
+              }} 
+              className="absolute top-4 right-4 p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white hover:bg-red-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-3 border border-red-600/20">
+                <Lock className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tighter">Modifye PIN ou</h3>
+            </div>
+
+            <form onSubmit={submitPinUpdate} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[8px] text-zinc-500 font-black uppercase tracking-widest text-center block">Ansyen PIN (4 chif)</label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  placeholder="••••"
+                  value={oldPinInput}
+                  onChange={(e) => setOldPinInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-black border border-white/5 p-4 rounded-xl focus:border-red-600 outline-none transition-all font-black text-center tracking-[1em] text-xl"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] text-zinc-500 font-black uppercase tracking-widest text-center block">Nouvo PIN (4 chif)</label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  placeholder="••••"
+                  value={newPinInput}
+                  onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-black border border-white/5 p-4 rounded-xl focus:border-red-600 outline-none transition-all font-black text-center tracking-[1em] text-xl"
+                  required
+                />
+              </div>
+
+              {updatePinError && <p className="text-red-500 text-[10px] font-black uppercase text-center">{updatePinError}</p>}
+              {updatePinSuccess && <p className="text-green-500 text-[10px] font-black uppercase text-center">{updatePinSuccess}</p>}
+
+              <button
+                type="submit"
+                disabled={isUpdatingPin || oldPinInput.length !== 4 || newPinInput.length !== 4}
+                className="w-full bg-red-600 py-4 rounded-xl font-black uppercase text-[11px] tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
+              >
+                {isUpdatingPin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CHANJE PIN NAN"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
