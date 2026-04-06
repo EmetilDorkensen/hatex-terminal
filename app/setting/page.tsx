@@ -85,7 +85,7 @@ export default function SettingsPage() {
     if (!isConfirmed) return;
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      redirectTo: `https://hatexcard.com/update-password`,
     });
 
     if (error) {
@@ -106,7 +106,8 @@ export default function SettingsPage() {
 
     setIsSendingEmail(true);
 
-    const updateUrl = `${window.location.origin}/update-pin`;
+    // Mwen mete vrè adrès sit ou a isit la pito
+    const updateUrl = `https://hatexcard.com/update-pin`;
     
     // Mesaj la byen klè ak yon gwo bouton wouj
     const messageHtml = `
@@ -116,7 +117,7 @@ export default function SettingsPage() {
       <br>
       <a href="${updateUrl}" style="background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">CHANJE KÒD PIN MWEN AN</a>
       <br><br>
-      <p>Si bouton an pa mache, kopye adrès sa a epi kole l nan navigatè (Chrome/Safari) w la:</p>
+      <p>⚠️ <b>TRÈ ENPÒTAN:</b> Pou sa mache san pwoblèm, tanpri <b>KOPYE adrès ki anba a epi KOLE L nan menm navigatè kote ou te gentan konekte sou kont ou an</b>:</p>
       <p style="background-color: #f3f4f6; padding: 10px; border-radius: 5px; color: #000; font-family: monospace; word-break: break-all;">
         ${updateUrl}
       </p>
@@ -137,7 +138,7 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        alert(`✅ Nou voye lyen PIN nan sou imèl ou (${user.email}). Ale klike sou li pou w chanje PIN nan.`);
+        alert(`✅ Nou voye lyen PIN nan sou imèl ou (${user.email}). Tanpri kopye lyen an epi kole l nan menm navigatè a.`);
       } else {
         alert("Te gen yon pwoblèm nan voye imèl la. Eseye ankò pita.");
       }
