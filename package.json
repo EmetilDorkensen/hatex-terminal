@@ -10,6 +10,9 @@
     "live": "git add . && git commit -m \"mizajou\" && git push origin main"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@emailjs/browser": "^4.4.1",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.98.0",

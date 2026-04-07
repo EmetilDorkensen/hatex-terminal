@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HatexCard</string>
+    <string name="title_activity_main">HatexCard</string>
+    <string name="package_name">com.HatexCard.app</string>
+    <string name="custom_url_scheme">com.HatexCard.app</string>
+</resources>

@@ -117,8 +117,8 @@ export default function LandingPage() {
             Rejwenn plis pase 12,000 Ayisyen k ap achte sou entènèt, jere biznis yo, epi voye lajan an sekirite nèt gras ak teknoloji HatexCard la. San frè kache.
           </p>
 
-          {/* Email CTA */}
-          <div className="a4 flex items-center justify-center gap-3 flex-wrap" style={{ marginBottom: "60px" }}>
+          {/* Email CTA AK BOUTON APK */}
+          <div className="a4 flex items-center justify-center gap-4 flex-wrap" style={{ marginBottom: "60px" }}>
             <div className="flex items-center rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(10px)" }}>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Mete imèl ou la..." style={{ background: "transparent", border: "none", outline: "none", padding: "13px 20px", fontSize: "14px", color: "#fff", width: "220px" }} />
               <button className="flex items-center gap-2 rounded-full transition-all hover:scale-105" style={{ margin: "5px", padding: "10px 20px", background: "linear-gradient(135deg,#e62e04,#b02000)", color: "#fff", fontWeight: 700, fontSize: "13px", border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(230,46,4,0.4)" }}>
@@ -126,6 +126,21 @@ export default function LandingPage() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </button>
             </div>
+
+            {/* NOUVO BOUTON TELECHAJE APK A */}
+            <a 
+              href="/HatexCard.apk" 
+              download="HatexCard_v1.0.apk"
+              className="flex items-center gap-2 rounded-full transition-all hover:scale-105" 
+              style={{ padding: "13px 24px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontWeight: 700, fontSize: "13px", backdropFilter: "blur(10px)", textDecoration: "none" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e62e04" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Telechaje App (APK)
+            </a>
           </div>
         </div>
 
@@ -405,9 +420,15 @@ export default function LandingPage() {
             <Link href="/signup" className="flex items-center gap-2 rounded-full font-bold transition-all hover:scale-105" style={{ padding: "14px 28px", fontSize: "14px", background: "linear-gradient(135deg,#e62e04,#b02000)", color: "#fff", boxShadow: "0 8px 30px rgba(230,46,4,0.4)" }}>
               <span>+</span> Ouvri Kont Gratis
             </Link>
-            <Link href="/login" className="flex items-center rounded-full font-bold transition-all" style={{ padding: "14px 28px", fontSize: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.65)" }}>
+            <Link href="/login" className="flex items-center rounded-full font-bold transition-all hover:scale-105" style={{ padding: "14px 28px", fontSize: "14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.65)" }}>
               Konekte nan Kont Ou
             </Link>
+
+            {/* NOUVO BOUTON TELECHAJE APK A */}
+            <a href="/HatexCard.apk" download="HatexCard_v1.0.apk" className="flex items-center gap-2 rounded-full font-bold transition-all hover:scale-105" style={{ padding: "14px 28px", fontSize: "14px", background: "rgba(230,46,4,0.15)", border: "1px solid rgba(230,46,4,0.3)", color: "#fff", textDecoration: "none" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e62e04" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Telechaje APK
+            </a>
           </div>
         </div>
       </section>
