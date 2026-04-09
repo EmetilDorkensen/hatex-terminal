@@ -1,28 +1,77 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function ReferralPage() {
   const router = useRouter();
-  
-  // TÈS DONE: Pou kounye a, nou mete moun nan gen 2 zanmi ki gentan pase KYC (2 x 300 = 600 HTG)
-  // Ou ka konekte sa ak Supabase pita.
-  const [totalInvited, setTotalInvited] = useState(2); 
-  const targetAmount = 1500;
-  const targetInvites = 5;
-  const currentAmount = totalInvited * (targetAmount / targetInvites); // 600 HTG
-  const invitesLeft = targetInvites - totalInvited; // 3 rete
-  const progressPercentage = (currentAmount / targetAmount) * 100;
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  const referralLink = "https://hatexcard.com/join/dorkensen8273"; // Egzanp lyen
-
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Nou ajoute 'kyc_status' nan sa n ap chèche yo
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('referral_code, successful_invites, kyc_status')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile) {
+            setUserData(profile);
+          }
+        } else {
+          router.push('/login');
+        }
+      } catch (err) {
+        console.error("Erè:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUser();
+  }, [supabase, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Tcheke si moun nan pase KYC
+  const isKycApproved = userData?.kyc_status === 'approved';
+
+  // Kalkil reyèl ki baze sou baz done a
+  const totalInvited = userData?.successful_invites || 0; 
+  const targetAmount = 1500;
+  const targetInvites = 5;
+  const currentAmount = Math.min(totalInvited * (targetAmount / targetInvites), targetAmount);
+  const invitesLeft = Math.max(targetInvites - totalInvited, 0);
+  const progressPercentage = Math.min((currentAmount / targetAmount) * 100, 100);
+
+  // Lyen an kreye SÈLMAN si l gen kòd la
+  const referralLink = typeof window !== 'undefined' && userData?.referral_code 
+    ? `${window.location.origin}/signup?ref=${userData.referral_code}` 
+    : "";
+
   const copyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -67,8 +116,11 @@ export default function ReferralPage() {
         <div className="bg-[#121420] p-5 rounded-3xl border border-white/5 mb-6 relative">
           <div className="flex justify-between items-end mb-3">
             <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Pwogresyon</span>
+              <span className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Pwogresyon w</span>
               <span className="text-lg font-black text-white">{currentAmount.toFixed(2)} <span className="text-[10px] text-zinc-500">/ 1,500.00 HTG</span></span>
+            </div>
+            <div className="flex flex-col text-right">
+               <span className="text-[12px] font-black text-white">{totalInvited} <span className="text-[10px] text-zinc-500">Zanmi</span></span>
             </div>
           </div>
 
@@ -82,34 +134,58 @@ export default function ReferralPage() {
             </div>
           </div>
 
-          <p className="text-[10px] font-black text-yellow-500 text-center uppercase tracking-widest">
-            Fè {invitesLeft} lòt enskripsyon pou debloke kòb la!
-          </p>
+          {invitesLeft > 0 ? (
+            <p className="text-[10px] font-black text-yellow-500 text-center uppercase tracking-widest">
+              Fè {invitesLeft} lòt enskripsyon pou debloke kòb la!
+            </p>
+          ) : (
+            <p className="text-[10px] font-black text-green-500 text-center uppercase tracking-widest">
+              Ou atenn objektif la! Kòb la ajoute sou balans ou.
+            </p>
+          )}
         </div>
 
-        {/* Link Box */}
-        <div className="mb-6">
-          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2 ml-2">Lyen Envitasyon w lan</p>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-[#121420] border border-white/5 p-4 rounded-2xl overflow-hidden">
-              <p className="text-[11px] text-zinc-300 font-mono truncate">{referralLink}</p>
-            </div>
+        {/* BLOKAJ KYC A - LI PARÈT SI L POKO PASE KYC */}
+        {!isKycApproved ? (
+          <div className="bg-red-600/10 border border-red-500/20 p-6 rounded-3xl text-center mt-2 mb-2">
+            <div className="text-4xl mb-3">🔒</div>
+            <h3 className="text-[12px] font-black text-white uppercase mb-2 tracking-widest">Lyen an Fèmen</h3>
+            <p className="text-[10px] text-zinc-400 font-bold leading-relaxed mb-5">
+              Ou dwe verifye idantite w (Pase KYC) anvan sistèm nan ka debloke lyen inik ou a pou w envite moun.
+            </p>
             <button 
-              onClick={copyLink}
-              className={`h-12 px-5 rounded-2xl font-black text-[10px] uppercase transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${copied ? 'bg-green-500 text-white shadow-green-500/20' : 'bg-white text-black shadow-white/10'}`}
+              onClick={() => router.push('/kyc')} 
+              className="bg-red-600 px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-red-600/20 active:scale-95 transition-all"
             >
-              {copied ? 'Kopye ✅' : 'Kopye'}
+              Al Pase KYC Kounya
             </button>
           </div>
-        </div>
+        ) : (
+          /* Link Box AK Share Button - YO PARÈT SÈLMAN SI L PASE KYC */
+          <>
+            <div className="mb-6">
+              <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2 ml-2">Lyen Envitasyon w lan</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-[#121420] border border-white/5 p-4 rounded-2xl overflow-hidden">
+                  <p className="text-[11px] text-zinc-300 font-mono truncate">{referralLink}</p>
+                </div>
+                <button 
+                  onClick={copyLink}
+                  className={`h-12 px-5 rounded-2xl font-black text-[10px] uppercase transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${copied ? 'bg-green-500 text-white shadow-green-500/20' : 'bg-white text-black shadow-white/10'}`}
+                >
+                  {copied ? 'Kopye ✅' : 'Kopye'}
+                </button>
+              </div>
+            </div>
 
-        {/* Share Button */}
-        <button 
-          onClick={copyLink}
-          className="w-full bg-red-600 text-white font-black uppercase text-[12px] tracking-widest py-5 rounded-full shadow-xl shadow-red-600/20 active:scale-95 transition-all flex justify-center items-center gap-2"
-        >
-          Pataje Lyen ak Zanmi
-        </button>
+            <button 
+              onClick={copyLink}
+              className="w-full bg-red-600 text-white font-black uppercase text-[12px] tracking-widest py-5 rounded-full shadow-xl shadow-red-600/20 active:scale-95 transition-all flex justify-center items-center gap-2"
+            >
+              Pataje Lyen ak Zanmi
+            </button>
+          </>
+        )}
 
       </div>
 
