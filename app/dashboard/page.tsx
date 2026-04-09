@@ -151,7 +151,7 @@ export default function Dashboard() {
         </div>
 
         {/* Kat Vityèl */}
-        <div className="mb-10 perspective-1000">
+        <div className="mb-8 perspective-1000">
           <p className="text-[10px] font-black uppercase italic text-zinc-500 mb-3 ml-2 tracking-widest flex justify-between">
             <span>Kat Vityèl</span>
             {isActivated && <span className="text-red-600 animate-pulse text-[8px]">Klike pou vire</span>}
@@ -214,6 +214,34 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ========================================= */}
+        {/* NOUVO BANYÈ ENVITASYON AN POU PATAJE LYEN */}
+        {/* ========================================= */}
+        <div className="mb-10 bg-gradient-to-r from-[#1a142c] to-[#251525] border border-red-500/10 rounded-[2rem] p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shadow-lg shadow-purple-900/10 cursor-pointer" onClick={() => router.push('/referral')}>
+          {/* Llimyè an fon */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
+          
+          <div className="flex-1 pr-4 relative z-10">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[9px] font-black uppercase text-purple-400 tracking-[0.2em] bg-purple-500/10 px-2 py-1 rounded-md">Envitasyon</span>
+            </div>
+            <h3 className="text-[12px] sm:text-[14px] text-white font-bold leading-snug mb-1">
+              Envite zanmi w e fè kòb ansanm avèk yo
+            </h3>
+            <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-4">
+              Jiska <span className="text-yellow-500 text-[13px]">1,500 HTG</span>
+            </p>
+            <button onClick={(e) => { e.stopPropagation(); router.push('/referral'); }} className="bg-yellow-500 hover:bg-yellow-400 text-black text-[9px] font-black uppercase tracking-widest px-6 py-3 rounded-full transition-all shadow-lg shadow-yellow-500/20 active:scale-95">
+              Pataje Lyen
+            </button>
+          </div>
+          <div className="text-6xl sm:text-7xl relative z-10 drop-shadow-2xl opacity-90 animate-pulse">
+            🎁
+          </div>
+        </div>
+        {/* ========================================= */}
 
         {/* Dènye Aktivite */}
         <div className="mb-20">
