@@ -14,8 +14,6 @@ export default function ReferralPage() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  
-  // NOUVO: Nou kreye yon eta espesyal pou lyen an pou evite bwat vid la
   const [referralLink, setReferralLink] = useState("Ap chaje...");
 
   useEffect(() => {
@@ -31,19 +29,35 @@ export default function ReferralPage() {
           
           if (profile) {
             setUserData(profile);
-            
-            // NOUVO: Si kont sa a twò ansyen epi l pa gen kòd, nou ba l youn dekou ak ID l lan
             const code = profile.referral_code || `htx_${user.id.substring(0, 6)}`;
-            
-            // Nou konstwi lyen an ansekirite
             setReferralLink(`${window.location.origin}/signup?ref=${code}`);
           }
+
+          // ==========================================
+          // NOUVO: SISTÈM AN TAN REYÈL (REAL-TIME)
+          // ==========================================
+          const channel = supabase
+            .channel(`referral_realtime_${user.id}`)
+            .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'profiles',
+              filter: `id=eq.${user.id}`
+            }, (payload) => {
+              // Lè baz done a chanje (KYC pase oswa invites monte), paj la chanje pou kont li
+              setUserData((prev: any) => ({ ...prev, ...payload.new }));
+            })
+            .subscribe();
+
+          setLoading(false);
+
+          return () => { supabase.removeChannel(channel); };
+
         } else {
           router.push('/login');
         }
       } catch (err) {
         console.error("Erè:", err);
-      } finally {
         setLoading(false);
       }
     };
@@ -59,7 +73,10 @@ export default function ReferralPage() {
   }
 
   const isKycApproved = userData?.kyc_status === 'approved';
+  // Nou asire n nou pran chif ki nan baz done a an tan reyèl
   const totalInvited = userData?.successful_invites || 0; 
+  
+  // Chak fwa totalInvited la moute 1, currentAmount lan ap pran +300
   const targetAmount = 1500;
   const targetInvites = 5;
   const currentAmount = Math.min(totalInvited * (targetAmount / targetInvites), targetAmount);
@@ -133,7 +150,7 @@ export default function ReferralPage() {
         </h2>
         
         <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mb-8 leading-relaxed">
-          *Nòt: Kòb sa a pap monte sou vrè balans ou toutotan ba pwogresyon an pa rive nan 1,500 HTG nèt. (5 zanmi kap pase KYC).
+          *Nòt: Kòb sa a pap monte sou vrè balans ou toutotan ba pwogresyon an pa rive nan 1,500 HTG nèt. (Chak 5 zanmi = 1 Sik).
         </p>
 
         <div className="bg-[#121420] p-5 rounded-3xl border border-white/5 mb-6 relative">
@@ -147,24 +164,21 @@ export default function ReferralPage() {
             </div>
           </div>
 
-          <div className="h-4 w-full bg-zinc-800 rounded-full overflow-hidden mb-3 border border-white/5">
+          <div className="h-4 w-full bg-zinc-800 rounded-full overflow-hidden mb-3 border border-white/5 shadow-inner">
             <div 
-              className="h-full bg-gradient-to-r from-red-600 to-yellow-500 rounded-full relative transition-all duration-1000"
+              className="h-full bg-gradient-to-r from-red-600 to-yellow-500 rounded-full relative transition-all duration-1000 ease-out"
               style={{ width: `${progressPercentage}%` }}
             >
               <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
             </div>
           </div>
 
-          {invitesLeft > 0 ? (
-            <p className="text-[10px] font-black text-yellow-500 text-center uppercase tracking-widest">
-              Fè {invitesLeft} lòt enskripsyon pou debloke kòb la!
-            </p>
-          ) : (
-            <p className="text-[10px] font-black text-green-500 text-center uppercase tracking-widest">
-              Ou atenn objektif la! Kòb la ajoute sou balans ou.
-            </p>
-          )}
+          <p className="text-[10px] font-black text-yellow-500 text-center uppercase tracking-widest mt-3">
+            {totalInvited === 0 
+              ? "Wonn nan kòmanse! Pataje lyen an pou ba a kòmanse monte." 
+              : `Fè ${invitesLeft} lòt enskripsyon pou debloke kòb la!`
+            }
+          </p>
         </div>
 
         {!isKycApproved ? (
