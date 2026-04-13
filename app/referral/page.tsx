@@ -20,7 +20,6 @@ export default function ReferralPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Nou ajoute 'kyc_status' nan sa n ap chèche yo
           const { data: profile } = await supabase
             .from('profiles')
             .select('referral_code, successful_invites, kyc_status')
@@ -50,10 +49,7 @@ export default function ReferralPage() {
     );
   }
 
-  // Tcheke si moun nan pase KYC
   const isKycApproved = userData?.kyc_status === 'approved';
-
-  // Kalkil reyèl ki baze sou baz done a
   const totalInvited = userData?.successful_invites || 0; 
   const targetAmount = 1500;
   const targetInvites = 5;
@@ -61,27 +57,58 @@ export default function ReferralPage() {
   const invitesLeft = Math.max(targetInvites - totalInvited, 0);
   const progressPercentage = Math.min((currentAmount / targetAmount) * 100, 100);
 
-  // Lyen an kreye SÈLMAN si l gen kòd la
   const referralLink = typeof window !== 'undefined' && userData?.referral_code 
     ? `${window.location.origin}/signup?ref=${userData.referral_code}` 
     : "";
 
-  const copyLink = () => {
-    if (referralLink) {
-      navigator.clipboard.writeText(referralLink);
+  // NOUVO FONKSYON POU PATAJE AK KOPYE
+  const copyLink = async () => {
+    if (!referralLink) return;
+
+    // 1. Eseye louvri meni pataje telefòn nan (WhatsApp, SMS, etc.)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'HatexCard Envitasyon',
+          text: 'Vini sou HatexCard! Kreye kont ou ak lyen sa a pou nou tou de ka fè kòb:',
+          url: referralLink,
+        });
+        return; // Si l reyisi pataje, fonksyon an kanpe la
+      } catch (error) {
+        console.log("Itilizatè a anile pataje a, n ap jis kopye l.");
+      }
+    }
+
+    // 2. Si pataje a pa mache oswa l pa sou telefòn, fòse kopye lyen an
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(referralLink);
+      } else {
+        // Fallback pèsonalize pou telefòn ki bloke clipboard nòmal la
+        const textArea = document.createElement("textarea");
+        textArea.value = referralLink;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      alert("Sistèm nan bloke kopye a. Tanpri seleksyone lyen an ak dwèt ou epi kopye l.");
     }
   };
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-5 font-sans italic relative overflow-x-hidden">
       
-      {/* Background Glows */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-[80px] pointer-events-none -mr-20 -mt-20"></div>
       <div className="absolute top-1/3 left-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[80px] pointer-events-none -ml-20"></div>
 
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6 relative z-10">
         <button onClick={() => router.back()} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800 active:scale-90 transition-all">
           <span className="text-xl">←</span>
@@ -89,10 +116,8 @@ export default function ReferralPage() {
         <h1 className="text-lg font-black uppercase tracking-widest text-red-600">Envitasyon</h1>
       </div>
 
-      {/* Main Card */}
       <div className="bg-zinc-900/50 backdrop-blur-md border border-white/5 p-6 rounded-[2rem] relative z-10 shadow-2xl mb-6">
         
-        {/* 45 Days Tag */}
         <div className="flex justify-between items-start mb-6">
           <div className="bg-white/10 px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
             <span className="text-[10px] font-black uppercase text-yellow-500 tracking-widest">⏱️ 45 Jou Rete</span>
@@ -102,17 +127,14 @@ export default function ReferralPage() {
           </div>
         </div>
 
-        {/* Title */}
         <h2 className="text-2xl font-black uppercase leading-tight mb-2 tracking-tighter">
           Envite Zanmi & <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">Jwenn 1,500 HTG</span>
         </h2>
         
-        {/* Warning Note */}
         <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mb-8 leading-relaxed">
           *Nòt: Kòb sa a pap monte sou vrè balans ou toutotan ba pwogresyon an pa rive nan 1,500 HTG nèt. (5 zanmi kap pase KYC).
         </p>
 
-        {/* Progress Bar Section */}
         <div className="bg-[#121420] p-5 rounded-3xl border border-white/5 mb-6 relative">
           <div className="flex justify-between items-end mb-3">
             <div className="flex flex-col">
@@ -124,7 +146,6 @@ export default function ReferralPage() {
             </div>
           </div>
 
-          {/* Bar */}
           <div className="h-4 w-full bg-zinc-800 rounded-full overflow-hidden mb-3 border border-white/5">
             <div 
               className="h-full bg-gradient-to-r from-red-600 to-yellow-500 rounded-full relative transition-all duration-1000"
@@ -145,7 +166,6 @@ export default function ReferralPage() {
           )}
         </div>
 
-        {/* BLOKAJ KYC A - LI PARÈT SI L POKO PASE KYC */}
         {!isKycApproved ? (
           <div className="bg-red-600/10 border border-red-500/20 p-6 rounded-3xl text-center mt-2 mb-2">
             <div className="text-4xl mb-3">🔒</div>
@@ -161,7 +181,6 @@ export default function ReferralPage() {
             </button>
           </div>
         ) : (
-          /* Link Box AK Share Button - YO PARÈT SÈLMAN SI L PASE KYC */
           <>
             <div className="mb-6">
               <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2 ml-2">Lyen Envitasyon w lan</p>
@@ -189,7 +208,6 @@ export default function ReferralPage() {
 
       </div>
 
-      {/* Rules / Steps */}
       <div className="px-2 pb-10">
         <h3 className="text-[12px] font-black text-white uppercase tracking-widest mb-5">Kòman sa mache?</h3>
         
