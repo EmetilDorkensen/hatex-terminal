@@ -14,6 +14,9 @@ export default function ReferralPage() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  
+  // NOUVO: Nou kreye yon eta espesyal pou lyen an pou evite bwat vid la
+  const [referralLink, setReferralLink] = useState("Ap chaje...");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -28,6 +31,12 @@ export default function ReferralPage() {
           
           if (profile) {
             setUserData(profile);
+            
+            // NOUVO: Si kont sa a twò ansyen epi l pa gen kòd, nou ba l youn dekou ak ID l lan
+            const code = profile.referral_code || `htx_${user.id.substring(0, 6)}`;
+            
+            // Nou konstwi lyen an ansekirite
+            setReferralLink(`${window.location.origin}/signup?ref=${code}`);
           }
         } else {
           router.push('/login');
@@ -57,15 +66,9 @@ export default function ReferralPage() {
   const invitesLeft = Math.max(targetInvites - totalInvited, 0);
   const progressPercentage = Math.min((currentAmount / targetAmount) * 100, 100);
 
-  const referralLink = typeof window !== 'undefined' && userData?.referral_code 
-    ? `${window.location.origin}/signup?ref=${userData.referral_code}` 
-    : "";
-
-  // NOUVO FONKSYON POU PATAJE AK KOPYE
   const copyLink = async () => {
-    if (!referralLink) return;
+    if (!referralLink || referralLink === "Ap chaje...") return;
 
-    // 1. Eseye louvri meni pataje telefòn nan (WhatsApp, SMS, etc.)
     if (navigator.share) {
       try {
         await navigator.share({
@@ -73,18 +76,16 @@ export default function ReferralPage() {
           text: 'Vini sou HatexCard! Kreye kont ou ak lyen sa a pou nou tou de ka fè kòb:',
           url: referralLink,
         });
-        return; // Si l reyisi pataje, fonksyon an kanpe la
+        return;
       } catch (error) {
-        console.log("Itilizatè a anile pataje a, n ap jis kopye l.");
+        console.log("Pataje anile.");
       }
     }
 
-    // 2. Si pataje a pa mache oswa l pa sou telefòn, fòse kopye lyen an
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(referralLink);
       } else {
-        // Fallback pèsonalize pou telefòn ki bloke clipboard nòmal la
         const textArea = document.createElement("textarea");
         textArea.value = referralLink;
         textArea.style.position = "fixed";
@@ -186,7 +187,7 @@ export default function ReferralPage() {
               <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2 ml-2">Lyen Envitasyon w lan</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-[#121420] border border-white/5 p-4 rounded-2xl overflow-hidden">
-                  <p className="text-[11px] text-zinc-300 font-mono truncate">{referralLink}</p>
+                  <p className="text-[11px] text-zinc-300 font-mono truncate select-all">{referralLink}</p>
                 </div>
                 <button 
                   onClick={copyLink}
