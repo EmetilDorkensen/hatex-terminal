@@ -4,19 +4,19 @@ import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 import { useSearchParams } from 'next/navigation';
 
-// Nou rale varyab yo dirèkteman
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 function SignupForm() {
   const searchParams = useSearchParams();
-  // Sa ap pran kòd moun ki te voye lyen an si l nan URL la (ex: ?ref=htx_123)
   const referredByCode = searchParams.get("ref");
+  const urlPromoCode = searchParams.get("promo"); // Si l nan lyen an tou
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [promoCode, setPromoCode] = useState(urlPromoCode || ''); // NOUVO: Eta pou kòd pwomo a
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
@@ -26,7 +26,6 @@ function SignupForm() {
     setMsg({ type: '', text: '' });
 
     try {
-      // 1. Enskri itilizatè a nan Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -36,7 +35,6 @@ function SignupForm() {
       });
 
       if (authError) {
-        // Tcheke si erè a se paske imèl la gentan itilize
         if (authError.message.includes("User already registered") || authError.status === 400) {
           throw new Error("Imèl sa a gen yon kont sou li deja! Tanpri fè Konekte (Login).");
         }
@@ -44,14 +42,17 @@ function SignupForm() {
       }
 
       if (authData.user) {
-        // 2. Kreye profil la imedyatman, ak kòd moun ki te envite l la
+        // Sove tout bagay, enkli Kòd Pwomo a
+        const cleanPromo = promoCode.trim().toUpperCase(); // Mete l an majiskil pikan
+        
         const { error: profileError } = await supabase.from('profiles').insert([
           {
             id: authData.user.id,
             full_name: fullName,
             kyc_status: 'pending',
-            referred_by: referredByCode || null, // Sove kòd moun ki envite l la
-            referral_code: `htx_${Math.random().toString(36).substring(2, 8)}` // Kreye kòd pa l
+            referred_by: referredByCode || null,
+            used_promo: cleanPromo !== '' ? cleanPromo : null, // Sove pwomo a la a
+            referral_code: `htx_${Math.random().toString(36).substring(2, 8)}`
           }
         ]);
 
@@ -81,7 +82,6 @@ function SignupForm() {
       </div>
 
       <form onSubmit={handleSignup} className="space-y-4">
-        {/* Nouvo jaden pou non moun nan */}
         <div className="space-y-2 text-left">
           <label className="text-[8px] text-zinc-600 ml-2">NON KONPLÈ OU</label>
           <input
@@ -118,7 +118,18 @@ function SignupForm() {
           />
         </div>
 
-        {/* Bwat Mesaj Erè / Siksè */}
+        {/* Bwat Kòd Pwomo a */}
+        <div className="space-y-2 text-left">
+          <label className="text-[8px] text-purple-500 ml-2">KÒD PWOMO (OPSYONÈL)</label>
+          <input
+            type="text"
+            placeholder="EX: VIP500"
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+            className="w-full bg-black border border-purple-500/30 p-5 rounded-2xl focus:border-purple-600 outline-none transition-all font-bold text-xs text-purple-400 placeholder:text-zinc-700"
+          />
+        </div>
+
         {msg.text && (
           <div className={`p-4 rounded-xl border ${msg.type === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' : 'bg-green-600/10 border-green-600/20 text-green-500'}`}>
              <p className="text-[10px] font-black uppercase text-center">{msg.text}</p>
@@ -146,13 +157,9 @@ function SignupForm() {
 export default function Signup() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white flex flex-col items-center justify-center p-6 italic uppercase font-black">
-      {/* Nou dwe vlope fòm nan nan yon Suspense 
-        paske l ap sèvi ak useSearchParams() ki se yon fonksyon kliyan 
-      */}
       <Suspense fallback={<div className="text-red-600 text-sm">Ap chaje...</div>}>
         <SignupForm />
       </Suspense>
-      
       <div className="mt-8 flex items-center gap-3 opacity-20">
          <div className="h-[1px] w-12 bg-white"></div>
          <span className="text-[8px] tracking-[0.4em]">SECURED ENCRYPTION</span>
