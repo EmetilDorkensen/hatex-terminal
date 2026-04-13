@@ -20,10 +20,12 @@ export default function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
 
-  // Fonksyon pou kreye yon kat si Supabase te rate l
+  // SISTÈM DEKOU POU KREYE KAT SI SUPABASE TE RATE L
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
-      const newCardNum = '4550' + Math.floor(1000 + Math.random() * 9000) + Math.floor(1000 + Math.random() * 9000) + Math.floor(1000 + Math.random() * 9000);
+      // Jenere chif inik solid
+      const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
+      const newCardNum = `4550${random4()}${random4()}${random4()}`; // Pa gen espas nan baz done a
       const newCvv = Math.floor(100 + Math.random() * 900).toString();
       
       const now = new Date();
@@ -51,7 +53,7 @@ export default function Dashboard() {
             .maybeSingle();
 
           if (profile) {
-            // Asire w nou fòse yon kat si l pa t genyen youn malgre l approved
+            // Fòse jenerasyon si l pa t gen kat malgre l approved
             profile = await generateMissingCard(user.id, profile);
             
             setUserData({ ...profile, email: user.email });
@@ -78,7 +80,6 @@ export default function Dashboard() {
               table: 'profiles',
               filter: `id=eq.${user.id}`
             }, async (payload) => {
-              // Si gen yon mizajou an tan reyèl, asire l toujou gen kat
               let updatedProfile = payload.new;
               updatedProfile = await generateMissingCard(user.id, updatedProfile);
               setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
