@@ -14,7 +14,6 @@ export default function Dashboard() {
 
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isActivated, setIsActivated] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const [showNumbers, setShowNumbers] = useState(false);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
@@ -23,19 +22,13 @@ export default function Dashboard() {
   // SISTÈM DEKOU POU KREYE KAT SI SUPABASE TE RATE L
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
-      // Jenere chif inik solid
       const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
-      const newCardNum = `4550${random4()}${random4()}${random4()}`; // Pa gen espas nan baz done a
+      const newCardNum = `4550${random4()}${random4()}${random4()}`;
       const newCvv = Math.floor(100 + Math.random() * 900).toString();
-      
       const now = new Date();
       const newExp = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
 
-      await supabase
-        .from('profiles')
-        .update({ card_number: newCardNum, cvv: newCvv, exp_date: newExp })
-        .eq('id', userId);
-
+      await supabase.from('profiles').update({ card_number: newCardNum, cvv: newCvv, exp_date: newExp }).eq('id', userId);
       return { ...currentProfile, card_number: newCardNum, cvv: newCvv, exp_date: newExp };
     }
     return currentProfile;
@@ -46,18 +39,11 @@ export default function Dashboard() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          let { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle();
+          let { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
 
           if (profile) {
-            // Fòse jenerasyon si l pa t gen kat malgre l approved
             profile = await generateMissingCard(user.id, profile);
-            
             setUserData({ ...profile, email: user.email });
-            setIsActivated(profile.kyc_status === 'approved');
           }
 
           const { data: transactions } = await supabase
@@ -68,9 +54,7 @@ export default function Dashboard() {
             .order('created_at', { ascending: false })
             .limit(3);
 
-          if (transactions) {
-            setRecentTransactions(transactions);
-          }
+          if (transactions) setRecentTransactions(transactions);
 
           const channel = supabase
             .channel(`profile_realtime_${user.id}`)
@@ -83,7 +67,6 @@ export default function Dashboard() {
               let updatedProfile = payload.new;
               updatedProfile = await generateMissingCard(user.id, updatedProfile);
               setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
-              setIsActivated(updatedProfile.kyc_status === 'approved');
             })
             .subscribe();
 
@@ -109,6 +92,48 @@ export default function Dashboard() {
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
+  // NOUVO: Fonksyon pou peye 520 Goud la
+  const handleActivateCard = async () => {
+    if (!userData) return;
+    
+    // Tcheke si l gen 520 Goud la
+    if (Number(userData.wallet_balance) < 520) {
+      alert("Ou pa gen ase kòb sou balans ou! Ou bezwen omwen 520 HTG pou aktive kat la.\n\nTanpri fè yon depo anvan.");
+      router.push('/deposit');
+      return;
+    }
+
+    if (!confirm("Èske w sèten ou vle peye 520 HTG pou aktive Kat Vityèl la ak Terminal ou a?")) return;
+
+    setLoading(true);
+    try {
+      const nouvoBalans = Number(userData.wallet_balance) - 520;
+      
+      // Koupe kòb la epi debloke kat la
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ wallet_balance: nouvoBalans, is_card_activated: true })
+        .eq('id', userData.id);
+      
+      if (updateErr) throw updateErr;
+
+      // Kreye resi tranzaksyon an
+      await supabase.from('transactions').insert({
+        user_id: userData.id,
+        amount: -520,
+        type: 'CARD_ACTIVATION',
+        description: 'Frè Aktivasyon Kat Vityèl & Terminal',
+        status: 'success'
+      });
+
+      alert("✅ Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
+    } catch (err: any) {
+      alert("Erè: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center">
@@ -116,6 +141,11 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // ETAT KAT LA
+  const kycPending = userData?.kyc_status !== 'approved';
+  const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
+  const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
@@ -137,17 +167,11 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2">
             {userData?.email === 'hatexcard@gmail.com' && (
-              <button
-                onClick={() => router.push('/admin')}
-                className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce"
-              >
+              <button onClick={() => router.push('/admin')} className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce">
                 ADMIN
               </button>
             )}
-            <button
-              onClick={() => setShowNumbers(!showNumbers)}
-              className="w-9 h-9 bg-zinc-900/50 rounded-full border border-zinc-800 flex items-center justify-center active:scale-90 transition-all shrink-0"
-            >
+            <button onClick={() => setShowNumbers(!showNumbers)} className="w-9 h-9 bg-zinc-900/50 rounded-full border border-zinc-800 flex items-center justify-center active:scale-90 transition-all shrink-0">
               <span className="text-sm">{showNumbers ? "🔒" : "👁️"}</span>
             </button>
           </div>
@@ -180,30 +204,47 @@ export default function Dashboard() {
         {/* Kat Vityèl */}
         <div className="mb-8 perspective-1000">
           <p className="text-[10px] font-black uppercase italic text-zinc-500 mb-3 ml-2 tracking-widest flex justify-between">
-            <span>Kat Vityèl</span>
-            {isActivated && <span className="text-red-600 animate-pulse text-[8px]">Klike pou vire</span>}
+            <span>Kat Vityèl {cardNeedsActivation && "(Poko Aktive)"}</span>
+            {cardFullyActive && <span className="text-red-600 animate-pulse text-[8px]">Klike pou vire</span>}
           </p>
           <div className="relative aspect-[1.58/1] w-full max-w-[500px] mx-auto">
-            {!isActivated && (
-              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/60 backdrop-blur-sm p-4 text-center">
+            
+            {/* LÈ L POKO PASE KYC */}
+            {kycPending && (
+              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/80 backdrop-blur-md p-4 text-center border border-white/5">
                 <p className="text-[9px] font-black uppercase mb-3 tracking-widest text-white/90">
-                  {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : "KYC Obligatwa"}
+                  {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : "Verifikasyon ID Obligatwa"}
                 </p>
                 <button onClick={() => router.push('/kyc')} className="bg-white text-black px-8 py-3 rounded-full font-black text-[10px] uppercase shadow-2xl active:scale-90 transition-all">
-                  Aktive Kat
+                  Pase KYC Gratis
                 </button>
               </div>
             )}
+
+            {/* LÈ L PASE KYC MEN L POKO PEYE 520 GOUD LA */}
+            {cardNeedsActivation && (
+              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/60 backdrop-blur-xl p-6 text-center border border-yellow-500/30">
+                <div className="text-3xl mb-2 drop-shadow-md">🔒</div>
+                <p className="text-[9px] font-bold uppercase mb-4 tracking-widest text-zinc-200 leading-relaxed drop-shadow-md">
+                  Aktive kat ou ak terminal ou paw komanse resevwa lajan, vann abònman, tout saw vle (Netflix / App) byen sekirize.
+                </p>
+                <button onClick={handleActivateCard} className="bg-yellow-500 text-black px-8 py-4 rounded-full font-black text-[10px] uppercase shadow-2xl shadow-yellow-500/20 active:scale-90 transition-all border border-yellow-400">
+                  AKTIVE POU 520 HTG
+                </button>
+              </div>
+            )}
+
+            {/* KAT LA MENM (Vizib si l aktive, oubyen twoub si l poko) */}
             <div
-              className={`relative h-full w-full transition-all duration-700 preserve-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`}
-              onClick={() => isActivated && setIsFlipped(!isFlipped)}
+              className={`relative h-full w-full transition-all duration-700 preserve-3d cursor-pointer ${isFlipped && cardFullyActive ? 'rotate-y-180' : ''}`}
+              onClick={() => cardFullyActive && setIsFlipped(!isFlipped)}
             >
               {/* Devan */}
               <div className="absolute inset-0 backface-hidden rounded-[2rem] overflow-hidden bg-gradient-to-tr from-red-700 via-red-600 to-zinc-950 p-4 sm:p-5 md:p-6 shadow-2xl border border-white/5">
-                <div className={`flex flex-col h-full justify-between ${!isActivated ? 'blur-md' : ''}`}>
+                <div className={`flex flex-col h-full justify-between ${!cardFullyActive ? 'blur-md opacity-50' : ''}`}>
                   <div className="flex justify-between items-start">
                     <div className="w-10 h-10 bg-white/10 rounded-xl border border-white/20 flex items-center justify-center overflow-hidden">
-                      {isActivated && <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-full h-full object-cover" />}
+                      <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <h2 className="text-[10px] font-black italic tracking-tighter uppercase font-mono">HatexCard</h2>
                   </div>
@@ -219,7 +260,7 @@ export default function Dashboard() {
                       <div className="flex gap-3 text-right flex-shrink-0">
                         <div>
                           <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">Exp</p>
-                          <p className="text-[9px] font-bold">{isActivated ? (userData?.exp_date || "**/**") : "**/**"}</p>
+                          <p className="text-[9px] font-bold">{userData?.exp_date || "**/**"}</p>
                         </div>
                         <div>
                           <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">CVV</p>
@@ -242,7 +283,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Banyè Envitasyon */}
+        {/* Banyè Envitasyon (Nou pase 750 HTG la) */}
         <div className="mb-10 bg-gradient-to-r from-[#1a142c] to-[#251525] border border-red-500/10 rounded-[2rem] p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shadow-lg shadow-purple-900/10 cursor-pointer" onClick={() => router.push('/referral')}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
@@ -255,7 +296,7 @@ export default function Dashboard() {
               Envite zanmi w e fè kòb ansanm avèk yo
             </h3>
             <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-4">
-              Jiska <span className="text-yellow-500 text-[13px]">1,500 HTG</span>
+              Jiska <span className="text-yellow-500 text-[13px]">750 HTG</span>
             </p>
             <button onClick={(e) => { e.stopPropagation(); router.push('/referral'); }} className="bg-yellow-500 hover:bg-yellow-400 text-black text-[9px] font-black uppercase tracking-widest px-6 py-3 rounded-full transition-all shadow-lg shadow-yellow-500/20 active:scale-95">
               Pataje Lyen
@@ -289,6 +330,7 @@ export default function Dashboard() {
                         {t.type === 'DEPOSIT' ? '📥' :
                          t.type === 'WITHDRAWAL' ? '📤' :
                          t.type === 'P2P' ? '🔄' :
+                         t.type === 'CARD_ACTIVATION' ? '🔓' :
                          t.type === 'CARD_RECHARGE' ? '💳' : '📄'}
                       </div>
                       <div className="min-w-0">
@@ -304,7 +346,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`text-[12px] font-black ${t.amount > 0 ? 'text-green-500' : 'text-white'}`}>
-                        {t.amount > 0 ? '+' : '-'}{Math.abs(t.amount).toLocaleString()}
+                        {t.amount > 0 ? '+' : ''}{Number(t.amount).toLocaleString()}
                         <span className="text-[7px] ml-1">HTG</span>
                       </p>
                     </div>
@@ -325,11 +367,25 @@ export default function Dashboard() {
         <div onClick={() => router.push('/kat')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
           <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Kat</span>
         </div>
-        <div onClick={() => router.push('/terminal')} className="relative -mt-10 md:-mt-12 cursor-pointer hover:scale-105 transition-all">
-          <div className="bg-red-600 w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-red-600/40 rotate-45">
-            <span className="text-2xl font-black -rotate-45 text-white italic">T</span>
+        
+        {/* BOUTON TERMINAL LA (Entèlijan: L ap mande aktivasyon si l bloke) */}
+        <div onClick={() => {
+            if (cardFullyActive) {
+              router.push('/terminal');
+            } else {
+              alert("⚠️ Ou dwe peye frè 520 HTG a pou aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
+              window.scrollTo({ top: 300, behavior: 'smooth' }); // Voye l sou kat la
+            }
+          }} 
+          className="relative -mt-10 md:-mt-12 cursor-pointer hover:scale-105 transition-all"
+        >
+          <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-lg rotate-45 ${cardFullyActive ? 'bg-red-600 shadow-red-600/40' : 'bg-zinc-700 shadow-black'}`}>
+            <span className={`text-2xl font-black -rotate-45 italic ${cardFullyActive ? 'text-white' : 'text-zinc-500'}`}>
+              {cardFullyActive ? 'T' : '🔒'}
+            </span>
           </div>
         </div>
+
         <div onClick={() => router.push('/transactions')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
           <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Istorik</span>
         </div>
