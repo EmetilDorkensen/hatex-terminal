@@ -20,6 +20,25 @@ export default function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
 
+  // Fonksyon pou kreye yon kat si Supabase te rate l
+  const generateMissingCard = async (userId: string, currentProfile: any) => {
+    if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
+      const newCardNum = '4550' + Math.floor(1000 + Math.random() * 9000) + Math.floor(1000 + Math.random() * 9000) + Math.floor(1000 + Math.random() * 9000);
+      const newCvv = Math.floor(100 + Math.random() * 900).toString();
+      
+      const now = new Date();
+      const newExp = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
+
+      await supabase
+        .from('profiles')
+        .update({ card_number: newCardNum, cvv: newCvv, exp_date: newExp })
+        .eq('id', userId);
+
+      return { ...currentProfile, card_number: newCardNum, cvv: newCvv, exp_date: newExp };
+    }
+    return currentProfile;
+  };
+
   useEffect(() => {
     const fetchUserAndProfile = async () => {
       try {
@@ -32,6 +51,9 @@ export default function Dashboard() {
             .maybeSingle();
 
           if (profile) {
+            // Asire w nou fòse yon kat si l pa t genyen youn malgre l approved
+            profile = await generateMissingCard(user.id, profile);
+            
             setUserData({ ...profile, email: user.email });
             setIsActivated(profile.kyc_status === 'approved');
           }
@@ -55,8 +77,12 @@ export default function Dashboard() {
               schema: 'public',
               table: 'profiles',
               filter: `id=eq.${user.id}`
-            }, (payload) => {
-              setUserData((prev: any) => ({ ...prev, ...payload.new }));
+            }, async (payload) => {
+              // Si gen yon mizajou an tan reyèl, asire l toujou gen kat
+              let updatedProfile = payload.new;
+              updatedProfile = await generateMissingCard(user.id, updatedProfile);
+              setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
+              setIsActivated(updatedProfile.kyc_status === 'approved');
             })
             .subscribe();
 
@@ -78,7 +104,7 @@ export default function Dashboard() {
 
   const formatCardNumber = (num: string) => {
     if (!num) return "**** **** **** ****";
-    if (showNumbers) return num.match(/.{1,4}/g)?.join(' ');
+    if (showNumbers) return num.match(/.{1,4}/g)?.join(' ') || num;
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
@@ -92,8 +118,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
-      {/* Kontni prensipal la pral pran tout lajè a, men limite a 1200px sou gwo ekran pou li pa twò louvraj */}
       <div className="w-full max-w-7xl mx-auto p-4 sm:p-5 md:p-6 lg:p-8 pb-32">
+        
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
@@ -137,7 +163,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Twa bouton aksyon yo */}
+        {/* Aksyon */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-8">
           <button onClick={() => router.push('/deposit')} className="bg-red-600 py-4 sm:py-5 md:py-6 rounded-[2.5rem] flex items-center justify-center text-white active:scale-95 transition-all shadow-lg shadow-red-600/20">
             <span className="text-[12px] sm:text-[13px] md:text-[14px] font-black uppercase italic tracking-widest">Depo</span>
@@ -192,11 +218,11 @@ export default function Dashboard() {
                       <div className="flex gap-3 text-right flex-shrink-0">
                         <div>
                           <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">Exp</p>
-                          <p className="text-[9px] font-bold">{isActivated ? userData?.exp_date : "**/**"}</p>
+                          <p className="text-[9px] font-bold">{isActivated ? (userData?.exp_date || "**/**") : "**/**"}</p>
                         </div>
                         <div>
                           <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">CVV</p>
-                          <p className="text-[9px] font-bold">{showNumbers ? userData?.cvv : "***"}</p>
+                          <p className="text-[9px] font-bold">{showNumbers ? (userData?.cvv || "***") : "***"}</p>
                         </div>
                       </div>
                     </div>
@@ -207,7 +233,7 @@ export default function Dashboard() {
               <div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2rem] bg-zinc-900 p-6 border border-white/10 flex flex-col items-center justify-center">
                 <div className="w-full h-10 bg-black absolute top-6 left-0"></div>
                 <div className="mt-8 bg-white p-2 rounded-xl">
-                  <QRCodeSVG value={`Card:${userData?.card_number}`} size={90} />
+                  <QRCodeSVG value={`Card:${userData?.card_number || 'INVALID'}`} size={90} />
                 </div>
                 <p className="text-[8px] font-black uppercase mt-4 text-red-600 tracking-widest italic animate-pulse">Eskane pou peye</p>
               </div>
@@ -215,11 +241,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ========================================= */}
-        {/* NOUVO BANYÈ ENVITASYON AN POU PATAJE LYEN */}
-        {/* ========================================= */}
+        {/* Banyè Envitasyon */}
         <div className="mb-10 bg-gradient-to-r from-[#1a142c] to-[#251525] border border-red-500/10 rounded-[2rem] p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shadow-lg shadow-purple-900/10 cursor-pointer" onClick={() => router.push('/referral')}>
-          {/* Llimyè an fon */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
           
@@ -241,7 +264,6 @@ export default function Dashboard() {
             🎁
           </div>
         </div>
-        {/* ========================================= */}
 
         {/* Dènye Aktivite */}
         <div className="mb-20">
@@ -293,37 +315,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-{/* Navigasyon anba (fixed) */}
-<div className="fixed bottom-4 md:bottom-6 left-3 right-3 sm:left-4 sm:right-4 max-w-lg mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/5 h-[4.5rem] rounded-[2rem] flex justify-around sm:justify-between items-center px-4 sm:px-8 z-50 shadow-2xl">
-        
-        {/* Akey */}
+      {/* Navigasyon anba (fixed) */}
+      <div className="fixed bottom-4 md:bottom-6 left-3 right-3 sm:left-4 sm:right-4 max-w-lg mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/5 h-[4.5rem] rounded-[2rem] flex justify-around sm:justify-between items-center px-4 sm:px-8 z-50 shadow-2xl">
         <div className="flex flex-col items-center text-red-600 cursor-pointer hover:scale-105 transition-all">
           <div className="w-1.5 h-1.5 bg-red-600 rounded-full mb-1"></div>
           <span className="text-[10px] sm:text-[11px] font-black uppercase">Akey</span>
         </div>
-
-        {/* Kat */}
         <div onClick={() => router.push('/kat')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
           <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Kat</span>
         </div>
-
-        {/* Bouton T (Santral) */}
         <div onClick={() => router.push('/terminal')} className="relative -mt-10 md:-mt-12 cursor-pointer hover:scale-105 transition-all">
           <div className="bg-red-600 w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-red-600/40 rotate-45">
             <span className="text-2xl font-black -rotate-45 text-white italic">T</span>
           </div>
         </div>
-
-        {/* Istorik */}
         <div onClick={() => router.push('/transactions')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
           <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Istorik</span>
         </div>
-
-        {/* Paramèt */}
         <div onClick={() => router.push('/setting')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
           <span className="text-[10px] sm:text-[11px] font-black uppercase text-red-400">Paramèt</span>
         </div>
-
       </div>
 
       <style jsx>{`
