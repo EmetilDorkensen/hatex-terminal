@@ -33,9 +33,6 @@ export default function ReferralPage() {
             setReferralLink(`${window.location.origin}/signup?ref=${code}`);
           }
 
-          // ==========================================
-          // NOUVO: SISTÈM AN TAN REYÈL (REAL-TIME)
-          // ==========================================
           const channel = supabase
             .channel(`referral_realtime_${user.id}`)
             .on('postgres_changes', {
@@ -44,15 +41,12 @@ export default function ReferralPage() {
               table: 'profiles',
               filter: `id=eq.${user.id}`
             }, (payload) => {
-              // Lè baz done a chanje (KYC pase oswa invites monte), paj la chanje pou kont li
               setUserData((prev: any) => ({ ...prev, ...payload.new }));
             })
             .subscribe();
 
           setLoading(false);
-
           return () => { supabase.removeChannel(channel); };
-
         } else {
           router.push('/login');
         }
@@ -73,15 +67,19 @@ export default function ReferralPage() {
   }
 
   const isKycApproved = userData?.kyc_status === 'approved';
-  // Nou asire n nou pran chif ki nan baz done a an tan reyèl
-  const totalInvited = userData?.successful_invites || 0; 
   
-  // Chak fwa totalInvited la moute 1, currentAmount lan ap pran +300
-  const targetAmount = 1500;
-  const targetInvites = 5;
-  const currentAmount = Math.min(totalInvited * (targetAmount / targetInvites), targetAmount);
-  const invitesLeft = Math.max(targetInvites - totalInvited, 0);
-  const progressPercentage = Math.min((currentAmount / targetAmount) * 100, 100);
+  // STATISTIK YO
+  const totalInvited = userData?.successful_invites || 0; 
+  const rewardPerFriend = 150; // 150 HTG chak fwa yon moun aktive kat li
+  const targetInvites = 5; // Yon sik se 5 moun (750 HTG)
+  const totalEarned = totalInvited * rewardPerFriend; // Total kòb li fè deja
+  
+  // Kalkil pwogresyon an pou sik 5 moun lan
+  const currentCycleInvites = totalInvited % targetInvites;
+  const isCycleComplete = totalInvited > 0 && currentCycleInvites === 0;
+  const displayInvites = isCycleComplete ? targetInvites : currentCycleInvites;
+  const progressPercentage = (displayInvites / targetInvites) * 100;
+  const invitesLeft = targetInvites - displayInvites;
 
   const copyLink = async () => {
     if (!referralLink || referralLink === "Ap chaje...") return;
@@ -138,7 +136,7 @@ export default function ReferralPage() {
         
         <div className="flex justify-between items-start mb-6">
           <div className="bg-white/10 px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase text-yellow-500 tracking-widest">⏱️ 45 Jou Rete</span>
+            <span className="text-[10px] font-black uppercase text-yellow-500 tracking-widest">💸 Kòb Imedyat</span>
           </div>
           <div className="w-10 h-10 bg-gradient-to-tr from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/20">
             <span className="text-xl drop-shadow-md">💰</span>
@@ -146,21 +144,21 @@ export default function ReferralPage() {
         </div>
 
         <h2 className="text-2xl font-black uppercase leading-tight mb-2 tracking-tighter">
-          Envite Zanmi & <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">Jwenn 1,500 HTG</span>
+          Envite Zanmi & <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">Jwenn 150 HTG pou chak</span>
         </h2>
         
         <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mb-8 leading-relaxed">
-          *Nòt: Kòb sa a pap monte sou vrè balans ou toutotan ba pwogresyon an pa rive nan 1,500 HTG nèt. (Chak 5 zanmi = 1 Sik).
+          *Nòt: Kòb la ap moute sou balans ou otomatikman kou zanmi an fin aktive Kat Vityèl li a nan aplikasyon an.
         </p>
 
         <div className="bg-[#121420] p-5 rounded-3xl border border-white/5 mb-6 relative">
           <div className="flex justify-between items-end mb-3">
             <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Pwogresyon w</span>
-              <span className="text-lg font-black text-white">{currentAmount.toFixed(2)} <span className="text-[10px] text-zinc-500">/ 1,500.00 HTG</span></span>
+              <span className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Total Kòb ou Fè</span>
+              <span className="text-lg font-black text-green-500">+{totalEarned.toFixed(2)} <span className="text-[10px] text-zinc-500">HTG</span></span>
             </div>
             <div className="flex flex-col text-right">
-               <span className="text-[12px] font-black text-white">{totalInvited} <span className="text-[10px] text-zinc-500">Zanmi</span></span>
+               <span className="text-[12px] font-black text-white">{totalInvited} <span className="text-[10px] text-zinc-500">Zanmi Aktif</span></span>
             </div>
           </div>
 
@@ -174,9 +172,11 @@ export default function ReferralPage() {
           </div>
 
           <p className="text-[10px] font-black text-yellow-500 text-center uppercase tracking-widest mt-3">
-            {totalInvited === 0 
-              ? "Wonn nan kòmanse! Pataje lyen an pou ba a kòmanse monte." 
-              : `Fè ${invitesLeft} lòt enskripsyon pou debloke kòb la!`
+            {isCycleComplete 
+              ? "Wonn nan konplete! Pataje lyen an pou kòmanse yon lòt sik." 
+              : displayInvites === 0 
+                ? "Pataje lyen an pou ba a kòmanse monte."
+                : `Fè ${invitesLeft} lòt enskripsyon pou w atenn objektif 750 HTG a!`
             }
           </p>
         </div>
@@ -238,16 +238,16 @@ export default function ReferralPage() {
           <div className="flex gap-4 items-start">
             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-[10px] font-black text-red-500 flex-shrink-0">2</div>
             <div>
-              <h4 className="text-[11px] font-black text-white uppercase mb-1 tracking-wide">Yo Pase Verifikasyon (KYC)</h4>
-              <p className="text-[10px] text-zinc-400 leading-relaxed font-bold">Lè zanmi w lan fin kreye kont lan, fòk li soumèt pyès idantite l (Pase KYC) pou kont lan ka aktive.</p>
+              <h4 className="text-[11px] font-black text-white uppercase mb-1 tracking-wide">Yo Pase KYC epi Aktive Kat la</h4>
+              <p className="text-[10px] text-zinc-400 leading-relaxed font-bold">Lè zanmi w lan fin verifye idantite l, li dwe peye frè 520 Goud la pou l aktive kat vityèl li a.</p>
             </div>
           </div>
 
           <div className="flex gap-4 items-start">
             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-[10px] font-black text-red-500 flex-shrink-0">3</div>
             <div>
-              <h4 className="text-[11px] font-black text-white uppercase mb-1 tracking-wide">Jwenn Rekonpans la</h4>
-              <p className="text-[10px] text-zinc-400 leading-relaxed font-bold">Lè 5 zanmi w yo fin pase KYC yo nèt (Ba a rive 1500 HTG), kòb la ap transfere nan vrè balans ou otomatikman.</p>
+              <h4 className="text-[11px] font-black text-white uppercase mb-1 tracking-wide">Ou Jwenn 150 HTG Imedyatman!</h4>
+              <p className="text-[10px] text-zinc-400 leading-relaxed font-bold">Nan menm segonn zanmi an peye 520 goud la, sistèm nan ap transfere 150 HTG otomatikman sou vrè balans ou. Ou pa bezwen tann 5 moun ankò pou w touché!</p>
             </div>
           </div>
         </div>
