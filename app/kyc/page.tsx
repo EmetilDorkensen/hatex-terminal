@@ -32,6 +32,11 @@ export default function KYCPage() {
       if (session) {
         const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         setUserData(prof);
+        
+        // Si l ap tann deja, voye l nan dènye etap la otomatikman
+        if (prof?.kyc_status === 'pending') {
+          setStep(3);
+        }
       } else {
         router.push('/login');
       }
@@ -46,7 +51,6 @@ export default function KYCPage() {
     }
   };
 
-  // NOUVO: Fonksyon pou voye done yo bay Admin nan san peye
   const soumetKycBayAdmin = async () => {
     if (!extractedData.firstName || !extractedData.lastName) {
       setErrorMsg("TANPRI ANTRE NON AK SIYATI OU AVAN.");
@@ -66,39 +70,43 @@ export default function KYCPage() {
       const timestamp = Date.now();
       const compressionOptions = { maxSizeMB: 1, maxWidthOrHeight: 1280, useWebWorker: true };
       
-      // 1. Konprese foto yo pou yo pa twò lou sou baz done a
-      const compressedId = await imageCompression(files.idFront, compressionOptions);
-      
-      // 2. Upload foto devan an nan Storage
-      const { data: frontData, error: frontErr } = await supabase.storage
-        .from('kyc-documents')
-        .upload(`${userData.id}/id_front_${timestamp}.jpg`, compressedId);
-      
+      // 1. Upload FOTO DEVAN
+      const compressedFront = await imageCompression(files.idFront, compressionOptions);
+      const { error: frontErr } = await supabase.storage.from('kyc-documents').upload(`${userData.id}/front_${timestamp}.jpg`, compressedFront);
       if (frontErr) throw frontErr;
+      const frontUrl = supabase.storage.from('kyc-documents').getPublicUrl(`${userData.id}/front_${timestamp}.jpg`).data.publicUrl;
 
-      // Pran lyen piblik foto a pou Admin nan ka wè l
-      const { data: publicUrlData } = supabase.storage
-        .from('kyc-documents')
-        .getPublicUrl(`${userData.id}/id_front_${timestamp}.jpg`);
-        
-      const kycDocUrl = publicUrlData.publicUrl;
+      // 2. Upload FOTO DÈYÈ (Si l se CIN)
+      let backUrl = null;
+      if (files.idBack) {
+        const compressedBack = await imageCompression(files.idBack, compressionOptions);
+        const { error: backErr } = await supabase.storage.from('kyc-documents').upload(`${userData.id}/back_${timestamp}.jpg`, compressedBack);
+        if (backErr) throw backErr;
+        backUrl = supabase.storage.from('kyc-documents').getPublicUrl(`${userData.id}/back_${timestamp}.jpg`).data.publicUrl;
+      }
 
-      // (Ou ka upload selfie a ak idBack la tou si w vle, men kycDocUrl la se li n ap bay admin nan wè dirèk la)
+      // 3. Upload SELFIE
+      const compressedSelfie = await imageCompression(files.selfie, compressionOptions);
+      const { error: selfieErr } = await supabase.storage.from('kyc-documents').upload(`${userData.id}/selfie_${timestamp}.jpg`, compressedSelfie);
+      if (selfieErr) throw selfieErr;
+      const selfieUrl = supabase.storage.from('kyc-documents').getPublicUrl(`${userData.id}/selfie_${timestamp}.jpg`).data.publicUrl;
 
-      // 3. Mete pwofil la a jou (kyc_status: pending) POU ADMIN KA JWENN LI
+      // 4. SOVE TOUT BAGAY NAN BAZ DONE A POU ADMIN
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
           kyc_status: 'pending',
           full_name: `${extractedData.firstName} ${extractedData.lastName}`.trim(),
-          kyc_document: kycDocUrl // Sove lyen foto a pou bouton "GADE PYÈS LA" nan Admin
+          kyc_front: frontUrl,
+          kyc_back: backUrl,
+          kyc_selfie: selfieUrl,
+          kyc_rejection_reason: null // Nou efase ansyen rezon an paske l fèk soumèt yon nouvo
         })
         .eq('id', userData.id);
 
       if (updateError) throw updateError;
       
-      // Pase nan dènye etap la (Siksè)
-      setStep(3);
+      setStep(3); // Siksè
       
     } catch (err: any) {
       setErrorMsg("Erè nan voye dokiman yo: " + err.message);
@@ -110,12 +118,29 @@ export default function KYCPage() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 italic font-sans">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => { if(step > 1 && step < 3) setStep(step - 1); else router.push('/dashboard'); }} className="text-zinc-500 text-2xl">←</button>
+        <button onClick={() => { if(step > 1 && step < 3) setStep(step - 1); else router.push('/dashboard'); }} className="text-zinc-500 text-2xl active:scale-90 transition-all">←</button>
         <h1 className="text-xl font-black uppercase text-red-600 italic">Verifikasyon ID</h1>
       </div>
 
       {errorMsg && <div className="bg-red-600/20 border border-red-600 p-4 rounded-2xl text-red-500 text-[10px] font-bold mb-6 text-center uppercase">{errorMsg}</div>}
       {successMsg && <div className="bg-green-600/20 border border-green-600 p-4 rounded-2xl text-green-500 text-[10px] font-bold mb-6 text-center uppercase">{successMsg}</div>}
+
+      {/* NOUVO NOTIFIKASYON REJÈ A */}
+      {userData?.kyc_status === 'rejected' && step === 1 && (
+        <div className="bg-yellow-500/20 border border-yellow-500 p-6 rounded-3xl mb-6 shadow-lg shadow-yellow-500/10 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-2xl drop-shadow-md">⚠️</span>
+            <h3 className="text-yellow-500 font-black uppercase tracking-widest text-[11px]">Demann ou an te Rejte!</h3>
+          </div>
+          <p className="text-white font-bold text-[10px] leading-relaxed mb-4">
+            <span className="text-zinc-400">Rezon an se:</span> <br/> 
+            "{userData.kyc_rejection_reason || 'Dokiman w yo pa t klè ase.'}"
+          </p>
+          <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest">
+            Tanpri reprann pwosesis la epi asire w foto yo parèt trè klè.
+          </p>
+        </div>
+      )}
 
       {step === 1 && (
         <div className="space-y-4 animate-in fade-in duration-300">
@@ -123,8 +148,8 @@ export default function KYCPage() {
            <p className="text-[10px] text-zinc-400 font-bold tracking-widest uppercase mb-6">Pwosesis sa a gratis epi li pran 2 minit.</p>
            
            {['CIN / KAT ELEKTORAL', 'PASPÒ', 'PÈMI KONDWI'].map((item) => (
-             <button key={item} onClick={() => { setDocType(item); setStep(2); }} className="w-full bg-zinc-900/50 p-6 rounded-[2rem] border border-white/5 text-left font-bold italic flex justify-between items-center active:scale-95 transition-all">
-               {item} <span className="text-red-600">→</span>
+             <button key={item} onClick={() => { setDocType(item); setStep(2); }} className="w-full bg-zinc-900/50 p-6 rounded-[2rem] border border-white/5 text-left font-bold italic flex justify-between items-center active:scale-95 transition-all hover:bg-white/5">
+               {item} <span className="text-red-600 text-xl">→</span>
              </button>
            ))}
         </div>
@@ -134,47 +159,46 @@ export default function KYCPage() {
         <div className="space-y-6 animate-in slide-in-from-right duration-300">
           <h2 className="text-2xl font-black uppercase italic leading-tight">Enfòmasyon w</h2>
           
-          {/* Chan pou Non ak Siyati manyèl */}
           <div className="grid grid-cols-2 gap-4 mb-2">
             <input 
               type="text" 
               placeholder="NON" 
-              className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700 text-[10px] font-black uppercase italic focus:border-red-600 outline-none"
+              className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700 text-[10px] font-black uppercase italic focus:border-red-600 outline-none transition-all"
               value={extractedData.firstName}
               onChange={(e) => setExtractedData(prev => ({ ...prev, firstName: e.target.value.toUpperCase() }))}
             />
             <input 
               type="text" 
               placeholder="SIYATI" 
-              className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700 text-[10px] font-black uppercase italic focus:border-red-600 outline-none"
+              className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700 text-[10px] font-black uppercase italic focus:border-red-600 outline-none transition-all"
               value={extractedData.lastName}
               onChange={(e) => setExtractedData(prev => ({ ...prev, lastName: e.target.value.toUpperCase() }))}
             />
           </div>
 
           <div className="space-y-4">
-            <label className={`block bg-zinc-900 p-6 rounded-[2rem] border-2 border-dashed text-center transition-all ${files.idFront ? 'border-red-600' : 'border-zinc-700'}`}>
-              <span className="text-3xl block mb-1">📸</span>
+            <label className={`block bg-zinc-900 p-6 rounded-[2rem] border-2 border-dashed text-center transition-all ${files.idFront ? 'border-red-600 bg-red-600/5' : 'border-zinc-700 hover:border-zinc-500'}`}>
+              <span className="text-3xl block mb-2 drop-shadow-md">📸</span>
               <p className="text-[9px] font-black uppercase italic">{files.idFront ? files.idFront.name : "Foto DEVAN Dokiman an"}</p>
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileChange(e, 'idFront')} />
             </label>
 
             {docType === 'CIN / KAT ELEKTORAL' && (
-              <label className={`block bg-zinc-900 p-6 rounded-[2rem] border-2 border-dashed text-center transition-all ${files.idBack ? 'border-red-600' : 'border-zinc-700'}`}>
-                <span className="text-3xl block mb-1">📸</span>
+              <label className={`block bg-zinc-900 p-6 rounded-[2rem] border-2 border-dashed text-center transition-all ${files.idBack ? 'border-red-600 bg-red-600/5' : 'border-zinc-700 hover:border-zinc-500'}`}>
+                <span className="text-3xl block mb-2 drop-shadow-md">📸</span>
                 <p className="text-[9px] font-black uppercase italic">{files.idBack ? files.idBack.name : "Foto DÈYÈ Dokiman an"}</p>
                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileChange(e, 'idBack')} />
               </label>
             )}
 
-            <label className={`block bg-zinc-900 p-6 rounded-[2rem] border-2 border-dashed text-center transition-all ${files.selfie ? 'border-red-600' : 'border-zinc-700'}`}>
-              <span className="text-3xl block mb-1">👤</span>
+            <label className={`block bg-zinc-900 p-6 rounded-[2rem] border-2 border-dashed text-center transition-all ${files.selfie ? 'border-red-600 bg-red-600/5' : 'border-zinc-700 hover:border-zinc-500'}`}>
+              <span className="text-3xl block mb-2 drop-shadow-md">👤</span>
               <p className="text-[9px] font-black uppercase italic">{files.selfie ? files.selfie.name : "Pran yon Selfie klè ak figi w"}</p>
               <input type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => handleFileChange(e, 'selfie')} />
             </label>
           </div>
 
-          <button disabled={loading} onClick={soumetKycBayAdmin} className="w-full bg-red-600 py-6 rounded-[2rem] font-black uppercase italic active:scale-95 transition-all">
+          <button disabled={loading} onClick={soumetKycBayAdmin} className="w-full bg-red-600 py-6 rounded-[2rem] font-black uppercase italic active:scale-95 transition-all shadow-lg shadow-red-600/20 disabled:opacity-50">
             {loading ? "Ap Soumèt Dokiman yo..." : "Soumèt pou Verifikasyon"}
           </button>
         </div>
@@ -183,17 +207,17 @@ export default function KYCPage() {
       {step === 3 && (
         <div className="text-center space-y-8 animate-in zoom-in duration-500 mt-10">
           <div className="py-10">
-            <div className="w-24 h-24 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl border border-yellow-500/30">
+            <div className="w-24 h-24 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl border border-yellow-500/30 shadow-lg shadow-yellow-500/10">
               ⏳
             </div>
-            <h2 className="text-2xl font-black uppercase italic text-white mb-3">Dokiman yo Soumèt!</h2>
+            <h2 className="text-2xl font-black uppercase italic text-white mb-3 tracking-tighter">Dokiman yo Soumèt!</h2>
             <p className="text-zinc-400 text-[11px] uppercase font-bold leading-relaxed px-4">
               Ekip nou an ap tcheke dokiman w yo kounye a.<br/> 
               Sa anjeneral pran mwens pase <span className="text-white">10 minit</span>.
             </p>
           </div>
           
-          <button onClick={() => router.push('/dashboard')} className="w-full bg-zinc-800 text-white py-5 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all border border-white/5">
+          <button onClick={() => router.push('/dashboard')} className="w-full bg-zinc-800 text-white py-5 rounded-[2.5rem] font-black uppercase italic active:scale-95 transition-all border border-white/5 hover:bg-zinc-700">
             Tounen nan Dashboard
           </button>
         </div>
