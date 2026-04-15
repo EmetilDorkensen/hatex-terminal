@@ -15,27 +15,14 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [promoCode, setPromoCode] = useState('');
-  const [referredByCode, setReferredByCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
   // ==========================================
-  // NOUVO: SISTÈM ENTÈLIJAN (MEMWA TELEFÒN)
+  // MEMWA TELEFÒN POU KÒD PWOMO SÈLMAN
   // ==========================================
   useEffect(() => {
-    // 1. Tcheke si gen kòd nan lyen an toudabò
-    const refFromUrl = searchParams.get("ref");
     const promoFromUrl = searchParams.get("promo");
-
-    if (refFromUrl) {
-      // Sere l nan memwa telefòn nan
-      localStorage.setItem('hatex_ref', refFromUrl);
-      setReferredByCode(refFromUrl);
-    } else {
-      // Si l pa nan lyen an, chèche l nan memwa telefòn nan
-      const savedRef = localStorage.getItem('hatex_ref');
-      if (savedRef) setReferredByCode(savedRef);
-    }
 
     if (promoFromUrl) {
       localStorage.setItem('hatex_promo', promoFromUrl);
@@ -55,7 +42,7 @@ function SignupForm() {
 
     try {
       // ==========================================
-      // VERIFYE KÒD PWOMO A AK LIMIT LI
+      // VERIFYE KÒD PWOMO A AK LIMIT LI ANVAN
       // ==========================================
       if (cleanPromo !== '') {
         const { data: promoData, error: promoError } = await supabase
@@ -67,10 +54,9 @@ function SignupForm() {
         if (promoError || !promoData) {
           setMsg({ type: 'error', text: 'Kòd Pwomo sa a pa valab oswa li pa egziste nan sistèm nan!' });
           setLoading(false);
-          return; // Kanpe enskripsyon an si kòd la pa bon
+          return; 
         }
 
-        // Tcheke si kòd la atenn limit li (egzanp: 100 moun)
         if (promoData.max_uses !== null && promoData.usage_count >= promoData.max_uses) {
           setMsg({ type: 'error', text: `Kòd Pwomo ${cleanPromo} an atenn limit li. Li pa valab ankò!` });
           setLoading(false);
@@ -95,22 +81,19 @@ function SignupForm() {
       }
 
       if (authData.user) {
-        // Sove tout done yo (Ak kòd moun ki te envite l la, menmsi se nan memwa l soti)
+        // Sove tout done yo (San zafè lyen afilyasyon an)
         const { error: profileError } = await supabase.from('profiles').insert([
           {
             id: authData.user.id,
             full_name: fullName,
             kyc_status: 'pending',
-            referred_by: referredByCode || null,
-            used_promo: cleanPromo !== '' ? cleanPromo : null,
-            referral_code: `htx_${Math.random().toString(36).substring(2, 8)}`
+            used_promo: cleanPromo !== '' ? cleanPromo : null
           }
         ]);
 
         if (profileError) console.error("Erè baz done:", profileError);
 
-        // NOU NETWAYE MEMWA TELEFÒN NAN POU KÒD LA PA KOLE POU LÒT MOUN KI TA ITILIZE MENM TELEFÒN NAN
-        localStorage.removeItem('hatex_ref');
+        // Netwaye memwa a pou l pa kole la
         localStorage.removeItem('hatex_promo');
 
         setMsg({ type: 'success', text: 'Kont la kreye! Tanpri tcheke imèl ou pou konfime enskripsyon an.' });
@@ -132,13 +115,6 @@ function SignupForm() {
       </div>
 
       <form onSubmit={handleSignup} className="space-y-4">
-        {/* Tcheke si moun nan te klike sou yon lyen avan l kreye kont lan */}
-        {referredByCode && (
-          <div className="bg-green-600/10 border border-green-600/30 p-3 rounded-xl mb-4 text-center">
-            <span className="text-[9px] text-green-500 font-black uppercase tracking-widest">✅ Envitasyon Valide</span>
-          </div>
-        )}
-
         <div className="space-y-2 text-left">
           <label className="text-[8px] text-zinc-600 ml-2 font-black">NON KONPLÈ OU</label>
           <input type="text" placeholder="EX: DORKENSEN EXEMPLE" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs" required />
@@ -154,6 +130,7 @@ function SignupForm() {
           <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs" required />
         </div>
 
+        {/* Bwat Kòd Pwomo a */}
         <div className="space-y-2 text-left">
           <label className="text-[8px] text-purple-500 ml-2 font-black">KÒD PWOMO (OPSYONÈL)</label>
           <input type="text" placeholder="EX: IZO2026" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} className="w-full bg-black border border-purple-500/30 p-5 rounded-2xl focus:border-purple-600 outline-none transition-all font-bold text-xs text-purple-400 placeholder:text-zinc-700 uppercase" />

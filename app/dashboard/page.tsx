@@ -18,6 +18,10 @@ export default function Dashboard() {
   const [showNumbers, setShowNumbers] = useState(false);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  
+  // ETA POU ANONS GLOBAL LA
+  const [announcement, setAnnouncement] = useState("");
+  const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
 
   // SISTÈM DEKOU POU KREYE KAT SI SUPABASE TE RATE L
   const generateMissingCard = async (userId: string, currentProfile: any) => {
@@ -46,6 +50,7 @@ export default function Dashboard() {
             setUserData({ ...profile, email: user.email });
           }
 
+          // Rale Tranzaksyon
           const { data: transactions } = await supabase
             .from('transactions')
             .select('*')
@@ -53,8 +58,19 @@ export default function Dashboard() {
             .not('description', 'ilike', '%Voye bay%')
             .order('created_at', { ascending: false })
             .limit(3);
-
           if (transactions) setRecentTransactions(transactions);
+
+          // Rale Anons Global la
+          const { data: settings } = await supabase
+            .from('global_settings')
+            .select('*')
+            .eq('id', 1)
+            .maybeSingle();
+            
+          if (settings) {
+            setAnnouncement(settings.announcement_text || "");
+            setIsAnnouncementActive(settings.announcement_active);
+          }
 
           const channel = supabase
             .channel(`profile_realtime_${user.id}`)
@@ -67,6 +83,16 @@ export default function Dashboard() {
               let updatedProfile = payload.new;
               updatedProfile = await generateMissingCard(user.id, updatedProfile);
               setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
+            })
+            // Koute si admin nan chanje anons lan nan paj Admin nan
+            .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'global_settings',
+              filter: `id=eq.1`
+            }, (payload) => {
+               setAnnouncement(payload.new.announcement_text);
+               setIsAnnouncementActive(payload.new.announcement_active);
             })
             .subscribe();
 
@@ -92,40 +118,25 @@ export default function Dashboard() {
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
-  // NOUVO: Fonksyon pou peye 520 Goud la
   const handleActivateCard = async () => {
     if (!userData) return;
-    
-    // Tcheke si l gen 520 Goud la
     if (Number(userData.wallet_balance) < 520) {
       alert("Ou pa gen ase kòb sou balans ou! Ou bezwen omwen 520 HTG pou aktive kat la.\n\nTanpri fè yon depo anvan.");
       router.push('/deposit');
       return;
     }
-
     if (!confirm("Èske w sèten ou vle peye 520 HTG pou aktive Kat Vityèl la ak Terminal ou a?")) return;
 
     setLoading(true);
     try {
       const nouvoBalans = Number(userData.wallet_balance) - 520;
-      
-      // Koupe kòb la epi debloke kat la
-      const { error: updateErr } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: nouvoBalans, is_card_activated: true })
-        .eq('id', userData.id);
-      
+      const { error: updateErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans, is_card_activated: true }).eq('id', userData.id);
       if (updateErr) throw updateErr;
 
-      // Kreye resi tranzaksyon an
       await supabase.from('transactions').insert({
-        user_id: userData.id,
-        amount: -520,
-        type: 'CARD_ACTIVATION',
-        description: 'Frè Aktivasyon Kat Vityèl & Terminal',
-        status: 'success'
+        user_id: userData.id, amount: -520, type: 'CARD_ACTIVATION',
+        description: 'Frè Aktivasyon Kat Vityèl & Terminal', status: 'success'
       });
-
       alert("✅ Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
     } catch (err: any) {
       alert("Erè: " + err.message);
@@ -142,10 +153,10 @@ export default function Dashboard() {
     );
   }
 
-  // ETAT KAT LA
   const kycPending = userData?.kyc_status !== 'approved';
   const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
   const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
+  const isAdmin = userData?.email === 'hatexcard@gmail.com';
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
@@ -166,8 +177,8 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            {userData?.email === 'hatexcard@gmail.com' && (
-              <button onClick={() => router.push('/admin')} className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce">
+            {isAdmin && (
+              <button onClick={() => router.push('/admin')} className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce shadow-lg shadow-red-600/30">
                 ADMIN
               </button>
             )}
@@ -209,7 +220,6 @@ export default function Dashboard() {
           </p>
           <div className="relative aspect-[1.58/1] w-full max-w-[500px] mx-auto">
             
-            {/* LÈ L POKO PASE KYC */}
             {kycPending && (
               <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/80 backdrop-blur-md p-4 text-center border border-white/5">
                 <p className="text-[9px] font-black uppercase mb-3 tracking-widest text-white/90">
@@ -221,7 +231,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* LÈ L PASE KYC MEN L POKO PEYE 520 GOUD LA */}
             {cardNeedsActivation && (
               <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/60 backdrop-blur-xl p-6 text-center border border-yellow-500/30">
                 <div className="text-3xl mb-2 drop-shadow-md">🔒</div>
@@ -234,12 +243,10 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* KAT LA MENM (Vizib si l aktive, oubyen twoub si l poko) */}
             <div
               className={`relative h-full w-full transition-all duration-700 preserve-3d cursor-pointer ${isFlipped && cardFullyActive ? 'rotate-y-180' : ''}`}
               onClick={() => cardFullyActive && setIsFlipped(!isFlipped)}
             >
-              {/* Devan */}
               <div className="absolute inset-0 backface-hidden rounded-[2rem] overflow-hidden bg-gradient-to-tr from-red-700 via-red-600 to-zinc-950 p-4 sm:p-5 md:p-6 shadow-2xl border border-white/5">
                 <div className={`flex flex-col h-full justify-between ${!cardFullyActive ? 'blur-md opacity-50' : ''}`}>
                   <div className="flex justify-between items-start">
@@ -271,7 +278,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              {/* Dèyè */}
               <div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2rem] bg-zinc-900 p-6 border border-white/10 flex flex-col items-center justify-center">
                 <div className="w-full h-10 bg-black absolute top-6 left-0"></div>
                 <div className="mt-8 bg-white p-2 rounded-xl">
@@ -283,29 +289,25 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Banyè Envitasyon (Nou pase 750 HTG la) */}
-        <div className="mb-10 bg-gradient-to-r from-[#1a142c] to-[#251525] border border-red-500/10 rounded-[2rem] p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shadow-lg shadow-purple-900/10 cursor-pointer" onClick={() => router.push('/referral')}>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
-          
-          <div className="flex-1 pr-4 relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[9px] font-black uppercase text-purple-400 tracking-[0.2em] bg-purple-500/10 px-2 py-1 rounded-md">Envitasyon</span>
+        {/* ==================================================== */}
+        {/* VUE AFICHAJ NOTIFIKASYON GLOBAL LA SÈLMAN */}
+        {/* ==================================================== */}
+        {isAnnouncementActive && announcement && (
+          <div className="mb-10 bg-zinc-900/60 border border-blue-500/20 rounded-[2rem] p-5 sm:p-6 relative overflow-hidden shadow-lg shadow-blue-900/10 backdrop-blur-md">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+            
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-xl">📢</span>
+              <span className="text-[9px] font-black uppercase text-blue-400 tracking-[0.2em] bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">
+                Notifikasyon Hatex
+              </span>
             </div>
-            <h3 className="text-[12px] sm:text-[14px] text-white font-bold leading-snug mb-1">
-              Envite zanmi w e fè kòb ansanm avèk yo
-            </h3>
-            <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-4">
-              Jiska <span className="text-yellow-500 text-[13px]">750 HTG</span>
+            
+            <p className="text-[12px] sm:text-[13px] text-white font-bold leading-relaxed whitespace-pre-wrap">
+              {announcement}
             </p>
-            <button onClick={(e) => { e.stopPropagation(); router.push('/referral'); }} className="bg-yellow-500 hover:bg-yellow-400 text-black text-[9px] font-black uppercase tracking-widest px-6 py-3 rounded-full transition-all shadow-lg shadow-yellow-500/20 active:scale-95">
-              Pataje Lyen
-            </button>
           </div>
-          <div className="text-6xl sm:text-7xl relative z-10 drop-shadow-2xl opacity-90 animate-pulse">
-            🎁
-          </div>
-        </div>
+        )}
 
         {/* Dènye Aktivite */}
         <div className="mb-20">
@@ -368,13 +370,12 @@ export default function Dashboard() {
           <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Kat</span>
         </div>
         
-        {/* BOUTON TERMINAL LA (Entèlijan: L ap mande aktivasyon si l bloke) */}
         <div onClick={() => {
             if (cardFullyActive) {
               router.push('/terminal');
             } else {
               alert("⚠️ Ou dwe peye frè 520 HTG a pou aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
-              window.scrollTo({ top: 300, behavior: 'smooth' }); // Voye l sou kat la
+              window.scrollTo({ top: 300, behavior: 'smooth' }); 
             }
           }} 
           className="relative -mt-10 md:-mt-12 cursor-pointer hover:scale-105 transition-all"

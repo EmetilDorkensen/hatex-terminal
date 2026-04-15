@@ -12,7 +12,12 @@ export default function AdminSuperPage() {
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
     
-    const [view, setView] = useState<'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo'>('depo');
+    // NOUVO ETA POU ANONS GLOBAL LA
+    const [anonsText, setAnonsText] = useState('');
+    const [anonsActive, setAnonsActive] = useState(true);
+    
+    // NOU METE 'anons' NAN LIS ONGLET YO
+    const [view, setView] = useState<'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'anons'>('depo');
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [accessGranted, setAccessGranted] = useState(false);
@@ -61,6 +66,13 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
             
+            // Rale Anons Global la
+            const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).single();
+            if (anonsData) {
+                setAnonsText(anonsData.announcement_text || '');
+                setAnonsActive(anonsData.announcement_active);
+            }
+
         } finally {
             setLoading(false);
         }
@@ -243,6 +255,28 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
+    // ==========================================
+    // SOVE NOTIFIKASYON GLOBAL LA
+    // ==========================================
+    const handleSaveAnons = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setProcessingId('saving_anons');
+        try {
+            const { error } = await supabase.from('global_settings').update({ 
+                announcement_text: anonsText, 
+                announcement_active: anonsActive 
+            }).eq('id', 1);
+            
+            if (error) throw error;
+            alert("✅ Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!");
+            raleDone();
+        } catch (err: any) { 
+            alert("Erè nan sove notifikasyon an: " + err.message); 
+        } finally { 
+            setProcessingId(null); 
+        }
+    };
+
     if (!accessGranted) return <div className="bg-black h-screen" />;
 
     return (
@@ -260,14 +294,57 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>KYC PENDING ({pendingKyc.length})</button>
                     <button onClick={() => setView('promo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'promo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>PWOMO</button>
                     <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>SISPANDI ({suspendedAccounts.length})</button>
+                    {/* NOUVO BOUTON ANONS LAN */}
+                    <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>ANONS</button>
                 </div>
 
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
+                    ) : view === 'anons' ? (
+                        // ==========================================
+                        // VUE NOTIFIKASYON GLOBAL (ANONS)
+                        // ==========================================
+                        <div className="bg-[#121420] p-6 rounded-3xl border border-blue-500/30 mb-8 shadow-lg shadow-blue-900/10">
+                            <div className="flex items-center gap-3 mb-6">
+                                <span className="text-2xl drop-shadow-md">📢</span>
+                                <h2 className="text-xl font-black uppercase text-blue-400 tracking-widest">Jere Notifikasyon Global</h2>
+                            </div>
+                            
+                            <form onSubmit={handleSaveAnons} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-zinc-400 font-black uppercase tracking-widest ml-2">Tèks k ap parèt sou paj kliyan yo:</label>
+                                    <textarea 
+                                        value={anonsText} 
+                                        onChange={(e) => setAnonsText(e.target.value)} 
+                                        placeholder="Ekri mesaj ou vle tout kliyan wè a la a..." 
+                                        className="w-full bg-black border border-white/10 p-5 rounded-2xl focus:border-blue-500 outline-none transition-all font-bold text-sm min-h-[150px] text-white whitespace-pre-wrap" 
+                                        required 
+                                    />
+                                </div>
+                                
+                                <div className="flex items-center gap-3 p-4 bg-black rounded-2xl border border-white/5 cursor-pointer" onClick={() => setAnonsActive(!anonsActive)}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={anonsActive} 
+                                        onChange={(e) => setAnonsActive(e.target.checked)} 
+                                        className="w-6 h-6 accent-blue-600 cursor-pointer"
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-black uppercase tracking-widest text-white">Afiche notifikasyon an?</span>
+                                        <span className="text-[9px] text-zinc-500 normal-case italic">Si w dezaktive l, li pap parèt sou Dashboard kliyan yo.</span>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" disabled={processingId === 'saving_anons'} className="w-full bg-blue-600 hover:bg-blue-500 px-8 py-5 rounded-2xl font-black uppercase italic active:scale-95 transition-all text-white shadow-lg shadow-blue-600/20">
+                                    {processingId === 'saving_anons' ? "AP SOVE..." : "SOVE NOTIFIKASYON AN"}
+                                </button>
+                            </form>
+                        </div>
                     ) : view === 'kyc' ? (
                         // ==========================================
-                        // VUE KYC MANIÈL (AK 3 FOTO YO)
+                        // VUE KYC MANIÈL
                         // ==========================================
                         pendingKyc.length === 0 ? (
                             <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn KYC k ap tann</div>
@@ -279,26 +356,11 @@ export default function AdminSuperPage() {
                                         <h3 className="text-lg font-black text-white">{user.full_name || 'San Non'}</h3>
                                         <p className="text-[10px] text-zinc-400 mb-4 lowercase">{user.email}</p>
                                         
-                                        {/* Bwat ki afiche 3 bouton foto yo */}
                                         <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                            {user.kyc_front && (
-                                                <a href={user.kyc_front} target="_blank" rel="noreferrer" className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest">
-                                                    👁️ DEVAN
-                                                </a>
-                                            )}
-                                            {user.kyc_back && (
-                                                <a href={user.kyc_back} target="_blank" rel="noreferrer" className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest">
-                                                    👁️ DÈYÈ
-                                                </a>
-                                            )}
-                                            {user.kyc_selfie && (
-                                                <a href={user.kyc_selfie} target="_blank" rel="noreferrer" className="text-[9px] bg-purple-600/20 px-4 py-2 rounded-lg text-purple-400 border border-purple-600/30 hover:bg-purple-600 hover:text-white transition-all font-black tracking-widest">
-                                                    📸 SELFIE
-                                                </a>
-                                            )}
-                                            {!user.kyc_front && !user.kyc_selfie && (
-                                                <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded border border-yellow-500/20">OKENN IMAJ SOU SISTÈM NAN</span>
-                                            )}
+                                            {user.kyc_front && <a href={user.kyc_front} target="_blank" rel="noreferrer" className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest">👁️ DEVAN</a>}
+                                            {user.kyc_back && <a href={user.kyc_back} target="_blank" rel="noreferrer" className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest">👁️ DÈYÈ</a>}
+                                            {user.kyc_selfie && <a href={user.kyc_selfie} target="_blank" rel="noreferrer" className="text-[9px] bg-purple-600/20 px-4 py-2 rounded-lg text-purple-400 border border-purple-600/30 hover:bg-purple-600 hover:text-white transition-all font-black tracking-widest">📸 SELFIE</a>}
+                                            {!user.kyc_front && !user.kyc_selfie && <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded border border-yellow-500/20">OKENN IMAJ SOU SISTÈM NAN</span>}
                                         </div>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
@@ -389,7 +451,7 @@ export default function AdminSuperPage() {
                             );
                         })
                     )}
-                    {!loading && view !== 'sispandi' && view !== 'kyc' && view !== 'promo' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
+                    {!loading && view !== 'sispandi' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
                 </div>
             </div>
         </div>
