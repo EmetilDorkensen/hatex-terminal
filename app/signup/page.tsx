@@ -18,12 +18,8 @@ function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
-  // ==========================================
-  // MEMWA TELEFÒN POU KÒD PWOMO SÈLMAN
-  // ==========================================
   useEffect(() => {
     const promoFromUrl = searchParams.get("promo");
-
     if (promoFromUrl) {
       localStorage.setItem('hatex_promo', promoFromUrl);
       setPromoCode(promoFromUrl.toUpperCase());
@@ -39,16 +35,14 @@ function SignupForm() {
     setMsg({ type: '', text: '' });
 
     const cleanPromo = promoCode.trim().toUpperCase();
-    let finalDiscountAmount = 0; // Pa defo, rediksyon an se 0
+    let finalDiscountAmount = 0; 
 
     try {
-      // ==========================================
-      // VERIFYE KÒD LA EPI PRAN VALÈ REDIKSYON AN
-      // ==========================================
+      // 1. VERIFYE KÒD LA EPI PRAN KANTITE REDIKSYON AN
       if (cleanPromo !== '') {
         const { data: promoData, error: promoError } = await supabase
           .from('promo_codes')
-          .select('code, usage_count, max_uses, reward_amount') // Nou rale kòb la la
+          .select('code, usage_count, max_uses, reward_amount')
           .eq('code', cleanPromo)
           .maybeSingle();
 
@@ -63,14 +57,10 @@ function SignupForm() {
           setLoading(false);
           return;
         }
-
-        // Si kòd la bon, nou kenbe valè rediksyon an
         finalDiscountAmount = promoData.reward_amount || 0;
       }
 
-      // ==========================================
-      // KREYE KONT LAN
-      // ==========================================
+      // 2. KREYE KONT KLIYAN AN
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -85,21 +75,24 @@ function SignupForm() {
       }
 
       if (authData.user) {
-        // NOU SOVE NI KÒD LA, NI VALÈ REDIKSYON AN NAN BAZ DONE A LA A
-        const { error: profileError } = await supabase.from('profiles').insert([
-          {
-            id: authData.user.id,
-            full_name: fullName,
-            kyc_status: 'pending',
-            used_promo: cleanPromo !== '' ? cleanPromo : null,
-            discount_amount: finalDiscountAmount // Sove kantite kòb la dirèk
-          }
-        ]);
+        // A) Sove Pwofil la
+        await supabase.from('profiles').insert([{
+          id: authData.user.id,
+          full_name: fullName,
+          kyc_status: 'pending',
+          used_promo: cleanPromo !== '' ? cleanPromo : null
+        }]);
 
-        if (profileError) console.error("Erè baz done:", profileError);
+        // B) NOUVO: Sove ID kliyan an ak rediksyon an nan espas apa a (Tiroir a)
+        if (finalDiscountAmount > 0) {
+          await supabase.from('user_discounts').insert([{
+            user_id: authData.user.id,
+            promo_code: cleanPromo,
+            discount_amount: finalDiscountAmount
+          }]);
+        }
 
         localStorage.removeItem('hatex_promo');
-
         setMsg({ type: 'success', text: 'Kont la kreye! Tanpri tcheke imèl ou pou konfime enskripsyon an.' });
       }
 
@@ -112,7 +105,6 @@ function SignupForm() {
 
   return (
     <div className="w-full max-w-md bg-zinc-900/30 p-10 rounded-[2.5rem] border border-white/5 shadow-2xl backdrop-blur-md">
-      
       <div className="text-center mb-10">
         <h1 className="text-4xl font-black tracking-tighter italic text-red-600 mb-2 underline decoration-white/10">HatexCard</h1>
         <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold tracking-widest">KREYE YON KONT NOUVO</p>

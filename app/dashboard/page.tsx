@@ -22,8 +22,8 @@ export default function Dashboard() {
   const [announcement, setAnnouncement] = useState("");
   const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
   
-  // Eta pou afiche rediksyon an sou ekran an
-  const [uiDiscountAmount, setUiDiscountAmount] = useState(0);
+  // Eta pou kenbe kantite rediksyon ki nan tiroir a
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
@@ -50,12 +50,15 @@ export default function Dashboard() {
             profile = await generateMissingCard(user.id, profile);
             setUserData({ ...profile, email: user.email });
             
-            // Rale rediksyon an jis pou afichaj UI a
-            if (profile.used_promo) {
-                const { data: promoData } = await supabase.from('promo_codes').select('reward_amount').eq('code', profile.used_promo).maybeSingle();
-                if (promoData) {
-                    setUiDiscountAmount(promoData.reward_amount || 0);
-                }
+            // NOUVO: Nou gade nan tiroir 'user_discounts' la si ID moun sa a la
+            const { data: discountData } = await supabase
+              .from('user_discounts')
+              .select('discount_amount')
+              .eq('user_id', user.id)
+              .maybeSingle();
+              
+            if (discountData) {
+              setDiscountAmount(discountData.discount_amount || 0);
             }
           }
 
@@ -101,47 +104,44 @@ export default function Dashboard() {
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
-  // Kalkil pou bouton ki sou ekran an
+  // Kalkil pou pri ki parèt sou ekran an
   const priBase = 520;
-  const uiPriAktivasyon = Math.max(0, priBase - uiDiscountAmount);
+  const uiPriAktivasyon = Math.max(0, priBase - discountAmount);
 
   // =========================================================================
-  // NOUVO FONKSYON AKTIVASYON AN AVÈK VERIFIKASYON AN TAN REYÈL NAN BAZ DONE A
+  // BOUTON AKTIVE A: Fè tout verifikasyon an fre dirèkteman nan baz done a!
   // =========================================================================
   const handleActivateCard = async () => {
     if (!userData) return;
     setLoading(true);
 
     try {
-      // 1. Nou rale done kliyan an frèch nan baz done a anvan nou fè anyen
+      // 1. Rale kòb aktyèl kliyan an dirèk nan baz done a
       const { data: realProfile, error: profileErr } = await supabase
         .from('profiles')
-        .select('wallet_balance, used_promo')
+        .select('wallet_balance')
         .eq('id', userData.id)
         .single();
 
       if (profileErr || !realProfile) throw new Error("Nou pa ka jwenn enfòmasyon w yo kounye a.");
 
+      // 2. Gade nan espas apa a rapid pou wè si ID moun nan la epi konbyen rediksyon l genyen
       let dbDiscountAmount = 0;
+      const { data: realDiscountData } = await supabase
+        .from('user_discounts')
+        .select('discount_amount')
+        .eq('user_id', userData.id)
+        .maybeSingle();
 
-      // 2. Si l te itilize yon kòd, nou al verifye konbyen rediksyon kòd la genyen vre
-      if (realProfile.used_promo) {
-        const { data: realPromo } = await supabase
-          .from('promo_codes')
-          .select('reward_amount')
-          .eq('code', realProfile.used_promo)
-          .maybeSingle();
-          
-        if (realPromo) {
-          dbDiscountAmount = realPromo.reward_amount || 0;
-        }
+      if (realDiscountData) {
+        dbDiscountAmount = realDiscountData.discount_amount || 0;
       }
 
-      // 3. Nou kalkile pri aktivasyon an ak done baz done a
+      // 3. Kalkile pri reyèl li dwe peye a
       const realActivationPrice = Math.max(0, priBase - dbDiscountAmount);
       const realWalletBalance = Number(realProfile.wallet_balance || 0);
 
-      // 4. Nou verifye si l gen ase kòb sou balans li a
+      // 4. Verifye si l gen kòb sa sou kont li
       if (realWalletBalance < realActivationPrice) {
         setLoading(false);
         alert(`Ou pa gen ase kòb sou balans ou!\n\nOu bezwen omwen ${realActivationPrice} HTG pou aktive kat la.\nTanpri fè yon depo anvan.`);
@@ -149,13 +149,13 @@ export default function Dashboard() {
         return;
       }
 
-      // 5. Konfimasyon final (Sekirite avan peman)
+      // 5. Mande konfimasyon
       if (!window.confirm(`Èske w sèten ou vle peye ${realActivationPrice} HTG pou aktive Kat Vityèl la ak Terminal ou a?`)) {
         setLoading(false);
         return;
       }
 
-      // 6. Si tout bagay anfòm, nou koupe kòb la epi aktive kat la
+      // 6. Koupe kòb la sou pwofil la epi aktive kat la
       const nouvoBalans = realWalletBalance - realActivationPrice;
       const { error: updateErr } = await supabase
         .from('profiles')
@@ -164,7 +164,7 @@ export default function Dashboard() {
 
       if (updateErr) throw updateErr;
 
-      // 7. Anrejistre tranzaksyon an ak pri egzak li te peye a
+      // 7. Enprime Resi a
       await supabase.from('transactions').insert({
         user_id: userData.id, 
         amount: -realActivationPrice, 
@@ -274,10 +274,9 @@ export default function Dashboard() {
                   Aktive kat ou ak terminal ou pou w kòmanse resevwa lajan, vann abònman, tout sa w vle.
                 </p>
                 
-                {/* Mesaj Rediksyon an si l gen kòd la */}
-                {uiDiscountAmount > 0 && (
+                {discountAmount > 0 && (
                    <p className="text-[10px] text-green-400 font-black mb-3 animate-pulse uppercase tracking-widest">
-                     🎉 Ou jwenn yon rediksyon {uiDiscountAmount} HTG!
+                     🎉 Ou jwenn yon rediksyon {discountAmount} HTG!
                    </p>
                 )}
 
