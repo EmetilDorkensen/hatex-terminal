@@ -19,11 +19,12 @@ export default function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
   
-  // ETA POU ANONS GLOBAL LA
   const [announcement, setAnnouncement] = useState("");
   const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
+  
+  // NOUVO: Eta pou kenbe kantite rediksyon an
+  const [discountAmount, setDiscountAmount] = useState(0);
 
-  // SISTÈM DEKOU POU KREYE KAT SI SUPABASE TE RATE L
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
       const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
@@ -48,53 +49,35 @@ export default function Dashboard() {
           if (profile) {
             profile = await generateMissingCard(user.id, profile);
             setUserData({ ...profile, email: user.email });
+            
+            // NOUVO: Si l gen yon kòd pwomo, chèche rediksyon an nan baz done a
+            if (profile.used_promo) {
+                const { data: promoData } = await supabase.from('promo_codes').select('reward_amount').eq('code', profile.used_promo).maybeSingle();
+                if (promoData) {
+                    setDiscountAmount(promoData.reward_amount || 0);
+                }
+            }
           }
 
-          // Rale Tranzaksyon
-          const { data: transactions } = await supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', user.id)
-            .not('description', 'ilike', '%Voye bay%')
-            .order('created_at', { ascending: false })
-            .limit(3);
+          const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(3);
           if (transactions) setRecentTransactions(transactions);
 
-          // Rale Anons Global la
-          const { data: settings } = await supabase
-            .from('global_settings')
-            .select('*')
-            .eq('id', 1)
-            .maybeSingle();
-            
+          const { data: settings } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
           if (settings) {
             setAnnouncement(settings.announcement_text || "");
             setIsAnnouncementActive(settings.announcement_active);
           }
 
-          const channel = supabase
-            .channel(`profile_realtime_${user.id}`)
-            .on('postgres_changes', {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'profiles',
-              filter: `id=eq.${user.id}`
-            }, async (payload) => {
+          const channel = supabase.channel(`profile_realtime_${user.id}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, async (payload) => {
               let updatedProfile = payload.new;
               updatedProfile = await generateMissingCard(user.id, updatedProfile);
               setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
             })
-            // Koute si admin nan chanje anons lan nan paj Admin nan
-            .on('postgres_changes', {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'global_settings',
-              filter: `id=eq.1`
-            }, (payload) => {
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'global_settings', filter: `id=eq.1` }, (payload) => {
                setAnnouncement(payload.new.announcement_text);
                setIsAnnouncementActive(payload.new.announcement_active);
-            })
-            .subscribe();
+            }).subscribe();
 
           setLoading(false);
           setLoadingRecent(false);
@@ -118,24 +101,29 @@ export default function Dashboard() {
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
+  // NOUVO: Kalkile Pri Aktivasyon an baze sou rediksyon an
+  const priBase = 520;
+  const priAktivasyon = Math.max(0, priBase - discountAmount);
+
   const handleActivateCard = async () => {
     if (!userData) return;
-    if (Number(userData.wallet_balance) < 520) {
-      alert("Ou pa gen ase kòb sou balans ou! Ou bezwen omwen 520 HTG pou aktive kat la.\n\nTanpri fè yon depo anvan.");
+    
+    if (Number(userData.wallet_balance) < priAktivasyon) {
+      alert(`Ou pa gen ase kòb sou balans ou! Ou bezwen omwen ${priAktivasyon} HTG pou aktive kat la.\n\nTanpri fè yon depo anvan.`);
       router.push('/deposit');
       return;
     }
-    if (!confirm("Èske w sèten ou vle peye 520 HTG pou aktive Kat Vityèl la ak Terminal ou a?")) return;
+    if (!confirm(`Èske w sèten ou vle peye ${priAktivasyon} HTG pou aktive Kat Vityèl la ak Terminal ou a?`)) return;
 
     setLoading(true);
     try {
-      const nouvoBalans = Number(userData.wallet_balance) - 520;
+      const nouvoBalans = Number(userData.wallet_balance) - priAktivasyon;
       const { error: updateErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans, is_card_activated: true }).eq('id', userData.id);
       if (updateErr) throw updateErr;
 
       await supabase.from('transactions').insert({
-        user_id: userData.id, amount: -520, type: 'CARD_ACTIVATION',
-        description: 'Frè Aktivasyon Kat Vityèl & Terminal', status: 'success'
+        user_id: userData.id, amount: -priAktivasyon, type: 'CARD_ACTIVATION',
+        description: discountAmount > 0 ? `Aktivasyon Kat (Ak Rediksyon -${discountAmount} HTG)` : 'Frè Aktivasyon Kat Vityèl', status: 'success'
       });
       alert("✅ Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
     } catch (err: any) {
@@ -234,11 +222,19 @@ export default function Dashboard() {
             {cardNeedsActivation && (
               <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/60 backdrop-blur-xl p-6 text-center border border-yellow-500/30">
                 <div className="text-3xl mb-2 drop-shadow-md">🔒</div>
-                <p className="text-[9px] font-bold uppercase mb-4 tracking-widest text-zinc-200 leading-relaxed drop-shadow-md">
-                  Aktive kat ou ak terminal ou paw komanse resevwa lajan, vann abònman, tout saw vle (Netflix / App) byen sekirize.
+                <p className="text-[9px] font-bold uppercase mb-2 tracking-widest text-zinc-200 leading-relaxed drop-shadow-md">
+                  Aktive kat ou ak terminal ou pou w kòmanse resevwa lajan, vann abònman, tout sa w vle.
                 </p>
+                
+                {/* NOUVO: Mesaj Rediksyon an si l gen kòd la */}
+                {discountAmount > 0 && (
+                   <p className="text-[10px] text-green-400 font-black mb-3 animate-pulse uppercase tracking-widest">
+                     🎉 Ou jwenn yon rediksyon {discountAmount} HTG!
+                   </p>
+                )}
+
                 <button onClick={handleActivateCard} className="bg-yellow-500 text-black px-8 py-4 rounded-full font-black text-[10px] uppercase shadow-2xl shadow-yellow-500/20 active:scale-90 transition-all border border-yellow-400">
-                  AKTIVE POU 520 HTG
+                  AKTIVE POU {priAktivasyon} HTG
                 </button>
               </div>
             )}
@@ -289,9 +285,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ==================================================== */}
-        {/* VUE AFICHAJ NOTIFIKASYON GLOBAL LA SÈLMAN */}
-        {/* ==================================================== */}
         {isAnnouncementActive && announcement && (
           <div className="mb-10 bg-zinc-900/60 border border-blue-500/20 rounded-[2rem] p-5 sm:p-6 relative overflow-hidden shadow-lg shadow-blue-900/10 backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -374,7 +367,7 @@ export default function Dashboard() {
             if (cardFullyActive) {
               router.push('/terminal');
             } else {
-              alert("⚠️ Ou dwe peye frè 520 HTG a pou aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
+              alert("⚠️ Ou dwe peye frè aktivasyon an pou aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
               window.scrollTo({ top: 300, behavior: 'smooth' }); 
             }
           }} 

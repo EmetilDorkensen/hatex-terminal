@@ -12,12 +12,12 @@ export default function AdminSuperPage() {
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
     
-    // NOUVO ETA POU ANONS GLOBAL LA
+    // ETA POU ANONS GLOBAL LA
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    // NOU METE 'anons' NAN LIS ONGLET YO
-    const [view, setView] = useState<'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'anons'>('depo');
+    // 'anons' se premye onglet la kounye a
+    const [view, setView] = useState<'anons' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo'>('anons');
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [accessGranted, setAccessGranted] = useState(false);
@@ -28,7 +28,6 @@ export default function AdminSuperPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // --- CONFIG TELEGRAM ---
     const BOT_TOKEN = "7547464134:AAH3M_R89D0UuN-WlOclj2D-Hj9S9I_K28Y";
     const CHAT_ID = "5352352512";
 
@@ -46,28 +45,23 @@ export default function AdminSuperPage() {
     const raleDone = async () => {
         setLoading(true);
         try {
-            // Rale Depo
             const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
             setDeposits(d || []);
 
-            // Rale Retrè
             const { data: w } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
             setWithdrawals(w || []);
 
-            // Rale Kont Sispandi
             const { data: s } = await supabase.from('profiles').select('*').eq('account_status', 'suspended').order('created_at', { ascending: false });
             setSuspendedAccounts(s || []);
 
-            // Rale KYC Pending
             const { data: k } = await supabase.from('profiles').select('*').eq('kyc_status', 'pending').order('created_at', { ascending: false });
             setPendingKyc(k || []);
 
-            // Rale Promo Codes
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
             
-            // Rale Anons Global la
-            const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).single();
+            // Rale Anons la
+            const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
                 setAnonsText(anonsData.announcement_text || '');
                 setAnonsActive(anonsData.announcement_active);
@@ -109,9 +103,6 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // DEPO AK RETRÈ
-    // ==========================================
     const apwouveDepo = async (d: any) => {
         const montanFinal = montanModifye[d.id] !== undefined ? montanModifye[d.id] : Number(d.amount);
         if (!confirm(`Konfime depo sa a?\nMontan k ap ajoute sou balans lan: ${montanFinal} HTG`)) return;
@@ -188,9 +179,6 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // DEBLOKE KONT
-    // ==========================================
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
@@ -201,12 +189,8 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // JERE KYC AK REZON REJÈ
-    // ==========================================
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
-        
         if (aksyon === 'rejected') {
             const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo (Egz: Pyès la twò flou, Foto a pa klè):");
             if (!rep) return; 
@@ -233,9 +217,6 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // KREYE KÒD PWOMO
-    // ==========================================
     const handleCreateCode = async (e: React.FormEvent) => {
         e.preventDefault();
         setProcessingId('creating_promo');
@@ -287,15 +268,14 @@ export default function AdminSuperPage() {
                     <button onClick={raleDone} className="bg-zinc-800 p-3 rounded-xl text-[10px] active:scale-95 transition-all">REFRESH</button>
                 </div>
 
-                {/* MENI ONGLET YO */}
+                {/* MENI ONGLET YO - ANONS an premye pozisyon */}
                 <div className="flex gap-2 mb-8 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar whitespace-nowrap">
+                    <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>📢 ANONS</button>
                     <button onClick={() => setView('depo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'depo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>DEPO ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'retre' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>RETRÈ ({withdrawals.filter(w => w.status === 'pending').length})</button>
-                    <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>KYC PENDING ({pendingKyc.length})</button>
+                    <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>KYC ({pendingKyc.length})</button>
                     <button onClick={() => setView('promo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'promo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>PWOMO</button>
                     <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>SISPANDI ({suspendedAccounts.length})</button>
-                    {/* NOUVO BOUTON ANONS LAN */}
-                    <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>ANONS</button>
                 </div>
 
                 <div className="space-y-4">
@@ -333,7 +313,7 @@ export default function AdminSuperPage() {
                                     />
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-black uppercase tracking-widest text-white">Afiche notifikasyon an?</span>
-                                        <span className="text-[9px] text-zinc-500 normal-case italic">Si w dezaktive l, li pap parèt sou Dashboard kliyan yo.</span>
+                                        <span className="text-[9px] text-zinc-500 normal-case italic">Si bwat sa pa make, notifikasyon an pap parèt pou kliyan yo.</span>
                                     </div>
                                 </div>
                                 
@@ -343,9 +323,6 @@ export default function AdminSuperPage() {
                             </form>
                         </div>
                     ) : view === 'kyc' ? (
-                        // ==========================================
-                        // VUE KYC MANIÈL
-                        // ==========================================
                         pendingKyc.length === 0 ? (
                             <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn KYC k ap tann</div>
                         ) : (
@@ -371,9 +348,6 @@ export default function AdminSuperPage() {
                             ))
                         )
                     ) : view === 'promo' ? (
-                        // ==========================================
-                        // VUE KÒD PWOMO
-                        // ==========================================
                         <div>
                             <form onSubmit={handleCreateCode} className="bg-[#121420] p-6 rounded-3xl border border-purple-500/30 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-lg shadow-purple-900/10">
                                 <div className="flex-1 w-full space-y-2">
@@ -402,9 +376,6 @@ export default function AdminSuperPage() {
                             </div>
                         </div>
                     ) : view === 'sispandi' ? (
-                        // ==========================================
-                        // VUE SISPANDI
-                        // ==========================================
                         suspendedAccounts.map((account) => (
                             <div key={account.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-red-600/30 relative overflow-hidden flex flex-col items-center text-center">
                                 <div className="w-12 h-12 bg-red-600/20 text-red-500 rounded-full flex items-center justify-center mb-4 border border-red-600/50"><span className="text-xl">⚠️</span></div>
@@ -414,9 +385,6 @@ export default function AdminSuperPage() {
                             </div>
                         ))
                     ) : (
-                        // ==========================================
-                        // VUE DEPO AK RETRÈ
-                        // ==========================================
                         (view === 'depo' ? deposits : withdrawals).map((item) => {
                             const isDepo = view === 'depo';
                             const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
