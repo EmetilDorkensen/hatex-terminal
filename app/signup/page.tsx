@@ -39,15 +39,16 @@ function SignupForm() {
     setMsg({ type: '', text: '' });
 
     const cleanPromo = promoCode.trim().toUpperCase();
+    let finalDiscountAmount = 0; // Pa defo, rediksyon an se 0
 
     try {
       // ==========================================
-      // VERIFYE KÒD PWOMO A AK LIMIT LI ANVAN
+      // VERIFYE KÒD LA EPI PRAN VALÈ REDIKSYON AN
       // ==========================================
       if (cleanPromo !== '') {
         const { data: promoData, error: promoError } = await supabase
           .from('promo_codes')
-          .select('code, usage_count, max_uses')
+          .select('code, usage_count, max_uses, reward_amount') // Nou rale kòb la la
           .eq('code', cleanPromo)
           .maybeSingle();
 
@@ -62,6 +63,9 @@ function SignupForm() {
           setLoading(false);
           return;
         }
+
+        // Si kòd la bon, nou kenbe valè rediksyon an
+        finalDiscountAmount = promoData.reward_amount || 0;
       }
 
       // ==========================================
@@ -81,19 +85,19 @@ function SignupForm() {
       }
 
       if (authData.user) {
-        // Sove tout done yo (San zafè lyen afilyasyon an)
+        // NOU SOVE NI KÒD LA, NI VALÈ REDIKSYON AN NAN BAZ DONE A LA A
         const { error: profileError } = await supabase.from('profiles').insert([
           {
             id: authData.user.id,
             full_name: fullName,
             kyc_status: 'pending',
-            used_promo: cleanPromo !== '' ? cleanPromo : null
+            used_promo: cleanPromo !== '' ? cleanPromo : null,
+            discount_amount: finalDiscountAmount // Sove kantite kòb la dirèk
           }
         ]);
 
         if (profileError) console.error("Erè baz done:", profileError);
 
-        // Netwaye memwa a pou l pa kole la
         localStorage.removeItem('hatex_promo');
 
         setMsg({ type: 'success', text: 'Kont la kreye! Tanpri tcheke imèl ou pou konfime enskripsyon an.' });
@@ -130,7 +134,6 @@ function SignupForm() {
           <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs" required />
         </div>
 
-        {/* Bwat Kòd Pwomo a */}
         <div className="space-y-2 text-left">
           <label className="text-[8px] text-purple-500 ml-2 font-black">KÒD PWOMO (OPSYONÈL)</label>
           <input type="text" placeholder="EX: IZO2026" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} className="w-full bg-black border border-purple-500/30 p-5 rounded-2xl focus:border-purple-600 outline-none transition-all font-bold text-xs text-purple-400 placeholder:text-zinc-700 uppercase" />

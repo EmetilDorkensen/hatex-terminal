@@ -21,9 +21,6 @@ export default function Dashboard() {
   
   const [announcement, setAnnouncement] = useState("");
   const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
-  
-  // NOUVO: Eta pou kenbe kantite rediksyon an
-  const [discountAmount, setDiscountAmount] = useState(0);
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
@@ -49,14 +46,6 @@ export default function Dashboard() {
           if (profile) {
             profile = await generateMissingCard(user.id, profile);
             setUserData({ ...profile, email: user.email });
-            
-            // NOUVO: Si l gen yon kòd pwomo, chèche rediksyon an nan baz done a
-            if (profile.used_promo) {
-                const { data: promoData } = await supabase.from('promo_codes').select('reward_amount').eq('code', profile.used_promo).maybeSingle();
-                if (promoData) {
-                    setDiscountAmount(promoData.reward_amount || 0);
-                }
-            }
           }
 
           const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(3);
@@ -101,7 +90,9 @@ export default function Dashboard() {
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
-  // NOUVO: Kalkile Pri Aktivasyon an baze sou rediksyon an
+  // NOUVO: Nou rale kantite rediksyon an dirèkteman nan userData a!
+  const discountAmount = userData?.discount_amount || 0;
+  
   const priBase = 520;
   const priAktivasyon = Math.max(0, priBase - discountAmount);
 
