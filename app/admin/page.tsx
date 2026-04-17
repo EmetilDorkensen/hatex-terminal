@@ -3,21 +3,26 @@ import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
 export default function AdminSuperPage() {
+    // LIS DONE YO
+    const [allUsers, setAllUsers] = useState<any[]>([]); // NOUVO: Tout kliyan yo
     const [deposits, setDeposits] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     
+    // ETA POU FÒMILÈ YO
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
+    const [searchQuery, setSearchQuery] = useState(''); // NOUVO: Pou chèche kliyan
     
     // ETA POU ANONS GLOBAL LA
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    // 'anons' se premye onglet la kounye a
-    const [view, setView] = useState<'anons' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo'>('anons');
+    // MENI ONGLET YO (Nou ajoute 'kliyan')
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo'>('anons');
+    
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [accessGranted, setAccessGranted] = useState(false);
@@ -45,6 +50,10 @@ export default function AdminSuperPage() {
     const raleDone = async () => {
         setLoading(true);
         try {
+            // Rale Tout Kliyan yo (POU RECHÈCH LA)
+            const { data: u } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+            setAllUsers(u || []);
+
             const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
             setDeposits(d || []);
 
@@ -60,7 +69,6 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
             
-            // Rale Anons la
             const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
                 setAnonsText(anonsData.announcement_text || '');
@@ -189,6 +197,17 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
+    // NOUVO: Fonksyon pou Sispann yon kont
+    const sispannKont = async (id: string, email: string) => {
+        if (!confirm(`⚠️ Èske w sèten ou vle SISPANN kont sa a? (${email})\nKliyan an pap ka konekte ni fè tranzaksyon ankò.`)) return;
+        setProcessingId(id);
+        try {
+            await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id);
+            alert(`🚫 Kont ${email} lan sispandi!`);
+            raleDone(); 
+        } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+    };
+
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
         if (aksyon === 'rejected') {
@@ -236,9 +255,6 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // SOVE NOTIFIKASYON GLOBAL LA
-    // ==========================================
     const handleSaveAnons = async (e: React.FormEvent) => {
         e.preventDefault();
         setProcessingId('saving_anons');
@@ -258,6 +274,15 @@ export default function AdminSuperPage() {
         }
     };
 
+    // NOUVO: Lojik pou chèche Kliyan an
+    const filteredUsers = allUsers.filter(user => {
+        if (!searchQuery) return true;
+        const lowerQuery = searchQuery.toLowerCase();
+        const emailMatch = user.email?.toLowerCase().includes(lowerQuery);
+        const nameMatch = user.full_name?.toLowerCase().includes(lowerQuery);
+        return emailMatch || nameMatch;
+    });
+
     if (!accessGranted) return <div className="bg-black h-screen" />;
 
     return (
@@ -268,9 +293,10 @@ export default function AdminSuperPage() {
                     <button onClick={raleDone} className="bg-zinc-800 p-3 rounded-xl text-[10px] active:scale-95 transition-all">REFRESH</button>
                 </div>
 
-                {/* MENI ONGLET YO - ANONS an premye pozisyon */}
+                {/* MENI ONGLET YO */}
                 <div className="flex gap-2 mb-8 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar whitespace-nowrap">
                     <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>📢 ANONS</button>
+                    <button onClick={() => setView('kliyan')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>👥 KLIYAN ({allUsers.length})</button>
                     <button onClick={() => setView('depo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'depo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>DEPO ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'retre' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>RETRÈ ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>KYC ({pendingKyc.length})</button>
@@ -281,6 +307,62 @@ export default function AdminSuperPage() {
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
+                    ) : view === 'kliyan' ? (
+                        // ==========================================
+                        // VUE RECHÈCH KLIYAN
+                        // ==========================================
+                        <div className="space-y-6">
+                            {/* Bwat Rechèch la */}
+                            <div className="bg-[#121420] p-4 rounded-3xl border border-indigo-500/30 shadow-lg shadow-indigo-900/10 flex items-center gap-3">
+                                <span className="text-xl ml-2">🔍</span>
+                                <input 
+                                    type="text" 
+                                    placeholder="CHÈCHE YON KLIYAN AK IMÈL LI OSWA NON L..." 
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-transparent border-none p-2 text-white outline-none font-black tracking-widest placeholder:text-zinc-600 text-xs sm:text-sm"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="bg-zinc-800 text-zinc-400 p-2 rounded-xl text-[10px] hover:text-white hover:bg-zinc-700 transition-all">EFASE</button>
+                                )}
+                            </div>
+
+                            {/* Lis Kliyan ki Koresponn ak Rechèch la */}
+                            <div className="space-y-4">
+                                {filteredUsers.length === 0 ? (
+                                    <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa jwenn okenn kliyan ak non oswa imèl sa a</div>
+                                ) : (
+                                    filteredUsers.map(user => (
+                                        <div key={user.id} className={`bg-zinc-900 p-5 sm:p-6 rounded-[2.5rem] border ${user.account_status === 'suspended' ? 'border-red-600/50 bg-red-950/10' : 'border-white/5'} relative flex flex-col md:flex-row gap-6 items-center justify-between transition-all`}>
+                                            <div className="flex items-center gap-4 w-full md:w-auto">
+                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl border shrink-0 ${user.account_status === 'suspended' ? 'bg-red-900/40 text-red-500 border-red-500/30' : 'bg-zinc-800 text-white border-white/10'}`}>
+                                                    {user.full_name ? user.full_name.charAt(0).toUpperCase() : '👤'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-sm sm:text-base font-black text-white truncate w-full">{user.full_name || 'San Non'}</h3>
+                                                    <p className="text-[10px] text-zinc-400 lowercase truncate w-full">{user.email}</p>
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        <span className="text-[9px] bg-zinc-800 text-zinc-300 px-2 py-1 rounded-md">BALANS: <span className="text-white">{Number(user.wallet_balance || 0).toLocaleString()} HTG</span></span>
+                                                        <span className={`text-[9px] px-2 py-1 rounded-md ${user.kyc_status === 'approved' ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-500'}`}>KYC: {user.kyc_status}</span>
+                                                        {user.is_card_activated && <span className="text-[9px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md">KAT AKTIVE</span>}
+                                                        {user.used_promo && <span className="text-[9px] bg-purple-900/30 text-purple-400 px-2 py-1 rounded-md">PWOMO: {user.used_promo}</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Bouton Aksyon */}
+                                            <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                                {user.account_status === 'suspended' ? (
+                                                    <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-green-600 px-6 py-4 rounded-2xl text-[10px] font-black text-white hover:bg-green-500 transition-all shadow-lg shadow-green-600/20">AKTIVE KONT</button>
+                                                ) : (
+                                                    <button onClick={() => sispannKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-red-600/20 border border-red-600/30 text-red-500 px-6 py-4 rounded-2xl text-[10px] font-black hover:bg-red-600 hover:text-white transition-all">SISPANN KONT</button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     ) : view === 'anons' ? (
                         // ==========================================
                         // VUE NOTIFIKASYON GLOBAL (ANONS)
@@ -355,14 +437,14 @@ export default function AdminSuperPage() {
                                     <input type="text" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} placeholder="NON ATIS LA" className="w-full bg-black border border-white/10 p-4 rounded-xl focus:border-purple-500 outline-none transition-all font-bold text-sm uppercase" required />
                                 </div>
                                 <div className="w-full md:w-48 space-y-2">
-                                    <label className="text-[9px] text-purple-400 font-black uppercase tracking-widest ml-2">Kado Kliyan an (HTG)</label>
+                                    <label className="text-[9px] text-purple-400 font-black uppercase tracking-widest ml-2">Rediksyon Aktivasyon (HTG)</label>
                                     <input type="number" value={promoReward} onChange={(e) => setPromoReward(e.target.value)} className="w-full bg-black border border-white/10 p-4 rounded-xl focus:border-purple-500 outline-none transition-all font-bold text-sm" required min="0" />
                                 </div>
                                 <button type="submit" disabled={processingId === 'creating_promo'} className="w-full md:w-auto bg-purple-600 px-8 py-4 rounded-xl font-black uppercase italic active:scale-95 transition-all">{processingId === 'creating_promo' ? "AP KREYE..." : "KREYE KÒD LA"}</button>
                             </form>
                             <div className="overflow-x-auto bg-[#121420] rounded-3xl border border-white/5">
                                 <table className="w-full text-left border-collapse">
-                                    <thead><tr className="border-b border-white/5 bg-black/20"><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest">Kòd Pwomo</th><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest text-center">Kado (HTG)</th><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest text-center">Moun Mennen</th></tr></thead>
+                                    <thead><tr className="border-b border-white/5 bg-black/20"><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest">Kòd Pwomo</th><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest text-center">Rediksyon (HTG)</th><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest text-center">Moun Mennen</th></tr></thead>
                                     <tbody>
                                         {promoCodes.length === 0 ? (
                                             <tr><td colSpan={3} className="p-8 text-center text-[10px] font-black uppercase text-zinc-600">Pa gen kòd kreye ankò.</td></tr>
@@ -419,7 +501,7 @@ export default function AdminSuperPage() {
                             );
                         })
                     )}
-                    {!loading && view !== 'sispandi' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
+                    {!loading && view !== 'sispandi' && view !== 'kliyan' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
                 </div>
             </div>
         </div>
