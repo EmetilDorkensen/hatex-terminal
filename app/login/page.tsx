@@ -17,6 +17,30 @@ export default function Login() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  // ==========================================
+  // NOUVO FONKSYON: TRACKING IP AK APARÈY
+  // ==========================================
+  const trackDeviceAndIP = async (userEmail: string) => {
+    try {
+      // 1. Rale adrès IP entènèt kliyan an
+      const res = await fetch('https://api.ipify.org?format=json');
+      const { ip } = await res.json();
+      
+      // 2. Rale non aparèy la (ex: iPhone, Android, Windows)
+      const device = navigator.userAgent;
+
+      // 3. Mete yo ajou nan pwofil li an kachèt
+      await supabase
+        .from('profiles')
+        .update({ last_ip: ip, last_device: device })
+        .eq('email', userEmail.trim().toLowerCase());
+        
+    } catch (e) {
+      console.error("Tracking error (ignored):", e);
+      // Nou inyore erè a pou l pa anpeche kliyan an konekte si entènèt li twò dousman
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -28,7 +52,7 @@ export default function Login() {
         // 1. KONEKSYON AK MODPAS
         // ==========================================
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
 
@@ -53,6 +77,9 @@ export default function Login() {
             return;
           }
 
+          // 🚨 PRAN IP AK APARÈY LA ANVAN L ALE 🚨
+          await trackDeviceAndIP(email);
+
           // Sèvi ak replace epi fose yon refresh pou Middleware la wè nouvo Cookie a
           window.location.href = '/dashboard';
         }
@@ -69,7 +96,7 @@ export default function Login() {
 
         // Rele fonksyon entelijan nou kreye nan baz done a
         const { data: rpcData, error: rpcErr } = await supabase.rpc('verify_wallet_pin', {
-          p_email: email,
+          p_email: email.trim().toLowerCase(),
           p_pin: pin
         });
 
@@ -81,6 +108,10 @@ export default function Login() {
 
         if (rpcData.success) {
           // PIN lan bon e kont lan pa sispandi. 
+          
+          // 🚨 PRAN IP AK APARÈY LA ANVAN L ALE 🚨
+          await trackDeviceAndIP(email);
+          
           window.location.href = '/dashboard';
         } else {
           // Afiche mesaj erè a ki soti dirèk nan baz done a (ex: "Ou rete 2 chans" oswa "Kont ou sispandi")
