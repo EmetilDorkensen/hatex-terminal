@@ -9,7 +9,6 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     );
 
-    // 1. Resevwa tout done WordPress voye yo (Enfo kat, pwodwi, elatriye)
     const body = await req.json();
     const { 
       merchant_api_key, amount_htg, order_id, 
@@ -20,7 +19,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Manke enfòmasyon kat la oswa kle machann nan.' }, { status: 400 });
     }
 
-    // 2. Verifye si machann nan bon
     const { data: merchant, error: merchantErr } = await supabaseAdmin
       .from('profiles')
       .select('id, account_status')
@@ -30,7 +28,6 @@ export async function POST(req: Request) {
     if (merchantErr || !merchant) return NextResponse.json({ error: 'Machann pa rekonèt.' }, { status: 404 });
     if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont machann sa bloke.' }, { status: 403 });
 
-    // 3. Kreye yon fo "Tikè Peman" vit vit pou fonksyon SQL la ka gen yon referans
     const { data: paymentRequest, error: insertErr } = await supabaseAdmin
       .from('payment_requests')
       .insert([{
@@ -45,31 +42,32 @@ export async function POST(req: Request) {
 
     if (insertErr) throw insertErr;
 
-    // 4. VERIFYE KAT LA EPI KOUPE KÒB LA (Avèk fonksyon SQL nou te fè a)
+    // ========================================================
+    // 🚨 NOU MACHE SOU NON EGZAK KOLÒN TAB PROFIL OU YO LA 🚨
+    // ========================================================
     const cleanCardNumber = card_number.replace(/\s/g, '');
     const { data: result, error: rpcError } = await supabaseAdmin.rpc('process_merchant_payment_with_card', {
       p_payment_id: paymentRequest.id,
       p_card_number: cleanCardNumber,
-      p_card_expiry: card_expiry,
-      p_card_cvv: card_cvv
+      p_exp_date: card_expiry, // Voye dat la nan kolòn exp_date
+      p_cvv: card_cvv          // Voye cvv a nan kolòn cvv
     });
 
     if (rpcError || !result.success) {
        return NextResponse.json({ error: result?.message || "Echèk nan verifye kat la." }, { status: 400 });
     }
 
-    // 5. ANREJISTRE TRANZAKSYON PLUGIN NAN AK TOUT ENFO LIVREZON AK PWODWI
+    // Anrejistre tranzaksyon Plugin nan
     await supabaseAdmin.from('plugin_transactions').insert([{
        merchant_id: merchant.id,
        amount_htg: Number(amount_htg),
        original_amount: Number(amount_htg),
        currency: 'HTG',
        order_id: order_id,
-       customer_info: customer_info, // Sa gen ladan l Non, Adrès, ak Pwodwi li achte yo
+       customer_info: customer_info,
        status: 'completed'
     }]);
 
-    // 6. Reponn WordPress la li mèt bay pwodwi a!
     return NextResponse.json({ success: true, message: 'Peman an pase!' });
 
   } catch (error: any) {

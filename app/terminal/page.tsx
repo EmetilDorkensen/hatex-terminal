@@ -510,7 +510,7 @@ export default function TerminalPage() {
     }
   };
 
-  // ============================================================
+// ============================================================
   // JENERE WOOCOMMERCE PLUGIN (KOU JENI A!)
   // ============================================================
   const generateWooCommercePlugin = async () => {
@@ -524,19 +524,30 @@ export default function TerminalPage() {
       const zip = new JSZip();
       const pluginDir = zip.folder("hatexcard-woocommerce");
 
-// KÒD PHP WOOCOMMERCE DIRECT PAYMENT (INLINE)
-const phpCode = `<?php
+      // KÒD PHP WOOCOMMERCE DIRECT PAYMENT (INLINE)
+      const phpCode = `<?php
 /**
  * Plugin Name: HatexCard Direct Gateway
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman HatexCard dirèkteman sou paj kès ou a (San redireksyon).
- * Version: 3.0.0
+ * Description: Aksepte peman HatexCard dirèkteman sou paj kès ou a. (Sipòte tout tèm ak Classic Checkout).
+ * Version: 5.0.0
  * Author: Hatex Group
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
+
+// ========================================================================
+// 🚨 AUTO-FIXER: ADAPTE AK TOUT TÈM AK NOUVO BLÒK WOOCOMMERCE YO OTOMATIK
+// ========================================================================
+register_activation_hook(__FILE__, 'hatexcard_auto_convert_checkout');
+function hatexcard_auto_convert_checkout() {
+    if (function_exists('wc_get_page_id')) {
+        $checkout_page_id = wc_get_page_id('checkout');
+        if ($checkout_page_id) {
+            $page = get_post($checkout_page_id);
+            if (strpos($page->post_content, '
 
 add_action('plugins_loaded', 'hatexcard_init_direct_gateway');
 
