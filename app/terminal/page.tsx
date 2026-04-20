@@ -511,11 +511,11 @@ export default function TerminalPage() {
   };
 
 // ============================================================
-  // JENERE WOOCOMMERCE PLUGIN (INIVÈSÈL - ZEWO MODIFIKASYON)
+  // JENERE WOOCOMMERCE PLUGIN (BÈL IMÈL SHOPIFY AK BÈL PAJ RESI)
   // ============================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
-    if (profile?.kyc_status !== 'approved') return alert('Ou dwe pase KYC pou w itilize Plugin sa a.');
+    if (profile?.kyc_status !== 'approved') return alert('Ou dwe pase KYC.');
     if (!profile?.api_key) return alert('Kle API w la manke.');
 
     setDownloadingPlugin('woocommerce');
@@ -524,25 +524,17 @@ export default function TerminalPage() {
       const zip = new JSZip();
       const pluginDir = zip.folder("hatexcard-woocommerce");
 
-      // KÒD PHP WOOCOMMERCE DIRECT PAYMENT (ENTÈSÈPTÈ INIVÈSÈL)
       const phpCode = `<?php
 /**
  * Plugin Name: HatexCard Direct Gateway
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman HatexCard dirèkteman sou sit ou a. (Entegrasyon Inivèsèl pou tout tèm ak nouvo blòk WooCommerce yo).
- * Version: 7.0.0
+ * Description: Aksepte peman HatexCard. (Gen ladan l Imèl Notifikasyon Machann ak paj resi custom).
+ * Version: 8.0.0
  * Author: Hatex Group
  */
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+if (!defined('ABSPATH')) exit;
 
-// ========================================================================
-// 🚨 KOU JENI INIVÈSÈL LA: ENTÈSÈPTE NOUVO BLÒK YO SOU FRONTIÈ A
-// ========================================================================
-// Kòd sa a PA modifye paj machann nan. Lè kliyan an sou sit la, 
-// li jis fòse WooCommerce afiche Kès Klasik la an kachèt pou fòmilè a ka parèt.
 add_filter('render_block', 'hatexcard_universal_checkout_adapter', 10, 2);
 function hatexcard_universal_checkout_adapter($block_content, $block) {
     if ($block['blockName'] === 'woocommerce/checkout') {
@@ -571,14 +563,13 @@ function hatexcard_init_direct_gateway() {
             $this->title = $this->get_option('title');
             $this->description = $this->get_option('description');
             $this->usd_rate = $this->get_option('usd_rate', '135');
-            
-            // ========================================================================
-            // API A KONEKTE AK BAZ DONE A OTOMATIKMAN
-            // ========================================================================
             $this->merchant_api_key = '${profile.api_key}'; 
             $this->api_direct_url = 'https://hatexcard.com/api/direct-payment';
 
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+            
+            // 🚨 AJOUTE BÈL MESAJ SOU PAJ "ORDER RECEIVED" LA 🚨
+            add_action('woocommerce_thankyou_' . $this->id, array($this, 'custom_thankyou_page'));
         }
 
         public function init_form_fields() {
@@ -590,13 +581,17 @@ function hatexcard_init_direct_gateway() {
             );
         }
 
-        // ========================================================================
-        // ADAPTABILITE: Itilize klas natif natal WooCommerce pou l pran fòm nenpòt tèm
-        // ========================================================================
+        // DESIGN BÈL PAJ RESI KLIYAN AN SOU WOOCOMMERCE LA
+        public function custom_thankyou_page() {
+            echo '<div style="background: #fdfdfd; border: 1px solid #16a34a; padding: 25px; border-radius: 12px; margin-bottom: 30px; text-align: center; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.1);">
+                    <div style="background: #16a34a; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; font-size: 24px;">✓</div>
+                    <h3 style="color: #16a34a; margin-top:0; font-size: 22px;">Peman an pase an sekirite!</h3>
+                    <p style="margin-bottom:0; color: #4b5563;">Mèsi paske w itilize HatexCard. Tranzaksyon w lan anrejistre avèk siksè.</p>
+                  </div>';
+        }
+
         public function payment_fields() {
-            if ($this->description) {
-                echo wpautop(wp_kses_post($this->description));
-            }
+            if ($this->description) echo wpautop(wp_kses_post($this->description));
             ?>
             <fieldset id="wc-hatexcard-direct-form" class="wc-payment-form" style="margin-top: 10px;">
                 <p class="form-row form-row-wide">
@@ -625,15 +620,8 @@ function hatexcard_init_direct_gateway() {
             $expiry = isset($_POST['hatex_expiry']) ? wc_clean($_POST['hatex_expiry']) : '';
             $cvv = isset($_POST['hatex_cvv']) ? wc_clean($_POST['hatex_cvv']) : '';
 
-            if (empty($card_number) || empty($expiry) || empty($cvv)) {
-                wc_add_notice('Tanpri ranpli tout enfòmasyon kat HatexCard la.', 'error');
-                return;
-            }
-
-            if (empty($this->merchant_api_key) || $this->merchant_api_key === 'undefined' || $this->merchant_api_key === '') {
-                wc_add_notice('Erè: Plugin sa a pa gen yon kle API valab. Tanpri re-telechaje l sou tablodbò Hatex ou a.', 'error');
-                return;
-            }
+            if (empty($card_number) || empty($expiry) || empty($cvv)) { wc_add_notice('Tanpri ranpli tout enfòmasyon kat la.', 'error'); return; }
+            if (empty($this->merchant_api_key)) { wc_add_notice('Erè: Plugin sa a pa gen kle API.', 'error'); return; }
 
             $total = $order->get_total();
             $currency = $order->get_currency();
@@ -644,47 +632,75 @@ function hatexcard_init_direct_gateway() {
             foreach ($items as $item_id => $item) {
                 $product = $item->get_product();
                 $image_url = wp_get_attachment_image_url($product->get_image_id(), 'thumbnail');
-                $products_info[] = array(
-                    'name' => $item->get_name(),
-                    'qty' => $item->get_quantity(),
-                    'total' => $item->get_total(),
-                    'image' => $image_url
-                );
+                $products_info[] = array('name' => $item->get_name(), 'qty' => $item->get_quantity(), 'total' => $item->get_total(), 'image' => $image_url);
             }
 
-            $payload = array(
-                'merchant_api_key' => $this->merchant_api_key,
-                'order_id' => $order_id,
-                'amount_htg' => $amount_htg,
-                'card_number' => $card_number,
-                'card_expiry' => $expiry,
-                'card_cvv' => $cvv,
-                'customer_info' => array(
-                    'name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-                    'email' => $order->get_billing_email(),
-                    'phone' => $order->get_billing_phone(),
-                    'address' => $order->get_shipping_address_1() . ', ' . $order->get_shipping_city(),
-                    'products' => $products_info
-                )
+            $customer_info = array(
+                'name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'email' => $order->get_billing_email(),
+                'phone' => $order->get_billing_phone(),
+                'address' => $order->get_shipping_address_1() . ', ' . $order->get_shipping_city()
             );
 
-            $response = wp_remote_post($this->api_direct_url, array(
-                'method' => 'POST',
-                'headers' => array('Content-Type' => 'application/json'),
-                'body' => json_encode($payload),
-                'timeout' => 15
-            ));
+            $payload = array(
+                'merchant_api_key' => $this->merchant_api_key, 'order_id' => $order_id, 'amount_htg' => $amount_htg,
+                'card_number' => $card_number, 'card_expiry' => $expiry, 'card_cvv' => $cvv,
+                'customer_info' => array_merge($customer_info, array('products' => $products_info))
+            );
 
-            if (is_wp_error($response)) {
-                wc_add_notice('Sèvè HatexCard la pa reponn. Tanpri re-eseye pi ta.', 'error');
-                return;
-            }
+            $response = wp_remote_post($this->api_direct_url, array('method' => 'POST', 'headers' => array('Content-Type' => 'application/json'), 'body' => json_encode($payload), 'timeout' => 15));
+
+            if (is_wp_error($response)) { wc_add_notice('Sèvè HatexCard la pa reponn.', 'error'); return; }
 
             $body = json_decode(wp_remote_retrieve_body($response), true);
 
             if (isset($body['success']) && $body['success'] === true) {
                 $order->payment_complete();
                 $order->add_order_note('✅ Peman dirèk HatexCard reyisi! Kòb la koupe sou kat kliyan an.');
+
+                // ====================================================================
+                // 🚨 VOYE IMÈL BAY MACHANN NAN AK TOUT DETAY YO (STYLE SHOPIFY) 🚨
+                // ====================================================================
+                $merchant_email = isset($body['merchant_email']) ? $body['merchant_email'] : get_option('admin_email');
+                $to = $merchant_email;
+                $subject = '💸 Nouvo Kòmand HatexCard - #' . $order_id;
+                $headers = array('Content-Type: text/html; charset=UTF-8');
+
+                $html = '<div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden;">';
+                $html .= '<div style="background: #e60000; padding: 20px; text-align: center; color: #ffffff;">';
+                $html .= '<h2 style="margin: 0; font-size: 24px;">Nouvo Kòmand Konfime!</h2>';
+                $html .= '</div>';
+                $html .= '<div style="padding: 20px;">';
+                $html .= '<p style="font-size: 16px; color: #333;">Ou fèk resevwa yon peman <strong>' . number_format($amount_htg, 2) . ' HTG</strong> via HatexCard pou kòmand #' . $order_id . '.</p>';
+
+                $html .= '<h3 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 30px;">🚚 Detay Livrezon:</h3>';
+                $html .= '<p style="color: #555; line-height: 1.6;"><strong>Kliyan:</strong> ' . $customer_info['name'] . '<br>';
+                $html .= '<strong>Telefòn:</strong> ' . $customer_info['phone'] . '<br>';
+                $html .= '<strong>Imèl:</strong> ' . $customer_info['email'] . '<br>';
+                $html .= '<strong>Adrès:</strong> ' . $customer_info['address'] . '</p>';
+
+                $html .= '<h3 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 30px;">🛍️ Pwodwi yo:</h3>';
+                $html .= '<table style="width: 100%; border-collapse: collapse;">';
+                foreach ($products_info as $prod) {
+                    $img_src = !empty($prod['image']) ? $prod['image'] : 'https://via.placeholder.com/50';
+                    $html .= '<tr>';
+                    $html .= '<td style="padding: 10px 0; border-bottom: 1px solid #eee; width: 60px;"><img src="' . $img_src . '" style="width: 50px; height: 50px; border-radius: 5px; object-fit: cover;"></td>';
+                    $html .= '<td style="padding: 10px; border-bottom: 1px solid #eee; color: #333;"><strong>' . $prod['name'] . '</strong> <br><span style="color: #888; font-size: 12px;">Kantite: ' . $prod['qty'] . '</span></td>';
+                    $html .= '</tr>';
+                }
+                $html .= '</table>';
+                
+                $html .= '<div style="background: #f9f9f9; padding: 15px; margin-top: 20px; border-radius: 5px; text-align: center;">';
+                $html .= '<p style="margin: 0; color: #333; font-weight: bold;">Montan total resevwa:</p>';
+                $html .= '<h2 style="margin: 5px 0 0 0; color: #16a34a;">' . number_format($amount_htg, 2) . ' HTG</h2>';
+                $html .= '</div>';
+
+                $html .= '<p style="text-align: center; margin-top: 30px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px;">Secured by Hatex Group</p>';
+                $html .= '</div></div>';
+
+                wp_mail($to, $subject, $html, $headers); // Tire imèl la!
+                // ====================================================================
+
                 $woocommerce->cart->empty_cart();
                 return array('result' => 'success', 'redirect' => $this->get_return_url($order));
             } else {
