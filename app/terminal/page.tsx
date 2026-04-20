@@ -511,11 +511,11 @@ export default function TerminalPage() {
   };
 
 // ============================================================
-  // JENERE WOOCOMMERCE PLUGIN (BÈL IMÈL SHOPIFY AK BÈL PAJ RESI)
+  // JENERE WOOCOMMERCE PLUGIN (FÒMA OTOMATIK + GOOGLE AUTOFILL)
   // ============================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
-    if (profile?.kyc_status !== 'approved') return alert('Ou dwe pase KYC.');
+    if (profile?.kyc_status !== 'approved') return alert('Ou dwe pase KYC pou w itilize Plugin sa a.');
     if (!profile?.api_key) return alert('Kle API w la manke.');
 
     setDownloadingPlugin('woocommerce');
@@ -524,12 +524,13 @@ export default function TerminalPage() {
       const zip = new JSZip();
       const pluginDir = zip.folder("hatexcard-woocommerce");
 
+      // KÒD PHP WOOCOMMERCE DIRECT PAYMENT
       const phpCode = `<?php
 /**
  * Plugin Name: HatexCard Direct Gateway
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman HatexCard. (Gen ladan l Imèl Notifikasyon Machann ak paj resi custom).
- * Version: 8.0.0
+ * Description: Aksepte peman HatexCard. (Sipòte Google Autofill, Fòma otomatik, ak Imèl Machann).
+ * Version: 9.5.0
  * Author: Hatex Group
  */
 
@@ -567,8 +568,6 @@ function hatexcard_init_direct_gateway() {
             $this->api_direct_url = 'https://hatexcard.com/api/direct-payment';
 
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-            
-            // 🚨 AJOUTE BÈL MESAJ SOU PAJ "ORDER RECEIVED" LA 🚨
             add_action('woocommerce_thankyou_' . $this->id, array($this, 'custom_thankyou_page'));
         }
 
@@ -581,7 +580,6 @@ function hatexcard_init_direct_gateway() {
             );
         }
 
-        // DESIGN BÈL PAJ RESI KLIYAN AN SOU WOOCOMMERCE LA
         public function custom_thankyou_page() {
             echo '<div style="background: #fdfdfd; border: 1px solid #16a34a; padding: 25px; border-radius: 12px; margin-bottom: 30px; text-align: center; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.1);">
                     <div style="background: #16a34a; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; font-size: 24px;">✓</div>
@@ -590,22 +588,25 @@ function hatexcard_init_direct_gateway() {
                   </div>';
         }
 
+        // ========================================================================
+        // 🚨 MAJI GOOGLE AUTOFILL LA AK KLAVYE NIMEWIK LA 🚨
+        // ========================================================================
         public function payment_fields() {
             if ($this->description) echo wpautop(wp_kses_post($this->description));
             ?>
             <fieldset id="wc-hatexcard-direct-form" class="wc-payment-form" style="margin-top: 10px;">
                 <p class="form-row form-row-wide">
-                    <label>Nimewo Kat HatexCard <span class="required">*</span></label>
-                    <input type="text" class="input-text" name="hatex_card_number" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number">
+                    <label for="hatex_card_number">Nimewo Kat HatexCard <span class="required">*</span></label>
+                    <input type="tel" id="hatex_card_number" class="input-text" name="hatex_card_number" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number" inputmode="numeric" oninput="let v = this.value.replace(/\\D/g, ''); let f = v.match(/.{1,4}/g); this.value = f ? f.join(' ') : v;">
                 </p>
                 <div style="display: flex; flex-wrap: wrap; margin-left: -10px; margin-right: -10px;">
                     <p class="form-row form-row-first" style="flex: 1; padding: 0 10px; min-width: 120px;">
-                        <label>Dat (MM/YY) <span class="required">*</span></label>
-                        <input type="text" class="input-text" name="hatex_expiry" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
+                        <label for="hatex_expiry">Dat (MM/YY) <span class="required">*</span></label>
+                        <input type="tel" id="hatex_expiry" class="input-text" name="hatex_expiry" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp" inputmode="numeric" oninput="let v = this.value.replace(/\\D/g, ''); if(v.length > 2) { v = v.substring(0,2) + '/' + v.substring(2,4); } this.value = v;">
                     </p>
                     <p class="form-row form-row-last" style="flex: 1; padding: 0 10px; min-width: 120px;">
-                        <label>CVV <span class="required">*</span></label>
-                        <input type="password" class="input-text" name="hatex_cvv" placeholder="CVC" maxlength="4" autocomplete="cc-csc">
+                        <label for="hatex_cvv">CVV <span class="required">*</span></label>
+                        <input type="password" id="hatex_cvv" class="input-text" name="hatex_cvv" placeholder="CVC" maxlength="4" autocomplete="cc-csc" inputmode="numeric" oninput="this.value = this.value.replace(/\\D/g, '');">
                     </p>
                 </div>
             </fieldset>
@@ -658,13 +659,17 @@ function hatexcard_init_direct_gateway() {
                 $order->payment_complete();
                 $order->add_order_note('✅ Peman dirèk HatexCard reyisi! Kòb la koupe sou kat kliyan an.');
 
-                // ====================================================================
-                // 🚨 VOYE IMÈL BAY MACHANN NAN AK TOUT DETAY YO (STYLE SHOPIFY) 🚨
-                // ====================================================================
-                $merchant_email = isset($body['merchant_email']) ? $body['merchant_email'] : get_option('admin_email');
+                $admin_email = get_option('admin_email');
+                $merchant_email = (isset($body['merchant_email']) && !empty($body['merchant_email'])) ? $body['merchant_email'] : $admin_email;
                 $to = $merchant_email;
                 $subject = '💸 Nouvo Kòmand HatexCard - #' . $order_id;
-                $headers = array('Content-Type: text/html; charset=UTF-8');
+                
+                $domain = parse_url(home_url(), PHP_URL_HOST);
+                $headers = array(
+                    'Content-Type: text/html; charset=UTF-8',
+                    'From: HatexCard System <orders@' . $domain . '>',
+                    'Reply-To: ' . $customer_info['email']
+                );
 
                 $html = '<div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden;">';
                 $html .= '<div style="background: #e60000; padding: 20px; text-align: center; color: #ffffff;">';
@@ -698,8 +703,13 @@ function hatexcard_init_direct_gateway() {
                 $html .= '<p style="text-align: center; margin-top: 30px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px;">Secured by Hatex Group</p>';
                 $html .= '</div></div>';
 
-                wp_mail($to, $subject, $html, $headers); // Tire imèl la!
-                // ====================================================================
+                $mail_sent = wp_mail($to, $subject, $html, $headers);
+                
+                if($mail_sent) {
+                    $order->add_order_note('✅ Imèl notifikasyon HatexCard la voye bay: ' . $to);
+                } else {
+                    $order->add_order_note('⚠️ Imèl notifikasyon an pa t ka voye. Verifye konfigirasyon sèvè ou a.');
+                }
 
                 $woocommerce->cart->empty_cart();
                 return array('result' => 'success', 'redirect' => $this->get_return_url($order));
