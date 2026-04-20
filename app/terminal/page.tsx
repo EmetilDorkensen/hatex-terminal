@@ -511,7 +511,7 @@ export default function TerminalPage() {
   };
 
 // ============================================================
-  // JENERE WOOCOMMERCE PLUGIN (KOU JENI A!)
+  // JENERE WOOCOMMERCE PLUGIN (INIVÈSÈL - ZEWO MODIFIKASYON)
   // ============================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
@@ -524,13 +524,13 @@ export default function TerminalPage() {
       const zip = new JSZip();
       const pluginDir = zip.folder("hatexcard-woocommerce");
 
-      // KÒD PHP WOOCOMMERCE DIRECT PAYMENT (AK GWO KOUCH SEKIRITE)
+      // KÒD PHP WOOCOMMERCE DIRECT PAYMENT (ENTÈSÈPTÈ INIVÈSÈL)
       const phpCode = `<?php
 /**
  * Plugin Name: HatexCard Direct Gateway
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman HatexCard dirèkteman sou paj kès ou a. (Sipòte tout tèm ak Classic Checkout).
- * Version: 5.0.1
+ * Description: Aksepte peman HatexCard dirèkteman sou sit ou a. (Entegrasyon Inivèsèl pou tout tèm ak nouvo blòk WooCommerce yo).
+ * Version: 7.0.0
  * Author: Hatex Group
  */
 
@@ -539,18 +539,17 @@ if (!defined('ABSPATH')) {
 }
 
 // ========================================================================
-// 🚨 AUTO-FIXER (PWOTEJE KONT FATAL ERROR): Ranje paj kès la sèlman si l egziste vre
+// 🚨 KOU JENI INIVÈSÈL LA: ENTÈSÈPTE NOUVO BLÒK YO SOU FRONTIÈ A
 // ========================================================================
-register_activation_hook(__FILE__, 'hatexcard_auto_convert_checkout');
-function hatexcard_auto_convert_checkout() {
-    if (function_exists('wc_get_page_id')) {
-        $checkout_page_id = wc_get_page_id('checkout');
-        // Verifye si ID a valab epi si l pi gran pase 0
-        if ($checkout_page_id && $checkout_page_id > 0) {
-            $page = get_post($checkout_page_id);
-            // 🚨 NOUVO SEKIRITE: Verifye si objè $page la egziste vre anvan n manyen l
-            if ($page && is_object($page) && isset($page->post_content)) {
-                if (strpos($page->post_content, '
+// Kòd sa a PA modifye paj machann nan. Lè kliyan an sou sit la, 
+// li jis fòse WooCommerce afiche Kès Klasik la an kachèt pou fòmilè a ka parèt.
+add_filter('render_block', 'hatexcard_universal_checkout_adapter', 10, 2);
+function hatexcard_universal_checkout_adapter($block_content, $block) {
+    if ($block['blockName'] === 'woocommerce/checkout') {
+        return '<div class="woocommerce">' . do_shortcode('[woocommerce_checkout]') . '</div>';
+    }
+    return $block_content;
+}
 
 add_action('plugins_loaded', 'hatexcard_init_direct_gateway');
 
@@ -561,8 +560,8 @@ function hatexcard_init_direct_gateway() {
         
         public function __construct() {
             $this->id = 'hatexcard_direct';
-            $this->icon = ''; // Ou ka mete yon icon kat si w vle
-            $this->has_fields = true; // 🚨 SA FÈ FÒMILÈ A PARÈT SOU PAJ KÈS LA 🚨
+            $this->icon = ''; 
+            $this->has_fields = true; 
             $this->method_title = 'HatexCard';
             $this->method_description = 'Fòmilè peman entegre pou kat HatexCard.';
 
@@ -573,9 +572,11 @@ function hatexcard_init_direct_gateway() {
             $this->description = $this->get_option('description');
             $this->usd_rate = $this->get_option('usd_rate', '135');
             
-            // Kle machann nan entegre otomatikman
+            // ========================================================================
+            // API A KONEKTE AK BAZ DONE A OTOMATIKMAN
+            // ========================================================================
             $this->merchant_api_key = '${profile.api_key}'; 
-            $this->api_direct_url = 'https://hatexcard.com/api/direct-payment'; // 👈 URL NOUVO API A
+            $this->api_direct_url = 'https://hatexcard.com/api/direct-payment';
 
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         }
@@ -589,41 +590,37 @@ function hatexcard_init_direct_gateway() {
             );
         }
 
-        // ===============================================
-        // DESINE FÒMILÈ KAT LA SOU PAJ KÈS WOOCOMMERCE LA
-        // ===============================================
+        // ========================================================================
+        // ADAPTABILITE: Itilize klas natif natal WooCommerce pou l pran fòm nenpòt tèm
+        // ========================================================================
         public function payment_fields() {
             if ($this->description) {
                 echo wpautop(wp_kses_post($this->description));
             }
             ?>
-            <fieldset id="wc-hatexcard-direct-form" class="wc-credit-card-form wc-payment-form" style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #e2e2e2; margin-top: 10px;">
+            <fieldset id="wc-hatexcard-direct-form" class="wc-payment-form" style="margin-top: 10px;">
                 <p class="form-row form-row-wide">
                     <label>Nimewo Kat HatexCard <span class="required">*</span></label>
-                    <input type="text" class="input-text" name="hatex_card_number" placeholder="0000 0000 0000 0000" maxlength="19" style="letter-spacing: 2px;">
+                    <input type="text" class="input-text" name="hatex_card_number" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number">
                 </p>
-                <div style="display: flex; gap: 15px;">
-                    <p class="form-row form-row-first" style="flex: 1;">
+                <div style="display: flex; flex-wrap: wrap; margin-left: -10px; margin-right: -10px;">
+                    <p class="form-row form-row-first" style="flex: 1; padding: 0 10px; min-width: 120px;">
                         <label>Dat (MM/YY) <span class="required">*</span></label>
-                        <input type="text" class="input-text" name="hatex_expiry" placeholder="MM/YY" maxlength="5">
+                        <input type="text" class="input-text" name="hatex_expiry" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
                     </p>
-                    <p class="form-row form-row-last" style="flex: 1;">
+                    <p class="form-row form-row-last" style="flex: 1; padding: 0 10px; min-width: 120px;">
                         <label>CVV <span class="required">*</span></label>
-                        <input type="password" class="input-text" name="hatex_cvv" placeholder="CVC" maxlength="4">
+                        <input type="password" class="input-text" name="hatex_cvv" placeholder="CVC" maxlength="4" autocomplete="cc-csc">
                     </p>
                 </div>
             </fieldset>
             <?php
         }
 
-        // ===============================================
-        // PRAN DONE YO EPI VOYE YO BAY SÈVÈ HATEXCARD LA
-        // ===============================================
         public function process_payment($order_id) {
             global $woocommerce;
             $order = wc_get_order($order_id);
             
-            // 1. Pran sa kliyan an tape yo
             $card_number = isset($_POST['hatex_card_number']) ? wc_clean($_POST['hatex_card_number']) : '';
             $expiry = isset($_POST['hatex_expiry']) ? wc_clean($_POST['hatex_expiry']) : '';
             $cvv = isset($_POST['hatex_cvv']) ? wc_clean($_POST['hatex_cvv']) : '';
@@ -633,12 +630,15 @@ function hatexcard_init_direct_gateway() {
                 return;
             }
 
-            // 2. Prepare kòb la ak enfòmasyon livrezon yo
+            if (empty($this->merchant_api_key) || $this->merchant_api_key === 'undefined' || $this->merchant_api_key === '') {
+                wc_add_notice('Erè: Plugin sa a pa gen yon kle API valab. Tanpri re-telechaje l sou tablodbò Hatex ou a.', 'error');
+                return;
+            }
+
             $total = $order->get_total();
             $currency = $order->get_currency();
             $amount_htg = ($currency === 'USD') ? $total * floatval($this->usd_rate) : $total;
 
-            // Ranmase lis pwodwi yo ak foto yo pou voye bay HatexCard
             $items = $order->get_items();
             $products_info = array();
             foreach ($items as $item_id => $item) {
@@ -664,11 +664,10 @@ function hatexcard_init_direct_gateway() {
                     'email' => $order->get_billing_email(),
                     'phone' => $order->get_billing_phone(),
                     'address' => $order->get_shipping_address_1() . ', ' . $order->get_shipping_city(),
-                    'products' => $products_info // 👈 NOU VOYE PWODWI AK FOTO YO LA A!
+                    'products' => $products_info
                 )
             );
 
-            // 3. Rele API HatexCard la an kachèt
             $response = wp_remote_post($this->api_direct_url, array(
                 'method' => 'POST',
                 'headers' => array('Content-Type' => 'application/json'),
@@ -677,24 +676,18 @@ function hatexcard_init_direct_gateway() {
             ));
 
             if (is_wp_error($response)) {
-                wc_add_notice('Sèvè HatexCard la pa reponn. Tanpri re-eseye.', 'error');
+                wc_add_notice('Sèvè HatexCard la pa reponn. Tanpri re-eseye pi ta.', 'error');
                 return;
             }
 
             $body = json_decode(wp_remote_retrieve_body($response), true);
 
-            // 4. Si sèvè w la di WI, kòb la koupe!
             if (isset($body['success']) && $body['success'] === true) {
                 $order->payment_complete();
                 $order->add_order_note('✅ Peman dirèk HatexCard reyisi! Kòb la koupe sou kat kliyan an.');
                 $woocommerce->cart->empty_cart();
-                
-                return array(
-                    'result' => 'success',
-                    'redirect' => $this->get_return_url($order) // Pouse l sou paj "Mèsi" WordPress la
-                );
+                return array('result' => 'success', 'redirect' => $this->get_return_url($order));
             } else {
-                // Si kat la pa gen kòb oswa li pa bon
                 $error_msg = isset($body['error']) ? $body['error'] : 'Peman an refize.';
                 wc_add_notice('HatexCard: ' . $error_msg, 'error');
                 return;
@@ -710,15 +703,13 @@ function add_hatexcard_direct_to_gateways($gateways) {
 }
 ?>`;
 
-      // Mete kòd la anndan katab zip la
       pluginDir?.file("hatexcard-gateway.php", phpCode);
-      pluginDir?.file("readme.txt", "=== HatexCard WooCommerce ===\nUpload katab zip sa a nan Plugins WordPress ou a epi aktive l. L ap jwenn kont ou otomatikman paske li gen kle w la kache anndan l.");
+      pluginDir?.file("readme.txt", "=== HatexCard WooCommerce ===\nUpload katab zip sa a nan Plugins WordPress ou a epi aktive l.");
 
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, `hatexcard-woocommerce-${profile.id.slice(0,8)}.zip`);
 
     } catch (error) {
-      console.error('Error:', error);
       alert('Erè pandan jenere WooCommerce plugin an.');
     } finally {
       setDownloadingPlugin(null);
