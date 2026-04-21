@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
+
+// Nou inisyalize Resend egzakteman jan w fè l nan lòt paj yo
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
@@ -28,7 +32,7 @@ export async function POST(req: Request) {
     if (merchantErr || !merchant) return NextResponse.json({ error: 'Machann pa rekonèt.' }, { status: 404 });
     if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont machann sa bloke.' }, { status: 403 });
 
-    // 2. Kreye Fakti a
+    // 2. Kreye Fakti a nan DB a
     const { data: paymentRequest, error: insertErr } = await supabaseAdmin
       .from('payment_requests')
       .insert([{
@@ -67,87 +71,86 @@ export async function POST(req: Request) {
        status: 'completed'
     }]);
 
-    // 5. Bati imèl la
-    const orderDate = new Date().toLocaleDateString('ht-HT', { year: 'numeric', month: 'long', day: 'numeric' });
-    
-    let productsHtml = '';
-    if (customer_info.products && customer_info.products.length > 0) {
-      customer_info.products.forEach((prod: any) => {
-        productsHtml += `
-          <tr>
-            <td style="padding: 12px 0; border-bottom: 1px solid #eaeaea; color: #333;">${prod.name} × ${prod.qty}</td>
-            <td style="padding: 12px 0; border-bottom: 1px solid #eaeaea; text-align: right; color: #333;">${prod.total}</td>
-          </tr>
-        `;
-      });
-    }
+    // ========================================================================
+    // 🚨 MAJI RESEND LAN: OFISYÈL SDK 🚨
+    // ========================================================================
+    try {
+      const orderDate = new Date().toLocaleDateString('ht-HT', { year: 'numeric', month: 'long', day: 'numeric' });
+      
+      let productsHtml = '';
+      if (customer_info.products && customer_info.products.length > 0) {
+        customer_info.products.forEach((prod: any) => {
+          productsHtml += `
+            <tr>
+              <td style="padding: 12px 0; border-bottom: 1px solid #eaeaea; color: #333;">${prod.name} × ${prod.qty}</td>
+              <td style="padding: 12px 0; border-bottom: 1px solid #eaeaea; text-align: right; color: #333;">${prod.total}</td>
+            </tr>
+          `;
+        });
+      }
 
-    const emailHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-        <h1 style="font-size: 24px; font-weight: normal; margin-bottom: 20px;">Nouvo Kòmand resi via HatexCard</h1>
-        <p style="color: #666; margin-bottom: 30px;">Felisitasyon! Ou fèk resevwa yon kòmand ki peye nèt.</p>
+      const emailHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+          <h1 style="font-size: 24px; font-weight: normal; margin-bottom: 20px;">Nouvo Kòmand resi via HatexCard</h1>
+          <p style="color: #666; margin-bottom: 30px;">Felisitasyon! Ou fèk resevwa yon kòmand ki peye nèt.</p>
 
-        <table style="width: 100%; margin-bottom: 30px; font-size: 14px;">
-          <tr>
-            <td style="padding-bottom: 10px;"><strong>Order #:</strong><br>${order_id}</td>
-            <td style="padding-bottom: 10px;"><strong>Date:</strong><br>${orderDate}</td>
-            <td style="padding-bottom: 10px;"><strong>Total:</strong><br>${amount_htg} HTG</td>
-          </tr>
-          <tr>
-            <td colspan="2"><strong>Email:</strong><br>${customer_info.email}</td>
-            <td><strong>Payment:</strong><br>Peye ak HatexCard</td>
-          </tr>
-        </table>
+          <table style="width: 100%; margin-bottom: 30px; font-size: 14px;">
+            <tr>
+              <td style="padding-bottom: 10px;"><strong>Order #:</strong><br>${order_id}</td>
+              <td style="padding-bottom: 10px;"><strong>Date:</strong><br>${orderDate}</td>
+              <td style="padding-bottom: 10px;"><strong>Total:</strong><br>${amount_htg} HTG</td>
+            </tr>
+            <tr>
+              <td colspan="2"><strong>Email:</strong><br>${customer_info.email}</td>
+              <td><strong>Payment:</strong><br>Peye ak HatexCard</td>
+            </tr>
+          </table>
 
-        <h2 style="font-size: 18px; font-weight: normal; border-bottom: 2px solid #eaeaea; padding-bottom: 10px; margin-bottom: 15px;">Order details</h2>
-        <table style="width: 100%; font-size: 14px; margin-bottom: 30px; border-collapse: collapse;">
-          <tr>
-            <th style="text-align: left; padding-bottom: 10px; border-bottom: 2px solid #eaeaea;">Product</th>
-            <th style="text-align: right; padding-bottom: 10px; border-bottom: 2px solid #eaeaea;">Total</th>
-          </tr>
-          ${productsHtml}
-          <tr>
-            <td style="padding: 15px 0; font-weight: bold;">Total:</td>
-            <td style="padding: 15px 0; text-align: right; font-weight: bold;">${amount_htg} HTG</td>
-          </tr>
-        </table>
+          <h2 style="font-size: 18px; font-weight: normal; border-bottom: 2px solid #eaeaea; padding-bottom: 10px; margin-bottom: 15px;">Order details</h2>
+          <table style="width: 100%; font-size: 14px; margin-bottom: 30px; border-collapse: collapse;">
+            <tr>
+              <th style="text-align: left; padding-bottom: 10px; border-bottom: 2px solid #eaeaea;">Product</th>
+              <th style="text-align: right; padding-bottom: 10px; border-bottom: 2px solid #eaeaea;">Total</th>
+            </tr>
+            ${productsHtml}
+            <tr>
+              <td style="padding: 15px 0; font-weight: bold;">Total:</td>
+              <td style="padding: 15px 0; text-align: right; font-weight: bold;">${amount_htg} HTG</td>
+            </tr>
+          </table>
 
-        <h2 style="font-size: 18px; font-weight: normal; margin-bottom: 15px;">Billing address</h2>
-        <div style="border: 1px solid #eaeaea; padding: 15px; font-size: 14px; color: #555; line-height: 1.5;">
-          ${customer_info.name}<br>
-          ${customer_info.address.replace(/, /g, '<br>')}<br>
-          ${customer_info.phone}
+          <h2 style="font-size: 18px; font-weight: normal; margin-bottom: 15px;">Billing address</h2>
+          <div style="border: 1px solid #eaeaea; padding: 15px; font-size: 14px; color: #555; line-height: 1.5;">
+            ${customer_info.name}<br>
+            ${customer_info.address.replace(/, /g, '<br>')}<br>
+            ${customer_info.phone}
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    // 6. Tire imèl la ak Resend an itilize domèn ou a
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+      // N AP TIRE L AK RESEND OFISYÈL
+      const resendData = await resend.emails.send({
         from: 'HatexCard <notifications@hatexcard.com>',
         to: merchant.email,
         subject: `💸 Nouvo Kòmand HatexCard - #${order_id}`,
         html: emailHtml
-      })
-    });
+      });
 
-    if (!resendResponse.ok) {
-      const errorData = await resendResponse.json();
-      console.error('Erè Resend API:', errorData);
+      console.log("✅ Imèl la ale dous! Men repons Resend lan:", resendData);
+
+    } catch (emailError) {
+      console.error("🚨 Erè lè n ap eseye voye imèl la ak Resend:", emailError);
+      // Nou pa bloke peman an, nou jis anrejistre erè a
     }
 
+    // Nou voye repons siksè bay WooCommerce pou l ka afiche paj vèt la
     return NextResponse.json({ 
         success: true, 
-        message: 'Peman an pase e imèl la voye!'
+        message: 'Peman an pase nèt!'
     });
 
   } catch (error: any) {
-    console.error("Direct API Error:", error);
+    console.error("🚨 Erè Jeneral nan API Direct Payment lan:", error);
     return NextResponse.json({ error: 'Erè nan sèvè HatexCard la.' }, { status: 500 });
   }
 }
