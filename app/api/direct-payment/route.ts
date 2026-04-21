@@ -1,6 +1,9 @@
-// app/api/direct-payment/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
+
+// Inisyalize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
@@ -16,22 +19,20 @@ export async function POST(req: Request) {
     } = body;
 
     if (!merchant_api_key || !card_number || !card_cvv) {
-      return NextResponse.json({ error: 'Manke enfòmasyon kat la oswa kle machann nan.' }, { status: 400 });
+      return NextResponse.json({ error: 'Manke enfòmasyon kat la.' }, { status: 400 });
     }
 
-    // ========================================================================
-    // 🚨 1. NOU CHÈCHE KOLÒN "email" LA NAN TAB PROFILES LA GRAS AK API KEY A
-    // ========================================================================
+    // 1. Jwenn imèl machann nan nan baz done a
     const { data: merchant, error: merchantErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, account_status, email') // Nou rale sèlman "email" pwofil la
+      .select('id, account_status, email')
       .eq('api_key', merchant_api_key)
       .single();
 
     if (merchantErr || !merchant) return NextResponse.json({ error: 'Machann pa rekonèt.' }, { status: 404 });
     if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont machann sa bloke.' }, { status: 403 });
 
-    // 2. Kreye fakti a
+    // 2. Kreye Fakti a nan baz done a
     const { data: paymentRequest, error: insertErr } = await supabaseAdmin
       .from('payment_requests')
       .insert([{
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
     if (insertErr) throw insertErr;
 
-    // 3. Koupe kòb la sou Kat kliyan an pou mete l nan Wallet machann nan
+    // 3. Koupe kòb la
     const cleanCardNumber = card_number.replace(/\s/g, '');
     const { data: result, error: rpcError } = await supabaseAdmin.rpc('process_merchant_payment_with_card', {
       p_payment_id: paymentRequest.id,
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
        return NextResponse.json({ error: result?.message || "Echèk nan verifye kat la." }, { status: 400 });
     }
 
-    // 4. Anrejistre kòmand lan nan tablodbò a
+    // 4. Anrejistre nan Dashboard la
     await supabaseAdmin.from('plugin_transactions').insert([{
        merchant_id: merchant.id,
        amount_htg: Number(amount_htg),
@@ -71,12 +72,73 @@ export async function POST(req: Request) {
     }]);
 
     // ========================================================================
-    // 🚨 5. NOU VOYE "email" MACHANN NAN BAY PLUGIN PHP A POU L TIRE MESAJ LA
+    // 🚨 MAJI A: VOYE BÈL IMÈL LA AK RESEND DIREKTEMAN SOU SÈVÈ A 🚨
     // ========================================================================
+    const orderDate = new Date().toLocaleDateString('ht-HT', { year: 'numeric', month: 'long', day: 'numeric' });
+    
+    // Bati lis pwodwi yo pou imèl la
+    let productsHtml = '';
+    if (customer_info.products && customer_info.products.length > 0) {
+      customer_info.products.forEach((prod: any) => {
+        productsHtml += `
+          <tr>
+            <td style="padding: 12px 0; border-bottom: 1px solid #eaeaea; color: #333;">${prod.name} × ${prod.qty}</td>
+            <td style="padding: 12px 0; border-bottom: 1px solid #eaeaea; text-align: right; color: #333;">${prod.total}</td>
+          </tr>
+        `;
+      });
+    }
+
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+        <h1 style="font-size: 24px; font-weight: normal; margin-bottom: 20px;">Nouvo Kòmand resi via HatexCard</h1>
+        <p style="color: #666; margin-bottom: 30px;">Felisitasyon! Ou fèk resevwa yon kòmand ki peye nèt.</p>
+
+        <table style="width: 100%; margin-bottom: 30px; font-size: 14px;">
+          <tr>
+            <td style="padding-bottom: 10px;"><strong>Order #:</strong><br>${order_id}</td>
+            <td style="padding-bottom: 10px;"><strong>Date:</strong><br>${orderDate}</td>
+            <td style="padding-bottom: 10px;"><strong>Total:</strong><br>${amount_htg} HTG</td>
+          </tr>
+          <tr>
+            <td colspan="2"><strong>Email:</strong><br>${customer_info.email}</td>
+            <td><strong>Payment:</strong><br>Peye ak HatexCard</td>
+          </tr>
+        </table>
+
+        <h2 style="font-size: 18px; font-weight: normal; border-bottom: 2px solid #eaeaea; padding-bottom: 10px; margin-bottom: 15px;">Order details</h2>
+        <table style="width: 100%; font-size: 14px; margin-bottom: 30px; border-collapse: collapse;">
+          <tr>
+            <th style="text-align: left; padding-bottom: 10px; border-bottom: 2px solid #eaeaea;">Product</th>
+            <th style="text-align: right; padding-bottom: 10px; border-bottom: 2px solid #eaeaea;">Total</th>
+          </tr>
+          ${productsHtml}
+          <tr>
+            <td style="padding: 15px 0; font-weight: bold;">Total:</td>
+            <td style="padding: 15px 0; text-align: right; font-weight: bold;">${amount_htg} HTG</td>
+          </tr>
+        </table>
+
+        <h2 style="font-size: 18px; font-weight: normal; margin-bottom: 15px;">Billing address</h2>
+        <div style="border: 1px solid #eaeaea; padding: 15px; font-size: 14px; color: #555; line-height: 1.5;">
+          ${customer_info.name}<br>
+          ${customer_info.address.replace(/, /g, '<br>')}<br>
+          ${customer_info.phone}
+        </div>
+      </div>
+    `;
+
+    // Voye imèl la avèk Resend
+    await resend.emails.send({
+      from: 'notifications@hatexcard.com', // Chanje sa si w gen yon domèn verifye sou Resend
+      to: merchant.email,
+      subject: `💸 Nouvo Kòmand HatexCard - #${order_id}`,
+      html: emailHtml
+    });
+
     return NextResponse.json({ 
         success: true, 
-        message: 'Peman an pase!',
-        merchant_email: merchant.email // Se la a Plugin nan ap pran l pou l voye foto yo!
+        message: 'Peman an pase e imèl la voye!'
     });
 
   } catch (error: any) {
