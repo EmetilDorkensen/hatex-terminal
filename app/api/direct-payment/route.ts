@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
-// Nou inisyalize Resend egzakteman jan w fè l nan lòt paj yo
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: Request) {
   try {
+    // ========================================================================
+    // 🚨 NOU DEPLASE RESEND LAN ANNDAN FONKSYON AN POU L PA KRAZE BUILD LA
+    // ========================================================================
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
@@ -140,10 +142,8 @@ export async function POST(req: Request) {
 
     } catch (emailError) {
       console.error("🚨 Erè lè n ap eseye voye imèl la ak Resend:", emailError);
-      // Nou pa bloke peman an, nou jis anrejistre erè a
     }
 
-    // Nou voye repons siksè bay WooCommerce pou l ka afiche paj vèt la
     return NextResponse.json({ 
         success: true, 
         message: 'Peman an pase nèt!'
