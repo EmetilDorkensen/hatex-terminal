@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
-
-// Inisyalize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +18,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Manke enfòmasyon kat la.' }, { status: 400 });
     }
 
-    // 1. Jwenn imèl machann nan nan baz done a
+    // 1. Jwenn imèl machann nan
     const { data: merchant, error: merchantErr } = await supabaseAdmin
       .from('profiles')
       .select('id, account_status, email')
@@ -32,7 +28,7 @@ export async function POST(req: Request) {
     if (merchantErr || !merchant) return NextResponse.json({ error: 'Machann pa rekonèt.' }, { status: 404 });
     if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont machann sa bloke.' }, { status: 403 });
 
-    // 2. Kreye Fakti a nan baz done a
+    // 2. Kreye Fakti a
     const { data: paymentRequest, error: insertErr } = await supabaseAdmin
       .from('payment_requests')
       .insert([{
@@ -47,7 +43,7 @@ export async function POST(req: Request) {
 
     if (insertErr) throw insertErr;
 
-    // 3. Koupe kòb la
+    // 3. Koupe kòb la sou kat la
     const cleanCardNumber = card_number.replace(/\s/g, '');
     const { data: result, error: rpcError } = await supabaseAdmin.rpc('process_merchant_payment_with_card', {
       p_payment_id: paymentRequest.id,
@@ -60,7 +56,7 @@ export async function POST(req: Request) {
        return NextResponse.json({ error: result?.message || "Echèk nan verifye kat la." }, { status: 400 });
     }
 
-    // 4. Anrejistre nan Dashboard la
+    // 4. Anrejistre tranzaksyon an
     await supabaseAdmin.from('plugin_transactions').insert([{
        merchant_id: merchant.id,
        amount_htg: Number(amount_htg),
@@ -71,12 +67,9 @@ export async function POST(req: Request) {
        status: 'completed'
     }]);
 
-    // ========================================================================
-    // 🚨 MAJI A: VOYE BÈL IMÈL LA AK RESEND DIREKTEMAN SOU SÈVÈ A 🚨
-    // ========================================================================
+    // 5. Bati imèl la
     const orderDate = new Date().toLocaleDateString('ht-HT', { year: 'numeric', month: 'long', day: 'numeric' });
     
-    // Bati lis pwodwi yo pou imèl la
     let productsHtml = '';
     if (customer_info.products && customer_info.products.length > 0) {
       customer_info.products.forEach((prod: any) => {
@@ -128,13 +121,25 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    // Voye imèl la avèk Resend
-    await resend.emails.send({
-      from: 'notifications@hatexcard.com', // Chanje sa si w gen yon domèn verifye sou Resend
-      to: merchant.email,
-      subject: `💸 Nouvo Kòmand HatexCard - #${order_id}`,
-      html: emailHtml
+    // 6. Tire imèl la ak Resend an itilize domèn ou a
+    const resendResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'HatexCard <notifications@hatexcard.com>',
+        to: merchant.email,
+        subject: `💸 Nouvo Kòmand HatexCard - #${order_id}`,
+        html: emailHtml
+      })
     });
+
+    if (!resendResponse.ok) {
+      const errorData = await resendResponse.json();
+      console.error('Erè Resend API:', errorData);
+    }
 
     return NextResponse.json({ 
         success: true, 
