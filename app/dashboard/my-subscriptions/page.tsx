@@ -47,7 +47,9 @@ export default function MySubscriptionsPage() {
     fetchMySubscriptions();
   }, [supabase, router]);
 
-  // FONKSYON POU ANILE ABÒNMAN AN
+  // ============================================================
+  // FONKSYON POU ANILE ABÒNMAN AN AK NOTIFIKASYON POU MACHANN
+  // ============================================================
   const handleCancelSubscription = async (sub: any) => {
     const isConfirmed = window.confirm(`Èske w sèten ou vle anile abònman "${sub.plan_name}" nan ${sub.shop_name}? Yo pap koupe kòb sou kat ou ankò pou sèvis sa a.`);
     if (!isConfirmed) return;
@@ -55,20 +57,50 @@ export default function MySubscriptionsPage() {
     setProcessingId(sub.id);
 
     try {
-      // Mete ajou estati abònman an nan tab la
-      const { error } = await supabase
+      // 1. Mete ajou estati abònman an nan tab la kòm 'cancelled'
+      const { error: cancelError } = await supabase
         .from('subscriptions_history')
         .update({ status: 'cancelled' })
         .eq('id', sub.id);
 
-      if (error) throw error;
+      if (cancelError) throw cancelError;
 
-      // Mete UI a ajou san rafrechi paj la
+      // 2. 🚨 NOUVO: Voye mesaj nan istorik/notifikasyon machann nan
+      // Sa sipoze ou gen yon tab tankou 'merchant_notifications' (ou ka adapte non an ak baz done w la)
+      const { error: notifyError } = await supabase
+        .from('merchant_notifications') 
+        .insert([{
+          merchant_id: sub.merchant_id, // Asire w sub la genyen merchant_id a ladan l
+          title: 'Abònman Anile ❌',
+          message: `Kliyan an fèk anile abònman "${sub.plan_name}" li a. Tanpri koupe sèvis la pou li depi jodi a.`,
+          type: 'cancellation',
+          read: false
+        }]);
+
+      if (notifyError) console.error("Nou pa t ka anrejistre notifikasyon an:", notifyError);
+
+      // 3. 🚨 NOUVO: Pou voye imèl machann nan n ap fè yon rekèt sou yon nouvo API (ki rele Resend)
+      // N ap bezwen kreye API sa a apre!
+      try {
+        await fetch('/api/notify-merchant-cancellation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchant_id: sub.merchant_id,
+            plan_name: sub.plan_name,
+            client_id: sub.client_id
+          })
+        });
+      } catch (emailErr) {
+        console.error("Sistèm imèl la gen yon ti pwoblèm, men anilasyon an fèt.");
+      }
+
+      // 4. Mete UI a ajou san rafrechi paj la
       setSubscriptions(subscriptions.map(s => 
         s.id === sub.id ? { ...s, status: 'cancelled' } : s
       ));
       
-      alert("Abònman ou an anile avèk siksè. Ou p ap peye pou li ankò.");
+      alert("Abònman ou an anile avèk siksè. Machann nan resevwa mesaj pou l koupe sèvis la.");
       
     } catch (err: any) {
       alert("Erè lè n ap anile abònman an: " + err.message);
