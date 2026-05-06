@@ -45,6 +45,12 @@ export default function TerminalPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   
+
+
+  const [activeTab, setActiveTab] = useState('plugins'); 
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [defaultUsdRate, setDefaultUsdRate] = useState('135');
+
   // Loading states
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -511,7 +517,7 @@ export default function TerminalPage() {
   };
 
 // ============================================================
-  // JENERE WOOCOMMERCE PLUGIN (FÒMA OTOMATIK JQUERY + ADRÈS KONPLÈ)
+  // JENERE WOOCOMMERCE PLUGIN (FÒMA OTOMATIK + TO ECHANJ MACHANN NAN)
   // ============================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
@@ -528,8 +534,8 @@ export default function TerminalPage() {
 /**
  * Plugin Name: HatexCard Direct Gateway
  * Plugin URI: https://hatexcard.com
- * Description: Aksepte peman HatexCard. (Klavye nimewik, espas otomatik, / nan dat la, Adrès konplè).
- * Version: 13.0.0
+ * Description: Aksepte peman HatexCard. (Klavye nimewik, espas otomatik, / nan dat la, Adrès konplè). To echanj inisyal: ${defaultUsdRate} HTG
+ * Version: 14.0.0
  * Author: Hatex Group
  */
 
@@ -562,7 +568,9 @@ function hatexcard_init_direct_gateway() {
 
             $this->title = $this->get_option('title');
             $this->description = $this->get_option('description');
-            $this->usd_rate = $this->get_option('usd_rate', '135');
+            
+            // 🚨 NOU METE TO ECHANJ KLIYAN AN TAPE A LA A OTOMATIKMAN
+            $this->usd_rate = $this->get_option('usd_rate', '${defaultUsdRate}');
             
             $this->merchant_api_key = '${profile.api_key}'; 
             $this->api_direct_url = 'https://hatexcard.com/api/direct-payment';
@@ -576,7 +584,8 @@ function hatexcard_init_direct_gateway() {
                 'enabled' => array('title' => 'Aktive', 'type' => 'checkbox', 'default' => 'yes'),
                 'title' => array('title' => 'Tit', 'type' => 'text', 'default' => 'Peye ak HatexCard'),
                 'description' => array('title' => 'Deskripsyon', 'type' => 'textarea', 'default' => 'Mete enfòmasyon kat HatexCard ou anba a.'),
-                'usd_rate' => array('title' => 'To Dola (HTG)', 'type' => 'number', 'default' => '135')
+                // 🚨 KLIYAN AN AP KA CHANJE TO A NAN WOOCOMMERCE TOU SI L VLE
+                'usd_rate' => array('title' => 'To Dola (HTG)', 'type' => 'number', 'default' => '${defaultUsdRate}', 'description' => 'Konbyen goud ou bay pou 1 dola?')
             );
         }
 
@@ -733,7 +742,6 @@ function add_hatexcard_direct_to_gateways($gateways) {
       setDownloadingPlugin(null);
     }
   };
-
   const saveYoutubeUrl = async () => {
     if (!profile?.id) return;
     await supabase.from('profiles').update({ sdk_tutorial_url: youtubeUrl }).eq('id', profile.id);
@@ -1241,6 +1249,8 @@ function add_hatexcard_direct_to_gateways($gateways) {
 
   const renderPlugins = () => (
     <div className="max-w-5xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+      
+      {/* HEADER AK BOUTON BACK */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 md:mb-8 gap-4">
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button onClick={() => setMode('dashboard')} className="p-3 bg-zinc-900 rounded-xl hover:bg-red-600 transition-all shrink-0">
@@ -1250,6 +1260,7 @@ function add_hatexcard_direct_to_gateways($gateways) {
         </div>
       </div>
 
+      {/* SEKSYON YOUTUBE LA */}
       <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2rem] md:rounded-[3rem] overflow-hidden mb-6 md:mb-8">
         <div className="p-5 md:p-7 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -1274,56 +1285,149 @@ function add_hatexcard_direct_to_gateways($gateways) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        
-        {/* WOOCOMMERCE PLUGIN CARD */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-blue-600/30 p-6 md:p-8 rounded-[2rem] hover:border-blue-500/50 transition-all flex flex-col h-full shadow-lg shadow-blue-900/10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-blue-600/20 p-3 rounded-xl"><ShoppingCart className="text-blue-400 w-6 h-6" /></div>
-            <div>
-              <h3 className="text-base md:text-xl font-black">WooCommerce</h3>
-              <p className="text-zinc-500 text-xs">WordPress Plugin</p>
-            </div>
-          </div>
-          <p className="text-zinc-400 text-[10px] md:text-sm mb-6 flex-grow">
-            Fè sit ou a aksepte HatexCard. L ap konvèti Dola an Goud epi voye kòb la sou kont ou dirèkteman.
-          </p>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-auto">
-            <div className="text-[10px] text-zinc-600"><span className="block">Vèsyon: 2.0.0</span></div>
-            <button 
-              onClick={generateWooCommercePlugin} 
-              disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profile?.api_key} 
-              className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-blue-600 rounded-xl font-black text-[10px] uppercase hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              {downloadingPlugin === 'woocommerce' ? <RefreshCw size={14} className="animate-spin" /> : <DownloadIcon size={14} />}
-              {downloadingPlugin === 'woocommerce' ? 'Ap jenere...' : 'Telechaje ZIP'}
-            </button>
-          </div>
-        </div>
-
-        {/* HOSTINGER PLUGIN CARD */}
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-8 rounded-[2rem] hover:border-red-600/30 transition-all flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-orange-600/20 p-3 rounded-xl"><Wifi className="text-orange-400 w-6 h-6" /></div>
-            <div>
-              <h3 className="text-base md:text-xl font-black">Hostinger / Horizon</h3>
-              <p className="text-zinc-500 text-xs">Embed Code</p>
-            </div>
-          </div>
-          <p className="text-zinc-400 text-[10px] md:text-sm mb-6 flex-grow">Kòd pou kole nan sit ou. Vèsyon 2.0 ak fòmilè kat entegre.</p>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-auto">
-            <div className="text-[10px] text-zinc-600"><span className="block">Vèsyon: 2.0.0</span></div>
-            <button onClick={generateHostingerPlugin} disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key} className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-red-600 rounded-xl font-black text-[10px] uppercase hover:bg-red-700 disabled:opacity-40 flex items-center justify-center gap-2">
-              {downloadingPlugin === 'hostinger' ? <RefreshCw size={14} className="animate-spin" /> : <DownloadIcon size={14} />}
-              {downloadingPlugin === 'hostinger' ? 'Ap jenere...' : 'Telechaje ZIP'}
-            </button>
-          </div>
-        </div>
-        
+      {/* MENI TABS YO (PLUGINS VS API) */}
+      <div className="flex border-b border-white/10 mb-6 gap-2">
+        <button
+          onClick={() => setActiveTab('plugins')}
+          className={`py-3 px-6 text-[11px] font-black uppercase tracking-widest transition-colors ${
+            activeTab === 'plugins' 
+              ? 'border-b-2 border-red-600 text-white' 
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Plugins Boutik
+        </button>
+        <button
+          onClick={() => setActiveTab('api')}
+          className={`py-3 px-6 text-[11px] font-black uppercase tracking-widest transition-colors ${
+            activeTab === 'api' 
+              ? 'border-b-2 border-red-600 text-white' 
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Devlopè & API
+        </button>
       </div>
+
+      {/* ZÒN KONTNI TABS YO */}
+      {activeTab === 'plugins' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {/* WOOCOMMERCE PLUGIN CARD */}
+          <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-blue-600/30 p-6 md:p-8 rounded-[2rem] hover:border-blue-500/50 transition-all flex flex-col h-full shadow-lg shadow-blue-900/10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-blue-600/20 p-3 rounded-xl"><ShoppingCart className="text-blue-400 w-6 h-6" /></div>
+              <div>
+                <h3 className="text-base md:text-xl font-black">WooCommerce</h3>
+                <p className="text-zinc-500 text-xs">WordPress Plugin</p>
+              </div>
+            </div>
+            <p className="text-zinc-400 text-[10px] md:text-sm mb-4">
+              Fè sit ou a aksepte HatexCard. Konfigirasyon an gentan fèt otomatikman nan ZIP ou pral telechaje a.
+            </p>
+            
+            {/* TI BWAT POU METE TO ECHANJ LA */}
+            <div className="mb-6">
+              <label className="text-[10px] text-zinc-500 font-bold uppercase block mb-2">To Echanj Dola (1 USD = ? HTG)</label>
+              <input 
+                type="number" 
+                value={defaultUsdRate} 
+                onChange={(e) => setDefaultUsdRate(e.target.value)} 
+                className="bg-black/40 border border-white/10 py-2 px-3 rounded-lg text-xs outline-none w-full text-white"
+                placeholder="135"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-auto">
+              <div className="text-[10px] text-zinc-600"><span className="block">Vèsyon: 3.0.0</span></div>
+              <button 
+                onClick={generateWooCommercePlugin} 
+                disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profile?.api_key} 
+                className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-blue-600 rounded-xl font-black text-[10px] uppercase hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {downloadingPlugin === 'woocommerce' ? <RefreshCw size={14} className="animate-spin" /> : <DownloadIcon size={14} />}
+                {downloadingPlugin === 'woocommerce' ? 'Ap jenere...' : 'Telechaje ZIP'}
+              </button>
+            </div>
+          </div>
+
+          {/* HOSTINGER PLUGIN CARD */}
+          <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-8 rounded-[2rem] hover:border-red-600/30 transition-all flex flex-col h-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-orange-600/20 p-3 rounded-xl"><Wifi className="text-orange-400 w-6 h-6" /></div>
+              <div>
+                <h3 className="text-base md:text-xl font-black">Hostinger / Horizon</h3>
+                <p className="text-zinc-500 text-xs">Embed Code</p>
+              </div>
+            </div>
+            <p className="text-zinc-400 text-[10px] md:text-sm mb-6 flex-grow">Kòd pou kole nan sit ou. Vèsyon 2.0 ak fòmilè kat entegre.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-auto">
+              <div className="text-[10px] text-zinc-600"><span className="block">Vèsyon: 2.0.0</span></div>
+              <button onClick={generateHostingerPlugin} disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key} className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-red-600 rounded-xl font-black text-[10px] uppercase hover:bg-red-700 disabled:opacity-40 flex items-center justify-center gap-2">
+                {downloadingPlugin === 'hostinger' ? <RefreshCw size={14} className="animate-spin" /> : <DownloadIcon size={14} />}
+                {downloadingPlugin === 'hostinger' ? 'Ap jenere...' : 'Telechaje ZIP'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* SEKSYON API DEVLOPÈ A */
+        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-lg">
+          <h3 className="text-lg md:text-xl font-black mb-2 text-white">API Piblik & Kle Sekrè</h3>
+          <p className="text-zinc-400 text-[11px] md:text-sm mb-6">Entegre HatexCard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
+          
+          <div className="bg-white/5 border border-white/10 p-5 rounded-xl mb-6">
+            <label className="block text-[10px] font-bold tracking-widest text-zinc-400 uppercase mb-2">Kle Prive (Secret Key)</label>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <input
+                type="text"
+                readOnly
+                value={profile?.api_key || "Y ap chaje kle a..."}
+                className="flex-1 w-full bg-black/40 border border-white/10 text-white text-xs rounded-lg p-3 font-mono outline-none"
+              />
+              <button
+                onClick={() => {
+                  if (profile?.api_key) {
+                    navigator.clipboard.writeText(profile.api_key);
+                    setCopiedKey(true);
+                    setTimeout(() => setCopiedKey(false), 2000);
+                  }
+                }}
+                className="w-full sm:w-auto bg-white hover:bg-gray-200 text-black px-6 py-3 rounded-lg font-black text-[10px] uppercase transition-all"
+              >
+                {copiedKey ? 'Kopye ✓' : 'Kopye Kle a'}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase mb-3">Egzanp Kòd Peman (Javascript)</h4>
+            <pre className="bg-[#050505] border border-white/5 text-zinc-300 p-4 rounded-xl overflow-x-auto text-[10px] font-mono leading-relaxed">
+<code>{`const response = await fetch('https://hatexcard.com/api/public/payments', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ${profile?.api_key || 'KLE_W_LA'}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    amount: 1500, // HTG
+    currency: 'HTG',
+    order_id: 'CMD-123',
+    card_info: {
+       number: '0000 0000 0000 0000',
+       exp: '12/28',
+       cvv: '123'
+    }
+  })
+});
+const data = await response.json();
+console.log(data);`}</code>
+            </pre>
+          </div>
+        </div>
+      )}
+
     </div>
   );
-
   const renderInvoices = () => {
     if (subMode === 'create') {
       return (
