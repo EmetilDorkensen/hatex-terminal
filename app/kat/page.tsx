@@ -61,7 +61,11 @@ export default function KatPage() {
     setTimeout(() => setCopyStatus(""), 2000);
   };
 
-  const isActivated = userData?.kyc_status === 'approved';
+  // 🚨 LA A: NOU TCHEKE KONDISYON YO
+  // Moun nan dwe gen KYC li 'approved' EPI li dwe gen yon abònman aktif
+  const hasKyc = userData?.kyc_status === 'approved';
+  const hasSubscription = userData?.plan_id && userData?.subscription_status === 'active';
+  const isActivated = hasKyc && hasSubscription;
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center">
@@ -96,9 +100,18 @@ export default function KatPage() {
         {!isActivated && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[3rem] bg-black/80 backdrop-blur-xl p-8 text-center border border-white/5">
             <div className="w-16 h-16 bg-red-600/10 rounded-full flex items-center justify-center text-red-600 mb-6 text-2xl animate-pulse">🔒</div>
-            <h3 className="text-[14px] font-black uppercase mb-2 tracking-widest">KYC Obligatwa</h3>
-            <p className="text-[9px] text-zinc-500 font-bold mb-6">Verifye idantite w pou debloke kat ou a.</p>
-            <button onClick={() => router.push('/kyc')} className="bg-white text-black px-12 py-5 rounded-[2rem] font-black text-[11px] uppercase shadow-2xl active:scale-95 transition-all tracking-widest">Pase KYC</button>
+            <h3 className="text-[14px] font-black uppercase mb-2 tracking-widest">
+              {hasKyc ? "Abònman Obligatwa" : "KYC Obligatwa"}
+            </h3>
+            <p className="text-[9px] text-zinc-500 font-bold mb-6">
+              {hasKyc ? "Ou dwe gen yon plan abònman aktif pou debloke kat ou a." : "Verifye idantite w pou kòmanse pwosesis la."}
+            </p>
+            <button 
+              onClick={() => router.push(hasKyc ? '/subscription' : '/kyc')} 
+              className="bg-white text-black px-12 py-5 rounded-[2rem] font-black text-[11px] uppercase shadow-2xl active:scale-95 transition-all tracking-widest"
+            >
+              {hasKyc ? "Wè Plan Yo" : "Pase KYC"}
+            </button>
           </div>
         )}
 
@@ -148,8 +161,8 @@ export default function KatPage() {
               </div>
           </div>
 
-{/* DÈYÈ */}
-<div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2rem] bg-[#0d0e14] p-8 border border-white/10 flex flex-col items-center justify-between shadow-2xl shadow-red-900/10">
+        {/* DÈYÈ */}
+        <div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2rem] bg-[#0d0e14] p-8 border border-white/10 flex flex-col items-center justify-between shadow-2xl shadow-red-900/10">
               <div className="w-full h-12 bg-black absolute top-8 left-0 border-y border-white/5"></div>
               <div className="mt-20 bg-white p-2 rounded-2xl">
                  <QRCodeSVG value={`Card:${userData?.card_number}`} size={100} />

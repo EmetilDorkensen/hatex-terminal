@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
+import { RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck } from 'lucide-react'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -24,6 +25,18 @@ export default function Dashboard() {
   
   // Eta pou kenbe kantite rediksyon ki nan tiroir a
   const [discountAmount, setDiscountAmount] = useState(0);
+
+  // ETA POU RANBOUSMAN
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundTxId, setRefundTxId] = useState("");
+  const [refundReason, setRefundReason] = useState("Kliyan an mande ranbousman");
+  const [isRefunding, setIsRefunding] = useState(false);
+
+  // ETA POU KONFIME LIVREZON (OTP)
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpTxId, setOtpTxId] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
@@ -50,7 +63,6 @@ export default function Dashboard() {
             profile = await generateMissingCard(user.id, profile);
             setUserData({ ...profile, email: user.email });
             
-            // NOUVO: Nou gade nan tiroir 'user_discounts' la si ID moun sa a la
             const { data: discountData } = await supabase
               .from('user_discounts')
               .select('discount_amount')
@@ -104,19 +116,14 @@ export default function Dashboard() {
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
   };
 
-  // Kalkil pou pri ki parèt sou ekran an
   const priBase = 520;
   const uiPriAktivasyon = Math.max(0, priBase - discountAmount);
 
-  // =========================================================================
-  // BOUTON AKTIVE A: Fè tout verifikasyon an fre dirèkteman nan baz done a!
-  // =========================================================================
   const handleActivateCard = async () => {
     if (!userData) return;
     setLoading(true);
 
     try {
-      // 1. Rale kòb aktyèl kliyan an dirèk nan baz done a
       const { data: realProfile, error: profileErr } = await supabase
         .from('profiles')
         .select('wallet_balance')
@@ -125,7 +132,6 @@ export default function Dashboard() {
 
       if (profileErr || !realProfile) throw new Error("Nou pa ka jwenn enfòmasyon w yo kounye a.");
 
-      // 2. Gade nan espas apa a rapid pou wè si ID moun nan la epi konbyen rediksyon l genyen
       let dbDiscountAmount = 0;
       const { data: realDiscountData } = await supabase
         .from('user_discounts')
@@ -137,11 +143,9 @@ export default function Dashboard() {
         dbDiscountAmount = realDiscountData.discount_amount || 0;
       }
 
-      // 3. Kalkile pri reyèl li dwe peye a
       const realActivationPrice = Math.max(0, priBase - dbDiscountAmount);
       const realWalletBalance = Number(realProfile.wallet_balance || 0);
 
-      // 4. Verifye si l gen kòb sa sou kont li
       if (realWalletBalance < realActivationPrice) {
         setLoading(false);
         alert(`Ou pa gen ase kòb sou balans ou!\n\nOu bezwen omwen ${realActivationPrice} HTG pou aktive kat la.\nTanpri fè yon depo anvan.`);
@@ -149,13 +153,11 @@ export default function Dashboard() {
         return;
       }
 
-      // 5. Mande konfimasyon
       if (!window.confirm(`Èske w sèten ou vle peye ${realActivationPrice} HTG pou aktive Kat Vityèl la ak Terminal ou a?`)) {
         setLoading(false);
         return;
       }
 
-      // 6. Koupe kòb la sou pwofil la epi aktive kat la
       const nouvoBalans = realWalletBalance - realActivationPrice;
       const { error: updateErr } = await supabase
         .from('profiles')
@@ -164,7 +166,6 @@ export default function Dashboard() {
 
       if (updateErr) throw updateErr;
 
-      // 7. Enprime Resi a
       await supabase.from('transactions').insert({
         user_id: userData.id, 
         amount: -realActivationPrice, 
@@ -178,6 +179,58 @@ export default function Dashboard() {
       alert("Erè: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGlobalRefund = async () => {
+    if (!refundTxId) return alert("Tanpri mete ID Tranzaksyon an.");
+    setIsRefunding(true);
+    
+    try {
+      const res = await fetch('/api/refunds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_id: refundTxId.trim(),
+          merchant_id: userData.id,
+          reason: refundReason
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      alert('✅ Ranbousman an fèt ak siksè! Kliyan an fèk resevwa kòb li.');
+      setShowRefundModal(false);
+      setRefundTxId('');
+      
+    } catch (err: any) {
+      alert(`❌ Erè: ${err.message}`);
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otpTxId || !otpCode) return alert("Tanpri ranpli tout bwat yo!");
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/verify-delivery', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: otpTxId.trim(), merchant_id: userData.id, otp_code: otpCode.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      alert(`✅ ${data.message}`);
+      setShowOtpModal(false);
+      setOtpTxId('');
+      setOtpCode('');
+    } catch (err: any) {
+      alert(`❌ Erè: ${err.message}`);
+      if (err.message.includes("sispandi")) window.location.reload();
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -196,10 +249,113 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
+      
+      {/* MODAL RANBOUSMAN */}
+      {showRefundModal && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-[#0a0b14] border border-red-500/30 w-full max-w-md rounded-[2rem] p-6 shadow-2xl relative">
+            <button 
+              onClick={() => setShowRefundModal(false)}
+              className="absolute top-5 right-5 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                <RefreshCcw size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic">Ranbousman</h3>
+                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">Remèt kliyan an lajan l</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">ID Tranzaksyon an</label>
+                <input 
+                  type="text" 
+                  value={refundTxId}
+                  onChange={(e) => setRefundTxId(e.target.value)}
+                  placeholder="Kole ID kòmand lan la a..."
+                  className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">Rezon Ranbousman an</label>
+                <select 
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors"
+                >
+                  <option value="Kliyan an mande ranbousman">Kliyan an mande l</option>
+                  <option value="Pwodwi a pa disponib">Pwodwi pa disponib</option>
+                  <option value="Sispèk Fwod">Sispèk Fwod</option>
+                  <option value="Lòt rezon">Lòt rezon</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowRefundModal(false)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+              >
+                Anile
+              </button>
+              <button 
+                onClick={handleGlobalRefund}
+                disabled={isRefunding || !refundTxId}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRefunding ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Konfime Ranbousman'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL OTP (KONFIME LIVREZON) */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-[#0a0b14] border border-green-500/30 w-full max-w-md rounded-[2rem] p-6 shadow-2xl relative">
+            <button onClick={() => setShowOtpModal(false)} className="absolute top-5 right-5 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500"><ShieldCheck size={24} /></div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic">Konfime Livrezon</h3>
+                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">Debloke kòb kòmand lan</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">ID Tranzaksyon an</label>
+                <input type="text" value={otpTxId} onChange={(e) => setOtpTxId(e.target.value)} placeholder="Eg: CMD-12345" className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-green-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">Kòd Sekrè Kliyan an (4 Chif)</label>
+                <input type="text" maxLength={4} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="0000" className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-2xl tracking-[1em] text-center font-mono outline-none focus:border-green-500/50 transition-colors" />
+                <p className="text-[9px] text-red-500 mt-2 font-bold uppercase">⚠️ Atansyon: Ou sèlman gen 3 chans si kòd la pa bon!</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowOtpModal(false)} className="flex-1 bg-zinc-800 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">Anile</button>
+              <button onClick={handleVerifyOTP} disabled={isVerifying || !otpTxId || otpCode.length !== 4} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all disabled:opacity-50">
+                {isVerifying ? 'Ap Verifye...' : 'Verifye Kòd la'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-7xl mx-auto p-4 sm:p-5 md:p-6 lg:p-8 pb-32">
         
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full border-2 border-red-600 p-0.5 bg-zinc-900 overflow-hidden flex items-center justify-center font-black shrink-0">
               {userData?.full_name?.charAt(0) || "H"}
@@ -212,7 +368,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setShowOtpModal(true)} className="bg-zinc-900/50 hover:bg-green-600/20 text-green-500 border border-white/5 hover:border-green-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
+              <CheckCircle size={12} /> KONFIME LIVREZON
+            </button>
+            
+            <button onClick={() => setShowRefundModal(true)} className="bg-zinc-900/50 hover:bg-red-600/20 text-red-500 border border-white/5 hover:border-red-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
+              <RefreshCcw size={12} /> RANBOUSE
+            </button>
+
             {isAdmin && (
               <button onClick={() => router.push('/admin')} className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce shadow-lg shadow-red-600/30">
                 ADMIN
@@ -276,7 +440,7 @@ export default function Dashboard() {
                 
                 {discountAmount > 0 && (
                    <p className="text-[10px] text-green-400 font-black mb-3 animate-pulse uppercase tracking-widest">
-                     🎉 Ou jwenn yon rediksyon {discountAmount} HTG!
+                      🎉 Ou jwenn yon rediksyon {discountAmount} HTG!
                    </p>
                 )}
 
