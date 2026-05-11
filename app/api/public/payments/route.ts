@@ -28,9 +28,13 @@ export async function POST(req: Request) {
     const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
 
     // 3. Pwosesis Kat la (Nou rele RPC ou te genyen an)
-    // Nou kreye yon request peman anvan
+    // 🚨 FIX POU ERÈ A: Nou ajoute redirect_url ak webhook_url nan baz done a
     const { data: pReq, error: pErr } = await supabaseAdmin.from('payment_requests').insert([{
-      merchant_id: merchant.id, amount: Number(amount), order_id: order_id.toString()
+      merchant_id: merchant.id, 
+      amount: Number(amount), 
+      order_id: order_id.toString(),
+      redirect_url: 'direct', // ✅ Sa te manke a, baz done a te bloke l pou sa!
+      webhook_url: 'direct'   // ✅ 
     }]).select().single();
 
     if (pErr) throw pErr;
@@ -47,7 +51,6 @@ export async function POST(req: Request) {
     }
 
     // 4. Sere tranzaksyon an nan Plugin Transactions ak Status 'pending' (Escrow)
-    // Nou mete OTP a anndan customer_info
     const finalCustomerInfo = { ...customer_info, delivery_otp };
 
     await supabaseAdmin.from('plugin_transactions').insert([{
@@ -61,20 +64,21 @@ export async function POST(req: Request) {
 
     // 5. KONSTRIKSYON IMÈL DETAYE A (AK FOTO AK VARYASYON)
     let productsHtml = '';
-    if (customer_info.products_detail && customer_info.products_detail.length > 0) {
-      customer_info.products_detail.forEach((prod: any) => {
-        const imgSrc = prod.image ? prod.image : 'https://hatexcard.com/no-image.png';
+    // Asire n n ap chèche done nan 'products' jan plugin nan voye l la
+    if (customer_info.products && customer_info.products.length > 0) {
+      customer_info.products.forEach((prod: any) => {
+        const imgSrc = prod.image ? prod.image : 'https://via.placeholder.com/50?text=No+Image';
         productsHtml += `
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #eee; width: 60px;">
-              <img src="${imgSrc}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover;">
+              <img src="${imgSrc}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #eee;">
             </td>
             <td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 14px;">
               <strong style="color:#000;">${prod.name}</strong> x${prod.qty}
               <br><span style="color:#888; font-size:11px;">${prod.meta || ''}</span>
             </td>
             <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">
-              $${prod.price_usd}
+              $${prod.total || '0.00'}
             </td>
           </tr>`;
       });
@@ -100,17 +104,20 @@ export async function POST(req: Request) {
         <p style="font-size: 14px; line-height: 1.6;">
           <b>Kliyan:</b> ${customer_info.name}<br>
           <b>Telefòn:</b> ${customer_info.phone}<br>
-          <b>Adrès:</b> ${customer_info.address.replace(/\n/g, '<br>')}
+          <b>Adrès:</b> ${customer_info.address ? customer_info.address.replace(/\n/g, '<br>') : ''}
         </p>
       </div>
     `;
 
-    await resend.emails.send({
-      from: 'HatexCard Orders <orders@hatexcard.com>',
-      to: merchant.email,
-      subject: `🛍️ Kòmand Nouvo #${order_id} - ${amount} HTG`,
-      html: emailHtml
-    });
+    // Voye imèl la sèlman si API key Resend lan la
+    if (process.env.RESEND_API_KEY) {
+        await resend.emails.send({
+          from: 'HatexCard Orders <orders@hatexcard.com>',
+          to: merchant.email,
+          subject: `🛍️ Kòmand Nouvo #${order_id} - ${amount} HTG`,
+          html: emailHtml
+        });
+    }
 
     // 6. RETOUNEN OTP A BAY PLUGIN NAN POU L KA AFICHE L BAY KLIYAN AN
     return NextResponse.json({ 
@@ -119,6 +126,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erè Sèvè: ' + error.message }, { status: 500 });
+    console.error("Erè Sèvè API:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
