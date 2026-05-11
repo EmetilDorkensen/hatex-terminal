@@ -198,7 +198,7 @@ export default function Dashboard() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Echèk nan ranbousman an.");
 
       alert('✅ Ranbousman an fèt ak siksè! Kliyan an fèk resevwa kòb li.');
       setShowRefundModal(false);
@@ -216,11 +216,16 @@ export default function Dashboard() {
     setIsVerifying(true);
     try {
       const res = await fetch('/api/verify-delivery', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: otpTxId.trim(), merchant_id: userData.id, otp_code: otpCode.trim() })
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            transaction_id: otpTxId.trim(), 
+            merchant_id: userData.id, 
+            otp_code: otpCode.trim() 
+        })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Echèk nan verifikasyon kòd la.");
       
       alert(`✅ ${data.message}`);
       setShowOtpModal(false);
@@ -228,7 +233,10 @@ export default function Dashboard() {
       setOtpCode('');
     } catch (err: any) {
       alert(`❌ Erè: ${err.message}`);
-      if (err.message.includes("sispandi")) window.location.reload();
+      // Rafrechi paj la si yo bloke kont machann nan (3 strikes)
+      if (err.message.includes("sispann") || err.message.includes("bloke")) {
+          window.location.reload();
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -333,7 +341,7 @@ export default function Dashboard() {
             <div className="space-y-4 mb-6">
               <div>
                 <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">ID Tranzaksyon an</label>
-                <input type="text" value={otpTxId} onChange={(e) => setOtpTxId(e.target.value)} placeholder="Eg: CMD-12345" className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-green-500/50 transition-colors" />
+                <input type="text" value={otpTxId} onChange={(e) => setOtpTxId(e.target.value)} placeholder="Eg: 74 oswa CMD-123" className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-green-500/50 transition-colors" />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">Kòd Sekrè Kliyan an (4 Chif)</label>
@@ -343,9 +351,9 @@ export default function Dashboard() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setShowOtpModal(false)} className="flex-1 bg-zinc-800 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">Anile</button>
-              <button onClick={handleVerifyOTP} disabled={isVerifying || !otpTxId || otpCode.length !== 4} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all disabled:opacity-50">
-                {isVerifying ? 'Ap Verifye...' : 'Verifye Kòd la'}
+              <button onClick={() => setShowOtpModal(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">Anile</button>
+              <button onClick={handleVerifyOTP} disabled={isVerifying || !otpTxId || otpCode.length !== 4} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                {isVerifying ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Verifye Kòd la'}
               </button>
             </div>
           </div>
