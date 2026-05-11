@@ -13,7 +13,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { amount, currency, order_id, card_info, customer_info } = body;
 
-    // 1. Chèche Machann nan via Bearer Token
     const authHeader = req.headers.get('Authorization');
     const api_key = authHeader?.replace('Bearer ', '');
     
@@ -22,19 +21,18 @@ export async function POST(req: Request) {
       .eq('api_key', api_key).single();
 
     if (mErr || !merchant) return NextResponse.json({ error: 'Kle API machann nan pa bon.' }, { status: 401 });
-    if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont machann sa a bloke.' }, { status: 403 });
+    if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont ou bloke.' }, { status: 403 });
 
-    // 2. Kreye yon Kòd Sekrè 4 Chif (OTP) pou Livrezon an
+    // 🚨 KREYE OTP A (4 CHIF)
     const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-    // 3. Pwosesis Kat la (Nou rele RPC ou te genyen an)
-    // 🚨 FIX POU ERÈ A: Nou ajoute redirect_url ak webhook_url nan baz done a
+    // PWOSESIS KAT LA
     const { data: pReq, error: pErr } = await supabaseAdmin.from('payment_requests').insert([{
       merchant_id: merchant.id, 
       amount: Number(amount), 
       order_id: order_id.toString(),
-      redirect_url: 'direct', // ✅ Sa te manke a, baz done a te bloke l pou sa!
-      webhook_url: 'direct'   // ✅ 
+      redirect_url: 'direct', 
+      webhook_url: 'direct'   
     }]).select().single();
 
     if (pErr) throw pErr;
@@ -50,21 +48,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: cardResult?.message || 'Kat la refize.' }, { status: 400 });
     }
 
-    // 4. Sere tranzaksyon an nan Plugin Transactions ak Status 'pending' (Escrow)
-    const finalCustomerInfo = { ...customer_info, delivery_otp };
+    // 🚨 STOKE NAN "BANK GLOBAL" LA (Escrow)
+    // Nou fòse OTP a antre nan customer_info a byen klè
+    const finalCustomerInfo = { 
+        ...customer_info, 
+        delivery_otp_code: delivery_otp 
+    };
 
     await supabaseAdmin.from('plugin_transactions').insert([{
       merchant_id: merchant.id,
       amount_htg: Number(amount),
       currency: 'HTG',
-      order_id: order_id.toString(),
+      order_id: order_id.toString(), // Egzanp: "74"
       customer_info: finalCustomerInfo,
-      status: 'pending' // 🚨 Bloke: Machann nan poko touche
+      status: 'pending' // Kòb la rete nan bank global la, li poko sou kont machann nan
     }]);
 
-    // 5. KONSTRIKSYON IMÈL DETAYE A (AK FOTO AK VARYASYON)
+    // 🚨 BATI IMÈL LA AK TOUT DETAY PWODWI YO
     let productsHtml = '';
-    // Asire n n ap chèche done nan 'products' jan plugin nan voye l la
+    // Nou asire n ap sèvi ak 'products' ki soti nan WooCommerce la
     if (customer_info.products && customer_info.products.length > 0) {
       customer_info.products.forEach((prod: any) => {
         const imgSrc = prod.image ? prod.image : 'https://via.placeholder.com/50?text=No+Image';
@@ -87,12 +89,12 @@ export async function POST(req: Request) {
     const emailHtml = `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 15px;">
         <h2 style="color: #16a34a;">💰 Nouvo Kòmand #${order_id}</h2>
-        <p>Ou resevwa yon peman <b>${amount} HTG</b>. Lajan an nan sistèm sekirite (Escrow).</p>
+        <p>Ou resevwa yon peman <b>${amount} HTG</b>. Lajan an nan sistèm sekirite (Bank Global la).</p>
         
         <div style="background: #fffbeb; border: 1px dashed #f59e0b; padding: 15px; border-radius: 10px; text-align: center;">
-          <p style="margin:0; font-size: 13px; color: #b45309;">Pou debloke kòb sa a, mande kliyan an kòd livrezon an:</p>
+          <p style="margin:0; font-size: 13px; color: #b45309;">Pou debloke kòb sa a sou kont ou, antre kòd livrezon an nan tèminal ou a:</p>
           <h1 style="margin: 5px 0; letter-spacing: 5px; color: #d97706;">****</h1>
-          <p style="font-size: 10px;">(Kliyan an gen kòd sa a sou ekran li)</p>
+          <p style="font-size: 10px;">(Lè w rive nan adrès la, mande kliyan an kòd 4 chif li a)</p>
         </div>
 
         <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 25px;">Pwodwi pou Livre:</h3>
@@ -109,7 +111,6 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    // Voye imèl la sèlman si API key Resend lan la
     if (process.env.RESEND_API_KEY) {
         await resend.emails.send({
           from: 'HatexCard Orders <orders@hatexcard.com>',
@@ -119,14 +120,12 @@ export async function POST(req: Request) {
         });
     }
 
-    // 6. RETOUNEN OTP A BAY PLUGIN NAN POU L KA AFICHE L BAY KLIYAN AN
     return NextResponse.json({ 
       success: true, 
       delivery_otp: delivery_otp 
     });
 
   } catch (error: any) {
-    console.error("Erè Sèvè API:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

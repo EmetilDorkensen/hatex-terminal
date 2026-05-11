@@ -517,7 +517,7 @@ export default function TerminalPage() {
   };
 
 // ============================================================
-  // JENERE WOOCOMMERCE PLUGIN (VÈSYON 20.0 - FULL PRO & DETAY)
+  // JENERE WOOCOMMERCE PLUGIN (VÈSYON 22.0 - AK BOUTON TELECHAJE PDF)
   // ============================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
@@ -534,14 +534,13 @@ export default function TerminalPage() {
 /**
  * Plugin Name: HatexCard Direct Gateway PRO
  * Plugin URI: https://hatexcard.com
- * Description: Peman HatexCard Ultra-Sekirize. Voye foto pwodwi, varyasyon (koulè/size), pri USD, ak adrès konplè bay machann nan. Sistèm Escrow ak OTP 4 chif enkli.
- * Version: 20.0.0
+ * Description: Peman Ultra-Sekirize. Skane foto, size, jere Escrow/OTP, ak Resi PDF pou kliyan an.
+ * Version: 22.0.0
  * Author: Hatex Group
  */
 
 if (!defined('ABSPATH')) exit;
 
-// Konpatibilite ak nouvo Checkout WooCommerce
 add_filter('render_block', 'hatexcard_universal_checkout_adapter', 10, 2);
 function hatexcard_universal_checkout_adapter(\$block_content, \$block) {
     if (\$block['blockName'] === 'woocommerce/checkout') {
@@ -559,10 +558,9 @@ function hatexcard_init_direct_gateway() {
         
         public function __construct() {
             \$this->id = 'hatexcard_direct';
-            \$this->icon = ''; 
             \$this->has_fields = true; 
             \$this->method_title = 'HatexCard';
-            \$this->method_description = 'Peman dirèk ak kòd livrezon sekirize (Escrow OTP).';
+            \$this->method_description = 'Peman ak kòd livrezon sekirize (Escrow OTP) epi resi PDF.';
 
             \$this->init_form_fields();
             \$this->init_settings();
@@ -583,19 +581,36 @@ function hatexcard_init_direct_gateway() {
                 'enabled' => array('title' => 'Aktive', 'type' => 'checkbox', 'default' => 'yes'),
                 'title' => array('title' => 'Tit', 'type' => 'text', 'default' => 'Peye ak HatexCard'),
                 'description' => array('title' => 'Deskripsyon', 'type' => 'textarea', 'default' => 'Mete enfòmasyon kat HatexCard ou anba a.'),
-                'usd_rate' => array('title' => 'To Dola (1 USD = ? HTG)', 'type' => 'number', 'default' => '${defaultUsdRate}', 'description' => 'Mete to echanj ou bay sou sit la.')
+                'usd_rate' => array('title' => 'To Dola (1 USD = ? HTG)', 'type' => 'number', 'default' => '${defaultUsdRate}')
             );
         }
 
+        // 🚨 NOUVO: BA BÈL RESI A AK BOUTON PDF LA
         public function custom_thankyou_page(\$order_id) {
             \$order = wc_get_order(\$order_id);
             \$otp = \$order->get_meta('_hatexcard_delivery_otp');
             if (!\$otp) return;
 
-            echo '<div style="background: #fffbeb; border: 2px dashed #f59e0b; padding: 30px; border-radius: 24px; margin-bottom: 40px; text-align: center; box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.2);">
-                    <p style="margin: 0; font-size: 13px; color: #b45309; font-weight: 900; text-transform: uppercase; letter-spacing: 3px;">Kòd Sekrè Livrezon (OTP):</p>
+            echo '<style>
+                    @media print {
+                        body * { visibility: hidden; }
+                        #hatex-receipt-area, #hatex-receipt-area * { visibility: visible; }
+                        #hatex-receipt-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 20px; }
+                        .no-print { display: none !important; }
+                    }
+                  </style>';
+
+            echo '<div id="hatex-receipt-area" style="background: #fffbeb; border: 2px dashed #f59e0b; padding: 30px; border-radius: 24px; margin-bottom: 40px; text-align: center;">
+                    <div style="margin-bottom: 20px;">
+                        <span style="background: #f59e0b; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; text-transform: uppercase;">Prèv Peman HatexCard</span>
+                    </div>
+                    <p style="margin: 0; font-size: 13px; color: #b45309; font-weight: 900; text-transform: uppercase;">Kòd Sekrè Livrezon (OTP):</p>
                     <h2 style="margin: 15px 0; font-size: 52px; color: #d97706; font-family: monospace; font-weight: 900; letter-spacing: 12px;">' . esc_html(\$otp) . '</h2>
-                    <p style="margin: 0; font-size: 11px; color: #92400e; font-weight: 600;">Kenbe kòd sa a. W ap bay livrè a li SÈLMAN lè ou resevwa machandiz ou a nan men w.</p>
+                    <p style="margin: 0; font-size: 11px; color: #92400e; font-weight: 600; margin-bottom: 20px;">Kòmand #' . \$order_id . ' - Kenbe kòd sa a pou livrè a.</p>
+                    
+                    <button class="no-print" onclick="window.print()" style="background: #d97706; color: white; border: none; padding: 12px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; box-shadow: 0 4px 6px rgba(217, 119, 6, 0.2);">
+                        📥 Enprime / Sove kòm PDF
+                    </button>
                   </div>';
         }
 
@@ -608,7 +623,6 @@ function hatexcard_init_direct_gateway() {
                     .hatex-field label { display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; margin-bottom: 5px; }
                     .hatex-input { width: 100% !important; padding: 12px !important; border-radius: 10px !important; border: 1px solid #ddd !important; font-size: 16px !important; }
                 </style>
-                
                 <div class="hatex-field">
                     <label>Nimewo Kat HatexCard <span class="required">*</span></label>
                     <input type="tel" name="hatex_card_number" class="hatex-input" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric">
@@ -627,13 +641,11 @@ function hatexcard_init_direct_gateway() {
 
             <script>
                 jQuery(document).ready(function(\$) {
-                    // Script pou espas nan nimewo kat
                     \$(document).on('input', 'input[name="hatex_card_number"]', function() {
                         var v = \$(this).val().replace(/\\D/g, '').substring(0, 16);
                         var p = v.match(/.{1,4}/g);
                         \$(this).val(p ? p.join(' ') : v);
                     });
-                    // Script pou / nan dat la
                     \$(document).on('input', 'input[name="hatex_expiry"]', function() {
                         var v = \$(this).val().replace(/\\D/g, '').substring(0, 4);
                         if (v.length > 2) \$(this).val(v.substring(0, 2) + '/' + v.substring(2, 4));
@@ -648,26 +660,24 @@ function hatexcard_init_direct_gateway() {
             global \$woocommerce;
             \$order = wc_get_order(\$order_id);
             
-            // 🚨 SKANE TOUT DETAY PWODWI YO (FOTO, VARYANT, PRI)
             \$items = \$order->get_items();
-            \$detailed_products = array();
+            \$products_array = array();
             foreach (\$items as \$item) {
                 \$product = \$item->get_product();
                 \$image_id = \$product->get_image_id();
                 \$image_url = \$image_id ? wp_get_attachment_image_url(\$image_id, 'full') : '';
                 
-                // Jwenn varyasyon (Koulè, Gwosè)
                 \$meta_string = '';
                 if (\$item->get_variation_id()) {
                     \$meta_string = wc_get_formatted_variation(\$product, true);
                 }
 
-                \$detailed_products[] = array(
-                    'name'      => \$item->get_name(),
-                    'qty'       => \$item->get_quantity(),
-                    'total'     => \$item->get_total(), // Pri an dola ($)
-                    'image'     => \$image_url,
-                    'meta'      => \$meta_string
+                \$products_array[] = array(
+                    'name'  => \$item->get_name(),
+                    'qty'   => \$item->get_quantity(),
+                    'total' => \$item->get_total(), 
+                    'image' => \$image_url,
+                    'meta'  => \$meta_string
                 );
             }
 
@@ -676,29 +686,26 @@ function hatexcard_init_direct_gateway() {
             \$full_address = \$order->get_formatted_shipping_address() ?: \$order->get_formatted_billing_address();
 
             \$payload = array(
-                'amount'        => \$amount_htg,
-                'currency'      => 'HTG',
-                'order_id'      => \$order_id,
-                'card_info'     => array(
+                'amount' => \$amount_htg,
+                'currency' => 'HTG',
+                'order_id' => \$order_id,
+                'card_info' => array(
                     'number' => str_replace(' ', '', \$_POST['hatex_card_number']),
-                    'exp'    => \$_POST['hatex_expiry'],
-                    'cvv'    => \$_POST['hatex_cvv']
+                    'exp' => \$_POST['hatex_expiry'],
+                    'cvv' => \$_POST['hatex_cvv']
                 ),
                 'customer_info' => array(
-                    'name'            => \$order->get_billing_first_name() . ' ' . \$order->get_billing_last_name(),
-                    'email'           => \$order->get_billing_email(),
-                    'phone'           => \$order->get_billing_phone(),
-                    'address'         => \$full_address,
-                    'products_detail' => \$detailed_products,
-                    'total_usd'       => \$total_usd
+                    'name' => \$order->get_billing_first_name() . ' ' . \$order->get_billing_last_name(),
+                    'email' => \$order->get_billing_email(),
+                    'phone' => \$order->get_billing_phone(),
+                    'address' => \$full_address,
+                    'products' => \$products_array,
+                    'usd_total' => \$total_usd
                 )
             );
 
             \$response = wp_remote_post(\$this->api_direct_url, array(
-                'headers' => array(
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer ' . \$this->merchant_api_key
-                ),
+                'headers' => array('Content-Type' => 'application/json', 'Authorization' => 'Bearer ' . \$this->merchant_api_key),
                 'body'    => json_encode(\$payload),
                 'timeout' => 30
             ));
@@ -711,7 +718,7 @@ function hatexcard_init_direct_gateway() {
                 \$otp = isset(\$body['delivery_otp']) ? \$body['delivery_otp'] : '';
                 \$order->update_meta_data('_hatexcard_delivery_otp', \$otp);
                 \$order->payment_complete();
-                \$order->add_order_note('✅ Peye ak HatexCard. OTP: ' . \$otp);
+                \$order->add_order_note('✅ Peman reyisi ak HatexCard. Kòd livrezon: ' . \$otp);
                 \$woocommerce->cart->empty_cart();
                 return array('result' => 'success', 'redirect' => \$this->get_return_url(\$order));
             } else {
@@ -729,8 +736,6 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 ?>`;
 
       pluginDir?.file("hatexcard-gateway.php", phpCode);
-      pluginDir?.file("readme.txt", "=== HatexCard WooCommerce Ultra V20 ===\nUpload zip sa a nan WordPress epi aktive l.");
-
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, `hatexcard-woocommerce.zip`);
 
