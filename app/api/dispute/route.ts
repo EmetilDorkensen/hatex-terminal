@@ -1,64 +1,73 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Nou kreye koneksyon ak baz done a
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 export async function POST(req: Request) {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    );
-
     const body = await req.json();
-    const { order_id, client_id, store_name, reason, proof_text, date } = body;
+    // Front-end lan voye ID a ak rezon an, nou pran yo:
+    const { orderId, reason, proofText, clientId, storeName } = body;
 
-    // Verifye si tout prèv yo la
-    if (!order_id || !store_name || !proof_text) {
-      return NextResponse.json({ error: 'Ou dwe ranpli tout enfòmasyon yo avèk prèv ou yo.' }, { status: 400 });
+    if (!orderId) {
+      return NextResponse.json({ error: "ID Kòmand lan obligatwa" }, { status: 400 });
     }
 
-    const cleanOrderId = order_id.toString().replace('#', '').trim();
+    const cleanId = orderId.trim().toLowerCase();
 
-    // 1. Chèche tranzaksyon an nan Bank Global la
-    const { data: tx, error: txErr } = await supabaseAdmin
+    // 1. Nou chèche kòmand lan nan baz done a ak nouvo order_id la (12 chif)
+    let { data: tx, error: fetchError } = await supabase
       .from('plugin_transactions')
       .select('*')
-      .eq('order_id', cleanOrderId)
-      .single();
+      .ilike('order_id', `${cleanId}%`)
+      .maybeSingle();
 
-    if (txErr || !tx) {
-      return NextResponse.json({ error: 'Nou pa jwenn kòmand sa a nan sistèm nan. Tcheke ID a byen.' }, { status: 404 });
+    // Si l pa jwenn li nan order_id la, l ap eseye chèche ansyen fòma ID yo
+    if (!tx) {
+        const { data: txOld } = await supabase
+        .from('plugin_transactions')
+        .select('*')
+        .ilike('id', `${cleanId}%`)
+        .maybeSingle();
+        tx = txOld;
     }
 
-    // 2. Tcheke estati kòmand lan
-    if (tx.status === 'delivered') return NextResponse.json({ error: 'Twò ta! Ou te gentan bay machann nan kòd OTP a. Lajan an soti nan Bank Global la deja.' }, { status: 403 });
-    if (tx.status === 'disputed') return NextResponse.json({ error: 'Kòmand sa a gen yon litij sou li deja.' }, { status: 400 });
-    if (tx.status === 'refunded') return NextResponse.json({ error: 'Kòmand sa a ranbouse deja.' }, { status: 400 });
+    // Si l toujou pa jwenn li ditou, nou voye erè 404 la bay kliyan an
+    if (!tx) {
+        return NextResponse.json({ error: "Nou pa jwenn kòmand sa a nan sistèm nan. Tcheke ID a byen." }, { status: 404 });
+    }
 
-    // 3. Pake tout prèv yo nan yon sèl dosye
+    // 2. Si l jwenn kòmand lan, nou prepare detay litij yo pou Admin an ka wè yo
     const disputeDetails = {
-      client_id,
-      store_name,
-      reason,
-      proof_text,
-      date_filed: date
+        client_id: clientId || tx.user_id,
+        store_name: storeName || tx.metadata?.merchant_name || 'Boutik',
+        proof_text: proofText || reason || 'Kliyan an fè yon plent.',
+        admin_reply: null
     };
 
-    // 🚨 4. MAJI A: NOU JELE KÒB LA EPI NOU VOYE L BAY ADMIN AN 🚨
-    const { error: updateErr } = await supabaseAdmin
-      .from('plugin_transactions')
-      .update({ 
-        status: 'disputed', // Fè machann nan pa ka touche l
-        dispute_reason: reason,
-        dispute_details: disputeDetails // Anrejistre prèv yo pou Admin an ka li l
-      })
-      .eq('id', tx.id);
+    // 3. Nou mete estati kòmand lan sou "disputed" (LITIJ)
+    const { error: updateError } = await supabase
+        .from('plugin_transactions')
+        .update({ 
+            status: 'disputed',
+            dispute_reason: reason || 'Plent Kliyan',
+            dispute_details: disputeDetails
+        })
+        .eq('id', tx.id);
 
-    if (updateErr) throw updateErr;
+    if (updateError) {
+        throw updateError;
+    }
 
-    return NextResponse.json({ success: true, message: 'Admin an resevwa prèv ou yo. Kòb la jele.' });
+    // 4. Tout bagay pase byen!
+    return NextResponse.json({ success: true, message: "Plent ou a ale avèk siksè! Admin an ap reponn ou." }, { status: 200 });
 
   } catch (error: any) {
-    console.error("Erè API Litij:", error);
-    return NextResponse.json({ error: 'Sèvè a gen yon pwoblèm teknik.' }, { status: 500 });
+    console.error("Erè nan API Litij la:", error);
+    return NextResponse.json({ error: "Gen yon pwoblèm nan sistèm nan. Eseye ankò pita." }, { status: 500 });
   }
 }
