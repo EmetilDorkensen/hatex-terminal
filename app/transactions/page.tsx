@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { RefreshCcw, Copy, CheckCircle2 } from 'lucide-react'; // Ajoute ikon kopye yo
+import { RefreshCcw, Copy, CheckCircle2 } from 'lucide-react';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('TOUT');
-  const [copiedId, setCopiedId] = useState<string | null>(null); // NOUVO: Pou jere ti animasyon kopye a
+  const [copiedId, setCopiedId] = useState<string | null>(null); 
 
   const tabs = ['TOUT', 'DEPO', 'TRANSFER', 'RETRÈ', 'KAT', 'ABÒNMAN'];
 
@@ -23,6 +23,7 @@ export default function TransactionsPage() {
     const fetchTransactions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Li rale tout done yo, enkli nouvo kolòn order_id la
         const { data, error } = await supabase
           .from('transactions')
           .select('*')
@@ -93,12 +94,11 @@ export default function TransactionsPage() {
     }
   };
 
-  // NOUVO: Fonksyon pou kopye ID 12 chif la
-  const handleCopyId = (fullId: string) => {
-    const shortId = fullId.replace(/-/g, '').substring(0, 12).toUpperCase();
-    navigator.clipboard.writeText(shortId);
-    setCopiedId(shortId);
-    setTimeout(() => setCopiedId(null), 2000); // Retire konfimasyon an apre 2 segonn
+  // NOUVO: Fonksyon pou kopye ID la, kèlkeswa sa l ye a
+  const handleCopyId = (textToCopy: string) => {
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedId(textToCopy);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   return (
@@ -147,8 +147,10 @@ export default function TransactionsPage() {
         <div className="space-y-4">
           {filteredTransactions.map((t) => {
             const isSubscription = t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription;
-            // NOUVO: Kreye vizyèl 12 chif inik la
-            const shortId = t.id.replace(/-/g, '').substring(0, 12).toUpperCase();
+            
+            // NOUVO: Sistèm nan ap chache 'order_id' ki sot nan SQL la an premye. 
+            // Si l pa jwenn li (pou ansyen tranzaksyon yo), l ap itilize 12 lèt nan ansyen ID a.
+            const displayId = t.order_id || t.id.replace(/-/g, '').substring(0, 12).toUpperCase();
             
             return (
               <div key={t.id} className={`bg-zinc-900/40 border ${isSubscription ? 'border-red-600/20 shadow-[0_4px_20px_rgba(230,46,4,0.05)]' : 'border-white/5'} p-5 rounded-[2.5rem] backdrop-blur-sm transition-all hover:bg-zinc-900/60`}>
@@ -162,17 +164,17 @@ export default function TransactionsPage() {
                         {getDynamicDescription(t)}
                       </h3>
                       
-                      {/* NOUVO: ID Tranzaksyon an ak bouton Kopye a */}
+                      {/* ID Tranzaksyon an ak bouton Kopye a */}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="bg-black/50 border border-white/5 text-[9px] text-zinc-400 font-mono px-2 py-0.5 rounded uppercase tracking-widest">
-                          ID: {shortId}
+                          ID: {displayId}
                         </span>
                         <button 
-                          onClick={() => handleCopyId(t.id)}
+                          onClick={() => handleCopyId(displayId)}
                           className="text-zinc-500 hover:text-white transition-colors"
                           title="Kopye ID Tranzaksyon an"
                         >
-                          {copiedId === shortId ? <CheckCircle2 size={12} className="text-green-500" /> : <Copy size={12} />}
+                          {copiedId === displayId ? <CheckCircle2 size={12} className="text-green-500" /> : <Copy size={12} />}
                         </button>
                       </div>
 
