@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { RefreshCcw } from 'lucide-react'; // Mwen enpòte ikon an pou bouton an
+import { RefreshCcw, Copy, CheckCircle2 } from 'lucide-react'; // Ajoute ikon kopye yo
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -15,8 +15,8 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('TOUT');
+  const [copiedId, setCopiedId] = useState<string | null>(null); // NOUVO: Pou jere ti animasyon kopye a
 
-  // NOUVO: Mwen ajoute tab 'ABÒNMAN' an pou li rete nan paj sa a si yo vle filtre la
   const tabs = ['TOUT', 'DEPO', 'TRANSFER', 'RETRÈ', 'KAT', 'ABÒNMAN'];
 
   useEffect(() => {
@@ -45,19 +45,13 @@ export default function TransactionsPage() {
     return `${name.substring(0, 3)}.....@${domain}`;
   };
 
-  // FONKSYON POU DESKRIPSYON KI PRIYORIZE NON BIZNIS LA AK ABÒNMAN
   const getDynamicDescription = (t: any) => {
-    // Si se yon Abònman
     if (t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription) {
       const planName = t.metadata?.plan_name || 'PLAN';
       const merchantName = t.metadata?.merchant_name || 'BIZNIS';
       return `ABÒNMAN ${planName.toUpperCase()} - ${merchantName.toUpperCase()}`;
     }
-    // Si se yon LAVANT (pou machann nan)
-    if (t.type === 'SALE') {
-      return `VANT BAY ${t.metadata?.customer_name || 'KLIYAN'}`;
-    }
-    // Si se yon ACHA (pou kliyan an)
+    if (t.type === 'SALE') return `VANT BAY ${t.metadata?.customer_name || 'KLIYAN'}`;
     if (t.type === 'PAYMENT') {
       const businessName = t.metadata?.merchant_name || 'BIZNIS';
       return `ACHA NAN ${businessName.toUpperCase()}`;
@@ -74,7 +68,6 @@ export default function TransactionsPage() {
     if (activeTab === 'TRANSFER') return t.type === 'P2P' || t.type === 'TRANSFER';
     if (activeTab === 'RETRÈ') return t.type === 'WITHDRAWAL';
     if (activeTab === 'KAT') return t.type === 'CARD_RECHARGE' || t.type === 'PAYMENT' || t.type === 'SALE';
-    // NOUVO: Filtre sèlman abònman yo pou tab ABÒNMAN an
     if (activeTab === 'ABÒNMAN') return t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription === true;
     return true;
   });
@@ -100,9 +93,16 @@ export default function TransactionsPage() {
     }
   };
 
+  // NOUVO: Fonksyon pou kopye ID 12 chif la
+  const handleCopyId = (fullId: string) => {
+    const shortId = fullId.replace(/-/g, '').substring(0, 12).toUpperCase();
+    navigator.clipboard.writeText(shortId);
+    setCopiedId(shortId);
+    setTimeout(() => setCopiedId(null), 2000); // Retire konfimasyon an apre 2 segonn
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic pb-24">
-      {/* HEADER AK BOUTON ABÒNMAN AN */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button onClick={() => router.back()} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800 active:scale-95 transition-all">
@@ -111,7 +111,6 @@ export default function TransactionsPage() {
           <h1 className="text-lg font-black uppercase tracking-widest text-red-600">Istorik</h1>
         </div>
         
-        {/* BOUTON POU JERE ABÒNMAN YO */}
         <button 
           onClick={() => router.push('/dashboard/my-subscriptions')}
           className="flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 border border-red-600/20 text-red-500 px-4 py-2 rounded-full font-black uppercase text-[10px] tracking-widest transition-all shadow-[0_4px_15px_rgba(230,46,4,0.1)] active:scale-95"
@@ -148,6 +147,8 @@ export default function TransactionsPage() {
         <div className="space-y-4">
           {filteredTransactions.map((t) => {
             const isSubscription = t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription;
+            // NOUVO: Kreye vizyèl 12 chif inik la
+            const shortId = t.id.replace(/-/g, '').substring(0, 12).toUpperCase();
             
             return (
               <div key={t.id} className={`bg-zinc-900/40 border ${isSubscription ? 'border-red-600/20 shadow-[0_4px_20px_rgba(230,46,4,0.05)]' : 'border-white/5'} p-5 rounded-[2.5rem] backdrop-blur-sm transition-all hover:bg-zinc-900/60`}>
@@ -161,11 +162,19 @@ export default function TransactionsPage() {
                         {getDynamicDescription(t)}
                       </h3>
                       
-                      <p className="text-[9px] text-zinc-500 font-bold lowercase mt-0.5">
-                        {t.type === 'SALE'
-                          ? (t.metadata?.customer_email ? maskEmail(t.metadata.customer_email) : 'Kliyan Hatex')
-                          : (t.metadata?.merchant_email ? maskEmail(t.metadata.merchant_email) : maskEmail(t.user_email))}
-                      </p>
+                      {/* NOUVO: ID Tranzaksyon an ak bouton Kopye a */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="bg-black/50 border border-white/5 text-[9px] text-zinc-400 font-mono px-2 py-0.5 rounded uppercase tracking-widest">
+                          ID: {shortId}
+                        </span>
+                        <button 
+                          onClick={() => handleCopyId(t.id)}
+                          className="text-zinc-500 hover:text-white transition-colors"
+                          title="Kopye ID Tranzaksyon an"
+                        >
+                          {copiedId === shortId ? <CheckCircle2 size={12} className="text-green-500" /> : <Copy size={12} />}
+                        </button>
+                      </div>
 
                       <p className="text-[9px] text-zinc-600 font-bold mt-1 uppercase">
                         {formatDate(t.created_at)} •
@@ -185,18 +194,14 @@ export default function TransactionsPage() {
                   </div>
                 </div>
 
-                {/* Zòn kote mesaj abònman yo afiche a si yo egziste nan metadata */}
                 {(t.metadata?.merchant_message || t.metadata?.customer_message) && (
                   <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                    {/* Mesaj Machann nan kite pou kliyan an */}
                     {t.metadata?.merchant_message && (
                       <div className="bg-black/30 rounded-2xl p-3 border border-white/5">
                         <span className="text-[7px] text-red-500 font-black uppercase tracking-widest block mb-1">Mesaj Machann:</span>
                         <p className="text-[10px] text-zinc-300 font-medium leading-relaxed">"{t.metadata.merchant_message}"</p>
                       </div>
                     )}
-                    
-                    {/* Nòt kliyan an te kite lè l t ap peye a */}
                     {t.metadata?.customer_message && (
                       <div className="bg-zinc-800/30 rounded-2xl p-3 border border-white/5">
                         <span className="text-[7px] text-blue-400 font-black uppercase tracking-widest block mb-1">Nòt Kliyan:</span>

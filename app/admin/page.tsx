@@ -1,27 +1,37 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
+import { Send, MessageSquare, UserX, ShieldCheck, AlertTriangle, Search } from 'lucide-react';
 
 export default function AdminSuperPage() {
     // LIS DONE YO
-    const [allUsers, setAllUsers] = useState<any[]>([]); // NOUVO: Tout kliyan yo
+    const [allUsers, setAllUsers] = useState<any[]>([]);
     const [deposits, setDeposits] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
+    const [disputes, setDisputes] = useState<any[]>([]); 
     
     // ETA POU FÒMILÈ YO
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
-    const [searchQuery, setSearchQuery] = useState(''); // NOUVO: Pou chèche kliyan
+    const [searchQuery, setSearchQuery] = useState('');
     
     // ETA POU ANONS GLOBAL LA
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    // MENI ONGLET YO (Nou ajoute 'kliyan')
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo'>('anons');
+    // ETA POU CHAT LITIJ YO
+    const [adminReplies, setAdminReplies] = useState<{ [key: string]: string }>({});
+
+    // NOUVO: ETA POU CHÈCHE YON LITIJ AK ID KÒMAND LAN
+    const [searchDisputeId, setSearchDisputeId] = useState('');
+    const [searchedDispute, setSearchedDispute] = useState<any>(null);
+    const [isSearchingDispute, setIsSearchingDispute] = useState(false);
+
+    // MENI ONGLET YO 
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij'>('anons');
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -50,7 +60,6 @@ export default function AdminSuperPage() {
     const raleDone = async () => {
         setLoading(true);
         try {
-            // Rale Tout Kliyan yo (POU RECHÈCH LA)
             const { data: u } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
             setAllUsers(u || []);
 
@@ -68,13 +77,15 @@ export default function AdminSuperPage() {
 
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
+
+            const { data: disp } = await supabase.from('plugin_transactions').select('*').eq('status', 'disputed').order('created_at', { ascending: false });
+            setDisputes(disp || []);
             
             const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
                 setAnonsText(anonsData.announcement_text || '');
                 setAnonsActive(anonsData.announcement_active);
             }
-
         } finally {
             setLoading(false);
         }
@@ -191,13 +202,12 @@ export default function AdminSuperPage() {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
         try {
-            await supabase.from('profiles').update({ account_status: 'active', failed_pin_attempts: 0 }).eq('id', id);
+            await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id);
             alert(`✅ Kont ${email} lan aktive!`);
             raleDone(); 
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // NOUVO: Fonksyon pou Sispann yon kont
     const sispannKont = async (id: string, email: string) => {
         if (!confirm(`⚠️ Èske w sèten ou vle SISPANN kont sa a? (${email})\nKliyan an pap ka konekte ni fè tranzaksyon ankò.`)) return;
         setProcessingId(id);
@@ -259,44 +269,147 @@ export default function AdminSuperPage() {
         e.preventDefault();
         setProcessingId('saving_anons');
         try {
-            const { error } = await supabase.from('global_settings').update({ 
-                announcement_text: anonsText, 
-                announcement_active: anonsActive 
-            }).eq('id', 1);
-            
+            const { error } = await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
             if (error) throw error;
             alert("✅ Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!");
             raleDone();
-        } catch (err: any) { 
-            alert("Erè nan sove notifikasyon an: " + err.message); 
-        } finally { 
-            setProcessingId(null); 
+        } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
+    };
+
+    // ==========================================
+    // NOUVO: FONKSYON POU CHÈCHE LITIJ NAN BAZ DONE A
+    // ==========================================
+    const handleAdminSearchDispute = async () => {
+        if (!searchDisputeId.trim()) return alert("Tanpri mete ID kòmand lan pou w chèche a.");
+        setIsSearchingDispute(true);
+        setSearchedDispute(null);
+        
+        try {
+            const cleanId = searchDisputeId.trim().toLowerCase();
+            
+            // Nou chèche ak ilike pou si admin an sèlman tape 12 chif yo
+            const { data, error } = await supabase
+                .from('plugin_transactions')
+                .select('*')
+                .ilike('id', `${cleanId}%`)
+                .maybeSingle();
+
+            // Si nou pa jwenn li nan ID a, nou chèche nan order_id (ID boutik la)
+            if (!data) {
+                const { data: data2 } = await supabase
+                    .from('plugin_transactions')
+                    .select('*')
+                    .eq('order_id', cleanId)
+                    .maybeSingle();
+                    
+                if (data2) {
+                    setSearchedDispute(data2);
+                } else {
+                    alert("Sistèm nan pa jwenn okenn kòmand avèk ID sa a.");
+                }
+            } else {
+                setSearchedDispute(data);
+            }
+            
+        } catch (err: any) {
+            alert("Erè: " + err.message);
+        } finally {
+            setIsSearchingDispute(false);
         }
     };
 
-    // NOUVO: Lojik pou chèche Kliyan an
+
+    const voyeReponsAdmin = async (txId: string, currentDetails: any) => {
+        const replyText = adminReplies[txId];
+        if (!replyText || replyText.trim() === '') return alert("Tanpri ekri yon mesaj anvan w voye l!");
+        setProcessingId(`reply_${txId}`);
+        try {
+            const updatedDetails = { ...currentDetails, admin_reply: replyText };
+            await supabase.from('plugin_transactions').update({ dispute_details: updatedDetails }).eq('id', txId);
+            alert("✅ Mesaj la ale! Kliyan an ap wè l kounye a.");
+            setAdminReplies({ ...adminReplies, [txId]: '' }); 
+            
+            // Rafrechi donè yo pou montre chanjman an
+            raleDone(); 
+            if (searchedDispute && searchedDispute.id === txId) {
+                setSearchedDispute({...searchedDispute, dispute_details: updatedDetails});
+            }
+        } catch (err: any) {
+            alert("Erè nan voye mesaj la: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const remetKliyanLajan = async (tx: any) => {
+        if (!confirm(`💸 Èske w sèten ou vle ranbouse kliyan an ${tx.amount_htg} HTG pou kòmand #${tx.order_id || tx.id.substring(0,8)} la?`)) return;
+        setProcessingId(`resolve_${tx.id}`);
+        try {
+            // Lajan an pral jwenn moun ki te achte a (client_id nan metadata oswa dispute_details)
+            const clientId = tx.dispute_details?.client_id || tx.metadata?.customer_id;
+            
+            if (!clientId) throw new Error("Nou pa jwenn ID Kliyan an pou n ranbouse l.");
+            
+            const { data: client, error: cErr } = await supabase.from('profiles').select('wallet_balance, email, full_name').eq('id', clientId).single();
+            if (cErr || !client) throw new Error("Kliyan pa jwenn nan baz done a.");
+            
+            const newBalance = Number(client.wallet_balance || 0) + Number(tx.amount_htg);
+            await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('id', clientId);
+            
+            await supabase.from('plugin_transactions').update({ status: 'refunded' }).eq('id', tx.id);
+            
+            await supabase.from('transactions').insert({
+                user_id: clientId,
+                amount: Number(tx.amount_htg),
+                type: 'REFUND',
+                description: `Ranbousman Kòmand #${tx.order_id || tx.id.substring(0,8)} (Litij Fèmen)`,
+                status: 'success'
+            });
+            
+            const mesajE = `Bonjou ${client.full_name}, litij pou kòmand #${tx.order_id || tx.id.substring(0,8)} la rezoud an favè w. Nou fèk ranbouse w ${tx.amount_htg} HTG sou balans ou.`;
+            await voyeEmailKliyan(client.email, client.full_name, mesajE, "✅ RANBOUSMAN FÈT - HATEX");
+            
+            alert("✅ Kliyan an jwenn lajan l tounen! Litij la fèmen.");
+            setSearchedDispute(null); // Fèmen rezilta rechèch la si l te louvri
+            raleDone();
+        } catch (err: any) {
+            alert("Erè: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
-        const emailMatch = user.email?.toLowerCase().includes(lowerQuery);
-        const nameMatch = user.full_name?.toLowerCase().includes(lowerQuery);
-        return emailMatch || nameMatch;
+        return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
+
+    const getClientInfo = (clientId: string) => {
+        return allUsers.find(u => u.id === clientId) || null;
+    };
 
     if (!accessGranted) return <div className="bg-black h-screen" />;
 
     return (
         <div className="min-h-screen bg-[#0a0b14] text-white p-4 uppercase italic font-bold pb-24">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-6xl mx-auto">
                 <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
                     <h1 className="text-2xl font-black text-red-600 italic tracking-tighter">HATEX ADMIN</h1>
                     <button onClick={raleDone} className="bg-zinc-800 p-3 rounded-xl text-[10px] active:scale-95 transition-all">REFRESH</button>
                 </div>
 
                 {/* MENI ONGLET YO */}
-                <div className="flex gap-2 mb-8 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar whitespace-nowrap">
+                <div className="flex gap-2 mb-8 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar whitespace-nowrap custom-scrollbar pb-2">
                     <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>📢 ANONS</button>
                     <button onClick={() => setView('kliyan')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>👥 KLIYAN ({allUsers.length})</button>
+                    
+                    <button onClick={() => setView('litij')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all relative ${view === 'litij' ? 'bg-yellow-600 shadow-lg shadow-yellow-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>
+                        ⚠️ LITIJ
+                        {disputes.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-full text-[8px] animate-pulse">{disputes.length}</span>}
+                    </button>
+                    
                     <button onClick={() => setView('depo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'depo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>DEPO ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'retre' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>RETRÈ ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>KYC ({pendingKyc.length})</button>
@@ -307,27 +420,291 @@ export default function AdminSuperPage() {
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
+                    ) : view === 'litij' ? (
+                        // ==========================================
+                        // VUE LITIJ / CHAT AK RECHÈCH ID KÒMAND
+                        // ==========================================
+                        <div className="space-y-8">
+                            
+                            {/* BWAT RECHÈCH POU ID KÒMAND LAN */}
+                            <div className="bg-[#121420] p-6 rounded-[2rem] border border-yellow-500/30 shadow-lg shadow-yellow-900/10">
+                                <p className="text-[10px] font-black text-yellow-500 mb-3 tracking-widest uppercase flex items-center gap-2">
+                                    <Search size={14} /> Chèche yon Tranzaksyon / Litij
+                                </p>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Kole 12 chif ID a la a..." 
+                                        value={searchDisputeId} 
+                                        onChange={(e) => setSearchDisputeId(e.target.value)}
+                                        className="flex-1 bg-black border border-white/10 p-4 rounded-xl text-white outline-none focus:border-yellow-500/50 transition-all font-mono uppercase text-sm"
+                                    />
+                                    <button 
+                                        onClick={handleAdminSearchDispute}
+                                        disabled={isSearchingDispute || !searchDisputeId}
+                                        className="bg-yellow-600 hover:bg-yellow-500 text-white px-6 rounded-xl font-black transition-all disabled:opacity-50 flex items-center justify-center min-w-[100px]"
+                                    >
+                                        {isSearchingDispute ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "CHÈCHE"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* REZILTA RECHÈCH LA */}
+                            {searchedDispute && (
+                                <div className="mb-10 relative">
+                                    <div className="absolute -top-3 left-6 bg-yellow-500 text-black px-3 py-1 rounded-md text-[9px] font-black uppercase z-10">Rezilta Rechèch</div>
+                                    <div className="bg-[#121420] rounded-[2.5rem] border-2 border-yellow-500 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] flex flex-col lg:flex-row relative">
+                                        
+                                        {/* Bouton fèmen rezilta a */}
+                                        <button onClick={() => setSearchedDispute(null)} className="absolute top-4 right-4 bg-zinc-800 text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500 transition-colors z-10">
+                                            ✕
+                                        </button>
+
+                                        {/* BÒ GÒCH: Enfòmasyon Kliyan an & Kòmand lan */}
+                                        <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between pt-12">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500 border border-yellow-500/30">
+                                                        <AlertTriangle size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-lg font-black text-white">LITIJ #{searchedDispute.order_id || 'ID'}</h3>
+                                                        <p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(searchedDispute.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+
+                                                {(() => {
+                                                    const sClient = getClientInfo(searchedDispute.dispute_details?.client_id || searchedDispute.metadata?.customer_id);
+                                                    return sClient ? (
+                                                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
+                                                            <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-3 font-black flex items-center gap-2">
+                                                                <UserX size={12} /> Enfòmasyon Kliyan
+                                                            </p>
+                                                            <p className="text-sm font-black text-white mb-1 truncate">{sClient.full_name}</p>
+                                                            <p className="text-[10px] text-zinc-400 mb-3 lowercase truncate">{sClient.email}</p>
+                                                            <div className="bg-zinc-900 px-3 py-2 rounded-xl inline-block border border-white/5">
+                                                                <span className="text-[9px] text-zinc-500">BALANS: </span>
+                                                                <span className="text-xs text-green-400">{Number(sClient.wallet_balance).toLocaleString()} HTG</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-red-400 mb-6">Enfòmasyon kliyan an pa disponib.</p>
+                                                    );
+                                                })()}
+
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <p className="text-[9px] text-zinc-500">BOUTIK LA:</p>
+                                                        <p className="text-xs text-white">{searchedDispute.dispute_details?.store_name || searchedDispute.metadata?.merchant_name || 'Enkoni'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] text-zinc-500">ESTATI AKTYÈL:</p>
+                                                        <p className={`text-xs font-black ${searchedDispute.status === 'refunded' ? 'text-green-500' : 'text-yellow-500'}`}>{searchedDispute.status.toUpperCase()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] text-zinc-500">MONTAN AN JÈ:</p>
+                                                        <p className="text-2xl font-black text-white italic">{searchedDispute.amount_htg} <span className="text-xs text-yellow-500">HTG</span></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {searchedDispute.status !== 'refunded' && (
+                                                <div className="mt-8 pt-6 border-t border-white/5">
+                                                    <button 
+                                                        onClick={() => remetKliyanLajan(searchedDispute)} 
+                                                        disabled={processingId === `resolve_${searchedDispute.id}`}
+                                                        className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-green-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        {processingId === `resolve_${searchedDispute.id}` ? 'AP RANBOUSE...' : '💸 REMÈT KLIYAN AN LAJAN L'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* BÒ DWA: Sistèm Chat la (Pou Rezilta a) */}
+                                        <div className="w-full lg:w-2/3 flex flex-col p-6 bg-black relative">
+                                            <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-6 custom-scrollbar">
+                                                <div className="flex flex-col items-start max-w-[85%]">
+                                                    <div className="flex items-center gap-2 mb-1 pl-1">
+                                                        <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs">👤</div>
+                                                        <span className="text-[10px] text-zinc-400 lowercase">Kliyan</span>
+                                                    </div>
+                                                    <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm border border-white/5 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
+                                                        {searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || 'Pa gen detay litij pou kòmand sa a.'}
+                                                    </div>
+                                                </div>
+
+                                                {searchedDispute.dispute_details?.admin_reply && (
+                                                    <div className="flex flex-col items-end max-w-[85%] ml-auto">
+                                                        <div className="flex items-center gap-2 mb-1 pr-1">
+                                                            <span className="text-[10px] text-red-500 lowercase">Admin</span>
+                                                            <div className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center text-xs text-red-500 border border-red-500/30"><ShieldCheck size={12}/></div>
+                                                        </div>
+                                                        <div className="bg-red-900/20 p-4 rounded-2xl rounded-tr-sm border border-red-500/30 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
+                                                            {searchedDispute.dispute_details?.admin_reply}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-auto bg-zinc-900 rounded-2xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
+                                                <textarea 
+                                                    placeholder="Tape repons ou an pou kliyan an la a..."
+                                                    value={adminReplies[searchedDispute.id] || ''}
+                                                    onChange={(e) => setAdminReplies({ ...adminReplies, [searchedDispute.id]: e.target.value })}
+                                                    className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white lowercase normal-case resize-none min-h-[50px]"
+                                                    rows={2}
+                                                ></textarea>
+                                                <button 
+                                                    onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {})}
+                                                    disabled={processingId === `reply_${searchedDispute.id}`}
+                                                    className="bg-red-600 hover:bg-red-500 w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20 transition-all active:scale-90"
+                                                >
+                                                    {processingId === `reply_${searchedDispute.id}` ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* LIS PLENT KI TOUJOU LOUVRI YO */}
+                            {disputes.length > 0 && (
+                                <>
+                                    <h2 className="text-xl font-black text-white border-b border-white/10 pb-2">TOUT PLENT YO</h2>
+                                    {disputes.map((tx) => {
+                                        const client = getClientInfo(tx.dispute_details?.client_id);
+                                        
+                                        return (
+                                            <div key={tx.id} className="bg-[#121420] rounded-[2.5rem] border border-zinc-800 overflow-hidden shadow-lg flex flex-col lg:flex-row opacity-80 hover:opacity-100 transition-opacity">
+                                                
+                                                {/* BÒ GÒCH: Enfòmasyon Kliyan an & Kòmand lan */}
+                                                <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between">
+                                                    <div>
+                                                        <div className="flex items-center gap-3 mb-6">
+                                                            <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500 border border-yellow-500/30">
+                                                                <AlertTriangle size={20} />
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="text-lg font-black text-white">LITIJ #{tx.order_id}</h3>
+                                                                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(tx.created_at).toLocaleDateString()}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {client ? (
+                                                            <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
+                                                                <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-3 font-black flex items-center gap-2">
+                                                                    <UserX size={12} /> Enfòmasyon Kliyan
+                                                                </p>
+                                                                <p className="text-sm font-black text-white mb-1 truncate">{client.full_name}</p>
+                                                                <p className="text-[10px] text-zinc-400 mb-3 lowercase truncate">{client.email}</p>
+                                                                <div className="bg-zinc-900 px-3 py-2 rounded-xl inline-block border border-white/5">
+                                                                    <span className="text-[9px] text-zinc-500">BALANS: </span>
+                                                                    <span className="text-xs text-green-400">{Number(client.wallet_balance).toLocaleString()} HTG</span>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-red-400 mb-6">Enfòmasyon kliyan an pa disponib.</p>
+                                                        )}
+
+                                                        <div className="space-y-3">
+                                                            <div>
+                                                                <p className="text-[9px] text-zinc-500">BOUTIK LA:</p>
+                                                                <p className="text-xs text-white">{tx.dispute_details?.store_name || 'Enkoni'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[9px] text-zinc-500">REZON PLENT LAN:</p>
+                                                                <p className="text-xs text-red-400">{tx.dispute_reason || 'Enkoni'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[9px] text-zinc-500">MONTAN AN JÈ:</p>
+                                                                <p className="text-2xl font-black text-white italic">{tx.amount_htg} <span className="text-xs text-yellow-500">HTG</span></p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-8 pt-6 border-t border-white/5">
+                                                        <button 
+                                                            onClick={() => remetKliyanLajan(tx)} 
+                                                            disabled={processingId === `resolve_${tx.id}`}
+                                                            className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-green-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            {processingId === `resolve_${tx.id}` ? 'AP RANBOUSE...' : '💸 REMÈT KLIYAN AN LAJAN L'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* BÒ DWA: Sistèm Chat la */}
+                                                <div className="w-full lg:w-2/3 flex flex-col p-6 bg-black relative">
+                                                    <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-6 custom-scrollbar">
+                                                        
+                                                        {/* MESAJ KLIYAN AN (PRÈV LA) */}
+                                                        <div className="flex flex-col items-start max-w-[85%]">
+                                                            <div className="flex items-center gap-2 mb-1 pl-1">
+                                                                <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs">👤</div>
+                                                                <span className="text-[10px] text-zinc-400 lowercase">{client?.full_name || 'Kliyan'}</span>
+                                                            </div>
+                                                            <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm border border-white/5 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
+                                                                {tx.dispute_details?.proof_text || 'Pa gen detay prèv.'}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* MESAJ ADMIN AN (SI L TE REponn) */}
+                                                        {tx.dispute_details?.admin_reply && (
+                                                            <div className="flex flex-col items-end max-w-[85%] ml-auto">
+                                                                <div className="flex items-center gap-2 mb-1 pr-1">
+                                                                    <span className="text-[10px] text-red-500 lowercase">Admin</span>
+                                                                    <div className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center text-xs text-red-500 border border-red-500/30"><ShieldCheck size={12}/></div>
+                                                                </div>
+                                                                <div className="bg-red-900/20 p-4 rounded-2xl rounded-tr-sm border border-red-500/30 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
+                                                                    {tx.dispute_details?.admin_reply}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* BWAT POU TAPE REPONS LAN */}
+                                                    <div className="mt-auto bg-zinc-900 rounded-2xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
+                                                        <textarea 
+                                                            placeholder="Tape repons ou an pou kliyan an la a..."
+                                                            value={adminReplies[tx.id] || ''}
+                                                            onChange={(e) => setAdminReplies({ ...adminReplies, [tx.id]: e.target.value })}
+                                                            className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white lowercase normal-case resize-none min-h-[50px]"
+                                                            rows={2}
+                                                        ></textarea>
+                                                        <button 
+                                                            onClick={() => voyeReponsAdmin(tx.id, tx.dispute_details)}
+                                                            disabled={processingId === `reply_${tx.id}`}
+                                                            className="bg-red-600 hover:bg-red-500 w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20 transition-all active:scale-90"
+                                                        >
+                                                            {processingId === `reply_${tx.id}` ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[8px] text-zinc-500 text-center mt-3 uppercase tracking-widest">
+                                                        Kliyan an ap resevwa repons sa a dirèk nan aplikasyon l lan
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </>
+                            )}
+                        </div>
                     ) : view === 'kliyan' ? (
                         // ==========================================
                         // VUE RECHÈCH KLIYAN
                         // ==========================================
                         <div className="space-y-6">
-                            {/* Bwat Rechèch la */}
                             <div className="bg-[#121420] p-4 rounded-3xl border border-indigo-500/30 shadow-lg shadow-indigo-900/10 flex items-center gap-3">
                                 <span className="text-xl ml-2">🔍</span>
                                 <input 
-                                    type="text" 
-                                    placeholder="CHÈCHE YON KLIYAN AK IMÈL LI OSWA NON L..." 
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    type="text" placeholder="CHÈCHE YON KLIYAN AK IMÈL LI OSWA NON L..." 
+                                    value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full bg-transparent border-none p-2 text-white outline-none font-black tracking-widest placeholder:text-zinc-600 text-xs sm:text-sm"
                                 />
-                                {searchQuery && (
-                                    <button onClick={() => setSearchQuery('')} className="bg-zinc-800 text-zinc-400 p-2 rounded-xl text-[10px] hover:text-white hover:bg-zinc-700 transition-all">EFASE</button>
-                                )}
+                                {searchQuery && <button onClick={() => setSearchQuery('')} className="bg-zinc-800 text-zinc-400 p-2 rounded-xl text-[10px] hover:text-white hover:bg-zinc-700 transition-all">EFASE</button>}
                             </div>
 
-                            {/* Lis Kliyan ki Koresponn ak Rechèch la */}
                             <div className="space-y-4">
                                 {filteredUsers.length === 0 ? (
                                     <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa jwenn okenn kliyan ak non oswa imèl sa a</div>
@@ -350,7 +727,6 @@ export default function AdminSuperPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Bouton Aksyon */}
                                             <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
                                                 {user.account_status === 'suspended' ? (
                                                     <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-green-600 px-6 py-4 rounded-2xl text-[10px] font-black text-white hover:bg-green-500 transition-all shadow-lg shadow-green-600/20">AKTIVE KONT</button>
@@ -377,21 +753,17 @@ export default function AdminSuperPage() {
                                 <div className="space-y-2">
                                     <label className="text-[10px] text-zinc-400 font-black uppercase tracking-widest ml-2">Tèks k ap parèt sou paj kliyan yo:</label>
                                     <textarea 
-                                        value={anonsText} 
-                                        onChange={(e) => setAnonsText(e.target.value)} 
+                                        value={anonsText} onChange={(e) => setAnonsText(e.target.value)} 
                                         placeholder="Ekri mesaj ou vle tout kliyan wè a la a..." 
-                                        className="w-full bg-black border border-white/10 p-5 rounded-2xl focus:border-blue-500 outline-none transition-all font-bold text-sm min-h-[150px] text-white whitespace-pre-wrap" 
+                                        className="w-full bg-black border border-white/10 p-5 rounded-2xl focus:border-blue-500 outline-none transition-all font-bold text-sm min-h-[150px] text-white whitespace-pre-wrap normal-case" 
                                         required 
                                     />
                                 </div>
                                 
                                 <div className="flex items-center gap-3 p-4 bg-black rounded-2xl border border-white/5 cursor-pointer" onClick={() => setAnonsActive(!anonsActive)}>
                                     <input 
-                                        type="checkbox" 
-                                        checked={anonsActive} 
-                                        onChange={(e) => setAnonsActive(e.target.checked)} 
-                                        className="w-6 h-6 accent-blue-600 cursor-pointer"
-                                        onClick={(e) => e.stopPropagation()}
+                                        type="checkbox" checked={anonsActive} onChange={(e) => setAnonsActive(e.target.checked)} 
+                                        className="w-6 h-6 accent-blue-600 cursor-pointer" onClick={(e) => e.stopPropagation()}
                                     />
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-black uppercase tracking-widest text-white">Afiche notifikasyon an?</span>
@@ -405,6 +777,9 @@ export default function AdminSuperPage() {
                             </form>
                         </div>
                     ) : view === 'kyc' ? (
+                        // ==========================================
+                        // VUE KYC
+                        // ==========================================
                         pendingKyc.length === 0 ? (
                             <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn KYC k ap tann</div>
                         ) : (
@@ -430,6 +805,9 @@ export default function AdminSuperPage() {
                             ))
                         )
                     ) : view === 'promo' ? (
+                        // ==========================================
+                        // VUE PWOMO
+                        // ==========================================
                         <div>
                             <form onSubmit={handleCreateCode} className="bg-[#121420] p-6 rounded-3xl border border-purple-500/30 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-lg shadow-purple-900/10">
                                 <div className="flex-1 w-full space-y-2">
@@ -458,6 +836,9 @@ export default function AdminSuperPage() {
                             </div>
                         </div>
                     ) : view === 'sispandi' ? (
+                        // ==========================================
+                        // VUE SISPANDI
+                        // ==========================================
                         suspendedAccounts.map((account) => (
                             <div key={account.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-red-600/30 relative overflow-hidden flex flex-col items-center text-center">
                                 <div className="w-12 h-12 bg-red-600/20 text-red-500 rounded-full flex items-center justify-center mb-4 border border-red-600/50"><span className="text-xl">⚠️</span></div>
@@ -467,6 +848,9 @@ export default function AdminSuperPage() {
                             </div>
                         ))
                     ) : (
+                        // ==========================================
+                        // VUE DEPO & RETRÈ
+                        // ==========================================
                         (view === 'depo' ? deposits : withdrawals).map((item) => {
                             const isDepo = view === 'depo';
                             const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
@@ -501,7 +885,7 @@ export default function AdminSuperPage() {
                             );
                         })
                     )}
-                    {!loading && view !== 'sispandi' && view !== 'kliyan' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
+                    {!loading && view !== 'sispandi' && view !== 'litij' && view !== 'kliyan' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
                 </div>
             </div>
         </div>

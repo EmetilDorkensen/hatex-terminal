@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
-import { RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck } from 'lucide-react'; 
+import { RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, Search } from 'lucide-react'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -23,14 +23,22 @@ export default function Dashboard() {
   const [announcement, setAnnouncement] = useState("");
   const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
   
-  // Eta pou kenbe kantite rediksyon ki nan tiroir a
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  // ETA POU RANBOUSMAN
+  // ==========================================
+  // ETA POU LITIJ / RANBOUSMAN (ALIEXPRESS STYLE)
+  // ==========================================
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundTxId, setRefundTxId] = useState("");
-  const [refundReason, setRefundReason] = useState("Kliyan an mande ranbousman");
+  const [refundReason, setRefundReason] = useState("Mwen pa resevwa pwodwi a");
+  const [storeName, setStoreName] = useState("");
+  const [proofText, setProofText] = useState("");
   const [isRefunding, setIsRefunding] = useState(false);
+  
+  // Nouvo eta pou Chat la
+  const [isCheckingId, setIsCheckingId] = useState(false);
+  const [disputeStatus, setDisputeStatus] = useState("");
+  const [adminReply, setAdminReply] = useState("");
 
   // ETA POU KONFIME LIVREZON (OTP)
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -124,24 +132,12 @@ export default function Dashboard() {
     setLoading(true);
 
     try {
-      const { data: realProfile, error: profileErr } = await supabase
-        .from('profiles')
-        .select('wallet_balance')
-        .eq('id', userData.id)
-        .single();
-
+      const { data: realProfile, error: profileErr } = await supabase.from('profiles').select('wallet_balance').eq('id', userData.id).single();
       if (profileErr || !realProfile) throw new Error("Nou pa ka jwenn enfòmasyon w yo kounye a.");
 
       let dbDiscountAmount = 0;
-      const { data: realDiscountData } = await supabase
-        .from('user_discounts')
-        .select('discount_amount')
-        .eq('user_id', userData.id)
-        .maybeSingle();
-
-      if (realDiscountData) {
-        dbDiscountAmount = realDiscountData.discount_amount || 0;
-      }
+      const { data: realDiscountData } = await supabase.from('user_discounts').select('discount_amount').eq('user_id', userData.id).maybeSingle();
+      if (realDiscountData) dbDiscountAmount = realDiscountData.discount_amount || 0;
 
       const realActivationPrice = Math.max(0, priBase - dbDiscountAmount);
       const realWalletBalance = Number(realProfile.wallet_balance || 0);
@@ -159,19 +155,12 @@ export default function Dashboard() {
       }
 
       const nouvoBalans = realWalletBalance - realActivationPrice;
-      const { error: updateErr } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: nouvoBalans, is_card_activated: true })
-        .eq('id', userData.id);
-
+      const { error: updateErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans, is_card_activated: true }).eq('id', userData.id);
       if (updateErr) throw updateErr;
 
       await supabase.from('transactions').insert({
-        user_id: userData.id, 
-        amount: -realActivationPrice, 
-        type: 'CARD_ACTIVATION',
-        description: dbDiscountAmount > 0 ? `Aktivasyon Kat (Ak Rediksyon -${dbDiscountAmount} HTG)` : 'Frè Aktivasyon Kat Vityèl', 
-        status: 'success'
+        user_id: userData.id, amount: -realActivationPrice, type: 'CARD_ACTIVATION',
+        description: dbDiscountAmount > 0 ? `Aktivasyon Kat (Ak Rediksyon -${dbDiscountAmount} HTG)` : 'Frè Aktivasyon Kat Vityèl', status: 'success'
       });
 
       alert("✅ Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
@@ -182,27 +171,69 @@ export default function Dashboard() {
     }
   };
 
-  const handleGlobalRefund = async () => {
-    if (!refundTxId) return alert("Tanpri mete ID Tranzaksyon an.");
+  // ==========================================
+  // FONKSYON POU TCHEKE SI KÒMAND LAN AN LITIJ DEJA
+  // ==========================================
+  const handleCheckOrderDispute = async () => {
+    if (!refundTxId) return alert("Tanpri mete ID kòmand lan anvan.");
+    setIsCheckingId(true);
+    setDisputeStatus("");
+    setAdminReply("");
+    
+    try {
+      const cleanId = refundTxId.toString().replace('#', '').trim();
+      const { data, error } = await supabase
+        .from('plugin_transactions')
+        .select('status, dispute_details, customer_info')
+        .eq('order_id', cleanId)
+        .maybeSingle();
+
+      if (data) {
+        setDisputeStatus(data.status);
+        if (data.dispute_details) {
+          setStoreName(data.dispute_details.store_name || "");
+          setProofText(data.dispute_details.proof_text || "");
+          setAdminReply(data.dispute_details.admin_reply || "");
+        } else if (data.status === 'pending') {
+          alert("Kòmand sa a anfòm, ou ka ouvè yon litij sou li.");
+        }
+      } else {
+        alert("Sistèm nan pa jwenn kòmand sa a. Tcheke ID a ankò.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsCheckingId(false);
+    }
+  };
+
+  // ==========================================
+  // FONKSYON POU VOYE NOUVO LITIJ LA BAY ADMIN
+  // ==========================================
+  const handleSubmitDispute = async () => {
+    if (!refundTxId || !storeName || !proofText) return alert("Tanpri ranpli tout bwat yo ak prèv yo!");
     setIsRefunding(true);
     
     try {
-      const res = await fetch('/api/refunds', {
+      const res = await fetch('/api/dispute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transaction_id: refundTxId.trim(),
-          merchant_id: userData.id,
-          reason: refundReason
+          order_id: refundTxId.trim(),
+          client_id: userData.id,
+          store_name: storeName,
+          reason: refundReason,
+          proof_text: proofText,
+          date: new Date().toISOString()
         })
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Echèk nan ranbousman an.");
+      if (!res.ok) throw new Error(data.error || "Echèk nan voye plent lan.");
 
-      alert('✅ Ranbousman an fèt ak siksè! Kliyan an fèk resevwa kòb li.');
-      setShowRefundModal(false);
-      setRefundTxId('');
+      alert('✅ Plent ou an ale jwenn Admin an avèk siksè! Lajan sa a jele kounye a.');
+      // Re-tcheke pou l ka afiche ekran Chat la dirèk
+      handleCheckOrderDispute(); 
       
     } catch (err: any) {
       alert(`❌ Erè: ${err.message}`);
@@ -216,13 +247,8 @@ export default function Dashboard() {
     setIsVerifying(true);
     try {
       const res = await fetch('/api/verify-delivery', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            transaction_id: otpTxId.trim(), 
-            merchant_id: userData.id, 
-            otp_code: otpCode.trim() 
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: otpTxId.trim(), merchant_id: userData.id, otp_code: otpCode.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Echèk nan verifikasyon kòd la.");
@@ -233,7 +259,6 @@ export default function Dashboard() {
       setOtpCode('');
     } catch (err: any) {
       alert(`❌ Erè: ${err.message}`);
-      // Rafrechi paj la si yo bloke kont machann nan (3 strikes)
       if (err.message.includes("sispann") || err.message.includes("bloke")) {
           window.location.reload();
       }
@@ -258,12 +283,15 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
       
-      {/* MODAL RANBOUSMAN */}
+      {/* MODAL LITIJ / RANBOUSMAN (AK CHAT ADMIN) */}
       {showRefundModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-[#0a0b14] border border-red-500/30 w-full max-w-md rounded-[2rem] p-6 shadow-2xl relative">
+          <div className="bg-[#0a0b14] border border-red-500/30 w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar rounded-[2rem] p-6 shadow-2xl relative">
             <button 
-              onClick={() => setShowRefundModal(false)}
+              onClick={() => {
+                setShowRefundModal(false);
+                setDisputeStatus(""); // Reset lè l fèmen l
+              }}
               className="absolute top-5 right-5 text-zinc-500 hover:text-white transition-colors"
             >
               <X size={20} />
@@ -271,54 +299,113 @@ export default function Dashboard() {
             
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                <RefreshCcw size={24} />
+                <AlertTriangle size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase italic">Ranbousman</h3>
-                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">Remèt kliyan an lajan l</p>
+                <h3 className="text-lg font-black uppercase italic">Mande Ranbousman</h3>
+                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">Sistèm Pwoteksyon Kliyan</p>
               </div>
             </div>
 
             <div className="space-y-4 mb-6">
+              {/* Bwat pou chèche kòmand lan */}
               <div>
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">ID Tranzaksyon an</label>
-                <input 
-                  type="text" 
-                  value={refundTxId}
-                  onChange={(e) => setRefundTxId(e.target.value)}
-                  placeholder="Kole ID kòmand lan la a..."
-                  className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors"
-                />
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">1. Antre ID Kòmand ou an</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={refundTxId}
+                    onChange={(e) => {
+                      setRefundTxId(e.target.value);
+                      if(disputeStatus) setDisputeStatus(""); // Reset si l chanje ID a
+                    }}
+                    placeholder="Eg: 74 oswa CMD-123"
+                    className="flex-1 bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors"
+                  />
+                  <button 
+                    onClick={handleCheckOrderDispute}
+                    disabled={isCheckingId || !refundTxId}
+                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50"
+                  >
+                    {isCheckingId ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Search size={18} />}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">Rezon Ranbousman an</label>
-                <select 
-                  value={refundReason}
-                  onChange={(e) => setRefundReason(e.target.value)}
-                  className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors"
-                >
-                  <option value="Kliyan an mande ranbousman">Kliyan an mande l</option>
-                  <option value="Pwodwi a pa disponib">Pwodwi pa disponib</option>
-                  <option value="Sispèk Fwod">Sispèk Fwod</option>
-                  <option value="Lòt rezon">Lòt rezon</option>
-                </select>
-              </div>
+
+              {/* SI KÒMAND LAN AN LITIJ DEJA -> AFICHE CHAT LA */}
+              {(disputeStatus === 'disputed' || disputeStatus === 'refunded') ? (
+                <div className="border border-white/5 bg-zinc-900/50 p-4 rounded-xl mt-4 animate-in slide-in-from-bottom-4">
+                  <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+                    <p className="text-[10px] uppercase font-bold text-zinc-400">Estati Dosye a:</p>
+                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md ${disputeStatus === 'refunded' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-500'}`}>
+                      {disputeStatus === 'refunded' ? 'RANBOUSE ✅' : 'AN LITIJ ⚠️ (Kòb la Jele)'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-4 space-y-2">
+                    {/* Mesaj Kliyan an (Prèv la) */}
+                    <div className="self-end bg-zinc-800 p-3 rounded-2xl rounded-tr-sm max-w-[90%] border border-white/5">
+                      <p className="text-[9px] text-zinc-400 mb-1 font-bold">Ou menm ({storeName})</p>
+                      <p className="text-xs text-white leading-relaxed">{proofText}</p>
+                    </div>
+
+                    {/* Mesaj Admin an */}
+                    <div className="self-start bg-red-900/20 p-3 rounded-2xl rounded-tl-sm max-w-[90%] border border-red-500/20">
+                      <p className="text-[9px] text-red-400 mb-1 font-black flex items-center gap-1">
+                        <ShieldCheck size={10} /> Admin HatexCard
+                      </p>
+                      <p className="text-xs text-white leading-relaxed">
+                        {adminReply ? adminReply : <span className="italic text-zinc-500">Nou resevwa dosye w la. N ap kontakte boutik la, pasyante...</span>}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : disputeStatus === 'pending' || disputeStatus === '' ? (
+                /* SI POKO GEN LITIJ -> AFICHE FÒMILÈ A */
+                <div className="space-y-4 animate-in fade-in">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">2. Non Boutik la <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)}
+                      placeholder="Kote w te achte l la"
+                      className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">3. Rezon <span className="text-red-500">*</span></label>
+                    <select value={refundReason} onChange={(e) => setRefundReason(e.target.value)} className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50">
+                      <option value="Mwen pa resevwa pwodwi a">Mwen pa resevwa pwodwi a</option>
+                      <option value="Pwodwi a andomaje">Pwodwi a kraze oswa andomaje</option>
+                      <option value="Se pa sa m te kòmande a">Se pa sa m te kòmande a</option>
+                      <option value="Fwod">Mwen sispèk yon fwod</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">4. Eksplikasyon & Prèv <span className="text-red-500">*</span></label>
+                    <textarea 
+                      value={proofText} onChange={(e) => setProofText(e.target.value)}
+                      placeholder="Esplike kisa k pase a, epi mete lyen foto si w genyen..." rows={3}
+                      className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 resize-none"
+                    ></textarea>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex gap-3">
-              <button 
-                onClick={() => setShowRefundModal(false)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
-              >
-                Anile
+              <button onClick={() => setShowRefundModal(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">
+                Fèmen
               </button>
-              <button 
-                onClick={handleGlobalRefund}
-                disabled={isRefunding || !refundTxId}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isRefunding ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Konfime Ranbousman'}
-              </button>
+              {/* Afiche bouton Soumèt la sèlman si li poko an litij */}
+              {(disputeStatus === 'pending' || disputeStatus === '') && (
+                <button 
+                  onClick={handleSubmitDispute}
+                  disabled={isRefunding || !refundTxId || !storeName || !proofText}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
+                >
+                  {isRefunding ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Soumèt Dosye a'}
+                </button>
+              )}
             </div>
           </div>
         </div>
