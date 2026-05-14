@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
-import { RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, Search, Send, CheckCircle2 } from 'lucide-react'; 
+import { RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, Search, Send, CheckCircle2, MessageSquare } from 'lucide-react'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -181,15 +181,17 @@ export default function Dashboard() {
   // ==========================================
   // FONKSYON POU CHÈCHE LITIJ LA NAN BAZ DONE
   // ==========================================
-  const handleCheckOrderDispute = async () => {
-    if (!refundTxId) return alert("Tanpri mete ID kòmand lan anvan.");
+  const handleCheckOrderDispute = async (overrideId?: string) => {
+    const targetId = overrideId || refundTxId;
+    if (!targetId) return alert("Tanpri mete ID kòmand lan anvan.");
     setIsCheckingId(true);
     setDisputeStatus("");
     setAdminReply("");
     setDisputeTableSource("");
+    if (overrideId) setRefundTxId(overrideId);
     
     try {
-      const cleanId = refundTxId.toString().replace('#', '').trim();
+      const cleanId = targetId.toString().replace('#', '').trim();
       let foundData = null;
       let source = "";
 
@@ -227,6 +229,49 @@ export default function Dashboard() {
   };
 
   // ==========================================
+  // FONKSYON POU OUVRI DÈNYE KONVÈSASYON AN
+  // ==========================================
+  const handleOpenLastDispute = async () => {
+      setIsCheckingId(true);
+      setShowRefundModal(true);
+      try {
+          const { data: recentTxs } = await supabase.from('plugin_transactions')
+            .select('order_id, dispute_details')
+            .in('status', ['disputed', 'refunded'])
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          let foundId = null;
+          if (recentTxs) {
+              const myDispute = recentTxs.find(t => t.dispute_details?.client_id === userData.id);
+              if (myDispute) foundId = myDispute.order_id;
+          }
+
+          if (!foundId) {
+             const { data: nTx } = await supabase.from('transactions')
+                .select('order_id')
+                .eq('user_id', userData.id)
+                .in('status', ['disputed', 'refunded'])
+                .order('created_at', { ascending: false })
+                .limit(1);
+             if (nTx && nTx.length > 0) foundId = nTx[0].order_id;
+          }
+
+          if (foundId) {
+             setRefundTxId(foundId);
+             await handleCheckOrderDispute(foundId);
+          } else {
+             alert("Ou pa gen okenn konvèsasyon litij ki ouvri kounye a.");
+             setShowRefundModal(false);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsCheckingId(false);
+      }
+  };
+
+  // ==========================================
   // FONKSYON POU LOUVRI YON NOUVO LITIJ
   // ==========================================
   const handleSubmitDispute = async (e: any) => {
@@ -256,7 +301,7 @@ export default function Dashboard() {
         alert("Erè: " + data.error);
       } else {
         alert("✅ Siksè: " + data.message);
-        handleCheckOrderDispute(); // Re-chèche l pou l ka ouvri bwat chat la dirèk
+        handleCheckOrderDispute(); 
       }
     } catch (error) {
       alert("Gen yon pwoblèm rezo. Tanpri eseye ankò.");
@@ -395,7 +440,7 @@ export default function Dashboard() {
                     className="flex-1 bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors uppercase"
                   />
                   <button 
-                    onClick={handleCheckOrderDispute}
+                    onClick={() => handleCheckOrderDispute()}
                     disabled={isCheckingId || !refundTxId}
                     className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50"
                   >
@@ -495,7 +540,7 @@ export default function Dashboard() {
                   </button>
               ) : (
                   <>
-                      <button onClick={() => setShowRefundModal(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">
+                      <button onClick={() => { setShowRefundModal(false); setDisputeStatus(""); }} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">
                         Fèmen
                       </button>
                       {(disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '') && (
@@ -571,6 +616,10 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button onClick={handleOpenLastDispute} className="bg-zinc-900/50 hover:bg-yellow-600/20 text-yellow-500 border border-white/5 hover:border-yellow-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
+              <MessageSquare size={12} /> LITIJ MWEN AN
+            </button>
+            
             <button onClick={() => setShowOtpModal(true)} className="bg-zinc-900/50 hover:bg-green-600/20 text-green-500 border border-white/5 hover:border-green-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
               <CheckCircle size={12} /> KONFIME LIVREZON
             </button>
