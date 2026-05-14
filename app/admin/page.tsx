@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, MessageSquare, UserX, ShieldCheck, AlertTriangle, Search } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store } from 'lucide-react';
 
 export default function AdminSuperPage() {
-    // LIS DONE YO
+    // 1. LIS DONE YO
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [deposits, setDeposits] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -13,26 +13,24 @@ export default function AdminSuperPage() {
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     const [disputes, setDisputes] = useState<any[]>([]); 
     
-    // ETA POU FÒMILÈ YO
+    // 2. ETA POU FÒMILÈ YO
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
     const [searchQuery, setSearchQuery] = useState('');
     
-    // ETA POU ANONS GLOBAL LA
+    // 3. ETA POU ANONS GLOBAL LA
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    // ETA POU CHAT LITIJ YO
+    // 4. ETA POU CHAT LITIJ YO AK RECHÈCH
     const [adminReplies, setAdminReplies] = useState<{ [key: string]: string }>({});
-
-    // NOUVO: ETA POU CHÈCHE YON LITIJ AK ID KÒMAND LAN
     const [searchDisputeId, setSearchDisputeId] = useState('');
     const [searchedDispute, setSearchedDispute] = useState<any>(null);
     const [isSearchingDispute, setIsSearchingDispute] = useState(false);
+    const [actionAmount, setActionAmount] = useState<number>(0);
 
-    // MENI ONGLET YO 
+    // 5. MENI ONGLET YO 
     const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij'>('anons');
-    
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [accessGranted, setAccessGranted] = useState(false);
@@ -78,8 +76,21 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            const { data: disp } = await supabase.from('plugin_transactions').select('*').eq('status', 'disputed').order('created_at', { ascending: false });
-            setDisputes(disp || []);
+            // Rale litij nan toude tab yo
+            const { data: disp1 } = await supabase.from('plugin_transactions').select('*').eq('status', 'disputed');
+            const { data: disp2 } = await supabase.from('transactions').select('*').eq('status', 'disputed');
+            
+            const allDisputes = [
+                ...(disp1 || []).map(d => ({ ...d, table_source: 'plugin_transactions' })),
+                ...(disp2 || []).map(d => ({ 
+                    ...d, 
+                    table_source: 'transactions', 
+                    dispute_details: d.metadata?.dispute_details || {}, 
+                    dispute_reason: d.description 
+                }))
+            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            
+            setDisputes(allDisputes);
             
             const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
@@ -122,6 +133,9 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
+    // ==========================================
+    // DEPO AK RETRÈ LOGIC
+    // ==========================================
     const apwouveDepo = async (d: any) => {
         const montanFinal = montanModifye[d.id] !== undefined ? montanModifye[d.id] : Number(d.amount);
         if (!confirm(`Konfime depo sa a?\nMontan k ap ajoute sou balans lan: ${montanFinal} HTG`)) return;
@@ -198,6 +212,9 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
+    // ==========================================
+    // KONT AK KYC LOGIC
+    // ==========================================
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
@@ -221,7 +238,7 @@ export default function AdminSuperPage() {
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
         if (aksyon === 'rejected') {
-            const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo (Egz: Pyès la twò flou, Foto a pa klè):");
+            const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:");
             if (!rep) return; 
             rezonReje = rep;
         } else {
@@ -246,6 +263,9 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
+    // ==========================================
+    // PWOMO AK ANONS LOGIC
+    // ==========================================
     const handleCreateCode = async (e: React.FormEvent) => {
         e.preventDefault();
         setProcessingId('creating_promo');
@@ -277,7 +297,7 @@ export default function AdminSuperPage() {
     };
 
     // ==========================================
-    // NOUVO: FONKSYON POU CHÈCHE LITIJ NAN BAZ DONE A
+    // LITIJ AK RECHÈCH ID LOGIC
     // ==========================================
     const handleAdminSearchDispute = async () => {
         if (!searchDisputeId.trim()) return alert("Tanpri mete ID kòmand lan pou w chèche a.");
@@ -286,30 +306,40 @@ export default function AdminSuperPage() {
         
         try {
             const cleanId = searchDisputeId.trim().toLowerCase();
+            let tx = null;
             
-            // Nou chèche ak ilike pou si admin an sèlman tape 12 chif yo
-            const { data, error } = await supabase
-                .from('plugin_transactions')
-                .select('*')
-                .ilike('id', `${cleanId}%`)
-                .maybeSingle();
-
-            // Si nou pa jwenn li nan ID a, nou chèche nan order_id (ID boutik la)
-            if (!data) {
-                const { data: data2 } = await supabase
-                    .from('plugin_transactions')
-                    .select('*')
-                    .eq('order_id', cleanId)
-                    .maybeSingle();
-                    
-                if (data2) {
-                    setSearchedDispute(data2);
-                } else {
-                    alert("Sistèm nan pa jwenn okenn kòmand avèk ID sa a.");
-                }
-            } else {
-                setSearchedDispute(data);
+            // 1. Chèche nan plugin_transactions
+            let { data: pluginTx } = await supabase.from('plugin_transactions').select('*').ilike('order_id', `${cleanId}%`).maybeSingle();
+            if (!pluginTx) {
+                const { data: pluginTxOld } = await supabase.from('plugin_transactions').select('*').ilike('id', `${cleanId}%`).maybeSingle();
+                pluginTx = pluginTxOld;
             }
+            
+            if (pluginTx) {
+                tx = { ...pluginTx, table_source: 'plugin_transactions' };
+            } else {
+                // 2. Chèche nan transactions
+                let { data: normTx } = await supabase.from('transactions').select('*').ilike('order_id', `${cleanId}%`).maybeSingle();
+                if (!normTx) {
+                    const { data: normTxOld } = await supabase.from('transactions').select('*').ilike('id', `${cleanId}%`).maybeSingle();
+                    normTx = normTxOld;
+                }
+                if (normTx) {
+                    tx = { 
+                        ...normTx, 
+                        table_source: 'transactions', 
+                        dispute_details: normTx.metadata?.dispute_details || {}, 
+                        dispute_reason: normTx.description 
+                    };
+                }
+            }
+
+            if (!tx) {
+                return alert("Sistèm nan pa jwenn okenn kòmand avèk ID sa a ditou. Tcheke si ID a bon.");
+            }
+
+            setActionAmount(Number(tx.amount_htg || Math.abs(tx.amount) || 0));
+            setSearchedDispute(tx);
             
         } catch (err: any) {
             alert("Erè: " + err.message);
@@ -318,60 +348,61 @@ export default function AdminSuperPage() {
         }
     };
 
+    const getPartiesForTx = (tx: any) => {
+        if (!tx) return { sender: null, receiver: null };
+        let sender = null;
+        let receiver = null;
 
-    const voyeReponsAdmin = async (txId: string, currentDetails: any) => {
-        const replyText = adminReplies[txId];
-        if (!replyText || replyText.trim() === '') return alert("Tanpri ekri yon mesaj anvan w voye l!");
-        setProcessingId(`reply_${txId}`);
-        try {
-            const updatedDetails = { ...currentDetails, admin_reply: replyText };
-            await supabase.from('plugin_transactions').update({ dispute_details: updatedDetails }).eq('id', txId);
-            alert("✅ Mesaj la ale! Kliyan an ap wè l kounye a.");
-            setAdminReplies({ ...adminReplies, [txId]: '' }); 
-            
-            // Rafrechi donè yo pou montre chanjman an
-            raleDone(); 
-            if (searchedDispute && searchedDispute.id === txId) {
-                setSearchedDispute({...searchedDispute, dispute_details: updatedDetails});
-            }
-        } catch (err: any) {
-            alert("Erè nan voye mesaj la: " + err.message);
-        } finally {
-            setProcessingId(null);
+        if (tx.table_source === 'plugin_transactions') {
+            const senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id || tx.user_id;
+            sender = allUsers.find(u => u.id === senderId || u.email === tx.metadata?.customer_email);
+
+            const receiverId = tx.metadata?.merchant_id;
+            receiver = allUsers.find(u => u.id === receiverId || u.email === tx.metadata?.merchant_email);
+            if (!receiver && tx.user_id !== senderId) receiver = allUsers.find(u => u.id === tx.user_id);
+        } else {
+            sender = allUsers.find(u => u.id === tx.user_id);
+            const rEmail = tx.metadata?.receiver_email;
+            receiver = allUsers.find(u => u.email === rEmail);
         }
+
+        return { sender, receiver };
     };
 
-    const remetKliyanLajan = async (tx: any) => {
-        if (!confirm(`💸 Èske w sèten ou vle ranbouse kliyan an ${tx.amount_htg} HTG pou kòmand #${tx.order_id || tx.id.substring(0,8)} la?`)) return;
-        setProcessingId(`resolve_${tx.id}`);
+    const balanseLajanKont = async (fromUser: any, toUser: any, tipChanjman: string) => {
+        if (!fromUser || !toUser) return alert("Nou manke Pwofil youn nan yo! Nou pa ka fè transfè a.");
+        if (actionAmount <= 0) return alert("Ou dwe mete yon montan ki pi gwo pase zewo.");
+        
+        const c = confirm(`⚠️ SÈTEN?\n\nOu pral RETIRE ${actionAmount} HTG sou kont:\n👤 ${fromUser.full_name}\n\nPou w AJOUTE sou kont:\n👤 ${toUser.full_name}\n\nÈske w vle kontinye?`);
+        if (!c) return;
+
+        setProcessingId('balance_transfer');
         try {
-            // Lajan an pral jwenn moun ki te achte a (client_id nan metadata oswa dispute_details)
-            const clientId = tx.dispute_details?.client_id || tx.metadata?.customer_id;
-            
-            if (!clientId) throw new Error("Nou pa jwenn ID Kliyan an pou n ranbouse l.");
-            
-            const { data: client, error: cErr } = await supabase.from('profiles').select('wallet_balance, email, full_name').eq('id', clientId).single();
-            if (cErr || !client) throw new Error("Kliyan pa jwenn nan baz done a.");
-            
-            const newBalance = Number(client.wallet_balance || 0) + Number(tx.amount_htg);
-            await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('id', clientId);
-            
-            await supabase.from('plugin_transactions').update({ status: 'refunded' }).eq('id', tx.id);
-            
-            await supabase.from('transactions').insert({
-                user_id: clientId,
-                amount: Number(tx.amount_htg),
-                type: 'REFUND',
-                description: `Ranbousman Kòmand #${tx.order_id || tx.id.substring(0,8)} (Litij Fèmen)`,
-                status: 'success'
-            });
-            
-            const mesajE = `Bonjou ${client.full_name}, litij pou kòmand #${tx.order_id || tx.id.substring(0,8)} la rezoud an favè w. Nou fèk ranbouse w ${tx.amount_htg} HTG sou balans ou.`;
-            await voyeEmailKliyan(client.email, client.full_name, mesajE, "✅ RANBOUSMAN FÈT - HATEX");
-            
-            alert("✅ Kliyan an jwenn lajan l tounen! Litij la fèmen.");
-            setSearchedDispute(null); // Fèmen rezilta rechèch la si l te louvri
-            raleDone();
+            const { data: latestFrom } = await supabase.from('profiles').select('wallet_balance').eq('id', fromUser.id).single();
+            const { data: latestTo } = await supabase.from('profiles').select('wallet_balance').eq('id', toUser.id).single();
+
+            const newFromBalance = Number(latestFrom?.wallet_balance || 0) - actionAmount;
+            const newToBalance = Number(latestTo?.wallet_balance || 0) + actionAmount;
+
+            await supabase.from('profiles').update({ wallet_balance: newFromBalance }).eq('id', fromUser.id);
+            await supabase.from('profiles').update({ wallet_balance: newToBalance }).eq('id', toUser.id);
+
+            await supabase.from('transactions').insert([
+                { user_id: fromUser.id, amount: -actionAmount, type: 'ADMIN_ADJUSTMENT', description: tipChanjman, status: 'success' },
+                { user_id: toUser.id, amount: actionAmount, type: 'ADMIN_ADJUSTMENT', description: tipChanjman, status: 'success' }
+            ]);
+
+            if (searchedDispute?.status === 'disputed') {
+                if (searchedDispute.table_source === 'plugin_transactions') {
+                    await supabase.from('plugin_transactions').update({ status: 'refunded' }).eq('id', searchedDispute.id);
+                } else {
+                    await supabase.from('transactions').update({ status: 'refunded' }).eq('id', searchedDispute.id);
+                }
+            }
+
+            alert(`✅ SIKSÈ! ${actionAmount} HTG fèk sot nan kont ${fromUser.full_name} al sou kont ${toUser.full_name}.`);
+            setSearchedDispute(null); 
+            raleDone(); 
         } catch (err: any) {
             alert("Erè: " + err.message);
         } finally {
@@ -379,6 +410,27 @@ export default function AdminSuperPage() {
         }
     };
 
+    const voyeReponsAdmin = async (txId: string, currentDetails: any, tabSource: string) => {
+        const replyText = adminReplies[txId];
+        if (!replyText || replyText.trim() === '') return alert("Tanpri ekri yon mesaj anvan w voye l!");
+        setProcessingId(`reply_${txId}`);
+        try {
+            const updatedDetails = { ...currentDetails, admin_reply: replyText };
+            if (tabSource === 'plugin_transactions') {
+                await supabase.from('plugin_transactions').update({ dispute_details: updatedDetails }).eq('id', txId);
+            } else {
+                const { data: oldTx } = await supabase.from('transactions').select('metadata').eq('id', txId).single();
+                await supabase.from('transactions').update({ metadata: { ...oldTx?.metadata, dispute_details: updatedDetails } }).eq('id', txId);
+            }
+            
+            alert("✅ Mesaj la ale!");
+            setAdminReplies({ ...adminReplies, [txId]: '' }); 
+            raleDone(); 
+            if (searchedDispute && searchedDispute.id === txId) {
+                setSearchedDispute({...searchedDispute, dispute_details: updatedDetails});
+            }
+        } catch (err: any) { alert("Erè nan voye mesaj la: " + err.message); } finally { setProcessingId(null); }
+    };
 
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
@@ -404,37 +456,30 @@ export default function AdminSuperPage() {
                 <div className="flex gap-2 mb-8 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar whitespace-nowrap custom-scrollbar pb-2">
                     <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>📢 ANONS</button>
                     <button onClick={() => setView('kliyan')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>👥 KLIYAN ({allUsers.length})</button>
-                    
                     <button onClick={() => setView('litij')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all relative ${view === 'litij' ? 'bg-yellow-600 shadow-lg shadow-yellow-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>
-                        ⚠️ LITIJ
+                        ⚠️ LITIJ / CHÈCHE
                         {disputes.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-full text-[8px] animate-pulse">{disputes.length}</span>}
                     </button>
-                    
                     <button onClick={() => setView('depo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'depo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>DEPO ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'retre' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>RETRÈ ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>KYC ({pendingKyc.length})</button>
                     <button onClick={() => setView('promo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'promo' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>PWOMO</button>
-                    <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>SISPANDI ({suspendedAccounts.length})</button>
+                    <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>SISPANDI</button>
                 </div>
 
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
                     ) : view === 'litij' ? (
-                        // ==========================================
-                        // VUE LITIJ / CHAT AK RECHÈCH ID KÒMAND
-                        // ==========================================
                         <div className="space-y-8">
-                            
-                            {/* BWAT RECHÈCH POU ID KÒMAND LAN */}
                             <div className="bg-[#121420] p-6 rounded-[2rem] border border-yellow-500/30 shadow-lg shadow-yellow-900/10">
                                 <p className="text-[10px] font-black text-yellow-500 mb-3 tracking-widest uppercase flex items-center gap-2">
-                                    <Search size={14} /> Chèche yon Tranzaksyon / Litij
+                                    <Search size={14} /> Chèche ID kòmand lan (Acha, Transfè, Depo...)
                                 </p>
                                 <div className="flex gap-2">
                                     <input 
                                         type="text" 
-                                        placeholder="Kole 12 chif ID a la a..." 
+                                        placeholder="Kole ID 12 chif la la a..." 
                                         value={searchDisputeId} 
                                         onChange={(e) => setSearchDisputeId(e.target.value)}
                                         className="flex-1 bg-black border border-white/10 p-4 rounded-xl text-white outline-none focus:border-yellow-500/50 transition-all font-mono uppercase text-sm"
@@ -449,136 +494,131 @@ export default function AdminSuperPage() {
                                 </div>
                             </div>
 
-                            {/* REZILTA RECHÈCH LA */}
-                            {searchedDispute && (
-                                <div className="mb-10 relative">
-                                    <div className="absolute -top-3 left-6 bg-yellow-500 text-black px-3 py-1 rounded-md text-[9px] font-black uppercase z-10">Rezilta Rechèch</div>
-                                    <div className="bg-[#121420] rounded-[2.5rem] border-2 border-yellow-500 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] flex flex-col lg:flex-row relative">
-                                        
-                                        {/* Bouton fèmen rezilta a */}
-                                        <button onClick={() => setSearchedDispute(null)} className="absolute top-4 right-4 bg-zinc-800 text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500 transition-colors z-10">
-                                            ✕
-                                        </button>
+                            {searchedDispute && (() => {
+                                const { sender, receiver } = getPartiesForTx(searchedDispute);
 
-                                        {/* BÒ GÒCH: Enfòmasyon Kliyan an & Kòmand lan */}
-                                        <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between pt-12">
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-6">
-                                                    <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500 border border-yellow-500/30">
-                                                        <AlertTriangle size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-lg font-black text-white">LITIJ #{searchedDispute.order_id || 'ID'}</h3>
-                                                        <p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(searchedDispute.created_at).toLocaleDateString()}</p>
-                                                    </div>
-                                                </div>
+                                return (
+                                    <div className="mb-10 relative">
+                                        <div className="absolute -top-3 left-6 bg-yellow-500 text-black px-3 py-1 rounded-md text-[9px] font-black uppercase z-10 flex items-center gap-1">
+                                            <AlertTriangle size={12}/> JERE TRANZAKSYON #{searchedDispute.order_id || searchedDispute.id.substring(0,8)}
+                                        </div>
+                                        <div className="bg-[#121420] rounded-[2.5rem] border-2 border-yellow-500 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] p-6 pt-10 relative">
+                                            
+                                            <button onClick={() => setSearchedDispute(null)} className="absolute top-4 right-4 bg-zinc-800 text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500 transition-colors z-10">✕</button>
 
-                                                {(() => {
-                                                    const sClient = getClientInfo(searchedDispute.dispute_details?.client_id || searchedDispute.metadata?.customer_id);
-                                                    return sClient ? (
-                                                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
-                                                            <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-3 font-black flex items-center gap-2">
-                                                                <UserX size={12} /> Enfòmasyon Kliyan
-                                                            </p>
-                                                            <p className="text-sm font-black text-white mb-1 truncate">{sClient.full_name}</p>
-                                                            <p className="text-[10px] text-zinc-400 mb-3 lowercase truncate">{sClient.email}</p>
-                                                            <div className="bg-zinc-900 px-3 py-2 rounded-xl inline-block border border-white/5">
-                                                                <span className="text-[9px] text-zinc-500">BALANS: </span>
-                                                                <span className="text-xs text-green-400">{Number(sClient.wallet_balance).toLocaleString()} HTG</span>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                                <div className="bg-black/50 border border-white/5 p-5 rounded-2xl relative">
+                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded">MOUN KI PEYE / VOYE A</span>
+                                                    {sender ? (
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center text-xl border border-white/10 shrink-0">👤</div>
+                                                            <div className="overflow-hidden">
+                                                                <p className="text-sm font-black truncate text-white">{sender.full_name}</p>
+                                                                <p className="text-[10px] text-zinc-500 lowercase truncate">{sender.email}</p>
+                                                                <p className="text-xs text-green-400 mt-1">Balans: {Number(sender.wallet_balance).toLocaleString()} HTG</p>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-red-400 mb-6">Enfòmasyon kliyan an pa disponib.</p>
-                                                    );
-                                                })()}
+                                                        <p className="text-xs text-red-500 italic mt-2">Nou pa jwenn Kliyan an.</p>
+                                                    )}
+                                                </div>
 
-                                                <div className="space-y-3">
-                                                    <div>
-                                                        <p className="text-[9px] text-zinc-500">BOUTIK LA:</p>
-                                                        <p className="text-xs text-white">{searchedDispute.dispute_details?.store_name || searchedDispute.metadata?.merchant_name || 'Enkoni'}</p>
+                                                <div className="bg-black/50 border border-white/5 p-5 rounded-2xl relative">
+                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded">MOUN KI RESEVWA A (MACHANN)</span>
+                                                    {receiver ? (
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 bg-blue-900/20 text-blue-500 rounded-full flex items-center justify-center text-xl border border-blue-500/30 shrink-0"><Store size={20}/></div>
+                                                            <div className="overflow-hidden">
+                                                                <p className="text-sm font-black truncate text-white">{receiver.full_name}</p>
+                                                                <p className="text-[10px] text-zinc-500 lowercase truncate">{receiver.email}</p>
+                                                                <p className="text-xs text-green-400 mt-1">Balans: {Number(receiver.wallet_balance).toLocaleString()} HTG</p>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-red-500 italic mt-2">Pwofil machann pa disponib.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
+                                                <div className="flex flex-col md:flex-row items-center gap-4">
+                                                    <div className="w-full md:w-1/3">
+                                                        <label className="text-[9px] text-zinc-500 uppercase tracking-widest block mb-2">Montan pou Transfere a (HTG)</label>
+                                                        <input 
+                                                            type="number" 
+                                                            value={actionAmount} 
+                                                            onChange={(e) => setActionAmount(Number(e.target.value))}
+                                                            className="w-full bg-black border border-yellow-500/30 p-4 rounded-xl text-yellow-500 font-black text-xl outline-none focus:border-yellow-500 transition-colors"
+                                                        />
                                                     </div>
-                                                    <div>
-                                                        <p className="text-[9px] text-zinc-500">ESTATI AKTYÈL:</p>
-                                                        <p className={`text-xs font-black ${searchedDispute.status === 'refunded' ? 'text-green-500' : 'text-yellow-500'}`}>{searchedDispute.status.toUpperCase()}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[9px] text-zinc-500">MONTAN AN JÈ:</p>
-                                                        <p className="text-2xl font-black text-white italic">{searchedDispute.amount_htg} <span className="text-xs text-yellow-500">HTG</span></p>
+
+                                                    <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 md:mt-0">
+                                                        <button 
+                                                            onClick={() => balanseLajanKont(receiver, sender, `Ranbousman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)}
+                                                            disabled={processingId === 'balance_transfer' || !receiver || !sender}
+                                                            className="bg-zinc-800 hover:bg-zinc-700 border border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                                        >
+                                                            <ArrowRightLeft className="text-red-400 rotate-180" size={20} />
+                                                            <span className="text-[9px] text-white tracking-widest text-center">RANBOUSE KLIYAN AN<br/><span className="text-zinc-500">(Rale nan Machann {'->'} Mete nan Kliyan)</span></span>
+                                                        </button>
+
+                                                        <button 
+                                                            onClick={() => balanseLajanKont(sender, receiver, `Peman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)}
+                                                            disabled={processingId === 'balance_transfer' || !receiver || !sender}
+                                                            className="bg-zinc-800 hover:bg-zinc-700 border border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                                        >
+                                                            <ArrowRightLeft className="text-green-400" size={20} />
+                                                            <span className="text-[9px] text-white tracking-widest text-center">PEYE MACHANN NAN<br/><span className="text-zinc-500">(Rale nan Kliyan {'->'} Mete nan Machann)</span></span>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {searchedDispute.status !== 'refunded' && (
-                                                <div className="mt-8 pt-6 border-t border-white/5">
+                                            <div className="mt-8 pt-8 border-t border-white/5">
+                                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-4">Mesaj Ak Kliyan an / Prèv Litij</p>
+                                                <div className="bg-black border border-white/5 rounded-2xl p-4 max-h-[250px] overflow-y-auto mb-4 space-y-4">
+                                                    <div className="flex flex-col items-start max-w-[85%]">
+                                                        <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm text-white text-xs whitespace-pre-wrap normal-case">
+                                                            {searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || searchedDispute.description || 'Pa gen mesaj sou sistèm nan pou tranzaksyon sa a.'}
+                                                        </div>
+                                                    </div>
+                                                    {searchedDispute.dispute_details?.admin_reply && (
+                                                        <div className="flex flex-col items-end max-w-[85%] ml-auto">
+                                                            <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-2xl rounded-tr-sm text-white text-xs whitespace-pre-wrap normal-case">
+                                                                {searchedDispute.dispute_details?.admin_reply}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="bg-zinc-900 rounded-xl p-2 flex gap-2 border border-white/10">
+                                                    <textarea 
+                                                        placeholder="Voye yon mesaj bay kliyan an..."
+                                                        value={adminReplies[searchedDispute.id] || ''}
+                                                        onChange={(e) => setAdminReplies({ ...adminReplies, [searchedDispute.id]: e.target.value })}
+                                                        className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white normal-case resize-none min-h-[40px]"
+                                                    ></textarea>
                                                     <button 
-                                                        onClick={() => remetKliyanLajan(searchedDispute)} 
-                                                        disabled={processingId === `resolve_${searchedDispute.id}`}
-                                                        className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-green-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                        onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {}, searchedDispute.table_source)}
+                                                        className="bg-red-600 hover:bg-red-500 w-12 rounded-lg flex items-center justify-center text-white"
                                                     >
-                                                        {processingId === `resolve_${searchedDispute.id}` ? 'AP RANBOUSE...' : '💸 REMÈT KLIYAN AN LAJAN L'}
+                                                        <Send size={16} />
                                                     </button>
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        {/* BÒ DWA: Sistèm Chat la (Pou Rezilta a) */}
-                                        <div className="w-full lg:w-2/3 flex flex-col p-6 bg-black relative">
-                                            <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-6 custom-scrollbar">
-                                                <div className="flex flex-col items-start max-w-[85%]">
-                                                    <div className="flex items-center gap-2 mb-1 pl-1">
-                                                        <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs">👤</div>
-                                                        <span className="text-[10px] text-zinc-400 lowercase">Kliyan</span>
-                                                    </div>
-                                                    <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm border border-white/5 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
-                                                        {searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || 'Pa gen detay litij pou kòmand sa a.'}
-                                                    </div>
-                                                </div>
-
-                                                {searchedDispute.dispute_details?.admin_reply && (
-                                                    <div className="flex flex-col items-end max-w-[85%] ml-auto">
-                                                        <div className="flex items-center gap-2 mb-1 pr-1">
-                                                            <span className="text-[10px] text-red-500 lowercase">Admin</span>
-                                                            <div className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center text-xs text-red-500 border border-red-500/30"><ShieldCheck size={12}/></div>
-                                                        </div>
-                                                        <div className="bg-red-900/20 p-4 rounded-2xl rounded-tr-sm border border-red-500/30 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
-                                                            {searchedDispute.dispute_details?.admin_reply}
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
 
-                                            <div className="mt-auto bg-zinc-900 rounded-2xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
-                                                <textarea 
-                                                    placeholder="Tape repons ou an pou kliyan an la a..."
-                                                    value={adminReplies[searchedDispute.id] || ''}
-                                                    onChange={(e) => setAdminReplies({ ...adminReplies, [searchedDispute.id]: e.target.value })}
-                                                    className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white lowercase normal-case resize-none min-h-[50px]"
-                                                    rows={2}
-                                                ></textarea>
-                                                <button 
-                                                    onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {})}
-                                                    disabled={processingId === `reply_${searchedDispute.id}`}
-                                                    className="bg-red-600 hover:bg-red-500 w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20 transition-all active:scale-90"
-                                                >
-                                                    {processingId === `reply_${searchedDispute.id}` ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}
-                                                </button>
-                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
-                            {/* LIS PLENT KI TOUJOU LOUVRI YO */}
-                            {disputes.length > 0 && (
+                            {disputes.length > 0 && !searchedDispute && (
                                 <>
-                                    <h2 className="text-xl font-black text-white border-b border-white/10 pb-2">TOUT PLENT YO</h2>
+                                    <h2 className="text-xl font-black text-white border-b border-white/10 pb-2">TOUT PLENT KI LOUVRI YO ({disputes.length})</h2>
                                     {disputes.map((tx) => {
-                                        const client = getClientInfo(tx.dispute_details?.client_id);
+                                        const client = getClientInfo(tx.dispute_details?.client_id || tx.user_id);
                                         
                                         return (
                                             <div key={tx.id} className="bg-[#121420] rounded-[2.5rem] border border-zinc-800 overflow-hidden shadow-lg flex flex-col lg:flex-row opacity-80 hover:opacity-100 transition-opacity">
-                                                
-                                                {/* BÒ GÒCH: Enfòmasyon Kliyan an & Kòmand lan */}
                                                 <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between">
                                                     <div>
                                                         <div className="flex items-center gap-3 mb-6">
@@ -586,7 +626,7 @@ export default function AdminSuperPage() {
                                                                 <AlertTriangle size={20} />
                                                             </div>
                                                             <div>
-                                                                <h3 className="text-lg font-black text-white">LITIJ #{tx.order_id}</h3>
+                                                                <h3 className="text-lg font-black text-white">LITIJ #{tx.order_id || tx.id.substring(0,8)}</h3>
                                                                 <p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(tx.created_at).toLocaleDateString()}</p>
                                                             </div>
                                                         </div>
@@ -609,8 +649,8 @@ export default function AdminSuperPage() {
 
                                                         <div className="space-y-3">
                                                             <div>
-                                                                <p className="text-[9px] text-zinc-500">BOUTIK LA:</p>
-                                                                <p className="text-xs text-white">{tx.dispute_details?.store_name || 'Enkoni'}</p>
+                                                                <p className="text-[9px] text-zinc-500">BOUTIK LA / TIP:</p>
+                                                                <p className="text-xs text-white">{tx.dispute_details?.store_name || tx.metadata?.merchant_name || tx.type || 'Enkoni'}</p>
                                                             </div>
                                                             <div>
                                                                 <p className="text-[9px] text-zinc-500">REZON PLENT LAN:</p>
@@ -618,38 +658,35 @@ export default function AdminSuperPage() {
                                                             </div>
                                                             <div>
                                                                 <p className="text-[9px] text-zinc-500">MONTAN AN JÈ:</p>
-                                                                <p className="text-2xl font-black text-white italic">{tx.amount_htg} <span className="text-xs text-yellow-500">HTG</span></p>
+                                                                <p className="text-2xl font-black text-white italic">{tx.amount_htg || Math.abs(tx.amount)} <span className="text-xs text-yellow-500">HTG</span></p>
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     <div className="mt-8 pt-6 border-t border-white/5">
                                                         <button 
-                                                            onClick={() => remetKliyanLajan(tx)} 
-                                                            disabled={processingId === `resolve_${tx.id}`}
-                                                            className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-green-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                            onClick={() => {
+                                                                setSearchDisputeId(tx.order_id || tx.id);
+                                                                handleAdminSearchDispute();
+                                                            }} 
+                                                            className="w-full bg-yellow-600 hover:bg-yellow-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-yellow-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                                                         >
-                                                            {processingId === `resolve_${tx.id}` ? 'AP RANBOUSE...' : '💸 REMÈT KLIYAN AN LAJAN L'}
+                                                            🔍 LOUVRI DOSYE A POU REZOUD LI
                                                         </button>
                                                     </div>
                                                 </div>
 
-                                                {/* BÒ DWA: Sistèm Chat la */}
                                                 <div className="w-full lg:w-2/3 flex flex-col p-6 bg-black relative">
                                                     <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-6 custom-scrollbar">
-                                                        
-                                                        {/* MESAJ KLIYAN AN (PRÈV LA) */}
                                                         <div className="flex flex-col items-start max-w-[85%]">
                                                             <div className="flex items-center gap-2 mb-1 pl-1">
                                                                 <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs">👤</div>
                                                                 <span className="text-[10px] text-zinc-400 lowercase">{client?.full_name || 'Kliyan'}</span>
                                                             </div>
                                                             <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm border border-white/5 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">
-                                                                {tx.dispute_details?.proof_text || 'Pa gen detay prèv.'}
+                                                                {tx.dispute_details?.proof_text || tx.dispute_reason || 'Pa gen detay prèv.'}
                                                             </div>
                                                         </div>
-
-                                                        {/* MESAJ ADMIN AN (SI L TE REponn) */}
                                                         {tx.dispute_details?.admin_reply && (
                                                             <div className="flex flex-col items-end max-w-[85%] ml-auto">
                                                                 <div className="flex items-center gap-2 mb-1 pr-1">
@@ -662,8 +699,6 @@ export default function AdminSuperPage() {
                                                             </div>
                                                         )}
                                                     </div>
-
-                                                    {/* BWAT POU TAPE REPONS LAN */}
                                                     <div className="mt-auto bg-zinc-900 rounded-2xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
                                                         <textarea 
                                                             placeholder="Tape repons ou an pou kliyan an la a..."
@@ -673,16 +708,13 @@ export default function AdminSuperPage() {
                                                             rows={2}
                                                         ></textarea>
                                                         <button 
-                                                            onClick={() => voyeReponsAdmin(tx.id, tx.dispute_details)}
+                                                            onClick={() => voyeReponsAdmin(tx.id, tx.dispute_details || {}, tx.table_source)}
                                                             disabled={processingId === `reply_${tx.id}`}
                                                             className="bg-red-600 hover:bg-red-500 w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20 transition-all active:scale-90"
                                                         >
                                                             {processingId === `reply_${tx.id}` ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}
                                                         </button>
                                                     </div>
-                                                    <p className="text-[8px] text-zinc-500 text-center mt-3 uppercase tracking-widest">
-                                                        Kliyan an ap resevwa repons sa a dirèk nan aplikasyon l lan
-                                                    </p>
                                                 </div>
                                             </div>
                                         );
@@ -691,9 +723,6 @@ export default function AdminSuperPage() {
                             )}
                         </div>
                     ) : view === 'kliyan' ? (
-                        // ==========================================
-                        // VUE RECHÈCH KLIYAN
-                        // ==========================================
                         <div className="space-y-6">
                             <div className="bg-[#121420] p-4 rounded-3xl border border-indigo-500/30 shadow-lg shadow-indigo-900/10 flex items-center gap-3">
                                 <span className="text-xl ml-2">🔍</span>
@@ -722,7 +751,6 @@ export default function AdminSuperPage() {
                                                         <span className="text-[9px] bg-zinc-800 text-zinc-300 px-2 py-1 rounded-md">BALANS: <span className="text-white">{Number(user.wallet_balance || 0).toLocaleString()} HTG</span></span>
                                                         <span className={`text-[9px] px-2 py-1 rounded-md ${user.kyc_status === 'approved' ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-500'}`}>KYC: {user.kyc_status}</span>
                                                         {user.is_card_activated && <span className="text-[9px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md">KAT AKTIVE</span>}
-                                                        {user.used_promo && <span className="text-[9px] bg-purple-900/30 text-purple-400 px-2 py-1 rounded-md">PWOMO: {user.used_promo}</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -740,9 +768,6 @@ export default function AdminSuperPage() {
                             </div>
                         </div>
                     ) : view === 'anons' ? (
-                        // ==========================================
-                        // VUE NOTIFIKASYON GLOBAL (ANONS)
-                        // ==========================================
                         <div className="bg-[#121420] p-6 rounded-3xl border border-blue-500/30 mb-8 shadow-lg shadow-blue-900/10">
                             <div className="flex items-center gap-3 mb-6">
                                 <span className="text-2xl drop-shadow-md">📢</span>
@@ -759,7 +784,6 @@ export default function AdminSuperPage() {
                                         required 
                                     />
                                 </div>
-                                
                                 <div className="flex items-center gap-3 p-4 bg-black rounded-2xl border border-white/5 cursor-pointer" onClick={() => setAnonsActive(!anonsActive)}>
                                     <input 
                                         type="checkbox" checked={anonsActive} onChange={(e) => setAnonsActive(e.target.checked)} 
@@ -770,16 +794,12 @@ export default function AdminSuperPage() {
                                         <span className="text-[9px] text-zinc-500 normal-case italic">Si bwat sa pa make, notifikasyon an pap parèt pou kliyan yo.</span>
                                     </div>
                                 </div>
-                                
                                 <button type="submit" disabled={processingId === 'saving_anons'} className="w-full bg-blue-600 hover:bg-blue-500 px-8 py-5 rounded-2xl font-black uppercase italic active:scale-95 transition-all text-white shadow-lg shadow-blue-600/20">
                                     {processingId === 'saving_anons' ? "AP SOVE..." : "SOVE NOTIFIKASYON AN"}
                                 </button>
                             </form>
                         </div>
                     ) : view === 'kyc' ? (
-                        // ==========================================
-                        // VUE KYC
-                        // ==========================================
                         pendingKyc.length === 0 ? (
                             <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn KYC k ap tann</div>
                         ) : (
@@ -805,9 +825,6 @@ export default function AdminSuperPage() {
                             ))
                         )
                     ) : view === 'promo' ? (
-                        // ==========================================
-                        // VUE PWOMO
-                        // ==========================================
                         <div>
                             <form onSubmit={handleCreateCode} className="bg-[#121420] p-6 rounded-3xl border border-purple-500/30 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-lg shadow-purple-900/10">
                                 <div className="flex-1 w-full space-y-2">
@@ -815,7 +832,7 @@ export default function AdminSuperPage() {
                                     <input type="text" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} placeholder="NON ATIS LA" className="w-full bg-black border border-white/10 p-4 rounded-xl focus:border-purple-500 outline-none transition-all font-bold text-sm uppercase" required />
                                 </div>
                                 <div className="w-full md:w-48 space-y-2">
-                                    <label className="text-[9px] text-purple-400 font-black uppercase tracking-widest ml-2">Rediksyon Aktivasyon (HTG)</label>
+                                    <label className="text-[9px] text-purple-400 font-black uppercase tracking-widest ml-2">Rediksyon (HTG)</label>
                                     <input type="number" value={promoReward} onChange={(e) => setPromoReward(e.target.value)} className="w-full bg-black border border-white/10 p-4 rounded-xl focus:border-purple-500 outline-none transition-all font-bold text-sm" required min="0" />
                                 </div>
                                 <button type="submit" disabled={processingId === 'creating_promo'} className="w-full md:w-auto bg-purple-600 px-8 py-4 rounded-xl font-black uppercase italic active:scale-95 transition-all">{processingId === 'creating_promo' ? "AP KREYE..." : "KREYE KÒD LA"}</button>
@@ -836,9 +853,6 @@ export default function AdminSuperPage() {
                             </div>
                         </div>
                     ) : view === 'sispandi' ? (
-                        // ==========================================
-                        // VUE SISPANDI
-                        // ==========================================
                         suspendedAccounts.map((account) => (
                             <div key={account.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-red-600/30 relative overflow-hidden flex flex-col items-center text-center">
                                 <div className="w-12 h-12 bg-red-600/20 text-red-500 rounded-full flex items-center justify-center mb-4 border border-red-600/50"><span className="text-xl">⚠️</span></div>
@@ -848,9 +862,6 @@ export default function AdminSuperPage() {
                             </div>
                         ))
                     ) : (
-                        // ==========================================
-                        // VUE DEPO & RETRÈ
-                        // ==========================================
                         (view === 'depo' ? deposits : withdrawals).map((item) => {
                             const isDepo = view === 'depo';
                             const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
