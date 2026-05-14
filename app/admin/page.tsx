@@ -1,12 +1,9 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus } from 'lucide-react';
 
 export default function AdminSuperPage() {
-    // ==========================================
-    // ETA AK VARYAB YO
-    // ==========================================
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [deposits, setDeposits] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -28,7 +25,7 @@ export default function AdminSuperPage() {
     const [isSearchingDispute, setIsSearchingDispute] = useState(false);
     const [actionAmount, setActionAmount] = useState<number>(0);
 
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij'>('anons');
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij'>('litij'); // Mwen mete litij pa defo pou w wè l rapid
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -54,9 +51,6 @@ export default function AdminSuperPage() {
         }
     }, []);
 
-    // ==========================================
-    // RALE TOUT DONE YO NAN BAZ DONE A
-    // ==========================================
     const raleDone = async () => {
         setLoading(true);
         try {
@@ -106,21 +100,13 @@ export default function AdminSuperPage() {
     const voyeEmailKliyan = async (email: string, non: string, mesaj: string, subject: string) => {
         if (!email) return;
         try {
-            await fetch('/api/send-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: email.trim(), subject, non, mesaj }),
-            });
+            await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: email.trim(), subject, non, mesaj }), });
         } catch (error) { console.error("Erè email:", error); }
     };
 
     const voyeTelegram = async (msg: string) => {
         try {
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'HTML' }),
-            });
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'HTML' }), });
         } catch (e) { console.error("Telegram error", e); }
     };
 
@@ -129,38 +115,24 @@ export default function AdminSuperPage() {
         setProcessingId(id);
         try {
             await supabase.from(table).delete().eq('id', id);
-            alert("🗑️ Efase nèt!");
-            raleDone();
+            alert("🗑️ Efase nèt!"); raleDone();
         } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // DEPO AK RETRÈ
-    // ==========================================
     const apwouveDepo = async (d: any) => {
         const montanFinal = montanModifye[d.id] !== undefined ? montanModifye[d.id] : Number(d.amount);
         if (!confirm(`Konfime depo sa a?\nMontan k ap ajoute sou balans lan: ${montanFinal} HTG`)) return;
-        
         setProcessingId(d.id);
         try {
             const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', d.user_id).single();
             if (pErr || !p) throw new Error("Kliyan pa jwenn nan sistèm nan.");
-
             const nouvoBalans = Number(p.wallet_balance || 0) + montanFinal;
-
             await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', d.user_id);
             await supabase.from('deposits').update({ status: 'approved', amount: montanFinal }).eq('id', d.id);
-            await supabase.from('transactions').insert({
-                user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT',
-                description: `Depo konfime: +${montanFinal} HTG`, status: 'success'
-            });
-
-            const mesajE = `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`;
-            await voyeEmailKliyan(p.email, p.full_name, mesajE, "✅ DEPO APWOUVE - HATEX CARD");
+            await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
+            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "✅ DEPO APWOUVE");
             await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan: ${montanFinal} HTG`);
-            
-            alert("✅ DEPO APWOUVE!");
-            raleDone();
+            alert("✅ DEPO APWOUVE!"); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -170,19 +142,11 @@ export default function AdminSuperPage() {
         try {
             const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', w.user_id).single();
             if (pErr || !p) throw new Error("Kliyan pa jwenn.");
-
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
-            await supabase.from('transactions').insert({
-                user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL',
-                description: `Retrè konfime: -${w.amount} HTG`, status: 'success'
-            });
-
-            const mesajE = `Bonjou ${p.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`;
-            await voyeEmailKliyan(p.email, p.full_name, mesajE, "💸 RETRÈ KONFIME - HATEX CARD");
+            await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
+            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "💸 RETRÈ KONFIME");
             await voyeTelegram(`💸 <b>RETRÈ KONFIME</b>\nKliyan: ${p.full_name}\nMontan: ${w.amount} HTG`);
-
-            alert("✅ RETRÈ FINI!");
-            raleDone();
+            alert("✅ RETRÈ FINI!"); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -193,96 +157,53 @@ export default function AdminSuperPage() {
         try {
             await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
             const { data: p } = await supabase.from('profiles').select('*').eq('id', item.user_id).single();
-            
             if (table === 'withdrawals') {
                 const balansR = Number(p.wallet_balance || 0) + Number(item.amount);
                 await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
             }
-
-            await supabase.from('transactions').insert({
-                user_id: item.user_id, amount: 0, type: 'REJECTED',
-                description: `Anile: ${rezon}`, status: 'failed'
-            });
-
-            const mesajE = `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`;
-            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, mesajE, "❌ TRANZAKSYON ANILE");
+            await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
+            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "❌ TRANZAKSYON ANILE");
             await voyeTelegram(`❌ <b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
-
-            alert("⚠️ Anile!");
-            raleDone();
+            alert("⚠️ Anile!"); raleDone();
         } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // KONT AK KYC
-    // ==========================================
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
-        try {
-            await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id);
-            alert(`✅ Kont ${email} lan aktive!`);
-            raleDone(); 
-        } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+        try { await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id); alert(`✅ Kont ${email} lan aktive!`); raleDone(); } 
+        catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
     const sispannKont = async (id: string, email: string) => {
-        if (!confirm(`⚠️ Èske w sèten ou vle SISPANN kont sa a? (${email})\nKliyan an pap ka konekte ni fè tranzaksyon ankò.`)) return;
+        if (!confirm(`⚠️ Èske w sèten ou vle SISPANN kont sa a? (${email})`)) return;
         setProcessingId(id);
-        try {
-            await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id);
-            alert(`🚫 Kont ${email} lan sispandi!`);
-            raleDone(); 
-        } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); alert(`🚫 Kont ${email} lan sispandi!`); raleDone(); } 
+        catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
-        if (aksyon === 'rejected') {
-            const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:");
-            if (!rep) return; 
-            rezonReje = rep;
-        } else {
-            if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}?`)) return;
-        }
-
+        if (aksyon === 'rejected') { const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:"); if (!rep) return; rezonReje = rep; } 
+        else { if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}?`)) return; }
         setProcessingId(id);
         try {
-            await supabase.from('profiles').update({ 
-                kyc_status: aksyon,
-                kyc_rejection_reason: aksyon === 'rejected' ? rezonReje : null
-            }).eq('id', id);
-            
-            const mesajE = aksyon === 'approved' 
-                ? `Felisitasyon ${full_name}! Dokiman w yo apwouve. Ou kapab aktive Kat Vityèl ou a nan aplikasyon an kounye a.`
-                : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}\n\nTanpri konekte sou aplikasyon an pou w soumèt lòt dokiman ki korije pwoblèm sa a.`;
-            
+            await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezonReje : null }).eq('id', id);
+            const mesajE = aksyon === 'approved' ? `Felisitasyon ${full_name}! Dokiman w yo apwouve.` : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
             if (email) await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE ✅' : 'REJTE ❌'}`);
-            
-            alert(`KYC a ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`);
-            raleDone();
+            alert(`KYC a ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); raleDone();
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // PWOMO AK ANONS
-    // ==========================================
     const handleCreateCode = async (e: React.FormEvent) => {
         e.preventDefault();
         setProcessingId('creating_promo');
         const cleanCode = newPromoCode.trim().toUpperCase();
         if (!cleanCode) { alert('Mete yon kòd valab.'); setProcessingId(null); return; }
-
         try {
             const { error } = await supabase.from('promo_codes').insert([{ code: cleanCode, reward_amount: parseInt(promoReward) }]);
-            if (error) {
-                if (error.code === '23505') throw new Error('Kòd sa a egziste deja!');
-                throw error;
-            }
-            alert(`✅ Kòd ${cleanCode} la kreye!`);
-            setNewPromoCode('');
-            setPromoReward('250');
-            raleDone();
+            if (error) { if (error.code === '23505') throw new Error('Kòd sa a egziste deja!'); throw error; }
+            alert(`✅ Kòd ${cleanCode} la kreye!`); setNewPromoCode(''); setPromoReward('250'); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -292,13 +213,61 @@ export default function AdminSuperPage() {
         try {
             const { error } = await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
             if (error) throw error;
-            alert("✅ Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!");
-            raleDone();
+            alert("✅ Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
         } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
     };
 
     // ==========================================
-    // NOUVO LITIJ AK RECHÈCH
+    // NOUVO FONKSYON POU AJOUTE/DIMINYE BALANS MANYÈLMAN
+    // ==========================================
+    const handleManualBalanceAdjust = async (user: any, action: 'add' | 'subtract') => {
+        if (!user) return;
+        const amtStr = prompt(`Antre montan ou vle ${action === 'add' ? 'AJOUTE sou' : 'RETIRE nan'} kont ${user.full_name} an:`);
+        if (!amtStr) return;
+        
+        const amt = Number(amtStr);
+        if (isNaN(amt) || amt <= 0) return alert("Montan an pa bon!");
+
+        if (!confirm(`W ap ${action === 'add' ? 'AJOUTE' : 'RETIRE'} ${amt} HTG ${action === 'add' ? 'sou' : 'nan'} kont ${user.full_name}. Kontinye?`)) return;
+
+        setProcessingId(`adjust_${user.id}`);
+        try {
+            const { data: dbUser } = await supabase.from('profiles').select('wallet_balance').eq('id', user.id).single();
+            const currentBal = Number(dbUser?.wallet_balance || 0);
+            const newBal = action === 'add' ? currentBal + amt : currentBal - amt;
+
+            await supabase.from('profiles').update({ wallet_balance: newBal }).eq('id', user.id);
+            await supabase.from('transactions').insert([{
+                user_id: user.id,
+                amount: action === 'add' ? amt : -amt,
+                type: 'ADMIN_ADJUSTMENT',
+                description: `Ajusteman Admin: ${action === 'add' ? '+' : '-'}${amt} HTG`,
+                status: 'success'
+            }]);
+
+            alert(`✅ Balans la modifye! Nouvo balans: ${newBal} HTG`);
+            
+            // Rafrechi UI lokal la pou l parèt menm kote a
+            if (searchedDispute) {
+                const updatedDispute = { ...searchedDispute };
+                if (updatedDispute.senderProfile?.id === user.id) {
+                    updatedDispute.senderProfile.wallet_balance = newBal;
+                }
+                if (updatedDispute.receiverProfile?.id === user.id) {
+                    updatedDispute.receiverProfile.wallet_balance = newBal;
+                }
+                setSearchedDispute(updatedDispute);
+            }
+            raleDone();
+        } catch (err: any) {
+            alert("Erè nan modifikasyon: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    // ==========================================
+    // RECHÈCH INTELIJAN (KLIYAN & MACHANN)
     // ==========================================
     const handleAdminSearchDispute = async () => {
         if (!searchDisputeId.trim()) return alert("Tanpri mete ID kòmand lan pou w chèche a.");
@@ -324,16 +293,48 @@ export default function AdminSuperPage() {
                     normTx = normTxOld;
                 }
                 if (normTx) {
-                    tx = { 
-                        ...normTx, 
-                        table_source: 'transactions', 
-                        dispute_details: normTx.metadata?.dispute_details || {}, 
-                        dispute_reason: normTx.description 
-                    };
+                    tx = { ...normTx, table_source: 'transactions', dispute_details: normTx.metadata?.dispute_details || {}, dispute_reason: normTx.description };
                 }
             }
 
             if (!tx) return alert("Sistèm nan pa jwenn okenn kòmand avèk ID sa a ditou. Tcheke si ID a bon.");
+
+            // ==== Lojik fò pou jwenn Kliyan ak Machann ====
+            let senderId = null;
+            let receiverId = null;
+
+            if (tx.table_source === 'plugin_transactions') {
+                // Nan plugin, mèt plugin an (user_id) se machann nan.
+                receiverId = tx.user_id; 
+                // Kliyan an se li ki nan metadata a oswa dispute_details
+                senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id;
+            } else {
+                // Nan tranzaksyon nòmal (P2P), moun ki voye a se user_id
+                senderId = tx.user_id;
+                receiverId = tx.metadata?.receiver_id || tx.metadata?.merchant_id;
+            }
+
+            // Jwenn Pwofil Sender a
+            let senderProfile = null;
+            if (senderId) {
+                const { data: s } = await supabase.from('profiles').select('*').eq('id', senderId).maybeSingle();
+                senderProfile = s || allUsers.find(u => u.id === senderId);
+            }
+
+            // Jwenn Pwofil Receiver a
+            let receiverProfile = null;
+            let receiverEmail = tx.metadata?.merchant_email || tx.metadata?.receiver_email || tx.customer_info?.email;
+
+            if (receiverId) {
+                const { data: r } = await supabase.from('profiles').select('*').eq('id', receiverId).maybeSingle();
+                receiverProfile = r || allUsers.find(u => u.id === receiverId);
+            } else if (receiverEmail) {
+                const { data: r } = await supabase.from('profiles').select('*').eq('email', receiverEmail).maybeSingle();
+                receiverProfile = r || allUsers.find(u => u.email === receiverEmail);
+            }
+
+            tx.senderProfile = senderProfile;
+            tx.receiverProfile = receiverProfile;
 
             setActionAmount(Number(tx.amount_htg || Math.abs(tx.amount) || 0));
             setSearchedDispute(tx);
@@ -345,29 +346,8 @@ export default function AdminSuperPage() {
         }
     };
 
-    const getPartiesForTx = (tx: any) => {
-        if (!tx) return { sender: null, receiver: null };
-        let sender = null;
-        let receiver = null;
-
-        if (tx.table_source === 'plugin_transactions') {
-            const senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id || tx.user_id;
-            sender = allUsers.find(u => u.id === senderId || u.email === tx.metadata?.customer_email);
-
-            const receiverId = tx.metadata?.merchant_id || tx.dispute_details?.merchant_id;
-            receiver = allUsers.find(u => u.id === receiverId || u.email === tx.metadata?.merchant_email);
-            if (!receiver && tx.user_id !== senderId) receiver = allUsers.find(u => u.id === tx.user_id);
-        } else {
-            sender = allUsers.find(u => u.id === tx.user_id);
-            const rEmail = tx.metadata?.receiver_email;
-            receiver = allUsers.find(u => u.email === rEmail);
-        }
-
-        return { sender, receiver };
-    };
-
     const balanseLajanKont = async (fromUser: any, toUser: any, tipChanjman: string) => {
-        if (!fromUser && !toUser) return alert("Sistèm nan pa jwenn okenn pwofil! Nou pa ka fè tranzaksyon an.");
+        if (!fromUser && !toUser) return alert("Sistèm nan pa jwenn okenn pwofil ditou! Nou pa ka fè tranzaksyon an.");
         if (actionAmount <= 0) return alert("Ou dwe mete yon montan ki pi gwo pase zewo.");
         
         let mesajKonfimasyon = "";
@@ -418,7 +398,6 @@ export default function AdminSuperPage() {
         if (!replyText || replyText.trim() === '') return alert("Tanpri ekri yon mesaj anvan w voye l!");
         setProcessingId(`reply_${txId}`);
         try {
-            // Nou tou kole nouvo mesaj la nan istorik Admin nan pou l pa pèdi mesaj kliyan an
             const updatedDetails = { ...currentDetails, admin_reply: replyText };
             if (tabSource === 'plugin_transactions') {
                 await supabase.from('plugin_transactions').update({ dispute_details: updatedDetails }).eq('id', txId);
@@ -441,10 +420,6 @@ export default function AdminSuperPage() {
         const lowerQuery = searchQuery.toLowerCase();
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
-
-    const getClientInfo = (clientId: string) => {
-        return allUsers.find(u => u.id === clientId) || null;
-    };
 
     if (!accessGranted) return <div className="bg-black h-screen" />;
 
@@ -498,10 +473,11 @@ export default function AdminSuperPage() {
                             </div>
 
                             {searchedDispute && (() => {
-                                const { sender, receiver } = getPartiesForTx(searchedDispute);
+                                const sender = searchedDispute.senderProfile;
+                                const receiver = searchedDispute.receiverProfile;
 
                                 return (
-                                    <div className="mb-10 relative">
+                                    <div className="mb-10 relative animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         <div className="absolute -top-3 left-6 bg-yellow-500 text-black px-3 py-1 rounded-md text-[9px] font-black uppercase z-10 flex items-center gap-1">
                                             <AlertTriangle size={12}/> JERE TRANZAKSYON #{searchedDispute.order_id || searchedDispute.id.substring(0,8)}
                                         </div>
@@ -509,80 +485,113 @@ export default function AdminSuperPage() {
                                             
                                             <button onClick={() => setSearchedDispute(null)} className="absolute top-4 right-4 bg-zinc-800 text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500 transition-colors z-10">✕</button>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                                <div className="bg-black/50 border border-white/5 p-5 rounded-2xl relative">
-                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded">MOUN KI PEYE / VOYE A</span>
+                                            <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 mb-8 bg-zinc-900/50 p-6 rounded-3xl border border-yellow-500/30 shadow-inner">
+                                                
+                                                {/* ======================= */}
+                                                {/* KLIYAN (SENDER) */}
+                                                {/* ======================= */}
+                                                <div className="flex-1 w-full bg-black border border-white/5 p-5 rounded-2xl relative flex flex-col justify-between">
+                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded font-black tracking-widest border border-white/10 shadow-lg">MOUN KI PEYE (KLIYAN)</span>
                                                     {sender ? (
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center text-xl border border-white/10 shrink-0">👤</div>
-                                                            <div className="overflow-hidden">
-                                                                <p className="text-sm font-black truncate text-white">{sender.full_name}</p>
-                                                                <p className="text-[10px] text-zinc-500 lowercase truncate">{sender.email}</p>
-                                                                <p className="text-xs text-green-400 mt-1">Balans: {Number(sender.wallet_balance).toLocaleString()} HTG</p>
+                                                        <>
+                                                            <div className="flex items-center gap-4 mt-2 mb-4">
+                                                                <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center text-xl border border-white/10 shrink-0">👤</div>
+                                                                <div className="overflow-hidden">
+                                                                    <p className="text-sm font-black truncate text-white">{sender.full_name}</p>
+                                                                    <p className="text-[10px] text-zinc-500 lowercase truncate">{sender.email}</p>
+                                                                    <p className="text-xs font-black text-green-400 mt-1 flex items-center gap-1">
+                                                                        <span>Balans:</span> 
+                                                                        <span className="bg-green-900/30 px-2 py-0.5 rounded text-green-400">{Number(sender.wallet_balance).toLocaleString()} HTG</span>
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                            <div className="flex gap-2 mt-auto pt-4 border-t border-white/5">
+                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600">
+                                                                    <Plus size={12}/> AJOUTE
+                                                                </button>
+                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600">
+                                                                    <Minus size={12}/> RETIRE
+                                                                </button>
+                                                            </div>
+                                                        </>
                                                     ) : (
-                                                        <p className="text-[10px] text-red-500 italic mt-2 font-black tracking-widest">⚠️ Kliyan an pa jwenn.</p>
+                                                        <p className="text-[10px] text-red-500 italic mt-4 font-black tracking-widest text-center flex items-center justify-center gap-1"><AlertTriangle size={12}/> Kliyan an pa jwenn sou sistèm nan.</p>
                                                     )}
                                                 </div>
 
-                                                <div className="bg-black/50 border border-white/5 p-5 rounded-2xl relative">
-                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded">MOUN KI RESEVWA A (MACHANN)</span>
-                                                    {receiver ? (
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-12 h-12 bg-blue-900/20 text-blue-500 rounded-full flex items-center justify-center text-xl border border-blue-500/30 shrink-0"><Store size={20}/></div>
-                                                            <div className="overflow-hidden">
-                                                                <p className="text-sm font-black truncate text-white">{receiver.full_name}</p>
-                                                                <p className="text-[10px] text-zinc-500 lowercase truncate">{receiver.email}</p>
-                                                                <p className="text-xs text-green-400 mt-1">Balans: {Number(receiver.wallet_balance).toLocaleString()} HTG</p>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-[10px] text-red-500 italic mt-2 font-black tracking-widest">⚠️ Pwofil machann pa disponib nan baz done a.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
-                                                <div className="flex flex-col md:flex-row items-center gap-4">
-                                                    <div className="w-full md:w-1/3">
-                                                        <label className="text-[9px] text-zinc-500 uppercase tracking-widest block mb-2">Montan (HTG)</label>
-                                                        <input 
-                                                            type="number" 
-                                                            value={actionAmount} 
+                                                {/* AKSYON NAN MITAN */}
+                                                <div className="flex flex-col items-center justify-center gap-3 shrink-0 w-full lg:w-48 my-4 lg:my-0">
+                                                    <div className="flex flex-col items-center bg-black p-4 rounded-2xl border border-white/5 w-full shadow-lg">
+                                                        <label className="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">Montan an (HTG)</label>
+                                                        <input
+                                                            type="number"
+                                                            value={actionAmount}
                                                             onChange={(e) => setActionAmount(Number(e.target.value))}
-                                                            className="w-full bg-black border border-yellow-500/30 p-4 rounded-xl text-yellow-500 font-black text-xl outline-none focus:border-yellow-500 transition-colors"
+                                                            className="w-full text-center bg-transparent text-yellow-500 font-black text-2xl outline-none"
                                                         />
                                                     </div>
-
-                                                    <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 md:mt-0">
-                                                        <button 
+                                                    <div className="flex gap-2 w-full">
+                                                        <button
                                                             onClick={() => balanseLajanKont(receiver, sender, `Ranbousman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)}
                                                             disabled={processingId === 'balance_transfer' || (!receiver && !sender)}
-                                                            className="bg-zinc-800 hover:bg-zinc-700 border border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                                            className="flex-1 bg-red-600 hover:bg-red-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-red-600/20 group"
+                                                            title="Rale nan Machann, Mete nan Kliyan"
                                                         >
-                                                            <ArrowRightLeft className="text-red-400 rotate-180" size={20} />
-                                                            <span className="text-[9px] text-white tracking-widest text-center">RANBOUSE KLIYAN AN<br/><span className="text-zinc-500">(Rale nan Machann {'->'} Mete nan Kliyan)</span></span>
+                                                            <ArrowRightLeft className="rotate-180 group-hover:-translate-x-1 transition-transform" size={16} />
+                                                            <span className="text-[8px] font-black tracking-widest leading-tight text-center">RANBOUSE<br/>KLIYAN</span>
                                                         </button>
-
-                                                        <button 
+                                                        <button
                                                             onClick={() => balanseLajanKont(sender, receiver, `Peman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)}
                                                             disabled={processingId === 'balance_transfer' || (!receiver && !sender)}
-                                                            className="bg-zinc-800 hover:bg-zinc-700 border border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                                            className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-green-600/20 group"
+                                                            title="Rale nan Kliyan, Mete nan Machann"
                                                         >
-                                                            <ArrowRightLeft className="text-green-400" size={20} />
-                                                            <span className="text-[9px] text-white tracking-widest text-center">PEYE MACHANN NAN<br/><span className="text-zinc-500">(Rale nan Kliyan {'->'} Mete nan Machann)</span></span>
+                                                            <ArrowRightLeft className="group-hover:translate-x-1 transition-transform" size={16} />
+                                                            <span className="text-[8px] font-black tracking-widest leading-tight text-center">PEYE<br/>MACHANN</span>
                                                         </button>
                                                     </div>
                                                 </div>
+
+                                                {/* ======================= */}
+                                                {/* MACHANN (RECEIVER) */}
+                                                {/* ======================= */}
+                                                <div className="flex-1 w-full bg-black border border-white/5 p-5 rounded-2xl relative flex flex-col justify-between">
+                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded font-black tracking-widest border border-white/10 shadow-lg">MOUN KI RESEVWA (MACHANN)</span>
+                                                    {receiver ? (
+                                                        <>
+                                                            <div className="flex items-center gap-4 mt-2 mb-4">
+                                                                <div className="w-12 h-12 bg-blue-900/20 text-blue-500 rounded-full flex items-center justify-center text-xl border border-blue-500/30 shrink-0"><Store size={20}/></div>
+                                                                <div className="overflow-hidden">
+                                                                    <p className="text-sm font-black truncate text-white">{receiver.full_name}</p>
+                                                                    <p className="text-[10px] text-zinc-500 lowercase truncate">{receiver.email}</p>
+                                                                    <p className="text-xs font-black text-blue-400 mt-1 flex items-center gap-1">
+                                                                        <span>Balans:</span>
+                                                                        <span className="bg-blue-900/30 px-2 py-0.5 rounded text-blue-400">{Number(receiver.wallet_balance).toLocaleString()} HTG</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2 mt-auto pt-4 border-t border-white/5">
+                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600">
+                                                                    <Plus size={12}/> AJOUTE
+                                                                </button>
+                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600">
+                                                                    <Minus size={12}/> RETIRE
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <p className="text-[10px] text-red-500 italic mt-4 font-black tracking-widest text-center flex items-center justify-center gap-1"><AlertTriangle size={12}/> Machann nan pa jwenn sou sistèm nan.</p>
+                                                    )}
+                                                </div>
+
                                             </div>
 
                                             <div className="mt-8 pt-8 border-t border-white/5">
                                                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-4">Mesaj Ak Kliyan an / Prèv Litij</p>
                                                 <div className="bg-black border border-white/5 rounded-2xl p-4 max-h-[250px] overflow-y-auto mb-4 space-y-4">
                                                     <div className="flex flex-col items-start max-w-[85%]">
-                                                        <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm text-white text-xs whitespace-pre-wrap normal-case">
-                                                            {searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || searchedDispute.description || 'Pa gen mesaj sou sistèm nan pou tranzaksyon sa a.'}
+                                                        <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm text-white text-xs whitespace-pre-wrap normal-case border border-white/5">
+                                                            {searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || 'Pa gen mesaj kliyan.'}
                                                         </div>
                                                     </div>
                                                     {searchedDispute.dispute_details?.admin_reply && (
@@ -602,7 +611,7 @@ export default function AdminSuperPage() {
                                                     ></textarea>
                                                     <button 
                                                         onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {}, searchedDispute.table_source)}
-                                                        className="bg-red-600 hover:bg-red-500 w-12 rounded-lg flex items-center justify-center text-white"
+                                                        className="bg-red-600 hover:bg-red-500 w-12 rounded-lg flex items-center justify-center text-white transition-all"
                                                     >
                                                         <Send size={16} />
                                                     </button>
@@ -618,7 +627,8 @@ export default function AdminSuperPage() {
                                 <>
                                     <h2 className="text-xl font-black text-white border-b border-white/10 pb-2">TOUT PLENT KI LOUVRI YO ({disputes.length})</h2>
                                     {disputes.map((tx) => {
-                                        const client = getClientInfo(tx.dispute_details?.client_id || tx.user_id);
+                                        let senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id || tx.user_id;
+                                        const client = allUsers.find(u => u.id === senderId) || allUsers.find(u => u.id === tx.user_id);
                                         return (
                                             <div key={tx.id} className="bg-[#121420] rounded-[2.5rem] border border-zinc-800 overflow-hidden shadow-lg flex flex-col lg:flex-row opacity-80 hover:opacity-100 transition-opacity">
                                                 <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between">
@@ -661,7 +671,7 @@ export default function AdminSuperPage() {
                                                         )}
                                                     </div>
                                                     <div className="mt-auto bg-zinc-900 rounded-2xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
-                                                        <textarea placeholder="Tape repons ou an pou kliyan an la a..." value={adminReplies[tx.id] || ''} onChange={(e) => setAdminReplies({ ...adminReplies, [tx.id]: e.target.value })} className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white normal-case resize-none min-h-[50px]"></textarea>
+                                                        <textarea placeholder="Tape repons ou an pou kliyan an la a..." value={adminReplies[tx.id] || ''} onChange={(e) => setAdminReplies({ ...adminReplies, [tx.id]: e.target.value })} className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white lowercase normal-case resize-none min-h-[50px]" rows={2}></textarea>
                                                         <button onClick={() => voyeReponsAdmin(tx.id, tx.dispute_details || {}, tx.table_source)} disabled={processingId === `reply_${tx.id}`} className="bg-red-600 hover:bg-red-500 w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20 transition-all active:scale-90">{processingId === `reply_${tx.id}` ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}</button>
                                                     </div>
                                                 </div>
