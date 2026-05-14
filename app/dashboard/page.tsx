@@ -198,7 +198,25 @@ export default function Dashboard() {
           alert("Kòmand sa a anfòm, ou ka ouvè yon litij sou li.");
         }
       } else {
-        alert("Sistèm nan pa jwenn kòmand sa a. Tcheke ID a ankò.");
+        // Chèche nan lòt tab la tou
+        const { data: normData } = await supabase
+          .from('transactions')
+          .select('status, metadata')
+          .eq('order_id', cleanId)
+          .maybeSingle();
+          
+        if (normData) {
+          setDisputeStatus(normData.status);
+          if (normData.metadata?.dispute_details) {
+            setStoreName(normData.metadata.dispute_details.store_name || "");
+            setProofText(normData.metadata.dispute_details.proof_text || "");
+            setAdminReply(normData.metadata.dispute_details.admin_reply || "");
+          } else {
+            alert("Kòmand sa a anfòm, ou ka ouvè yon litij sou li.");
+          }
+        } else {
+          alert("Sistèm nan pa jwenn kòmand sa a. Tcheke ID a ankò.");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -210,33 +228,42 @@ export default function Dashboard() {
   // ==========================================
   // FONKSYON POU VOYE NOUVO LITIJ LA BAY ADMIN
   // ==========================================
-  const handleSubmitDispute = async () => {
-    if (!refundTxId || !storeName || !proofText) return alert("Tanpri ranpli tout bwat yo ak prèv yo!");
-    setIsRefunding(true);
+  const handleSubmitDispute = async (e: any) => {
+    e.preventDefault();
     
+    if (!refundTxId || refundTxId.trim() === '') {
+      alert("Tanpri mete ID kòmand lan (12 chif).");
+      return;
+    }
+
+    setIsRefunding(true);
+
     try {
-      const res = await fetch('/api/dispute', {
+      const response = await fetch('/api/dispute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          order_id: refundTxId.trim(),
-          client_id: userData.id,
-          store_name: storeName,
-          reason: refundReason,
-          proof_text: proofText,
-          date: new Date().toISOString()
-        })
+          orderId: refundTxId.trim(),     
+          reason: refundReason,         
+          proofText: proofText, 
+          clientId: userData?.id,
+          storeName: storeName
+        }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Echèk nan voye plent lan.");
-
-      alert('✅ Plent ou an ale jwenn Admin an avèk siksè! Lajan sa a jele kounye a.');
-      // Re-tcheke pou l ka afiche ekran Chat la dirèk
-      handleCheckOrderDispute(); 
-      
-    } catch (err: any) {
-      alert(`❌ Erè: ${err.message}`);
+      const data = await response.json();
+      if (!response.ok) {
+        alert("Erè: " + data.error);
+      } else {
+        alert("✅ Siksè: " + data.message);
+        setShowRefundModal(false);
+        setRefundTxId("");
+        setStoreName("");
+        setProofText("");
+        setDisputeStatus("");
+      }
+    } catch (error) {
+      alert("Gen yon pwoblèm rezo. Tanpri eseye ankò.");
     } finally {
       setIsRefunding(false);
     }
@@ -360,7 +387,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-              ) : disputeStatus === 'pending' || disputeStatus === '' ? (
+              ) : disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '' ? (
                 /* SI POKO GEN LITIJ -> AFICHE FÒMILÈ A */
                 <div className="space-y-4 animate-in fade-in">
                   <div>
@@ -397,7 +424,7 @@ export default function Dashboard() {
                 Fèmen
               </button>
               {/* Afiche bouton Soumèt la sèlman si li poko an litij */}
-              {(disputeStatus === 'pending' || disputeStatus === '') && (
+              {(disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '') && (
                 <button 
                   onClick={handleSubmitDispute}
                   disabled={isRefunding || !refundTxId || !storeName || !proofText}
