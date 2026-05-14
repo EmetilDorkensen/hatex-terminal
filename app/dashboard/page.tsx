@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [isRefunding, setIsRefunding] = useState(false);
   
   const [isCheckingId, setIsCheckingId] = useState(false);
+  const [existingDisputeId, setExistingDisputeId] = useState(""); // NOUVO: Kenbe ID litij ki deja la a
   const [disputeStatus, setDisputeStatus] = useState("");
   const [adminReply, setAdminReply] = useState("");
   const [disputeTableSource, setDisputeTableSource] = useState(""); 
@@ -179,8 +180,48 @@ export default function Dashboard() {
   };
 
   // ==========================================
-  // FONKSYON POU CHÈCHE LITIJ LA NAN BAZ DONE
+  // FONKSYON POU OUVRI MODÈL RANBOUSMAN AK TCHEKE SI GIN LITIJ
   // ==========================================
+  const handleOpenRefundModal = async () => {
+      setShowRefundModal(true);
+      setDisputeStatus("");
+      setRefundTxId("");
+      setExistingDisputeId("");
+      setIsCheckingId(true);
+      
+      try {
+          const { data: recentTxs } = await supabase.from('plugin_transactions')
+            .select('order_id, dispute_details')
+            .in('status', ['disputed', 'refunded'])
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          let foundId = null;
+          if (recentTxs) {
+              const myDispute = recentTxs.find(t => t.dispute_details?.client_id === userData.id);
+              if (myDispute) foundId = myDispute.order_id;
+          }
+
+          if (!foundId) {
+             const { data: nTx } = await supabase.from('transactions')
+                .select('order_id')
+                .eq('user_id', userData.id)
+                .in('status', ['disputed', 'refunded'])
+                .order('created_at', { ascending: false })
+                .limit(1);
+             if (nTx && nTx.length > 0) foundId = nTx[0].order_id;
+          }
+
+          if (foundId) {
+             setExistingDisputeId(foundId);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsCheckingId(false);
+      }
+  };
+
   const handleCheckOrderDispute = async (overrideId?: string) => {
     const targetId = overrideId || refundTxId;
     if (!targetId) return alert("Tanpri mete ID kòmand lan anvan.");
@@ -228,72 +269,16 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // FONKSYON POU OUVRI DÈNYE KONVÈSASYON AN
-  // ==========================================
-  const handleOpenLastDispute = async () => {
-      setIsCheckingId(true);
-      setShowRefundModal(true);
-      try {
-          const { data: recentTxs } = await supabase.from('plugin_transactions')
-            .select('order_id, dispute_details')
-            .in('status', ['disputed', 'refunded'])
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-          let foundId = null;
-          if (recentTxs) {
-              const myDispute = recentTxs.find(t => t.dispute_details?.client_id === userData.id);
-              if (myDispute) foundId = myDispute.order_id;
-          }
-
-          if (!foundId) {
-             const { data: nTx } = await supabase.from('transactions')
-                .select('order_id')
-                .eq('user_id', userData.id)
-                .in('status', ['disputed', 'refunded'])
-                .order('created_at', { ascending: false })
-                .limit(1);
-             if (nTx && nTx.length > 0) foundId = nTx[0].order_id;
-          }
-
-          if (foundId) {
-             setRefundTxId(foundId);
-             await handleCheckOrderDispute(foundId);
-          } else {
-             alert("Ou pa gen okenn konvèsasyon litij ki ouvri kounye a.");
-             setShowRefundModal(false);
-          }
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setIsCheckingId(false);
-      }
-  };
-
-  // ==========================================
-  // FONKSYON POU LOUVRI YON NOUVO LITIJ
-  // ==========================================
   const handleSubmitDispute = async (e: any) => {
     e.preventDefault();
-    if (!refundTxId || refundTxId.trim() === '') {
-      alert("Tanpri mete ID kòmand lan (12 chif).");
-      return;
-    }
-
+    if (!refundTxId || refundTxId.trim() === '') return alert("Tanpri mete ID kòmand lan (12 chif).");
     setIsRefunding(true);
 
     try {
       const response = await fetch('/api/dispute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: refundTxId.trim(),     
-          reason: refundReason,         
-          proofText: proofText, 
-          clientId: userData?.id,
-          storeName: storeName
-        }),
+        body: JSON.stringify({ orderId: refundTxId.trim(), reason: refundReason, proofText: proofText, clientId: userData?.id, storeName: storeName }),
       });
 
       const data = await response.json();
@@ -310,9 +295,6 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // FONKSYON POU VOYE YON NOUVO MESAJ NAN CHAT LA
-  // ==========================================
   const handleClientSendReply = async () => {
     if (!chatReply.trim() || !disputeTableSource) return;
     setIsSendingReply(true);
@@ -335,9 +317,6 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // FONKSYON POU KLIYAN AN FÈMEN DOSYE A
-  // ==========================================
   const handleCloseDisputeClient = async () => {
     if (!confirm("Èske w sèten ou vle fèmen dosye sa a nèt? Ou p ap ka poze pwoblèm sou kòmand sa a ankò.")) return;
     setIsClosingDispute(true);
@@ -354,9 +333,6 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // FONKSYON OTP POU KONFIME LIVREZON
-  // ==========================================
   const handleVerifyOTP = async () => {
     if (!otpTxId || !otpCode) return alert("Tanpri ranpli tout bwat yo!");
     setIsVerifying(true);
@@ -399,7 +375,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
       
       {/* ========================================== */}
-      {/* MODAL LITIJ / RANBOUSMAN (AK CHAT) */}
+      {/* MODAL LITIJ / RANBOUSMAN (AK CHAT / KONTINYE KONVÈSASYON) */}
       {/* ========================================== */}
       {showRefundModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -407,7 +383,7 @@ export default function Dashboard() {
             <button 
               onClick={() => {
                 setShowRefundModal(false);
-                setDisputeStatus(""); // Reset lè l fèmen l pou si l vle louvri l ankò li tounen nòmal
+                setDisputeStatus(""); 
               }}
               className="absolute top-5 right-5 text-zinc-500 hover:text-white transition-colors"
             >
@@ -425,33 +401,14 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-4 mb-6 flex-1 flex flex-col min-h-0">
-              {/* Bwat pou chèche kòmand lan */}
-              <div className="shrink-0">
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">1. Antre ID Kòmand ou an</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={refundTxId}
-                    onChange={(e) => {
-                      setRefundTxId(e.target.value);
-                      if(disputeStatus) setDisputeStatus(""); 
-                    }}
-                    placeholder="Eg: 12Chif"
-                    className="flex-1 bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 transition-colors uppercase"
-                  />
-                  <button 
-                    onClick={() => handleCheckOrderDispute()}
-                    disabled={isCheckingId || !refundTxId}
-                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50"
-                  >
-                    {isCheckingId ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Search size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* SI KÒMAND LAN AN LITIJ DEJA -> AFICHE CHAT LA */}
-              {(disputeStatus === 'disputed' || disputeStatus === 'refunded') ? (
-                <div className="border border-white/5 bg-zinc-900/50 p-4 rounded-xl mt-4 animate-in slide-in-from-bottom-4 flex flex-col min-h-[300px]">
+              
+              {isCheckingId ? (
+                 <div className="flex justify-center items-center py-10">
+                    <div className="w-6 h-6 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                 </div>
+              ) : (disputeStatus === 'disputed' || disputeStatus === 'refunded') ? (
+                /* SI CHAT LA OUVRI -> AFICHE KONVÈSASYON AN */
+                <div className="border border-white/5 bg-zinc-900/50 p-4 rounded-xl animate-in slide-in-from-bottom-4 flex flex-col min-h-[300px]">
                   <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2 shrink-0">
                     <p className="text-[10px] uppercase font-bold text-zinc-400">Estati Dosye a:</p>
                     <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md ${disputeStatus === 'refunded' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-500'}`}>
@@ -460,13 +417,11 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex-1 overflow-y-auto space-y-4 mb-4 custom-scrollbar pr-2 flex flex-col">
-                    {/* Mesaj Kliyan an */}
                     <div className="self-end bg-zinc-800 p-3 rounded-2xl rounded-tr-sm max-w-[95%] border border-white/5 ml-auto">
                       <p className="text-[9px] text-zinc-400 mb-1 font-bold">Ou menm ({storeName})</p>
                       <p className="text-xs text-white leading-relaxed whitespace-pre-wrap normal-case">{proofText}</p>
                     </div>
 
-                    {/* Mesaj Admin an */}
                     <div className="self-start bg-red-900/20 p-3 rounded-2xl rounded-tl-sm max-w-[95%] border border-red-500/20 mr-auto">
                       <p className="text-[9px] text-red-400 mb-1 font-black flex items-center gap-1">
                         <ShieldCheck size={10} /> Admin HatexCard
@@ -477,7 +432,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Kliyan an ka voye mesaj toujou si l poko ranbouse nèt */}
                   {disputeStatus !== 'refunded' && (
                       <div className="bg-black rounded-xl p-1 flex gap-2 border border-white/10 shrink-0">
                           <input 
@@ -497,9 +451,32 @@ export default function Dashboard() {
                       </div>
                   )}
                 </div>
-              ) : disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '' ? (
-                /* SI POKO GEN LITIJ -> AFICHE FÒMILÈ NÒMAL LA */
+              ) : existingDisputeId ? (
+                /* SI KLIYAN AN GEN LITIJ -> PA BAY RECHÈCH, JUST BAY BOUTON KONTINYE A */
+                <div className="flex flex-col items-center justify-center py-6 px-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl animate-in fade-in">
+                    <div className="w-16 h-16 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center mb-4">
+                        <MessageSquare size={28} />
+                    </div>
+                    <h4 className="text-sm font-black uppercase text-center mb-2">Ou gen yon dosye ki louvri!</h4>
+                    <p className="text-xs text-zinc-400 text-center mb-6 px-2">Nou detekte ou gen yon konvèsasyon ranbousman ki poko fèmen sou sistèm nan. Klike anba a pou w wè repons lan oswa ekri Admin nan.</p>
+                    <button 
+                        onClick={() => handleCheckOrderDispute(existingDisputeId)}
+                        className="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-yellow-600/20 flex items-center justify-center gap-2"
+                    >
+                        Kontinye Konvèsasyon an
+                    </button>
+                </div>
+              ) : (
+                /* SI PA GEN ANYEN -> AFICHE FÒMILÈ POU KREYE A (SAN RECHÈCH) */
                 <div className="space-y-4 animate-in fade-in shrink-0">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">1. Antre ID Kòmand ou an <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" value={refundTxId} onChange={(e) => setRefundTxId(e.target.value)}
+                      placeholder="Eg: 12Chif"
+                      className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 uppercase"
+                    />
+                  </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">2. Non Boutik la <span className="text-red-500">*</span></label>
                     <input 
@@ -526,7 +503,7 @@ export default function Dashboard() {
                     ></textarea>
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
 
             <div className="flex gap-3 mt-auto shrink-0">
@@ -543,7 +520,7 @@ export default function Dashboard() {
                       <button onClick={() => { setShowRefundModal(false); setDisputeStatus(""); }} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">
                         Fèmen
                       </button>
-                      {(disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '') && (
+                      {(disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '') && !existingDisputeId && !isCheckingId && (
                         <button 
                           onClick={handleSubmitDispute}
                           disabled={isRefunding || !refundTxId || !storeName || !proofText}
@@ -616,15 +593,12 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={handleOpenLastDispute} className="bg-zinc-900/50 hover:bg-yellow-600/20 text-yellow-500 border border-white/5 hover:border-yellow-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
-              <MessageSquare size={12} /> LITIJ MWEN AN
-            </button>
             
             <button onClick={() => setShowOtpModal(true)} className="bg-zinc-900/50 hover:bg-green-600/20 text-green-500 border border-white/5 hover:border-green-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
               <CheckCircle size={12} /> KONFIME LIVREZON
             </button>
             
-            <button onClick={() => setShowRefundModal(true)} className="bg-zinc-900/50 hover:bg-red-600/20 text-red-500 border border-white/5 hover:border-red-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
+            <button onClick={handleOpenRefundModal} className="bg-zinc-900/50 hover:bg-red-600/20 text-red-500 border border-white/5 hover:border-red-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
               <RefreshCcw size={12} /> RANBOUSE
             </button>
 
