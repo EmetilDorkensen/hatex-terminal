@@ -51,7 +51,7 @@ export default function AdminSuperPage() {
 
     useEffect(() => {
         const pass = prompt("Antre modpas Admin lan:");
-        if (pass === "fiokes1234") {
+        if (pass === "@fiokes1234") {
             setAccessGranted(true);
             raleDone();
         } else {
@@ -134,7 +134,7 @@ export default function AdminSuperPage() {
 
         try {
             const { data: settings } = await supabase.from('global_settings').select('finance_password').eq('id', 1).maybeSingle();
-            const validPass = settings?.finance_password || 'hatexfinans2026';
+            const validPass = settings?.finance_password || '@fiokes1234';
 
             if (pass === validPass) {
                 setBusinessTabPasswordVerified(true);

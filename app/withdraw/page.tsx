@@ -52,9 +52,14 @@ export default function WithdrawPage() {
 
   // 1. Lè itilizatè a peze premye bouton Konfime a (Mande PIN)
   const initiateWithdrawal = () => {
+    // VERIFIKASYON KONT SISPANDI
+    if (profile?.account_status === 'suspended') {
+      return alert("🚫 Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè kounye a.");
+    }
+
     if (currentAmount < 500) return alert("Minimòm retrè se 500 HTG");
     if (currentAmount > (profile?.wallet_balance || 0)) return alert("Ou pa gen ase kòb sou kont ou.");
-    if (!phone && !isLargeWithdrawal) return alert("Tanpri mete nimewo telefòn ou"); // Si l ap retire +15k, nimewo pa obligatwa la menm jan
+    if (!phone && !isLargeWithdrawal) return alert("Tanpri mete nimewo telefòn ou"); 
     
     // Mande PIN
     setPinError('');
@@ -73,25 +78,31 @@ export default function WithdrawPage() {
     setPinError('');
 
     try {
-      // A) VERIFYE KÒD PIN NAN BAZ DONE A ANVAN TOUT BAGAY
-      const { data: pinCheck, error: pinErr } = await supabase
+      // A) VERIFYE KÒD PIN AK ESTATI KONT NAN BAZ DONE A ANVAN TOUT BAGAY
+      const { data: checkData, error: checkErr } = await supabase
         .from('profiles')
-        .select('transaction_pin, wallet_balance')
+        .select('transaction_pin, wallet_balance, account_status')
         .eq('id', profile.id)
         .single();
         
-      if (pinErr || !pinCheck) throw new Error("Nou pa jwenn kont ou.");
-      if (pinCheck.transaction_pin !== enteredPin) {
+      if (checkErr || !checkData) throw new Error("Nou pa jwenn kont ou.");
+      
+      // DÈNYE VERIFIKASYON SI KONT LAN SISPANDI
+      if (checkData.account_status === 'suspended') {
+        throw new Error("🚫 Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
+      }
+
+      if (checkData.transaction_pin !== enteredPin) {
         throw new Error("❌ PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
       
       // Asire nou lajan an la vre vre nan baz done a nan menm segonn nan
-      if (currentAmount > Number(pinCheck.wallet_balance)) {
+      if (currentAmount > Number(checkData.wallet_balance)) {
          throw new Error("Ou pa gen ase kòb pou tranzaksyon sa a.");
       }
 
       // B) KOUPE LAJAN AN NAN BALANS LA
-      const nouvoBalans = Number(pinCheck.wallet_balance) - currentAmount;
+      const nouvoBalans = Number(checkData.wallet_balance) - currentAmount;
       const { error: balanceError } = await supabase
         .from('profiles')
         .update({ wallet_balance: nouvoBalans })
@@ -116,7 +127,7 @@ export default function WithdrawPage() {
 
       if (withdrawError) {
         // ROLLBACK SI L PA MACHE
-        await supabase.from('profiles').update({ wallet_balance: pinCheck.wallet_balance }).eq('id', profile.id);
+        await supabase.from('profiles').update({ wallet_balance: checkData.wallet_balance }).eq('id', profile.id);
         throw new Error("Sistèm nan jwenn yon pwoblèm. Nou remèt kòb la sou balans ou.");
       }
 
@@ -155,7 +166,7 @@ export default function WithdrawPage() {
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic relative">
       
       {/* ==================================================== */}
-      {/* POPUP: MANDE PIN POU KONFIME RETRÈ A                   */}
+      {/* POPUP: MANDE PIN POU KONFIME RETRÈ A                  */}
       {/* ==================================================== */}
       {showPinPrompt && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
@@ -203,10 +214,28 @@ export default function WithdrawPage() {
           </div>
 
           <div className="space-y-6">
+            
+            {/* AVÈTISMAN SI KONT LAN SISPANDI */}
+            {profile?.account_status === 'suspended' && (
+               <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center shadow-lg">
+                  <span className="text-2xl mb-2 block">⚠️</span>
+                  <p className="text-[11px] text-red-500 font-black uppercase tracking-widest leading-relaxed">
+                     KONT OU A SISPANDI. OU PA GEN OTORIZASYON POU RETIRE LAJAN. TANPRI KONTAKTE SIPÒ A.
+                  </p>
+               </div>
+            )}
+
             <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5 shadow-2xl">
                 <p className="text-[10px] text-center mb-4 text-zinc-500 uppercase font-black tracking-widest">Balans ou: {profile?.wallet_balance?.toLocaleString() || 0} HTG</p>
                 <div className="flex items-center justify-center gap-2">
-                   <input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="w-full bg-transparent text-5xl font-black text-center outline-none text-white" placeholder="0" />
+                   <input 
+                      type="number" 
+                      value={amount} 
+                      onChange={(e) => setAmount(Number(e.target.value))} 
+                      disabled={profile?.account_status === 'suspended'}
+                      className="w-full bg-transparent text-5xl font-black text-center outline-none text-white disabled:opacity-50" 
+                      placeholder="0" 
+                   />
                 </div>
                 
                 {currentAmount > 0 && !isLargeWithdrawal && (
@@ -235,20 +264,32 @@ export default function WithdrawPage() {
             {!isLargeWithdrawal && (
                 <div className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 space-y-4">
                     <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Metòd Pèman</label>
-                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full bg-black/50 p-5 rounded-2xl border border-white/5 text-xs font-black italic outline-none">
+                    <select 
+                       value={method} 
+                       onChange={(e) => setMethod(e.target.value)} 
+                       disabled={profile?.account_status === 'suspended'}
+                       className="w-full bg-black/50 p-5 rounded-2xl border border-white/5 text-xs font-black italic outline-none disabled:opacity-50"
+                    >
                         <option value="MonCash">MonCash</option>
                         <option value="NatCash">NatCash</option>
                     </select>
                     
                     <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Nimewo Kont / Telefòn</label>
-                    <input type="text" placeholder="EG: 44332211" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-black/50 p-5 rounded-2xl outline-none border border-white/5 text-xs font-black italic" />
+                    <input 
+                       type="text" 
+                       placeholder="EG: 44332211" 
+                       value={phone} 
+                       onChange={(e) => setPhone(e.target.value)} 
+                       disabled={profile?.account_status === 'suspended'}
+                       className="w-full bg-black/50 p-5 rounded-2xl outline-none border border-white/5 text-xs font-black italic disabled:opacity-50" 
+                    />
                 </div>
             )}
 
             <button 
               onClick={initiateWithdrawal} 
-              disabled={loading || currentAmount <= 0} 
-              className={`w-full py-6 rounded-full font-black uppercase text-sm transition-all shadow-xl ${loading ? 'bg-zinc-800 opacity-50' : 'bg-red-600 active:scale-95 shadow-red-600/20'}`}
+              disabled={loading || currentAmount <= 0 || profile?.account_status === 'suspended'} 
+              className={`w-full py-6 rounded-full font-black uppercase text-sm transition-all shadow-xl ${loading || profile?.account_status === 'suspended' ? 'bg-zinc-800 opacity-50 cursor-not-allowed' : 'bg-red-600 active:scale-95 shadow-red-600/20'}`}
             >
               Konfime ak Retire
             </button>
