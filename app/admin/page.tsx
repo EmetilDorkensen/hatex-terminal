@@ -33,13 +33,13 @@ export default function AdminSuperPage() {
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
     // ==========================================
-    // ETA POU KONT BIZNIS LA
+    // ETA POU KONT BIZNIS LA (NOUVO METÒD SENP LAN)
     // ==========================================
     const [businessTabPasswordVerified, setBusinessTabPasswordVerified] = useState(false);
     const [loadingBiznis, setLoadingBiznis] = useState(false);
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
-    const [feesBreakdown, setFeesBreakdown] = useState({ activation: 0, depoRetre: 0, rechaj: 0 });
+    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0 });
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -148,41 +148,42 @@ export default function AdminSuperPage() {
         }
     };
 
+    // ==========================================
+    // METÒD SENPLIFYE POU KALKILE FRÈ SOU TAB YO DIREK
+    // ==========================================
     const kalkileTotalBiznis = async () => {
         setLoadingBiznis(true);
         try {
-            const { data: freshUsers } = await supabase.from('profiles').select('wallet_balance');
-            const totalKliyan = (freshUsers || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
+            // 1. Total Kòb sou tout Balans Kliyan yo
+            const { data: profiles } = await supabase.from('profiles').select('wallet_balance');
+            const totalKliyan = (profiles || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
             setTotalClientBal(totalKliyan);
 
-            const { data: txs } = await supabase.from('transactions').select('amount, type');
+            // 2. Chèche Frè sou tout Depo ki reyisi yo
+            const { data: depData, error: errDep } = await supabase.from('deposits').select('fee').eq('status', 'approved');
+            const totalDepoFee = errDep ? 0 : (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
+
+            // 3. Chèche Frè sou tout Retrè ki reyisi yo
+            const { data: witData, error: errWit } = await supabase.from('withdrawals').select('fee').eq('status', 'completed');
+            const totalRetreFee = errWit ? 0 : (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
+
+            // 4. Chèche Frè sou tout Transfè ki reyisi yo
+            // Nou tcheke si status la se success oswa completed (depann de kòman ou te anrejistre l nan tab transfers la)
+            const { data: traData, error: errTra } = await supabase.from('transfers').select('fee, status');
+            const totalTransfeFee = errTra ? 0 : (traData || [])
+                .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
+                .reduce((acc, t) => acc + Number(t.fee || 0), 0);
+
+            // Nou mete tout done yo nan state yo
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee });
             
-            let act = 0;
-            let depRet = 0;
-            let rech = 0;
-
-            if (txs) {
-                txs.forEach(t => {
-                    const amt = Math.abs(Number(t.amount || 0)); 
-                    
-                    if (t.type === 'CARD_ACTIVATION') {
-                        act += amt;
-                    } else if (t.type === 'DEPOSIT_FEE' || t.type === 'WITHDRAWAL_FEE') {
-                        depRet += amt;
-                    } else if (t.type === 'RECHARGE_FEE' || t.type === 'CARD_RECHARGE_FEE') {
-                        rech += amt;
-                    } else if (t.type && typeof t.type === 'string' && t.type.includes('FEE')) {
-                        depRet += amt;
-                    }
-                });
-            }
-
-            setFeesBreakdown({ activation: act, depoRetre: depRet, rechaj: rech });
-            setTotalBiznisProfit(act + depRet + rech);
+            // Grand Total Pwofi a
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee;
+            setTotalBiznisProfit(granTotalPwofi);
 
         } catch (error) {
             console.error("Erè kalkil biznis:", error);
-            alert("Pa ka rale done finansye yo kounye a.");
+            alert("Sistèm nan jwenn yon ti pwoblèm nan rale done yo. Tcheke si tab transfers la ekziste byen.");
         } finally {
             setLoadingBiznis(false);
         }
@@ -210,15 +211,11 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // LOGIK POU KONFIME DEPO AK FRÈ BIZNIS LA OTOMATIK
-    // ==========================================
     const apwouveDepo = async (d: any) => {
         const isModified = montanModifye[d.id] !== undefined;
         const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
         
-        // Si admin lan modifye montan an, nou rekalkile frè a (5%). 
-        // Sinon, nou pran frè ki te deja anrejistre nan baz done a pandan depo a.
+        // Kalkil frè a: 5% si l modifye, sinon nou pran frè ki sou baz done a
         const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
         const totalPeye = montanFinal + frePouBiznisLa;
 
@@ -233,10 +230,10 @@ export default function AdminSuperPage() {
             const nouvoBalans = Number(p.wallet_balance || 0) + montanFinal;
             await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', d.user_id);
             
-            // 2. Aktyalize estati Depo a pou l pase nan Apwouve
+            // 2. Aktyalize estati Depo a ak vrè frè a, konsa Kès Biznis la ap tou jwenn li nan kalkil "kalkileTotalBiznis" lan.
             await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
             
-            // 3. Kreye resi (tranzaksyon) depo a nan je kliyan an
+            // 3. Resi pou kliyan an nan istwa l
             await supabase.from('transactions').insert({ 
                 user_id: d.user_id, 
                 amount: montanFinal, 
@@ -245,21 +242,10 @@ export default function AdminSuperPage() {
                 status: 'success' 
             });
 
-            // 4. KREYE RESI FRÈ A POU ANTREPRIZ LA (SA AP MANTE KONT BIZNIS LA OTOMATIKMAN)
-            if (frePouBiznisLa > 0) {
-                await supabase.from('transactions').insert({ 
-                    user_id: d.user_id, 
-                    amount: frePouBiznisLa, 
-                    type: 'DEPOSIT_FEE', 
-                    description: `Frè platfòm sou depo: +${frePouBiznisLa} HTG`, 
-                    status: 'success' 
-                });
-            }
-
             await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "✅ DEPO APWOUVE");
             await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
             
-            alert("✅ SIKSÈ! Depo a apwouve, kòb la al sou kont li, epi frè a antre nan Kès Biznis la."); 
+            alert("✅ SIKSÈ! Depo a apwouve, kòb la al sou kont li, epi frè a byen anrejistre pou Kès Biznis la."); 
             raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -270,7 +256,10 @@ export default function AdminSuperPage() {
         try {
             const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', w.user_id).single();
             if (pErr || !p) throw new Error("Kliyan pa jwenn.");
+            
+            // Isit la asire w w update fee a tou si w te bezwen nan retrè a
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
+            
             await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
             await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "💸 RETRÈ KONFIME");
             await voyeTelegram(`💸 <b>RETRÈ KONFIME</b>\nKliyan: ${p.full_name}\nMontan: ${w.amount} HTG`);
@@ -286,7 +275,7 @@ export default function AdminSuperPage() {
             await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
             const { data: p } = await supabase.from('profiles').select('*').eq('id', item.user_id).single();
             if (table === 'withdrawals') {
-                const balansR = Number(p.wallet_balance || 0) + Number(item.amount);
+                const balansR = Number(p.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); // Ranbouse ak tout frè a si l te peye l deja
                 await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
             }
             await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
@@ -606,19 +595,19 @@ export default function AdminSuperPage() {
                                     </div>
 
                                     <div className="bg-[#121420] p-6 rounded-[2rem] border border-white/5 mt-6">
-                                        <h3 className="text-[12px] font-black text-zinc-400 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Detay Kòb Antrepriz La Fè A</h3>
+                                        <h3 className="text-[12px] font-black text-zinc-400 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Detay Frè Antrepriz La Fè</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                             <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Aktivasyon Kat</p>
-                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.activation).toLocaleString()} HTG</p>
+                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Kolekte Sou Depo</p>
+                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.depo).toLocaleString()} HTG</p>
                                             </div>
                                             <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Rechaj / Lòt</p>
-                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.rechaj).toLocaleString()} HTG</p>
+                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Kolekte Sou Retrè</p>
+                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.retre).toLocaleString()} HTG</p>
                                             </div>
                                             <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Depo / Retrè</p>
-                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.depoRetre).toLocaleString()} HTG</p>
+                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Kolekte Sou Transfè</p>
+                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.transfe).toLocaleString()} HTG</p>
                                             </div>
                                         </div>
                                     </div>
@@ -923,7 +912,6 @@ export default function AdminSuperPage() {
                                             {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan san frè a:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-zinc-800 text-white px-3 py-2 rounded-xl text-[8px] font-black tracking-widest hover:bg-zinc-700">MODIFYE</button>}
                                         </div>
 
-                                        {/* AFFICHAJ DETAY POU FRÈ AK TOTAL (TRÈ ENPÒTAN POU DEPOZ AK BIZNIS KÈS LA) */}
                                         {isDepo && item.fee !== undefined && (
                                             <div className="mt-4 space-y-1">
                                                 <div className="flex justify-between items-center p-2 bg-emerald-900/10 rounded-lg">
