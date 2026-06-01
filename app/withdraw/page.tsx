@@ -11,9 +11,6 @@ export default function WithdrawPage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
-  // ==========================================
-  // ETA POU SISTÈM PIN NAN
-  // ==========================================
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -23,7 +20,6 @@ export default function WithdrawPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Kalkil frè ak kantite (Si montan an < 15000 frè a se 5%, si l > 15000 frè a se 0 pou gwo tranzaksyon)
   const currentAmount = Number(amount) || 0;
   const isLargeWithdrawal = currentAmount > 15000;
   
@@ -37,10 +33,9 @@ export default function WithdrawPage() {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (data) {
            setProfile(data);
-           // Si kliyan an poko janm fè yon PIN (Etap 2 Sekirite), nou fòse l fè l
            if (!data.transaction_pin) {
-               alert("Ou dwe gen yon kòd PIN pou sekirize kont ou anvan ou ka retire lajan. Y ap mennen w nan paj paramèt la.");
-               router.push('/setting'); // Oubyen kote l ka kreye PIN li an
+               alert("Ou dwe gen yon kòd PIN pou sekirize kont ou anvan ou ka retire lajan.");
+               router.push('/setting'); 
            }
         }
       } else {
@@ -50,24 +45,58 @@ export default function WithdrawPage() {
     fetchProfile();
   }, [supabase, router]);
 
-  // 1. Lè itilizatè a peze premye bouton Konfime a (Mande PIN)
-  const initiateWithdrawal = () => {
-    // VERIFIKASYON KONT SISPANDI
-    if (profile?.account_status === 'suspended') {
-      return alert("🚫 Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè kounye a.");
-    }
+  // ==========================================
+  // LOJIK POU TCHEKE BAZ DONE A FRECH
+  // ==========================================
+  const initiateWithdrawal = async () => {
+    setLoading(true);
 
-    if (currentAmount < 500) return alert("Minimòm retrè se 500 HTG");
-    if (currentAmount > (profile?.wallet_balance || 0)) return alert("Ou pa gen ase kòb sou kont ou.");
-    if (!phone && !isLargeWithdrawal) return alert("Tanpri mete nimewo telefòn ou"); 
-    
-    // Mande PIN
-    setPinError('');
-    setEnteredPin('');
-    setShowPinPrompt(true);
+    try {
+      // 1. AL CHÈCHE ESTATI A DIRÈK NAN TAB PROFILES LA KOUNYE A
+      const { data: statusCheck, error: statusErr } = await supabase
+        .from('profiles')
+        .select('account_status')
+        .eq('id', profile.id)
+        .single();
+
+      if (statusErr || !statusCheck) {
+        setLoading(false);
+        return alert("Sistèm nan pa jwenn kont ou pou verifye l.");
+      }
+
+      // 2. BLOKE SI L SISPANDI
+      if (statusCheck.account_status === 'suspended') {
+        setLoading(false);
+        return alert("🚫 Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè.");
+      }
+
+      // 3. KITE L PASE SI L ACTIVE AK LÒT KONDISYON YO
+      if (statusCheck.account_status === 'active') {
+        if (currentAmount < 500) {
+          setLoading(false);
+          return alert("Minimòm retrè se 500 HTG");
+        }
+        if (currentAmount > (profile?.wallet_balance || 0)) {
+          setLoading(false);
+          return alert("Ou pa gen ase kòb sou kont ou.");
+        }
+        if (!phone && !isLargeWithdrawal) {
+          setLoading(false);
+          return alert("Tanpri mete nimewo telefòn ou"); 
+        }
+
+        // Tout bagay fre, nou mande PIN nan
+        setPinError('');
+        setEnteredPin('');
+        setShowPinPrompt(true);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 2. Vre tranzaksyon an fèt LÈ bon PIN nan antre
   const executeWithdrawal = async () => {
     if (enteredPin.length !== 4) {
       setPinError("PIN nan dwe gen 4 chif");
@@ -78,7 +107,6 @@ export default function WithdrawPage() {
     setPinError('');
 
     try {
-      // A) VERIFYE KÒD PIN AK ESTATI KONT NAN BAZ DONE A ANVAN TOUT BAGAY
       const { data: checkData, error: checkErr } = await supabase
         .from('profiles')
         .select('transaction_pin, wallet_balance, account_status')
@@ -87,7 +115,7 @@ export default function WithdrawPage() {
         
       if (checkErr || !checkData) throw new Error("Nou pa jwenn kont ou.");
       
-      // DÈNYE VERIFIKASYON SI KONT LAN SISPANDI
+      // Tcheke yon dènye fwa jis pou sekirite absoli
       if (checkData.account_status === 'suspended') {
         throw new Error("🚫 Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
       }
@@ -96,12 +124,10 @@ export default function WithdrawPage() {
         throw new Error("❌ PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
       
-      // Asire nou lajan an la vre vre nan baz done a nan menm segonn nan
       if (currentAmount > Number(checkData.wallet_balance)) {
          throw new Error("Ou pa gen ase kòb pou tranzaksyon sa a.");
       }
 
-      // B) KOUPE LAJAN AN NAN BALANS LA
       const nouvoBalans = Number(checkData.wallet_balance) - currentAmount;
       const { error: balanceError } = await supabase
         .from('profiles')
@@ -110,7 +136,6 @@ export default function WithdrawPage() {
 
       if (balanceError) throw new Error("Erè nan mizajou balans ou an. Tanpri re-eseye.");
 
-      // C) EKRI RESI RETRÈ A (Ak yon makè si se yon gwo tranzaksyon)
       const withdrawalMethod = isLargeWithdrawal ? 'VIP_LARGE_TRANSFER' : method;
       const withdrawalPhone = isLargeWithdrawal ? 'Pral bay li bay Sèvis Kliyan' : phone;
 
@@ -126,17 +151,15 @@ export default function WithdrawPage() {
       }]);
 
       if (withdrawError) {
-        // ROLLBACK SI L PA MACHE
         await supabase.from('profiles').update({ wallet_balance: checkData.wallet_balance }).eq('id', profile.id);
         throw new Error("Sistèm nan jwenn yon pwoblèm. Nou remèt kòb la sou balans ou.");
       }
 
-      // D) VOYE NOTIFIKASYON TELEGRAM
       const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY';
       const CHAT_ID = '8392894841';
       const msg = isLargeWithdrawal 
-        ? `🚨 *GWO DEMANN RETRÈ VIP*\n\n👤: ${profile.full_name}\n💰 Montan: ${currentAmount} HTG\n⚠️ _Montan an plis pase 15,000 HTG. Kliyan an ap kontakte w pou l ba w kote l vle kòb la. Li deja koupe sou balans li._`
-        : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (5%): ${withdrawFee} HTG\n✅ Nèt pou voye: ${netAmount} HTG\n📲: ${method} (${phone})\n\n_Kòb la deja retire sou balans kliyan an_`;
+        ? `🚨 *GWO DEMANN RETRÈ VIP*\n\n👤: ${profile.full_name}\n💰 Montan: ${currentAmount} HTG\n⚠️ _Montan an plis pase 15,000 HTG._`
+        : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (5%): ${withdrawFee} HTG\n✅ Nèt pou voye: ${netAmount} HTG\n📲: ${method} (${phone})`;
       
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -147,7 +170,7 @@ export default function WithdrawPage() {
       setShowPinPrompt(false);
       
       if (isLargeWithdrawal) {
-          alert("✅ Demann ou a pase! Piske se yon gwo sòm (Plis pase 15,000 HTG), tanpri kontakte Sèvis Kliyan pou n bay kote nou dwe voye kòb la pou ou.");
+          alert("✅ Demann ou a pase! Tanpri kontakte Sèvis Kliyan pou n bay kote nou dwe voye kòb la pou ou.");
       } else {
           alert("✅ Retrè voye! Kòb la retire sou balans ou. N ap voye l nan 15-45 minit.");
       }
@@ -165,9 +188,6 @@ export default function WithdrawPage() {
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic relative">
       
-      {/* ==================================================== */}
-      {/* POPUP: MANDE PIN POU KONFIME RETRÈ A                  */}
-      {/* ==================================================== */}
       {showPinPrompt && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
           <div className="bg-[#121420] border border-white/10 p-8 rounded-[2.5rem] w-full max-w-sm text-center shadow-2xl">
@@ -204,9 +224,6 @@ export default function WithdrawPage() {
         </div>
       )}
 
-      {/* ==================================================== */}
-      {/* PAJ NORMAL LA (Fòm Retrè a)                            */}
-      {/* ==================================================== */}
       <div className={`transition-all duration-300 ${showPinPrompt ? 'opacity-30 pointer-events-none blur-sm' : ''}`}>
           <div className="flex items-center gap-4 mb-8">
             <button onClick={() => router.back()} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-white/5">←</button>
@@ -215,12 +232,11 @@ export default function WithdrawPage() {
 
           <div className="space-y-6">
             
-            {/* AVÈTISMAN SI KONT LAN SISPANDI */}
             {profile?.account_status === 'suspended' && (
                <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center shadow-lg">
                   <span className="text-2xl mb-2 block">⚠️</span>
                   <p className="text-[11px] text-red-500 font-black uppercase tracking-widest leading-relaxed">
-                     KONT OU A SISPANDI. OU PA GEN OTORIZASYON POU RETIRE LAJAN. TANPRI KONTAKTE SIPÒ A.
+                     KONT OU A SISPANDI. OU PA GEN OTORIZASYON POU RETIRE LAJAN.
                   </p>
                </div>
             )}
@@ -245,22 +261,19 @@ export default function WithdrawPage() {
                   </div>
                 )}
                 
-                {/* Mesaj GWO SÒM (Pou retrè > 15,000) */}
                 {isLargeWithdrawal && (
                   <div className="mt-6 pt-6 border-t border-white/5">
                      <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl text-center">
                         <span className="text-lg mb-2 block">🌟</span>
                         <p className="text-[9px] font-black uppercase text-yellow-500 tracking-widest leading-relaxed">
                           Ou ap retire plis pase 15,000 HTG.<br/>
-                          Transfè sa a p ap gen frè otomatikman, men w ap bezwen bay nou yon kote pou n depoze l (Zelle, CashApp, Bank, etc.).<br/>
-                          Nou pral retire l sou balans ou a, apre sa y ap kontakte w oswa ou ka ekri sipò nou.
+                          Transfè sa a p ap gen frè otomatikman, men w ap bezwen bay nou yon kote pou n depoze l.
                         </p>
                      </div>
                   </div>
                 )}
             </div>
             
-            {/* Si l ap retire anba 15,000 HTG, li dwe bay nimewo MonCash/NatCash nòmal li */}
             {!isLargeWithdrawal && (
                 <div className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 space-y-4">
                     <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Metòd Pèman</label>
@@ -289,14 +302,10 @@ export default function WithdrawPage() {
             <button 
               onClick={initiateWithdrawal} 
               disabled={loading || currentAmount <= 0 || profile?.account_status === 'suspended'} 
-              className={`w-full py-6 rounded-full font-black uppercase text-sm transition-all shadow-xl ${loading || profile?.account_status === 'suspended' ? 'bg-zinc-800 opacity-50 cursor-not-allowed' : 'bg-red-600 active:scale-95 shadow-red-600/20'}`}
+              className={`w-full py-6 rounded-full font-black uppercase text-sm transition-all shadow-xl flex items-center justify-center ${loading || profile?.account_status === 'suspended' ? 'bg-zinc-800 opacity-50 cursor-not-allowed' : 'bg-red-600 active:scale-95 shadow-red-600/20'}`}
             >
-              Konfime ak Retire
+              {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "Konfime ak Retire"}
             </button>
-
-            <p className="text-[9px] text-center text-zinc-600 uppercase font-bold leading-relaxed">
-              Lè w klike sou bouton an epi w mete PIN ou a, kòb la ap retire otomatikman sou balans Hatex ou a.
-            </p>
           </div>
       </div>
     </div>
