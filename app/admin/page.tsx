@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus, Lock, Briefcase, DollarSign, EyeOff } from 'lucide-react';
 
 export default function AdminSuperPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -25,12 +25,21 @@ export default function AdminSuperPage() {
     const [isSearchingDispute, setIsSearchingDispute] = useState(false);
     const [actionAmount, setActionAmount] = useState<number>(0);
 
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij'>('litij'); // Mwen mete litij pa defo pou w wè l rapid
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij' | 'biznis'>('litij'); 
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [accessGranted, setAccessGranted] = useState(false);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
+
+    // ==========================================
+    // ETA POU KONT BIZNIS LA
+    // ==========================================
+    const [businessTabPasswordVerified, setBusinessTabPasswordVerified] = useState(false);
+    const [loadingBiznis, setLoadingBiznis] = useState(false);
+    const [totalClientBal, setTotalClientBal] = useState(0);
+    const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
+    const [feesBreakdown, setFeesBreakdown] = useState({ activation: 0, depoRetre: 0, rechaj: 0 });
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -94,6 +103,101 @@ export default function AdminSuperPage() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    // ==========================================
+    // FONKSYON POU KRIPTE/MASKE URL POU KLIYAN PA WÈ L
+    // ==========================================
+    const handleOpenMaskedUrl = (url: string) => {
+        if (!url) return;
+        // Nou louvri yon paj vid, epi nou pouse foto a ladan l avèk kòd HTML. 
+        // Konsa URL Supabase la pa janm parèt nan navigatè a (l ap make about:blank)
+        const newWindow = window.open('about:blank', '_blank');
+        if (newWindow) {
+            newWindow.document.write(`
+                <html style="background:#0a0b14; display:flex; justify-content:center; align-items:center; margin:0;">
+                    <head><title>Dokiman Sekirize - HatexCard</title></head>
+                    <body>
+                        <img src="${url}" style="max-width:100%; max-height:100vh; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"/>
+                    </body>
+                </html>
+            `);
+            newWindow.document.close();
+        }
+    };
+
+    // ==========================================
+    // KONT BIZNIS - KALKIL PWOFI AK BALANS
+    // ==========================================
+    const handleOpenBiznis = async () => {
+        if (businessTabPasswordVerified) {
+            setView('biznis');
+            kalkileTotalBiznis();
+            return;
+        }
+
+        const pass = prompt("🔒 ANTRE MODPAS SEKRÈ FINANSYE A:");
+        if (!pass) return;
+
+        try {
+            // Tcheke nan global_settings si gen yon modpas anrejistre
+            const { data: settings } = await supabase.from('global_settings').select('finance_password').eq('id', 1).maybeSingle();
+            // Si l pa nan baz done a, nou mete 'hatexfinans2026' pa defo pou w pa bloke
+            const validPass = settings?.finance_password || 'hatexfinans2026';
+
+            if (pass === validPass) {
+                setBusinessTabPasswordVerified(true);
+                setView('biznis');
+                kalkileTotalBiznis();
+            } else {
+                alert("❌ Modpas la pa bon! Ou pa gen aksè ak kès biznis la.");
+            }
+        } catch (e) {
+            alert("Erè nan sistèm sekirite a.");
+        }
+    };
+
+    const kalkileTotalBiznis = async () => {
+        setLoadingBiznis(true);
+        try {
+            // 1. Total lajan ki nan men kliyan yo kounye a
+            const { data: freshUsers } = await supabase.from('profiles').select('wallet_balance');
+            const totalKliyan = (freshUsers || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
+            setTotalClientBal(totalKliyan);
+
+            // 2. Chèche tout tranzaksyon ki se FRÈ platfòm nan kenbe yo
+            const { data: txs } = await supabase.from('transactions').select('amount, type');
+            
+            let act = 0;
+            let depRet = 0;
+            let rech = 0;
+
+            if (txs) {
+                txs.forEach(t => {
+                    const amt = Math.abs(Number(t.amount || 0)); // Nou pran valè absoli an paske frè yo ka an negatif
+                    
+                    if (t.type === 'CARD_ACTIVATION') {
+                        act += amt;
+                    } else if (t.type === 'DEPOSIT_FEE' || t.type === 'WITHDRAWAL_FEE') {
+                        depRet += amt;
+                    } else if (t.type === 'RECHARGE_FEE' || t.type === 'CARD_RECHARGE_FEE') {
+                        rech += amt;
+                    } else if (t.type && typeof t.type === 'string' && t.type.includes('FEE')) {
+                        // Kenbe nenpòt lòt tranzaksyon ki gen mo "FEE" ladan l
+                        depRet += amt;
+                    }
+                });
+            }
+
+            setFeesBreakdown({ activation: act, depoRetre: depRet, rechaj: rech });
+            setTotalBiznisProfit(act + depRet + rech);
+
+        } catch (error) {
+            console.error("Erè kalkil biznis:", error);
+            alert("Pa ka rale done finansye yo kounye a.");
+        } finally {
+            setLoadingBiznis(false);
         }
     };
 
@@ -217,9 +321,6 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // NOUVO FONKSYON POU AJOUTE/DIMINYE BALANS MANYÈLMAN
-    // ==========================================
     const handleManualBalanceAdjust = async (user: any, action: 'add' | 'subtract') => {
         if (!user) return;
         const amtStr = prompt(`Antre montan ou vle ${action === 'add' ? 'AJOUTE sou' : 'RETIRE nan'} kont ${user.full_name} an:`);
@@ -247,7 +348,6 @@ export default function AdminSuperPage() {
 
             alert(`✅ Balans la modifye! Nouvo balans: ${newBal} HTG`);
             
-            // Rafrechi UI lokal la pou l parèt menm kote a
             if (searchedDispute) {
                 const updatedDispute = { ...searchedDispute };
                 if (updatedDispute.senderProfile?.id === user.id) {
@@ -266,9 +366,6 @@ export default function AdminSuperPage() {
         }
     };
 
-    // ==========================================
-    // RECHÈCH INTELIJAN (KLIYAN & MACHANN)
-    // ==========================================
     const handleAdminSearchDispute = async () => {
         if (!searchDisputeId.trim()) return alert("Tanpri mete ID kòmand lan pou w chèche a.");
         setIsSearchingDispute(true);
@@ -299,29 +396,23 @@ export default function AdminSuperPage() {
 
             if (!tx) return alert("Sistèm nan pa jwenn okenn kòmand avèk ID sa a ditou. Tcheke si ID a bon.");
 
-            // ==== Lojik fò pou jwenn Kliyan ak Machann ====
             let senderId = null;
             let receiverId = null;
 
             if (tx.table_source === 'plugin_transactions') {
-                // Nan plugin, mèt plugin an (user_id) se machann nan.
                 receiverId = tx.user_id; 
-                // Kliyan an se li ki nan metadata a oswa dispute_details
                 senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id;
             } else {
-                // Nan tranzaksyon nòmal (P2P), moun ki voye a se user_id
                 senderId = tx.user_id;
                 receiverId = tx.metadata?.receiver_id || tx.metadata?.merchant_id;
             }
 
-            // Jwenn Pwofil Sender a
             let senderProfile = null;
             if (senderId) {
                 const { data: s } = await supabase.from('profiles').select('*').eq('id', senderId).maybeSingle();
                 senderProfile = s || allUsers.find(u => u.id === senderId);
             }
 
-            // Jwenn Pwofil Receiver a
             let receiverProfile = null;
             let receiverEmail = tx.metadata?.merchant_email || tx.metadata?.receiver_email || tx.customer_info?.email;
 
@@ -443,11 +534,94 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>KYC ({pendingKyc.length})</button>
                     <button onClick={() => setView('promo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'promo' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>PWOMO</button>
                     <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>SISPANDI</button>
+                    
+                    {/* BOUTON BIZNIS KREYE AK SEKIRITE KADNA A */}
+                    <button onClick={handleOpenBiznis} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 ${view === 'biznis' ? 'bg-emerald-600 shadow-lg shadow-emerald-600/20 text-white' : 'bg-emerald-900/30 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white'}`}>
+                        {businessTabPasswordVerified ? <Briefcase size={14}/> : <Lock size={14}/>} 
+                        KONT BIZNIS
+                    </button>
                 </div>
 
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
+                    ) : view === 'biznis' ? (
+                        /* ========================================== */
+                        /* ENTÈFAS POU KONT BIZNIS LA                 */
+                        /* ========================================== */
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="flex items-center gap-3 mb-6">
+                                <span className="p-3 bg-emerald-500/20 rounded-xl text-emerald-500"><Briefcase size={24}/></span>
+                                <div>
+                                    <h2 className="text-2xl font-black uppercase text-white tracking-widest">Kès Jeneral Antrepriz la</h2>
+                                    <p className="text-[10px] text-zinc-400 font-bold tracking-widest flex items-center gap-1"><ShieldCheck size={12}/> Aksè Sekirize (Sèlman Mèt Biznis la)</p>
+                                </div>
+                            </div>
+
+                            {loadingBiznis ? (
+                                <div className="text-center py-20 animate-pulse text-zinc-500 text-xs flex flex-col items-center justify-center gap-4">
+                                    <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                                    L-AP KALKILE TOUT TRANZAKSYON YO...
+                                </div>
+                            ) : (
+                                <>
+                                    {/* KAT PRENSIPAL YO */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        
+                                        {/* KÒB KLIYAN YO */}
+                                        <div className="bg-[#121420] p-6 rounded-[2rem] border border-blue-500/30 relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 flex items-center gap-2"><UserX size={14}/> Total Kòb Kliyan Yo (Lajan Moun Yo)</p>
+                                            <h3 className="text-4xl md:text-5xl font-black italic text-white tracking-tighter">
+                                                {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-blue-500">HTG</span>
+                                            </h3>
+                                            <p className="text-[9px] text-zinc-500 mt-4 normal-case font-bold">Sa se sòm total tout kòb ki sou kont chak grenn kliyan. Ou pa ka touche sa!</p>
+                                        </div>
+
+                                        {/* PWOFI BIZNIS LA */}
+                                        <div className="bg-emerald-900/20 p-6 rounded-[2rem] border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2"><DollarSign size={14}/> Pwofi Biznis La (Kòb Antrepriz La)</p>
+                                            <h3 className="text-4xl md:text-5xl font-black italic text-emerald-400 tracking-tighter">
+                                                {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-emerald-600">HTG</span>
+                                            </h3>
+                                            <p className="text-[9px] text-zinc-400 mt-4 normal-case font-bold">Sa se total tout frè ou fè sou platfòm nan. Se kòb sa a ki pou ou legalman.</p>
+                                        </div>
+
+                                    </div>
+
+                                    {/* DETAY FRÈ YO */}
+                                    <div className="bg-[#121420] p-6 rounded-[2rem] border border-white/5 mt-6">
+                                        <h3 className="text-[12px] font-black text-zinc-400 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Detay Kòb Antrepriz La Fè A</h3>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
+                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Aktivasyon Kat</p>
+                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.activation).toLocaleString()} HTG</p>
+                                            </div>
+                                            <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
+                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Rechaj / Lòt</p>
+                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.rechaj).toLocaleString()} HTG</p>
+                                            </div>
+                                            <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
+                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Depo / Retrè</p>
+                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.depoRetre).toLocaleString()} HTG</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-blue-900/20 p-6 rounded-[2rem] border border-blue-500/30 mt-6 flex justify-between items-center">
+                                        <div>
+                                            <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest mb-1">Gran Total Sou Sistèm Nan</p>
+                                            <p className="text-[9px] text-zinc-400 normal-case font-bold">Kòb Kliyan + Kòb Biznis (Sa se total jeneral ki sipoze sou kès bank ou toutbon an)</p>
+                                        </div>
+                                        <p className="text-2xl font-black text-white italic">
+                                            {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     ) : view === 'litij' ? (
                         <div className="space-y-8">
                             <div className="bg-[#121420] p-6 rounded-[2rem] border border-yellow-500/30 shadow-lg shadow-yellow-900/10">
@@ -742,9 +916,10 @@ export default function AdminSuperPage() {
                                     <div className="flex-1 text-center md:text-left">
                                         <h3 className="text-lg font-black text-white">{user.full_name || 'San Non'}</h3><p className="text-[10px] text-zinc-400 mb-4 lowercase">{user.email}</p>
                                         <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                            {user.kyc_front && <a href={user.kyc_front} target="_blank" rel="noreferrer" className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest">👁️ DEVAN</a>}
-                                            {user.kyc_back && <a href={user.kyc_back} target="_blank" rel="noreferrer" className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest">👁️ DÈYÈ</a>}
-                                            {user.kyc_selfie && <a href={user.kyc_selfie} target="_blank" rel="noreferrer" className="text-[9px] bg-purple-600/20 px-4 py-2 rounded-lg text-purple-400 border border-purple-600/30 hover:bg-purple-600 hover:text-white transition-all font-black tracking-widest">📸 SELFIE</a>}
+                                            {/* NOU CHAJE BOUTON YO AVÈK FONKSYON MASKÈ URL LA */}
+                                            {user.kyc_front && <button onClick={() => handleOpenMaskedUrl(user.kyc_front)} className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> DEVAN</button>}
+                                            {user.kyc_back && <button onClick={() => handleOpenMaskedUrl(user.kyc_back)} className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> DÈYÈ</button>}
+                                            {user.kyc_selfie && <button onClick={() => handleOpenMaskedUrl(user.kyc_selfie)} className="text-[9px] bg-purple-600/20 px-4 py-2 rounded-lg text-purple-400 border border-purple-600/30 hover:bg-purple-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> SELFIE</button>}
                                             {!user.kyc_front && !user.kyc_selfie && <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded border border-yellow-500/20">OKENN IMAJ SOU SISTÈM NAN</span>}
                                         </div>
                                     </div>
@@ -802,14 +977,15 @@ export default function AdminSuperPage() {
                                                 <button disabled={processingId === item.id} onClick={() => isDepo ? apwouveDepo(item) : apwouveRetre(item)} className="flex-1 bg-white text-black py-4 rounded-2xl text-[10px] font-black hover:bg-green-500 hover:text-white transition-all">KONFIME APWOUVE</button>
                                                 <button disabled={processingId === item.id} onClick={() => anileTranzaksyon(item, isDepo ? 'deposits' : 'withdrawals')} className="bg-red-600/20 text-red-600 border border-red-600/30 px-5 py-4 rounded-2xl text-[10px] hover:bg-red-600 hover:text-white transition-all">ANILE</button>
                                             </div>
-                                            {isDepo && item.proof_img_1 && (<a href={item.proof_img_1} target="_blank" rel="noreferrer" className="block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest">👁️ GADE FOTO PRÈV</a>)}
+                                            {/* BOUTON PRÈV LA KRIPTE KÒNYA TOU */}
+                                            {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_1)} className="w-full block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest flex items-center justify-center gap-2"><EyeOff size={12}/> GADE FOTO PRÈV</button>)}
                                         </div>
                                     )}
                                 </div>
                             );
                         })
                     )}
-                    {!loading && view !== 'sispandi' && view !== 'litij' && view !== 'kliyan' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
+                    {!loading && view !== 'biznis' && view !== 'sispandi' && view !== 'litij' && view !== 'kliyan' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
                 </div>
             </div>
         </div>
