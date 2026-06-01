@@ -106,13 +106,8 @@ export default function AdminSuperPage() {
         }
     };
 
-    // ==========================================
-    // FONKSYON POU KRIPTE/MASKE URL POU KLIYAN PA WÈ L
-    // ==========================================
     const handleOpenMaskedUrl = (url: string) => {
         if (!url) return;
-        // Nou louvri yon paj vid, epi nou pouse foto a ladan l avèk kòd HTML. 
-        // Konsa URL Supabase la pa janm parèt nan navigatè a (l ap make about:blank)
         const newWindow = window.open('about:blank', '_blank');
         if (newWindow) {
             newWindow.document.write(`
@@ -127,9 +122,6 @@ export default function AdminSuperPage() {
         }
     };
 
-    // ==========================================
-    // KONT BIZNIS - KALKIL PWOFI AK BALANS
-    // ==========================================
     const handleOpenBiznis = async () => {
         if (businessTabPasswordVerified) {
             setView('biznis');
@@ -141,9 +133,7 @@ export default function AdminSuperPage() {
         if (!pass) return;
 
         try {
-            // Tcheke nan global_settings si gen yon modpas anrejistre
             const { data: settings } = await supabase.from('global_settings').select('finance_password').eq('id', 1).maybeSingle();
-            // Si l pa nan baz done a, nou mete 'hatexfinans2026' pa defo pou w pa bloke
             const validPass = settings?.finance_password || 'hatexfinans2026';
 
             if (pass === validPass) {
@@ -161,12 +151,10 @@ export default function AdminSuperPage() {
     const kalkileTotalBiznis = async () => {
         setLoadingBiznis(true);
         try {
-            // 1. Total lajan ki nan men kliyan yo kounye a
             const { data: freshUsers } = await supabase.from('profiles').select('wallet_balance');
             const totalKliyan = (freshUsers || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
             setTotalClientBal(totalKliyan);
 
-            // 2. Chèche tout tranzaksyon ki se FRÈ platfòm nan kenbe yo
             const { data: txs } = await supabase.from('transactions').select('amount, type');
             
             let act = 0;
@@ -175,7 +163,7 @@ export default function AdminSuperPage() {
 
             if (txs) {
                 txs.forEach(t => {
-                    const amt = Math.abs(Number(t.amount || 0)); // Nou pran valè absoli an paske frè yo ka an negatif
+                    const amt = Math.abs(Number(t.amount || 0)); 
                     
                     if (t.type === 'CARD_ACTIVATION') {
                         act += amt;
@@ -184,7 +172,6 @@ export default function AdminSuperPage() {
                     } else if (t.type === 'RECHARGE_FEE' || t.type === 'CARD_RECHARGE_FEE') {
                         rech += amt;
                     } else if (t.type && typeof t.type === 'string' && t.type.includes('FEE')) {
-                        // Kenbe nenpòt lòt tranzaksyon ki gen mo "FEE" ladan l
                         depRet += amt;
                     }
                 });
@@ -223,20 +210,57 @@ export default function AdminSuperPage() {
         } finally { setProcessingId(null); }
     };
 
+    // ==========================================
+    // LOGIK POU KONFIME DEPO AK FRÈ BIZNIS LA OTOMATIK
+    // ==========================================
     const apwouveDepo = async (d: any) => {
-        const montanFinal = montanModifye[d.id] !== undefined ? montanModifye[d.id] : Number(d.amount);
-        if (!confirm(`Konfime depo sa a?\nMontan k ap ajoute sou balans lan: ${montanFinal} HTG`)) return;
+        const isModified = montanModifye[d.id] !== undefined;
+        const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
+        
+        // Si admin lan modifye montan an, nou rekalkile frè a (5%). 
+        // Sinon, nou pran frè ki te deja anrejistre nan baz done a pandan depo a.
+        const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
+        const totalPeye = montanFinal + frePouBiznisLa;
+
+        if (!confirm(`TCHEKE DEPO SA BYEN:\n\n- Kliyan an ap resevwa: ${montanFinal} HTG\n- Frè pou Antrepriz la (Biznis): ${frePouBiznisLa} HTG\n- Total kliyan an te dwe voye sou Moncash la se: ${totalPeye} HTG\n\nÈske w wè ${totalPeye} HTG a sou telefòn ou? Si wi, konfime l.`)) return;
+        
         setProcessingId(d.id);
         try {
             const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', d.user_id).single();
             if (pErr || !p) throw new Error("Kliyan pa jwenn nan sistèm nan.");
+            
+            // 1. Mete montanFinal la sou balans kliyan an
             const nouvoBalans = Number(p.wallet_balance || 0) + montanFinal;
             await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', d.user_id);
-            await supabase.from('deposits').update({ status: 'approved', amount: montanFinal }).eq('id', d.id);
-            await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
+            
+            // 2. Aktyalize estati Depo a pou l pase nan Apwouve
+            await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
+            
+            // 3. Kreye resi (tranzaksyon) depo a nan je kliyan an
+            await supabase.from('transactions').insert({ 
+                user_id: d.user_id, 
+                amount: montanFinal, 
+                type: 'DEPOSIT', 
+                description: `Depo konfime: +${montanFinal} HTG`, 
+                status: 'success' 
+            });
+
+            // 4. KREYE RESI FRÈ A POU ANTREPRIZ LA (SA AP MANTE KONT BIZNIS LA OTOMATIKMAN)
+            if (frePouBiznisLa > 0) {
+                await supabase.from('transactions').insert({ 
+                    user_id: d.user_id, 
+                    amount: frePouBiznisLa, 
+                    type: 'DEPOSIT_FEE', 
+                    description: `Frè platfòm sou depo: +${frePouBiznisLa} HTG`, 
+                    status: 'success' 
+                });
+            }
+
             await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "✅ DEPO APWOUVE");
-            await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan: ${montanFinal} HTG`);
-            alert("✅ DEPO APWOUVE!"); raleDone();
+            await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
+            
+            alert("✅ SIKSÈ! Depo a apwouve, kòb la al sou kont li, epi frè a antre nan Kès Biznis la."); 
+            raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -535,7 +559,6 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('promo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'promo' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>PWOMO</button>
                     <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>SISPANDI</button>
                     
-                    {/* BOUTON BIZNIS KREYE AK SEKIRITE KADNA A */}
                     <button onClick={handleOpenBiznis} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 ${view === 'biznis' ? 'bg-emerald-600 shadow-lg shadow-emerald-600/20 text-white' : 'bg-emerald-900/30 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white'}`}>
                         {businessTabPasswordVerified ? <Briefcase size={14}/> : <Lock size={14}/>} 
                         KONT BIZNIS
@@ -546,9 +569,6 @@ export default function AdminSuperPage() {
                     {loading ? (
                         <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
                     ) : view === 'biznis' ? (
-                        /* ========================================== */
-                        /* ENTÈFAS POU KONT BIZNIS LA                 */
-                        /* ========================================== */
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="flex items-center gap-3 mb-6">
                                 <span className="p-3 bg-emerald-500/20 rounded-xl text-emerald-500"><Briefcase size={24}/></span>
@@ -565,10 +585,7 @@ export default function AdminSuperPage() {
                                 </div>
                             ) : (
                                 <>
-                                    {/* KAT PRENSIPAL YO */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        
-                                        {/* KÒB KLIYAN YO */}
                                         <div className="bg-[#121420] p-6 rounded-[2rem] border border-blue-500/30 relative overflow-hidden group">
                                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
                                             <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 flex items-center gap-2"><UserX size={14}/> Total Kòb Kliyan Yo (Lajan Moun Yo)</p>
@@ -578,7 +595,6 @@ export default function AdminSuperPage() {
                                             <p className="text-[9px] text-zinc-500 mt-4 normal-case font-bold">Sa se sòm total tout kòb ki sou kont chak grenn kliyan. Ou pa ka touche sa!</p>
                                         </div>
 
-                                        {/* PWOFI BIZNIS LA */}
                                         <div className="bg-emerald-900/20 p-6 rounded-[2rem] border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative overflow-hidden group">
                                             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
                                             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2"><DollarSign size={14}/> Pwofi Biznis La (Kòb Antrepriz La)</p>
@@ -587,13 +603,10 @@ export default function AdminSuperPage() {
                                             </h3>
                                             <p className="text-[9px] text-zinc-400 mt-4 normal-case font-bold">Sa se total tout frè ou fè sou platfòm nan. Se kòb sa a ki pou ou legalman.</p>
                                         </div>
-
                                     </div>
 
-                                    {/* DETAY FRÈ YO */}
                                     <div className="bg-[#121420] p-6 rounded-[2rem] border border-white/5 mt-6">
                                         <h3 className="text-[12px] font-black text-zinc-400 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Detay Kòb Antrepriz La Fè A</h3>
-                                        
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                             <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
                                                 <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Aktivasyon Kat</p>
@@ -656,14 +669,9 @@ export default function AdminSuperPage() {
                                             <AlertTriangle size={12}/> JERE TRANZAKSYON #{searchedDispute.order_id || searchedDispute.id.substring(0,8)}
                                         </div>
                                         <div className="bg-[#121420] rounded-[2.5rem] border-2 border-yellow-500 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] p-6 pt-10 relative">
-                                            
                                             <button onClick={() => setSearchedDispute(null)} className="absolute top-4 right-4 bg-zinc-800 text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500 transition-colors z-10">✕</button>
 
                                             <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 mb-8 bg-zinc-900/50 p-6 rounded-3xl border border-yellow-500/30 shadow-inner">
-                                                
-                                                {/* ======================= */}
-                                                {/* KLIYAN (SENDER) */}
-                                                {/* ======================= */}
                                                 <div className="flex-1 w-full bg-black border border-white/5 p-5 rounded-2xl relative flex flex-col justify-between">
                                                     <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded font-black tracking-widest border border-white/10 shadow-lg">MOUN KI PEYE (KLIYAN)</span>
                                                     {sender ? (
@@ -680,12 +688,8 @@ export default function AdminSuperPage() {
                                                                 </div>
                                                             </div>
                                                             <div className="flex gap-2 mt-auto pt-4 border-t border-white/5">
-                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600">
-                                                                    <Plus size={12}/> AJOUTE
-                                                                </button>
-                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600">
-                                                                    <Minus size={12}/> RETIRE
-                                                                </button>
+                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600"><Plus size={12}/> AJOUTE</button>
+                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600"><Minus size={12}/> RETIRE</button>
                                                             </div>
                                                         </>
                                                     ) : (
@@ -693,42 +697,17 @@ export default function AdminSuperPage() {
                                                     )}
                                                 </div>
 
-                                                {/* AKSYON NAN MITAN */}
                                                 <div className="flex flex-col items-center justify-center gap-3 shrink-0 w-full lg:w-48 my-4 lg:my-0">
                                                     <div className="flex flex-col items-center bg-black p-4 rounded-2xl border border-white/5 w-full shadow-lg">
                                                         <label className="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">Montan an (HTG)</label>
-                                                        <input
-                                                            type="number"
-                                                            value={actionAmount}
-                                                            onChange={(e) => setActionAmount(Number(e.target.value))}
-                                                            className="w-full text-center bg-transparent text-yellow-500 font-black text-2xl outline-none"
-                                                        />
+                                                        <input type="number" value={actionAmount} onChange={(e) => setActionAmount(Number(e.target.value))} className="w-full text-center bg-transparent text-yellow-500 font-black text-2xl outline-none" />
                                                     </div>
                                                     <div className="flex gap-2 w-full">
-                                                        <button
-                                                            onClick={() => balanseLajanKont(receiver, sender, `Ranbousman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)}
-                                                            disabled={processingId === 'balance_transfer' || (!receiver && !sender)}
-                                                            className="flex-1 bg-red-600 hover:bg-red-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-red-600/20 group"
-                                                            title="Rale nan Machann, Mete nan Kliyan"
-                                                        >
-                                                            <ArrowRightLeft className="rotate-180 group-hover:-translate-x-1 transition-transform" size={16} />
-                                                            <span className="text-[8px] font-black tracking-widest leading-tight text-center">RANBOUSE<br/>KLIYAN</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => balanseLajanKont(sender, receiver, `Peman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)}
-                                                            disabled={processingId === 'balance_transfer' || (!receiver && !sender)}
-                                                            className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-green-600/20 group"
-                                                            title="Rale nan Kliyan, Mete nan Machann"
-                                                        >
-                                                            <ArrowRightLeft className="group-hover:translate-x-1 transition-transform" size={16} />
-                                                            <span className="text-[8px] font-black tracking-widest leading-tight text-center">PEYE<br/>MACHANN</span>
-                                                        </button>
+                                                        <button onClick={() => balanseLajanKont(receiver, sender, `Ranbousman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)} disabled={processingId === 'balance_transfer' || (!receiver && !sender)} className="flex-1 bg-red-600 hover:bg-red-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-red-600/20 group" title="Rale nan Machann, Mete nan Kliyan"><ArrowRightLeft className="rotate-180 group-hover:-translate-x-1 transition-transform" size={16} /><span className="text-[8px] font-black tracking-widest leading-tight text-center">RANBOUSE<br/>KLIYAN</span></button>
+                                                        <button onClick={() => balanseLajanKont(sender, receiver, `Peman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)} disabled={processingId === 'balance_transfer' || (!receiver && !sender)} className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-green-600/20 group" title="Rale nan Kliyan, Mete nan Machann"><ArrowRightLeft className="group-hover:translate-x-1 transition-transform" size={16} /><span className="text-[8px] font-black tracking-widest leading-tight text-center">PEYE<br/>MACHANN</span></button>
                                                     </div>
                                                 </div>
 
-                                                {/* ======================= */}
-                                                {/* MACHANN (RECEIVER) */}
-                                                {/* ======================= */}
                                                 <div className="flex-1 w-full bg-black border border-white/5 p-5 rounded-2xl relative flex flex-col justify-between">
                                                     <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded font-black tracking-widest border border-white/10 shadow-lg">MOUN KI RESEVWA (MACHANN)</span>
                                                     {receiver ? (
@@ -738,60 +717,37 @@ export default function AdminSuperPage() {
                                                                 <div className="overflow-hidden">
                                                                     <p className="text-sm font-black truncate text-white">{receiver.full_name}</p>
                                                                     <p className="text-[10px] text-zinc-500 lowercase truncate">{receiver.email}</p>
-                                                                    <p className="text-xs font-black text-blue-400 mt-1 flex items-center gap-1">
-                                                                        <span>Balans:</span>
-                                                                        <span className="bg-blue-900/30 px-2 py-0.5 rounded text-blue-400">{Number(receiver.wallet_balance).toLocaleString()} HTG</span>
-                                                                    </p>
+                                                                    <p className="text-xs font-black text-blue-400 mt-1 flex items-center gap-1"><span>Balans:</span><span className="bg-blue-900/30 px-2 py-0.5 rounded text-blue-400">{Number(receiver.wallet_balance).toLocaleString()} HTG</span></p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex gap-2 mt-auto pt-4 border-t border-white/5">
-                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600">
-                                                                    <Plus size={12}/> AJOUTE
-                                                                </button>
-                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600">
-                                                                    <Minus size={12}/> RETIRE
-                                                                </button>
+                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600"><Plus size={12}/> AJOUTE</button>
+                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600"><Minus size={12}/> RETIRE</button>
                                                             </div>
                                                         </>
                                                     ) : (
                                                         <p className="text-[10px] text-red-500 italic mt-4 font-black tracking-widest text-center flex items-center justify-center gap-1"><AlertTriangle size={12}/> Machann nan pa jwenn sou sistèm nan.</p>
                                                     )}
                                                 </div>
-
                                             </div>
 
                                             <div className="mt-8 pt-8 border-t border-white/5">
                                                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-4">Mesaj Ak Kliyan an / Prèv Litij</p>
                                                 <div className="bg-black border border-white/5 rounded-2xl p-4 max-h-[250px] overflow-y-auto mb-4 space-y-4">
                                                     <div className="flex flex-col items-start max-w-[85%]">
-                                                        <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm text-white text-xs whitespace-pre-wrap normal-case border border-white/5">
-                                                            {searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || 'Pa gen mesaj kliyan.'}
-                                                        </div>
+                                                        <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm text-white text-xs whitespace-pre-wrap normal-case border border-white/5">{searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || 'Pa gen mesaj kliyan.'}</div>
                                                     </div>
                                                     {searchedDispute.dispute_details?.admin_reply && (
                                                         <div className="flex flex-col items-end max-w-[85%] ml-auto">
-                                                            <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-2xl rounded-tr-sm text-white text-xs whitespace-pre-wrap normal-case">
-                                                                {searchedDispute.dispute_details?.admin_reply}
-                                                            </div>
+                                                            <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-2xl rounded-tr-sm text-white text-xs whitespace-pre-wrap normal-case">{searchedDispute.dispute_details?.admin_reply}</div>
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="bg-zinc-900 rounded-xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
-                                                    <textarea 
-                                                        placeholder="Voye yon mesaj bay kliyan an..."
-                                                        value={adminReplies[searchedDispute.id] || ''}
-                                                        onChange={(e) => setAdminReplies({ ...adminReplies, [searchedDispute.id]: e.target.value })}
-                                                        className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white normal-case resize-none min-h-[40px]"
-                                                    ></textarea>
-                                                    <button 
-                                                        onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {}, searchedDispute.table_source)}
-                                                        className="bg-red-600 hover:bg-red-500 w-12 rounded-lg flex items-center justify-center text-white transition-all"
-                                                    >
-                                                        <Send size={16} />
-                                                    </button>
+                                                    <textarea placeholder="Voye yon mesaj bay kliyan an..." value={adminReplies[searchedDispute.id] || ''} onChange={(e) => setAdminReplies({ ...adminReplies, [searchedDispute.id]: e.target.value })} className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white normal-case resize-none min-h-[40px]"></textarea>
+                                                    <button onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {}, searchedDispute.table_source)} className="bg-red-600 hover:bg-red-500 w-12 rounded-lg flex items-center justify-center text-white transition-all"><Send size={16} /></button>
                                                 </div>
                                             </div>
-
                                         </div>
                                     </div>
                                 );
@@ -807,10 +763,7 @@ export default function AdminSuperPage() {
                                             <div key={tx.id} className="bg-[#121420] rounded-[2.5rem] border border-zinc-800 overflow-hidden shadow-lg flex flex-col lg:flex-row opacity-80 hover:opacity-100 transition-opacity">
                                                 <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between">
                                                     <div>
-                                                        <div className="flex items-center gap-3 mb-6">
-                                                            <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500 border border-yellow-500/30"><AlertTriangle size={20} /></div>
-                                                            <div><h3 className="text-lg font-black text-white">LITIJ #{tx.order_id || tx.id.substring(0,8)}</h3><p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(tx.created_at).toLocaleDateString()}</p></div>
-                                                        </div>
+                                                        <div className="flex items-center gap-3 mb-6"><div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500 border border-yellow-500/30"><AlertTriangle size={20} /></div><div><h3 className="text-lg font-black text-white">LITIJ #{tx.order_id || tx.id.substring(0,8)}</h3><p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(tx.created_at).toLocaleDateString()}</p></div></div>
                                                         {client ? (
                                                             <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
                                                                 <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-3 font-black flex items-center gap-2"><UserX size={12} /> Enfòmasyon Kliyan</p>
@@ -827,9 +780,7 @@ export default function AdminSuperPage() {
                                                             <div><p className="text-[9px] text-zinc-500">MONTAN AN JÈ:</p><p className="text-2xl font-black text-white italic">{tx.amount_htg || Math.abs(tx.amount)} <span className="text-xs text-yellow-500">HTG</span></p></div>
                                                         </div>
                                                     </div>
-                                                    <div className="mt-8 pt-6 border-t border-white/5">
-                                                        <button onClick={() => { setSearchDisputeId(tx.order_id || tx.id); handleAdminSearchDispute(); }} className="w-full bg-yellow-600 hover:bg-yellow-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-yellow-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">🔍 LOUVRI DOSYE A POU REZOUD LI</button>
-                                                    </div>
+                                                    <div className="mt-8 pt-6 border-t border-white/5"><button onClick={() => { setSearchDisputeId(tx.order_id || tx.id); handleAdminSearchDispute(); }} className="w-full bg-yellow-600 hover:bg-yellow-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-yellow-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">🔍 LOUVRI DOSYE A POU REZOUD LI</button></div>
                                                 </div>
                                                 <div className="w-full lg:w-2/3 flex flex-col p-6 bg-black relative">
                                                     <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-6 custom-scrollbar">
@@ -916,7 +867,6 @@ export default function AdminSuperPage() {
                                     <div className="flex-1 text-center md:text-left">
                                         <h3 className="text-lg font-black text-white">{user.full_name || 'San Non'}</h3><p className="text-[10px] text-zinc-400 mb-4 lowercase">{user.email}</p>
                                         <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                            {/* NOU CHAJE BOUTON YO AVÈK FONKSYON MASKÈ URL LA */}
                                             {user.kyc_front && <button onClick={() => handleOpenMaskedUrl(user.kyc_front)} className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> DEVAN</button>}
                                             {user.kyc_back && <button onClick={() => handleOpenMaskedUrl(user.kyc_back)} className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> DÈYÈ</button>}
                                             {user.kyc_selfie && <button onClick={() => handleOpenMaskedUrl(user.kyc_selfie)} className="text-[9px] bg-purple-600/20 px-4 py-2 rounded-lg text-purple-400 border border-purple-600/30 hover:bg-purple-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> SELFIE</button>}
@@ -960,25 +910,42 @@ export default function AdminSuperPage() {
                         (view === 'depo' ? deposits : withdrawals).map((item) => {
                             const isDepo = view === 'depo';
                             const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
+                            
                             return (
                                 <div key={item.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
                                     {item.status !== 'pending' && <button onClick={() => deleteTranzaksyon(item.id, isDepo ? 'deposits' : 'withdrawals')} className="absolute top-5 right-5 text-red-600 text-[9px] bg-red-600/10 px-2 py-1 rounded hover:bg-red-600 hover:text-white transition-colors">EFASE</button>}
                                     <div className="flex justify-between mb-4 pr-12"><div className="flex flex-col"><span className="text-[9px] text-zinc-500">KLIYAN ID: {item.user_id?.slice(0,8)}...</span><span className="text-[9px] text-zinc-400">METÒD: {item.method}</span></div><span className={`text-[8px] h-fit px-3 py-1 rounded-full font-black ${item.status === 'pending' ? 'bg-yellow-500 text-black' : item.status === 'approved' || item.status === 'completed' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{item.status}</span></div>
+                                    
                                     <div className="mb-6 border-b border-white/5 pb-6">
-                                        <p className="text-[9px] text-zinc-500 mb-1">MONTAN {isDepo ? 'KLIYAN AN DECLARE' : 'KLIYAN MANDE A'}:</p>
+                                        <p className="text-[9px] text-zinc-500 mb-1">MONTAN {isDepo ? 'KLIYAN AN DECLARE (SAN FRÈ)' : 'KLIYAN MANDE A'}:</p>
                                         <div className="flex items-center justify-between">
                                             <p className="text-4xl font-black italic tracking-tighter text-white">{aficheMontan} <span className="text-xs text-red-600">HTG</span></p>
-                                            {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-zinc-800 text-white px-3 py-2 rounded-xl text-[8px] font-black tracking-widest hover:bg-zinc-700">MODIFYE</button>}
+                                            {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan san frè a:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-zinc-800 text-white px-3 py-2 rounded-xl text-[8px] font-black tracking-widest hover:bg-zinc-700">MODIFYE</button>}
                                         </div>
+
+                                        {/* AFFICHAJ DETAY POU FRÈ AK TOTAL (TRÈ ENPÒTAN POU DEPOZ AK BIZNIS KÈS LA) */}
+                                        {isDepo && item.fee !== undefined && (
+                                            <div className="mt-4 space-y-1">
+                                                <div className="flex justify-between items-center p-2 bg-emerald-900/10 rounded-lg">
+                                                    <span className="text-[9px] text-zinc-400">FRÈ BIZNIS LA (5%):</span>
+                                                    <span className="text-[10px] text-emerald-500 font-black">+{montanModifye[item.id] ? (montanModifye[item.id] * 0.05).toFixed(2) : item.fee} HTG</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-2 bg-zinc-800 rounded-lg border border-white/5">
+                                                    <span className="text-[9px] text-white font-black">TOTAL KLIYAN TE DWE VOYE A:</span>
+                                                    <span className="text-sm text-yellow-500 font-black">{montanModifye[item.id] ? (montanModifye[item.id] * 1.05).toFixed(2) : item.total_to_pay || (Number(item.amount) + Number(item.fee))} HTG</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
+                                    
                                     {item.status === 'pending' && (
                                         <div className="space-y-4">
                                             <div className="flex gap-2">
                                                 <button disabled={processingId === item.id} onClick={() => isDepo ? apwouveDepo(item) : apwouveRetre(item)} className="flex-1 bg-white text-black py-4 rounded-2xl text-[10px] font-black hover:bg-green-500 hover:text-white transition-all">KONFIME APWOUVE</button>
                                                 <button disabled={processingId === item.id} onClick={() => anileTranzaksyon(item, isDepo ? 'deposits' : 'withdrawals')} className="bg-red-600/20 text-red-600 border border-red-600/30 px-5 py-4 rounded-2xl text-[10px] hover:bg-red-600 hover:text-white transition-all">ANILE</button>
                                             </div>
-                                            {/* BOUTON PRÈV LA KRIPTE KÒNYA TOU */}
-                                            {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_1)} className="w-full block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest flex items-center justify-center gap-2"><EyeOff size={12}/> GADE FOTO PRÈV</button>)}
+                                            {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_1)} className="w-full block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest flex items-center justify-center gap-2"><EyeOff size={12}/> GADE FOTO PRÈV 1</button>)}
+                                            {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_2)} className="w-full block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest flex items-center justify-center gap-2"><EyeOff size={12}/> GADE FOTO PRÈV 2</button>)}
                                         </div>
                                     )}
                                 </div>
