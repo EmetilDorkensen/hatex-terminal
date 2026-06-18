@@ -43,7 +43,7 @@ export default function TravayPage() {
         <div className="bg-red-900/20 border border-red-500/30 p-8 rounded-[2rem] text-center">
           <p className="text-sm font-bold text-white mb-2">Ou pa wè yon pòs ki koresponn ak pwofil ou men ou vle travay avèk nou?</p>
           <p className="text-xs text-zinc-400 mb-6">Voye CV w ak yon ti lèt motivasyon dirèkteman ban nou.</p>
-          <a href="mailto:jobs@hatexcard.com" className="inline-block bg-red-600 text-white px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-red-500 transition-all shadow-lg shadow-red-600/20">jobs@hatexcard.com</a>
+          <a href="mailto:contact@hatexcard.com" className="inline-block bg-red-600 text-white px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-red-500 transition-all shadow-lg shadow-red-600/20">jobs@hatexcard.com</a>
         </div>
       </div>
     </div>

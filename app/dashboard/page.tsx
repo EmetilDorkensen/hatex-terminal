@@ -574,24 +574,70 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* HEADER AK MAIN DASHBOARD */}
-      {/* ========================================== */}
-      <div className="w-full max-w-7xl mx-auto p-4 sm:p-5 md:p-6 lg:p-8 pb-32">
-        
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full border-2 border-red-600 p-0.5 bg-zinc-900 overflow-hidden flex items-center justify-center font-black shrink-0">
-              {userData?.full_name?.charAt(0) || "H"}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest leading-none italic">Byenvini 👋</p>
-              <h2 className="font-bold text-[11px] uppercase italic mt-1 tracking-wide truncate max-w-[120px] md:max-w-[200px] lg:max-w-[250px]">
-                {userData?.full_name || "Kliyan Hatex"}
-              </h2>
-            </div>
-          </div>
+{/* ========================================== */}
+        {/* HEADER AK MAIN DASHBOARD */}
+        {/* ========================================== */}
+        <div className="w-full max-w-7xl mx-auto p-4 sm:p-5 md:p-6 lg:p-8 pb-32">
+          
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              {/* INPUT FILE KACHE POU FOTO A */}
+              <input 
+                type="file" 
+                id="avatarUpload" 
+                className="hidden" 
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !userData) return;
+                  
+                  setLoading(true);
+                  try {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${userData.id}/${Date.now()}.${fileExt}`;
+                    
+                    // Voye nan Storage
+                    const { error: uploadError } = await supabase.storage
+                      .from('avatars')
+                      .upload(fileName, file, { upsert: true });
+                    
+                    if (uploadError) throw uploadError;
 
+                    // Jwenn URL piblik la
+                    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+
+                    // Mete ajou baz done a
+                    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userData.id);
+                    
+                    setUserData({...userData, avatar_url: publicUrl});
+                    alert("✅ Foto pwofil ou mete ajou!");
+                  } catch (err: any) {
+                    alert("Erè nan mete foto a: " + err.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              />
+
+              <label 
+                htmlFor="avatarUpload" 
+                className="w-12 h-12 rounded-full border-2 border-red-600 p-0.5 bg-zinc-900 overflow-hidden flex items-center justify-center font-black shrink-0 cursor-pointer hover:scale-105 transition-all relative group"
+              >
+                {userData?.avatar_url ? (
+                  <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white">{userData?.full_name?.charAt(0) || "H"}</span>
+                )}
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-white uppercase font-bold">Edit</div>
+              </label>
+
+              <div className="overflow-hidden">
+                <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest leading-none italic">Byenvini 👋</p>
+                <h2 className="font-bold text-[11px] uppercase italic mt-1 tracking-wide truncate max-w-[120px] md:max-w-[200px] lg:max-w-[250px]">
+                  {userData?.full_name || "Kliyan Hatex"}
+                </h2>
+              </div>
+            </div>
           <div className="flex flex-wrap items-center gap-2">
             
             <button onClick={() => setShowOtpModal(true)} className="bg-zinc-900/50 hover:bg-green-600/20 text-green-500 border border-white/5 hover:border-green-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
@@ -758,11 +804,11 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-zinc-800/80 border border-white/5 flex-shrink-0">
-                        {t.type === 'DEPOSIT' ? '📥' :
-                         t.type === 'WITHDRAWAL' ? '📤' :
-                         t.type === 'P2P' ? '🔄' :
-                         t.type === 'CARD_ACTIVATION' ? '🔓' :
-                         t.type === 'CARD_RECHARGE' ? '💳' : '📄'}
+                        {t.type === 'DEPOSIT' ? '' :
+                         t.type === 'WITHDRAWAL' ? '' :
+                         t.type === 'P2P' ? '' :
+                         t.type === 'CARD_ACTIVATION' ? '' :
+                         t.type === 'CARD_RECHARGE' ? '' : ''}
                       </div>
                       <div className="min-w-0">
                         <h3 className="text-[10px] font-black uppercase tracking-tight text-zinc-100 truncate max-w-[120px] sm:max-w-[200px] md:max-w-[300px]">

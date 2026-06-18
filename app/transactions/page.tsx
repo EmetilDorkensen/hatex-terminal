@@ -81,16 +81,16 @@ export default function TransactionsPage() {
   };
 
   const getIcon = (type: string, amount: number, isSub: boolean) => {
-    if (isSub) return '🔁';
+    if (isSub) return '';
     switch (type.toUpperCase()) {
-      case 'DEPOSIT': return '📥';
-      case 'WITHDRAWAL': return '📤';
-      case 'CARD_RECHARGE': return '💳';
+      case 'DEPOSIT': return '';
+      case 'WITHDRAWAL': return '';
+      case 'CARD_RECHARGE': return '';
       case 'PAYMENT': return '🛍️';
-      case 'SALE': return '💰';
-      case 'P2P': return '🔄';
-      case 'TRANSFER': return '🔄';
-      default: return amount > 0 ? '➕' : '➖';
+      case 'SALE': return '';
+      case 'P2P': return '';
+      case 'TRANSFER': return '';
+      default: return amount > 0 ? '' : '';
     }
   };
 

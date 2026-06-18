@@ -35,7 +35,7 @@ export default function PresPage() {
           <div className="bg-zinc-900/50 p-8 rounded-[2rem] border border-white/5 flex flex-col justify-center">
             <h2 className="text-lg font-black uppercase text-white mb-4">Kontak Laprès</h2>
             <p className="text-zinc-400 text-sm mb-6">Pou tout demann entèvyou, atik, oswa repòtaj sou HatexCard, tanpri ekri nou dirèkteman. Ekip nou an ap reponn ou nan 24 èdtan.</p>
-            <div className="bg-black p-4 rounded-xl border border-white/10 font-mono text-sm text-red-400 font-bold">press@hatexcard.com</div>
+            <div className="bg-black p-4 rounded-xl border border-white/10 font-mono text-sm text-red-400 font-bold">suppoer@hatexcard.com</div>
           </div>
         </div>
       </div>

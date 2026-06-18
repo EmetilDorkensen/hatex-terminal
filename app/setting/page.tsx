@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
-  ArrowLeft, User, ShieldCheck, Mail, MessageCircle, 
-  Lock, Bell, Globe, Info, LogOut, 
-  ChevronRight, CreditCard, Loader2, AlertTriangle, Key, Edit2, X
+  ArrowLeft, ShieldCheck, Mail, MessageCircle, 
+  Lock, Bell, Globe, LogOut, 
+  ChevronRight, Loader2, Key, Edit2, X
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -106,7 +106,6 @@ export default function SettingsPage() {
     setIsUpdatingPin(true);
 
     try {
-      // Tcheke si ansyen PIN lan bon anvan
       const { data: checkProfile, error: checkErr } = await supabase
         .from('profiles')
         .select('pin_code')
@@ -121,7 +120,6 @@ export default function SettingsPage() {
         return;
       }
 
-      // Si l bon, anrejistre nouvo a
       const { error: updateErr } = await supabase
         .from('profiles')
         .update({ pin_code: newPinInput })
@@ -131,7 +129,6 @@ export default function SettingsPage() {
 
       setUpdatePinSuccess("PIN ou an chanje avèk siksè!");
       
-      // Fèmen modal la apre 1.5 segonn
       setTimeout(() => {
         setShowUpdatePinModal(false);
         setOldPinInput('');
@@ -210,8 +207,12 @@ export default function SettingsPage() {
         {/* KAT PWOfil KLIYAN AN */}
         <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2rem] flex items-center gap-5 shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-[50px] rounded-full" />
-          <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-red-600 to-black rounded-full flex items-center justify-center font-black text-xl border-2 border-white/10 shrink-0 z-10 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-            {initials}
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-zinc-900 rounded-full flex items-center justify-center font-black text-xl border-2 border-red-600/50 shrink-0 z-10 shadow-[0_0_20px_rgba(220,38,38,0.2)] overflow-hidden">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white">{initials}</span>
+            )}
           </div>
           <div className="z-10 flex-1 min-w-0">
             <h2 className="text-xl md:text-2xl font-black uppercase truncate">{fullName}</h2>
@@ -299,7 +300,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* LÒT SEKSYON YO (Preferans, Sipò, About, Dekonekte) RETE MENM JAN AN */}
+        {/* LÒT SEKSYON YO (Preferans, Sipò, Dekonekte) */}
         <div className="space-y-4">
           <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Preferans E-Wallet</h3>
           <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] overflow-hidden shadow-lg">
@@ -367,20 +368,6 @@ export default function SettingsPage() {
                 <span className="block text-[10px] text-zinc-500 font-bold mt-1">contact@hatexcard.com</span>
               </div>
             </a>
-          </div>
-        </div>
-
-        <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] p-6 md:p-8 text-center italic relative overflow-hidden">
-          <Info className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-          <h3 className="text-base font-black uppercase tracking-widest text-zinc-300">À propos de HatexCard / H-Pay</h3>
-          <p className="text-[10px] md:text-xs text-zinc-500 mt-3 leading-relaxed max-w-lg mx-auto font-bold">
-            H-Pay se premye bous dijital ak sistèm peman anliy (E-wallet) serye nan peyi a. 
-            Li fasilite tranzaksyon ant machann ak kliyan an tout sekirite gras ak teknoloji Escrow nou an ak kat entèlijan HatexCard la.
-          </p>
-          <div className="mt-6 flex justify-center gap-4 text-[9px] font-black uppercase tracking-widest text-zinc-600">
-            <span className="hover:text-zinc-400 cursor-pointer transition-colors">Tèm ak Kondisyon</span>
-            <span>•</span>
-            <span>Vèsyon 2.1.0</span>
           </div>
         </div>
 
