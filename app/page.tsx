@@ -60,14 +60,7 @@ export default function LandingPage() {
   ];
 
   const faqs = [
-    {
-      q: "Èske kat vityèl HatexCard la pase sou tout sit entènasyonal?",
-      a: "Wi. Kat vityèl nou yo fonksyone tankou yon kat kredi entènasyonal estanda. Ou ka peye Netflix, Amazon, Shein, sèvis hosting, oswa nenpòt platfòm ki aksepte peman kat san okenn pwoblèm."
-    },
-    {
-      q: "Kisa Garanti Escrow 24h la ye ak kijan li pwoteje mwen?",
-      a: "Lè yon kliyan achte yon pwodwi oswa sèvis ak HatexCard, lajan an pa ale jwenn machann nan imedyatman. Li rete bloke nan sistèm nou pou 24 èdtan. Si achè a pa satisfè, li ka ouvri yon diskisyon pou retounen kòb li. Sa pwoteje de pati yo."
-    },
+
     {
       q: "Kòman m entegre API Hatexcard nan sit entènèt oswa app mwen?",
       a: "Nou gen yon API RESTful konplè ak dokimantasyon detaye. Pou WooCommerce ak Hostinger, nou gen yon plugin ki pran mwens pase 5 minit pou enstale. Kliyan w yo ap ka peye an Goud dirèkteman sou sit ou san yo pa kite paj la."
@@ -96,14 +89,6 @@ export default function LandingPage() {
   const features = [
     {
       icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e62e04" strokeWidth="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
-      ),
-      ti: "Kat Vityèl Entènasyonal",
-      ds: "Kreye yon kat an Goud imedyatman. Peye Netflix, Amazon, Shein, sèvis hosting ak tout platfòm entènasyonal san kont bank etranje.",
-      tg: "ENTÈNASYONAL"
-    },
-    {
-      icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e62e04" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       ),
       ti: "Smart Invoice",
@@ -115,7 +100,7 @@ export default function LandingPage() {
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e62e04" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6M3 15h6M15 3v6M15 15v6M15 9h6M15 15h6"/></svg>
       ),
       ti: "Peman QR Kòd",
-      ds: "Kliyan skan QR kòd biznis ou ak telefòn yo epi peye montan egzak la nan segonn. Yon sèl aksyon — pa gen chanj, pa gen erè.",
+      ds: "Kliyan skan QR kòd biznis ou ak telefòn yo epi peye montan egzak la nan yon segonn. Yon sèl aksyon — pa gen echanj, pa gen erè.",
       tg: "RAPID"
     },
     {
@@ -658,8 +643,8 @@ export default function LandingPage() {
                 { op: "Tranzaksyon P2P (ant itilizatè)", val: "Gratis", hi: true },
                 { op: "Peman bay machann ak kat", val: "Gratis", hi: true },
                 { op: "Rechaj kat vityèl", val: "Gratis", hi: true },
-                { op: "Depo (500 HTG ak plis)", val: "25 HTG", hi: false },
-                { op: "Retrè (500 HTG ak plis)", val: "25 HTG", hi: false },
+                { op: "Depo ", val: "5%", hi: false },
+                { op: "Retrè", val: "5%", hi: false },
                 { op: "Kreye kont ak verifikasyon KYC", val: "Gratis", hi: true },
                 { op: "Smart Invoice & QR Kòd", val: "Gratis", hi: true },
                 { op: "Accès API & Plugin", val: "Gratis", hi: true },
@@ -751,17 +736,19 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══ FOOTER ═══ */}
-      <footer style={{ borderTop: "1px solid rgba(255,255,255,0.05)", position: "relative", zIndex: 10 }}>
+ {/* ═══ FOOTER ═══ */}
+ <footer style={{ borderTop: "1px solid rgba(255,255,255,0.05)", position: "relative", zIndex: 10 }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "60px 24px 40px" }}>
+          
           {/* Top row */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "48px", marginBottom: "56px" }}>
+            
             {/* Brand col */}
             <div style={{ flex: "0 0 260px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-                <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: "linear-gradient(135deg,#e62e04,#8a1c02)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {/* LOGO ZONE */}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><circle cx="7" cy="15" r="1" fill="white"/></svg>
+                <div style={{ width: "32px", height: "32px", borderRadius: "9px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {/* LOGO HATEXCARD LA */}
+                  <img src="https://i.imgur.com/xDk58Xk.png" alt="HatexCard Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
                 <span style={{ fontWeight: 900, fontSize: "16px", letterSpacing: "-0.04em" }}>HATEX<span style={{ color: "#e62e04" }}>CARD</span></span>
               </div>
@@ -769,39 +756,73 @@ export default function LandingPage() {
                 Platfòm peman digital 100% an Goud. Fèt pou Ayiti, konstwi pou rès la.
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
-                {/* Social icons */}
-                {[
-                  <svg key="tw" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.766l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>,
-                  <svg key="fb" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>,
-                  <svg key="wa" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                ].map((icon, i) => (
-                  <a key={i} href="#" style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", transition: "all 0.2s" }} className="hover:text-white hover:border-white/20">
-                    {icon}
-                  </a>
-                ))}
+                
+                {/* Social icons - Ak lyen ofisyèl yo */}
+                <a href="https://twitter.com/hatexcard" target="_blank" rel="noopener noreferrer" style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", transition: "all 0.2s" }} className="hover:text-white hover:border-white/20">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.766l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="https://facebook.com/hatexcard" target="_blank" rel="noopener noreferrer" style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", transition: "all 0.2s" }} className="hover:text-blue-500 hover:border-blue-500/20">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                </a>
+                <a href="https://wa.me/50937201241" target="_blank" rel="noopener noreferrer" style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", transition: "all 0.2s" }} className="hover:text-green-500 hover:border-green-500/20">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                </a>
               </div>
             </div>
 
-            {/* Link cols */}
-            {[
-              { title: "Pwodwi", links: ["Kat Vityèl", "Smart Invoice", "Peman QR Kòd", "Abònman Otomatik", "Sèvis Taksi & Livrezon", "Transfè Sekirize"] },
-              { title: "Devlopè", links: ["API Referans", "Plugin WooCommerce", "Plugin Hostinger", "Sandbox & Tès", "Changelog"] },
-              { title: "Konpayi", links: ["Sou Nou", "Blog", "Pres & Medya", "Travay ak Nou", "Kontakte"] },
-              { title: "Legal", links: ["Kondisyon Itilizasyon", "Konfidansyalite", "Politik Retrè", "Politik KYC & AML", "Sekirite"] },
-            ].map(col => (
-              <div key={col.title} style={{ flex: "1 1 140px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>{col.title}</div>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {col.links.map(l => (
-                    <li key={l}><a href="#" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">{l}</a></li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            {/* Pwodwi */}
+            <div style={{ flex: "1 1 140px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>Pwodwi</div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+                <li><a href="/login" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Kat Vityèl</a></li>
+                <li><a href="/login" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Smart Invoice</a></li>
+                <li><a href="/login" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Peman QR Kòd</a></li>
+                <li><a href="/login" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Abònman Otomatik</a></li>
+                <li><a href="/login" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Sèvis Taksi & Livrezon</a></li>
+                <li><a href="/login" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Transfè Sekirize</a></li>
+              </ul>
+            </div>
+
+            {/* Devlopè */}
+            <div style={{ flex: "1 1 140px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>Devlopè</div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+                <li><a href="/api-docs" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">API Referans</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Plugin WooCommerce</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Plugin Hostinger</a></li>
+                <li><a href="/sandbox" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Sandbox & Tès</a></li>
+                <li><a href="/changelog" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Changelog</a></li>
+              </ul>
+            </div>
+
+            {/* Konpayi */}
+            <div style={{ flex: "1 1 140px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>Konpayi</div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+                <li><a href="/sou-nou" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Sou Nou</a></li>
+                <li><a href="/blog" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Blog</a></li>
+                <li><a href="/pres" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Pres & Medya</a></li>
+                <li><a href="/travay" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Travay ak Nou</a></li>
+                <li><a href="mailto:support@hatexcard.com" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Kontakte</a></li>
+              </ul>
+            </div>
+
+            {/* Legal - TOUT KONEKTE SOU PAJ POLITIK LA */}
+            <div style={{ flex: "1 1 140px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>Legal</div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+                <li><a href="/politik" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Kondisyon Itilizasyon</a></li>
+                <li><a href="/politik" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Konfidansyalite</a></li>
+                <li><a href="/politik" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Politik Retrè</a></li>
+                <li><a href="/politik" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Politik KYC & AML</a></li>
+                <li><a href="/politik" style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-white">Sekirite</a></li>
+              </ul>
+            </div>
+
           </div>
 
-          {/* Bottom bar */}
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "24px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+{/* Bottom bar */}
+<div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "24px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
             <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>
               © 2026 Hatexcard. Tout dwa rezève. Platfòm peman an Goud pou Ayiti.
             </span>
@@ -810,6 +831,7 @@ export default function LandingPage() {
               <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.2)", letterSpacing: "0.08em" }}>Tout sistèm operasyonèl</span>
             </div>
           </div>
+
         </div>
       </footer>
     </div>
