@@ -172,7 +172,7 @@ export default function TransferPage() {
       {showCreatePin && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
           <div className="bg-[#121420] border border-red-600/30 p-8 rounded-[2.5rem] w-full max-w-sm text-center shadow-2xl shadow-red-900/20">
-            <div className="text-4xl mb-4">🔐</div>
+            <div className="text-4xl mb-4"></div>
             <h2 className="text-xl font-black uppercase text-red-600 mb-2">Kreye PIN Sekirite w</h2>
             <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-6">
               Ou dwe kreye yon kòd 4 chif pou pwoteje lajan w. L ap mande w li chak fwa w ap fè yon transfè.

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Terminal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
@@ -863,7 +864,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
     }
   };
 
-  // ============================================================
+// ============================================================
   // RENDER FUNCTIONS
   // ============================================================
   
@@ -880,7 +881,9 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
           </span>
         </div>
       </div>
-      <div className="grid grid-cols-3 sm:flex sm:flex-row gap-2 w-full md:w-auto">
+      
+      {/* 6 Bouton kounye a - Pafè pou grid-cols-3 sou mobil */}
+      <div className="grid grid-cols-3 sm:flex sm:flex-row flex-wrap gap-2 w-full md:w-auto">
         <button
           onClick={() => setMode('dashboard')}
           className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
@@ -890,6 +893,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
           <LayoutGrid size={14} className="mb-1 md:mb-0 md:mr-2" />
           <span>Dash<span className="hidden md:inline">board</span></span>
         </button>
+
         <button
           onClick={() => setMode('plugins')}
           className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
@@ -899,6 +903,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
           <DownloadCloud size={14} className="mb-1 md:mb-0 md:mr-2" />
           <span>Plugins</span>
         </button>
+
         <button
           onClick={() => { setMode('invoices'); setSubMode('list'); }}
           className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
@@ -908,6 +913,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
           <FileText size={14} className="mb-1 md:mb-0 md:mr-2" />
           <span>Invoices</span>
         </button>
+
         <button
           onClick={() => setMode('transactions')}
           className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
@@ -917,9 +923,20 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
           <History size={14} className="mb-1 md:mb-0 md:mr-2" />
           <span>Journal</span>
         </button>
+
+        {/* NOUVO BOUTON DEVELOPER A KI KORIJE NET KALE */}
+        <button
+          onClick={() => router.push('/developer')}
+          className="flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white"
+        >
+          <Terminal size={14} className="mb-1 md:mb-0 md:mr-2" />
+          <span>API <span className="hidden md:inline">/ Dev</span></span>
+        </button>
+
+        {/* BOUTON SETTINGS LAN */}
         <button
           onClick={() => setMode('settings')}
-          className={`col-span-2 sm:col-span-1 flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
+          className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
             mode === 'settings' ? 'bg-red-600 shadow-xl scale-105 text-white' : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white'
           }`}
         >

@@ -851,7 +851,7 @@ export default function Dashboard() {
             if (cardFullyActive) {
               router.push('/terminal');
             } else {
-              alert("⚠️ Ou dwe peye frè aktivasyon an pou aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
+              alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
               window.scrollTo({ top: 300, behavior: 'smooth' }); 
             }
           }} 
