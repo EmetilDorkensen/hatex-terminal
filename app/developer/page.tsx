@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-// Nou ajoute BookOpen isit la pou ikon bouton dokimantasyon an
-import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen } from 'lucide-react';
+import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle } from 'lucide-react';
 
 export default function DeveloperDashboard() {
   const router = useRouter();
@@ -61,7 +60,14 @@ export default function DeveloperDashboard() {
     if (!error) alert("Webhook URL sove avèk siksè!");
   };
 
-  if (loading) return <div className="min-h-screen bg-[#06070d] flex items-center justify-center"><Loader2 className="animate-spin text-red-600" /></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
+      <div className="flex flex-col items-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+        <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
+      </div>
+    </div>
+  );
 
   const codeSnippets = {
     js: `const response = await fetch('https://hatexcard.com/api/public/payments', {
@@ -137,103 +143,115 @@ echo $response;
   };
 
   return (
-    <div className="min-h-screen bg-[#05060A] text-white p-6 md:p-12 font-sans selection:bg-red-600/30">
-      <div className="max-w-5xl mx-auto space-y-12">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8 font-sans">
+      <div className="max-w-5xl mx-auto space-y-8">
         
         {/* EN-TÈT AK BOUTON DOKIMANTASYON AN */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-200 pb-6">
           <div>
-            <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-4">
-              <Terminal className="text-red-600 w-10 h-10" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+              <Terminal className="text-indigo-600 w-8 h-8" />
               API Piblik & Kle Sekrè
             </h1>
-            <p className="text-zinc-400 mt-2 text-lg">Entegre Hatexcard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
+            <p className="text-slate-500 mt-2 text-sm md:text-base font-medium">Entegre Hatexcard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
           </div>
           
           <button 
             onClick={() => router.push('/developer/docs')}
-            className="flex items-center justify-center gap-2 bg-[#1a1d2d] hover:bg-[#23273b] border border-white/10 text-white px-6 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-black/50 w-full md:w-auto"
+            className="flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-6 py-3 rounded-xl font-bold transition-all shadow-sm w-full md:w-auto"
           >
-            <BookOpen className="w-5 h-5 text-blue-400" />
-            <span className="uppercase tracking-widest text-[11px] font-black">Gade Dokimantasyon an</span>
+            <BookOpen className="w-5 h-5" />
+            <span className="uppercase tracking-wider text-[11px]">Gade Dokimantasyon an</span>
           </button>
         </div>
 
         {/* Bwat KLE SEKRE A */}
-        <div className="bg-[#0C0D14] border border-white/5 p-8 rounded-3xl shadow-xl">
-          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 block">Kle Prive (Secret Key)</label>
-          <div className="flex items-center justify-between bg-black border border-white/10 p-5 rounded-2xl">
-            <code className="font-mono text-sm md:text-base text-red-400 break-all">{merchant?.api_key}</code>
+        <div className="bg-white border border-gray-200 p-6 sm:p-8 rounded-2xl shadow-sm">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Kle Prive (Secret Key)</label>
+          <div className="flex items-center justify-between bg-slate-50 border border-gray-200 p-4 rounded-xl">
+            <code className="font-mono text-sm md:text-base text-indigo-600 break-all select-all font-semibold">
+              {merchant?.api_key}
+            </code>
             <button 
               onClick={() => handleCopy(merchant?.api_key, 'api')} 
-              className="ml-4 p-3 bg-zinc-900 hover:bg-zinc-800 rounded-xl transition-all shrink-0"
+              className="ml-4 p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
+              title="Kopye Kle a"
             >
-              {copiedKey === 'api' ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5 text-zinc-400" />}
+              {copiedKey === 'api' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5 text-slate-400 hover:text-indigo-600" />}
             </button>
           </div>
-          <div className="mt-4 flex items-start gap-2 text-[10px] text-yellow-500/80 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
-            <ShieldAlert className="w-4 h-4 shrink-0" />
-            <p><strong>ATANSYON:</strong> Kle sa a pèmèt trete tranzaksyon reyèl. Kenbe l an sekirite epi pa janm pataje l nan kòd piblik (tankou GitHub).</p>
+          <div className="mt-4 flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-800">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider mb-1">ATANSYON</p>
+              <p className="text-sm font-medium leading-relaxed">
+                Kle sa a pèmèt trete tranzaksyon reyèl. Kenbe l an sekirite epi pa janm pataje l nan kòd piblik (tankou GitHub oswa nan kòd Frontend lan).
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Bwat WEBHOOK LA */}
-        <div className="bg-[#0C0D14] border border-white/5 p-8 rounded-3xl shadow-xl">
+        <div className="bg-white border border-gray-200 p-6 sm:p-8 rounded-2xl shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <Webhook className="text-blue-500 w-6 h-6" />
-            <h2 className="text-xl font-black uppercase tracking-widest">Konfigirasyon Webhook</h2>
+            <Webhook className="text-indigo-600 w-6 h-6" />
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Konfigirasyon Webhook</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 block">Webhook URL (Kote nou voye alèt la)</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Webhook URL (Kote nou voye alèt la)</label>
               <div className="flex gap-2">
                 <input 
                   type="url" 
                   value={webhookUrlInput}
                   onChange={(e) => setWebhookUrlInput(e.target.value)}
-                  placeholder="https://hatexcard.com/api/hatex-webhook"
-                  className="flex-1 bg-black border border-white/10 p-4 rounded-xl outline-none focus:border-blue-500 text-sm font-mono"
+                  placeholder="https://sit-ou.com/api/hatex-webhook"
+                  className="flex-1 bg-slate-50 border border-gray-200 p-3.5 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-mono text-slate-900 placeholder:text-slate-400 transition-shadow"
                 />
                 <button 
                   onClick={handleSaveWebhook}
                   disabled={savingUrl}
-                  className="bg-blue-600 hover:bg-blue-500 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-xl font-bold uppercase text-[10px] tracking-wider transition-all disabled:opacity-50 flex items-center justify-center shadow-sm"
+                  title="Sove URL la"
                 >
                   {savingUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 </button>
               </div>
+              <p className="text-xs text-slate-500 mt-2 font-medium">Egzanp: https://sit-ou.com/api/hatex-webhook</p>
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 block">Webhook Secret (Pou verifye siyati a)</label>
-              <div className="flex items-center justify-between bg-black border border-white/10 p-4 rounded-xl">
-                <code className="font-mono text-sm text-zinc-300 truncate pr-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Webhook Secret (Pou verifye siyati a)</label>
+              <div className="flex items-center justify-between bg-slate-50 border border-gray-200 p-3.5 rounded-xl">
+                <code className="font-mono text-sm text-slate-600 font-semibold truncate pr-4">
                   {merchant?.webhook_secret ? 'whsec_••••••••••••••••' : 'Poko pwodwi'}
                 </code>
                 <button 
                   onClick={() => handleCopy(merchant?.webhook_secret, 'webhook')} 
-                  className="text-zinc-500 hover:text-white transition-colors"
+                  className="p-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
+                  title="Kopye Secret la"
                 >
-                  {copiedKey === 'webhook' ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                  {copiedKey === 'webhook' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-slate-400 hover:text-indigo-600" />}
                 </button>
               </div>
+              <p className="text-xs text-slate-500 mt-2 font-medium">Sèvi ak kòd sa a pou verifye HMAC SHA-256 la.</p>
             </div>
           </div>
         </div>
 
         {/* Bwat EGZANP KÒD LA */}
-        <div className="bg-[#0C0D14] border border-white/5 rounded-3xl shadow-xl overflow-hidden">
-          <div className="bg-[#11131c] border-b border-white/5 flex items-center justify-between p-4">
-            <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-              <Code2 className="text-zinc-500 w-5 h-5" /> Egzanp Kòd Peman & Sekirite
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-slate-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <Code2 className="text-indigo-600 w-5 h-5" /> Egzanp Kòd Peman & Sekirite
             </h2>
             <div className="flex gap-2">
               {(['js', 'php', 'curl'] as const).map(tab => (
                 <button 
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-white text-slate-500 hover:text-indigo-600 border border-gray-200 shadow-sm'}`}
                 >
                   {tab === 'js' ? 'Node/JS' : tab}
                 </button>
@@ -241,15 +259,16 @@ echo $response;
             </div>
           </div>
           
-          <div className="relative group">
-            <pre className="p-6 overflow-x-auto text-sm font-mono text-green-400 bg-black m-0 custom-scrollbar">
+          <div className="relative group bg-slate-900">
+            <pre className="p-6 overflow-x-auto text-sm font-mono text-emerald-400 m-0 custom-scrollbar leading-relaxed">
               <code>{codeSnippets[activeTab]}</code>
             </pre>
             <button 
               onClick={() => handleCopy(codeSnippets[activeTab], 'code')}
-              className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all opacity-0 group-hover:opacity-100 backdrop-blur-md"
+              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 backdrop-blur-md"
+              title="Kopye Kòd la"
             >
-              {copiedKey === 'code' ? <CheckCircle2 className="w-5 h-5 text-white" /> : <Copy className="w-5 h-5 text-white" />}
+              {copiedKey === 'code' ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-white" />}
             </button>
           </div>
         </div>

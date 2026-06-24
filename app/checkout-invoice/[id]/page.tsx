@@ -123,9 +123,9 @@ export default function InvoiceCheckout() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center italic text-white font-black uppercase tracking-widest">
-      <Loader2 className="animate-spin mb-4 text-red-600" size={48} />
-      <span>Verifye Invoice...</span>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans text-slate-900">
+      <Loader2 className="animate-spin mb-4 text-indigo-600" size={40} />
+      <span className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Verifye Invoice...</span>
     </div>
   );
 
@@ -133,81 +133,86 @@ export default function InvoiceCheckout() {
   const merchantLogo = invoice?.profiles?.avatar_url;
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-4 flex items-center justify-center italic font-medium">
-      <div className="w-full max-w-[480px] bg-[#0d0e1a] border border-white/5 rounded-[3.5rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 flex items-center justify-center font-sans">
+      <div className="w-full max-w-[480px] bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
         
-        {/* Dekorasyon background */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-red-600/10 blur-[100px] rounded-full"></div>
+        {/* Dekorasyon background anlè */}
+        <div className="absolute top-0 left-0 right-0 h-2 bg-indigo-600"></div>
         
         <div className="relative z-10">
-          <div className="text-center mb-8">
-            <div className="relative w-24 h-24 mx-auto mb-4 group">
+          
+          {/* Header Machann nan */}
+          <div className="text-center mb-8 mt-2">
+            <div className="relative w-20 h-20 mx-auto mb-4 group">
               {merchantLogo ? (
                 <img 
                   src={merchantLogo} 
                   alt={merchantName} 
-                  className="w-full h-full rounded-[2.2rem] object-cover border-2 border-white/10 shadow-2xl transition-transform group-hover:scale-105" 
+                  className="w-full h-full rounded-2xl object-cover border border-gray-200 shadow-sm transition-transform group-hover:scale-105 bg-white" 
                 />
               ) : (
-                <div className="bg-gradient-to-br from-red-600/20 to-red-900/40 w-full h-full rounded-[2.2rem] flex items-center justify-center border border-white/5 shadow-lg">
-                  <Store className="text-red-600 w-10 h-10" />
+                <div className="bg-indigo-50 w-full h-full rounded-2xl flex items-center justify-center border border-indigo-100 shadow-sm">
+                  <Store className="text-indigo-600 w-8 h-8" />
                 </div>
               )}
-              <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-4 border-[#0d0e1a] flex items-center justify-center">
+              <div className="absolute -bottom-2 -right-2 bg-emerald-500 w-6 h-6 rounded-full border-[3px] border-white flex items-center justify-center">
                 <ShieldCheck size={12} className="text-white" />
               </div>
             </div>
-            <h1 className="text-2xl font-black uppercase tracking-tighter text-white leading-none">{merchantName}</h1>
+            
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{merchantName}</h1>
             <div className="flex items-center justify-center gap-2 mt-2">
-               <span className="text-[9px] bg-white/5 px-2 py-1 rounded-full text-zinc-500 font-black uppercase tracking-widest">
+               <span className="text-xs bg-slate-100 px-3 py-1 rounded-md text-slate-600 font-semibold uppercase tracking-wider border border-slate-200">
                  Invoice #{invoice.id.split('-')[0]}
                </span>
             </div>
           </div>
 
-          <div className="bg-gradient-to-b from-white/[0.04] to-transparent p-7 rounded-[2.5rem] border border-white/5 text-center mb-8">
-            <p className="text-[10px] text-zinc-500 font-black uppercase mb-1 tracking-[0.2em]">Montan Total</p>
-            <h2 className="text-5xl font-black text-white tracking-tighter">
-              {invoice.amount.toLocaleString()} <span className="text-red-600 text-lg ml-1 font-black">HTG</span>
+          {/* Bwat Montan an */}
+          <div className="bg-slate-50 p-6 rounded-2xl border border-gray-200 text-center mb-8 shadow-sm">
+            <p className="text-xs text-slate-500 font-semibold uppercase mb-1 tracking-wider">Montan Total</p>
+            <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">
+              {invoice.amount.toLocaleString()} <span className="text-indigo-600 text-lg ml-1 font-bold">HTG</span>
             </h2>
           </div>
 
-          <div className="space-y-4 mb-8">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-zinc-500 uppercase text-[10px] font-black flex items-center gap-2"><User size={14}/> Kliyan</span>
-              <span className="text-white text-xs font-bold">{invoice.client_email}</span>
+          <div className="mb-8">
+            <div className="flex justify-between items-center px-2 mb-4">
+              <span className="text-slate-500 uppercase text-xs font-semibold flex items-center gap-2"><User size={16}/> Kliyan</span>
+              <span className="text-slate-900 text-sm font-semibold">{invoice.client_email}</span>
             </div>
-            <div className="h-[1px] bg-white/5 w-full"></div>
+            <div className="h-[1px] bg-gray-200 w-full"></div>
           </div>
 
           {/* Sistèm Blokaj ak Fòm */}
           {isOwner ? (
-            <div className="bg-orange-600/10 border border-orange-600/20 p-7 rounded-[2.5rem] text-center animate-in fade-in zoom-in duration-300">
-              <Ban className="text-orange-500 mx-auto mb-3" size={44} />
-              <h3 className="text-orange-500 font-black uppercase text-xs mb-2 tracking-widest">Sistèm Sekirite</h3>
-              <p className="text-[11px] text-zinc-400 font-bold leading-relaxed px-4">
+            <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl text-center shadow-sm">
+              <Ban className="text-amber-500 mx-auto mb-3" size={40} />
+              <h3 className="text-amber-700 font-bold uppercase text-xs mb-2 tracking-wider">Sistèm Sekirite</h3>
+              <p className="text-sm text-amber-800 font-medium leading-relaxed px-2">
                 Ou pa ka peye pwòp invoice ou. Tanpri voye lyen sa a bay kliyan an pou l fè peman an.
               </p>
             </div>
           ) : invoice.status === 'paid' ? (
             <div 
-              className="bg-green-600/10 border border-green-600/20 p-8 rounded-[2.5rem] text-center cursor-pointer group hover:bg-green-600/20 transition-all shadow-lg shadow-green-900/10"
+              className="bg-emerald-50 border border-emerald-200 p-8 rounded-2xl text-center cursor-pointer group hover:bg-emerald-100 transition-all shadow-sm"
               onClick={() => router.push(`/checkout-invoice/success?id=${id}`)}
             >
-              <ShieldCheck className="text-green-500 mx-auto mb-3 animate-bounce" size={48} />
-              <h3 className="text-green-500 font-black uppercase text-sm mb-1 tracking-tighter">Peman Konfime</h3>
-              <p className="text-[10px] text-zinc-400 font-bold uppercase">Klike la a pou rale resi ou</p>
+              <ShieldCheck className="text-emerald-500 mx-auto mb-3 group-hover:scale-110 transition-transform" size={48} />
+              <h3 className="text-emerald-700 font-bold uppercase text-sm mb-1 tracking-wide">Peman Konfime</h3>
+              <p className="text-xs text-emerald-600 font-semibold uppercase">Klike la a pou rale resi ou</p>
             </div>
           ) : (
             <form onSubmit={handlePayment} className="space-y-5">
+              
               <div className="group">
-                <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2 ml-4 tracking-widest flex items-center gap-2">
-                  <CreditCard size={12}/> Nimewo Kat
+                <label className="block text-xs text-slate-600 font-bold uppercase mb-2 tracking-wider flex items-center gap-2">
+                  <CreditCard size={14} className="text-indigo-600" /> Nimewo Kat
                 </label>
                 <input 
                   type="text" 
                   required
-                  className="w-full bg-black/40 border border-white/10 rounded-[1.8rem] px-6 py-5 text-sm font-black text-white outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all placeholder:text-zinc-700 shadow-inner"
+                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="0000 0000 0000 0000"
                   value={cardInfo.cardNumber}
                   onChange={handleCardNumberChange}
@@ -216,24 +221,28 @@ export default function InvoiceCheckout() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2 ml-4 tracking-widest">Dat Eksp.</label>
+                  <label className="block text-xs text-slate-600 font-bold uppercase mb-2 tracking-wider flex items-center gap-2">
+                    <Receipt size={14} className="text-indigo-600" /> Dat Eksp.
+                  </label>
                   <input 
                     type="text" 
                     required
                     placeholder="MM/YY" 
-                    className="w-full bg-black/40 border border-white/10 rounded-[1.8rem] px-6 py-5 text-sm font-black text-white outline-none focus:border-red-600 transition-all text-center" 
+                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-center shadow-sm placeholder:text-gray-400" 
                     value={cardInfo.cardExpiry} 
                     onChange={handleExpiryChange} 
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-zinc-500 font-black uppercase mb-2 ml-4 tracking-widest">CVV</label>
+                  <label className="block text-xs text-slate-600 font-bold uppercase mb-2 tracking-wider flex items-center gap-2">
+                    <Lock size={14} className="text-indigo-600" /> CVV
+                  </label>
                   <input 
                     type="password" 
                     required
                     maxLength={4}
                     placeholder="•••" 
-                    className="w-full bg-black/40 border border-white/10 rounded-[1.8rem] px-6 py-5 text-sm font-black text-white outline-none focus:border-red-600 transition-all text-center tracking-[0.5em]" 
+                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-center tracking-widest shadow-sm placeholder:text-gray-400" 
                     value={cardInfo.cardCvv} 
                     onChange={(e) => setCardInfo({...cardInfo, cardCvv: e.target.value.replace(/\D/g, '')})} 
                   />
@@ -241,7 +250,7 @@ export default function InvoiceCheckout() {
               </div>
 
               {message.text && (
-                <div className="p-5 rounded-[1.8rem] text-[10px] font-black uppercase flex items-center gap-3 bg-red-600/10 border border-red-600/20 text-red-500 animate-in slide-in-from-bottom-2 duration-300">
+                <div className="p-4 rounded-xl text-sm font-medium flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700">
                   <AlertCircle size={18} className="shrink-0" /> 
                   <span className="leading-tight">{message.text}</span>
                 </div>
@@ -250,10 +259,10 @@ export default function InvoiceCheckout() {
               <button
                 type="submit"
                 disabled={payLoading}
-                className="w-full bg-white hover:bg-zinc-200 text-black py-6 rounded-[2.2rem] font-black text-[13px] uppercase tracking-tighter transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4 shadow-[0_15px_30px_rgba(255,255,255,0.1)] active:scale-95"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 mt-2 shadow-sm hover:shadow-md"
               >
                 {payLoading ? (
-                  <Loader2 className="animate-spin text-red-600" size={20} />
+                  <Loader2 className="animate-spin text-white" size={20} />
                 ) : (
                   <>
                     <Lock size={16} /> 
@@ -262,9 +271,15 @@ export default function InvoiceCheckout() {
                 )}
               </button>
               
-              <p className="text-center text-[9px] text-zinc-600 font-bold uppercase mt-4 flex items-center justify-center gap-2 italic">
-                <ShieldCheck size={12} /> Sekirize pa H-Pay Encryption
-              </p>
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <p className="text-center text-xs text-slate-500 font-semibold flex items-center justify-center gap-1.5">
+                  <ShieldCheck size={14} className="text-indigo-500" /> Peman an ankripte epi l an sekirite
+                </p>
+                <div className="flex items-center gap-1 opacity-50 mt-1">
+                   <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-3 h-3 rounded-sm grayscale" />
+                   <span className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Hatexcard</span>
+                </div>
+              </div>
             </form>
           )}
         </div>

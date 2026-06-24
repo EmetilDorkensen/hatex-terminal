@@ -4,9 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
-  ArrowLeft, ShieldCheck, Mail, MessageCircle, 
-  Lock, Bell, Globe, LogOut, 
-  ChevronRight, Loader2, Key, Edit2, X
+  ArrowLeft, Bell, Globe, LogOut, ChevronRight, 
+  Loader2, Key, Edit2, X, Lock, ShieldCheck, Mail, User
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -64,9 +63,6 @@ export default function SettingsPage() {
     loadSettings();
   }, [supabase, router]);
 
-  // ==========================================
-  // FONKSYON POU KREYE PREMYE PIN NAN
-  // ==========================================
   const handleSavePin = async () => {
     if (newPin.length !== 4) {
       alert("PIN lan dwe gen egzakteman 4 chif!");
@@ -90,9 +86,6 @@ export default function SettingsPage() {
     }
   };
 
-  // ==========================================
-  // FONKSYON POU MODIFYE PIN NAN (Anndan app la)
-  // ==========================================
   const submitPinUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdatePinError('');
@@ -143,9 +136,6 @@ export default function SettingsPage() {
     }
   };
 
-  // ==========================================
-  // VOYE IMÈL POU MODPAS LA SÈLMAN
-  // ==========================================
   const handleResetPassword = async () => {
     if (!user?.email) return;
     
@@ -159,7 +149,7 @@ export default function SettingsPage() {
     if (error) {
       alert("Erè lè n ap voye imèl la: " + error.message);
     } else {
-      alert(`✅ Nou voye yon imèl bay ${user.email} pou w ka chanje modpas ou. Tanpri tcheke bwat lèt ou a.`);
+      alert(`Nou voye yon imèl bay ${user.email} pou w ka chanje modpas ou. Tanpri tcheke bwat lèt ou a.`);
     }
   };
 
@@ -179,9 +169,8 @@ export default function SettingsPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#06070d] flex flex-col items-center justify-center">
-      <Loader2 className="animate-spin text-red-600 mb-4 w-12 h-12" />
-      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 animate-pulse">Chaje Paramèt...</p>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <Loader2 className="animate-spin text-indigo-600 w-10 h-10" />
     </div>
   );
 
@@ -190,48 +179,45 @@ export default function SettingsPage() {
   const initials = fullName.substring(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#06070d] text-white p-4 sm:p-6 md:p-10 font-medium selection:bg-red-600 pb-24 relative">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-10 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-8">
         
         {/* HEADER */}
-        <div className="flex items-center gap-4 border-b border-white/5 pb-6">
-          <button onClick={() => router.back()} className="p-3 bg-zinc-900/50 rounded-2xl hover:bg-red-600 transition-all text-zinc-400 hover:text-white shrink-0">
+        <div className="flex items-center gap-4 pb-6">
+          <button onClick={() => router.back()} className="p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-all shadow-sm text-slate-600">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl md:text-4xl font-black uppercase tracking-tighter italic">Paramèt <span className="text-red-600">Kont</span></h1>
-            <p className="text-[9px] md:text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] mt-1">Jere pwofil ak sekirite w</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Paramèt Kont</h1>
+            <p className="text-xs text-slate-500 font-medium">Jere pwofil ak sekirite w</p>
           </div>
         </div>
 
         {/* KAT PWOfil KLIYAN AN */}
-        <div className="bg-[#0d0e1a] border border-white/5 p-6 rounded-[2rem] flex items-center gap-5 shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-[50px] rounded-full" />
-          <div className="w-16 h-16 md:w-20 md:h-20 bg-zinc-900 rounded-full flex items-center justify-center font-black text-xl border-2 border-red-600/50 shrink-0 z-10 shadow-[0_0_20px_rgba(220,38,38,0.2)] overflow-hidden">
+        <div className="bg-white border border-gray-200 p-6 rounded-2xl flex items-center gap-5 shadow-sm">
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-indigo-50 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xl border border-indigo-100 shrink-0 overflow-hidden">
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-white">{initials}</span>
-            )}
+            ) : initials}
           </div>
-          <div className="z-10 flex-1 min-w-0">
-            <h2 className="text-xl md:text-2xl font-black uppercase truncate">{fullName}</h2>
-            <p className="text-[10px] md:text-xs text-zinc-400 font-bold tracking-widest truncate">{email}</p>
-            <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/10 text-green-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border border-green-500/20">
-              <ShieldCheck className="w-3 h-3" /> Kont Verifye
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg md:text-xl font-bold truncate">{fullName}</h2>
+            <p className="text-xs md:text-sm text-slate-500 font-medium truncate">{email}</p>
+            <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100">
+              <ShieldCheck size={12} /> Kont Verifye
             </div>
           </div>
         </div>
 
-        {/* 1. SEKIRITE AK AKSÈ */}
+        {/* SEKIRITE AK AKSÈ */}
         <div className="space-y-4">
-          <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Sekirite</h3>
-          <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] overflow-hidden shadow-lg">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-2">Sekirite</h3>
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
             
             {!hasPin ? (
-              <div className="p-5 md:p-6 border-b border-white/5 bg-red-600/5">
-                <h4 className="text-sm font-black uppercase tracking-wider mb-2 text-red-500">Kreye PIN 4 Chif ou</h4>
-                <p className="text-[10px] text-zinc-400 font-bold mb-4">Ou dwe kreye yon PIN pou w ka konekte rapid e pwoteje kòb ou.</p>
+              <div className="p-6 border-b border-gray-100 bg-amber-50/50">
+                <h4 className="text-sm font-bold text-slate-900 mb-2">Kreye PIN 4 Chif ou</h4>
+                <p className="text-xs text-slate-600 mb-4">Ou dwe kreye yon PIN pou w ka konekte rapid e pwoteje kòb ou.</p>
                 <div className="flex gap-3">
                   <input 
                     type="password" 
@@ -239,12 +225,12 @@ export default function SettingsPage() {
                     placeholder="••••"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-                    className="bg-black border border-white/10 rounded-xl px-4 py-3 text-center tracking-[0.5em] font-black w-32 outline-none focus:border-red-600 transition-all"
+                    className="bg-white border border-gray-300 rounded-xl px-4 py-2 font-mono w-32 outline-none focus:border-indigo-500 text-center"
                   />
                   <button 
                     onClick={handleSavePin}
                     disabled={isSavingPin || newPin.length !== 4}
-                    className="bg-red-600 text-white px-6 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50 hover:bg-red-700 transition-all"
+                    className="bg-indigo-600 text-white px-6 rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all disabled:opacity-50"
                   >
                     {isSavingPin ? 'Ap Sove...' : 'Sove PIN'}
                   </button>
@@ -252,200 +238,156 @@ export default function SettingsPage() {
               </div>
             ) : (
               <>
-                {/* Toggle pou limen/fèmen PIN nan */}
-                <div className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Lock className="w-5 h-5" /></div>
+                    <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Lock className="w-5 h-5" /></div>
                     <div>
-                      <h4 className="text-sm font-black uppercase tracking-wider">Modpas PIN (4 chif)</h4>
-                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Mande PIN lè w ap louvri aplikasyon an</p>
+                      <h4 className="text-sm font-bold text-slate-900">Modpas PIN (4 chif)</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Mande PIN lè w ap louvri aplikasyon an</p>
                     </div>
                   </div>
                   <button 
                     onClick={togglePin}
-                    className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${pinEnabled ? 'bg-red-600' : 'bg-zinc-800'}`}
+                    className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${pinEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
                   >
                     <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${pinEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
                   </button>
                 </div>
 
-                {/* Bouton Modifye PIN k ap louvri modal la */}
                 <div 
                   onClick={() => setShowUpdatePinModal(true)}
-                  className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                  className="flex items-center justify-between p-6 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Edit2 className="w-5 h-5" /></div>
+                    <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Edit2 className="w-5 h-5" /></div>
                     <div>
-                      <h4 className="text-sm font-black uppercase tracking-wider">Modifye PIN nan</h4>
-                      <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Chanje kòd sekirite 4 chif ou a</p>
+                      <h4 className="text-sm font-bold text-slate-900">Modifye PIN nan</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Chanje kòd sekirite 4 chif ou a</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-zinc-600" />
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
               </>
             )}
 
-            {/* Modifye Modpas (Voye Imèl otomatikman) */}
-            <div onClick={handleResetPassword} className="flex items-center justify-between p-5 md:p-6 hover:bg-white/[0.02] transition-colors cursor-pointer">
+            <div onClick={handleResetPassword} className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors cursor-pointer">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Key className="w-5 h-5" /></div>
+                <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Key className="w-5 h-5" /></div>
                 <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Modifye Modpas</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Klike pou n voye lyen an sou imèl ou</p>
+                  <h4 className="text-sm font-bold text-slate-900">Modifye Modpas</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Klike pou n voye lyen an sou imèl ou</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-zinc-600" />
+              <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
           </div>
         </div>
 
-        {/* LÒT SEKSYON YO (Preferans, Sipò, Dekonekte) */}
+        {/* LÒT SEKSYON */}
         <div className="space-y-4">
-          <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Preferans E-Wallet</h3>
-          <div className="bg-[#0d0e1a] border border-white/5 rounded-[2rem] overflow-hidden shadow-lg">
-            <div className="flex items-center justify-between p-5 md:p-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+          <h3 className="text-xs font-bold uppercase text-slate-500 ml-2">Preferans</h3>
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Bell className="w-5 h-5" /></div>
+                <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Bell className="w-5 h-5" /></div>
                 <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Notifikasyon</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Resevwa alèt pou chak tranzaksyon</p>
+                  <h4 className="text-sm font-bold text-slate-900">Notifikasyon</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Resevwa alèt pou chak tranzaksyon</p>
                 </div>
               </div>
               <button 
                 onClick={() => setNotifications(!notifications)}
-                className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${notifications ? 'bg-red-600' : 'bg-zinc-800'}`}
+                className={`w-12 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${notifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
               >
                 <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${notifications ? 'translate-x-7' : 'translate-x-1'}`} />
               </button>
             </div>
 
-            <div className="p-5 md:p-6 hover:bg-white/[0.02] transition-colors">
+            <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-zinc-900 rounded-xl text-zinc-400"><Globe className="w-5 h-5" /></div>
+                <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Globe className="w-5 h-5" /></div>
                 <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Lang Aplikasyon an</h4>
-                  <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold mt-0.5">Chwazi lang ki pi bon pou ou a</p>
+                  <h4 className="text-sm font-bold text-slate-900">Lang</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Chwazi lang ki pi bon pou ou</p>
                 </div>
               </div>
               
-              <div className="flex gap-2 bg-black p-1 rounded-xl border border-white/5">
-                <button 
-                  onClick={() => setSelectedLang('HT')}
-                  className={`flex-1 py-2 text-[10px] font-black tracking-widest rounded-lg transition-all ${selectedLang === 'HT' ? 'bg-red-600 text-white' : 'text-zinc-500 hover:text-white'}`}
-                >Kreyòl</button>
-                <button 
-                  onClick={() => setSelectedLang('EN')}
-                  className={`flex-1 py-2 text-[10px] font-black tracking-widest rounded-lg transition-all ${selectedLang === 'EN' ? 'bg-red-600 text-white' : 'text-zinc-500 hover:text-white'}`}
-                >English</button>
-                <button 
-                  onClick={() => setSelectedLang('ES')}
-                  className={`flex-1 py-2 text-[10px] font-black tracking-widest rounded-lg transition-all ${selectedLang === 'ES' ? 'bg-red-600 text-white' : 'text-zinc-500 hover:text-white'}`}
-                >Español</button>
+              <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
+                {['HT', 'EN', 'ES'].map((lang) => (
+                  <button 
+                    key={lang}
+                    onClick={() => setSelectedLang(lang)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedLang === lang ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {lang === 'HT' ? 'Kreyòl' : lang === 'EN' ? 'English' : 'Español'}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] ml-4">Sipò Kliyan</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <a href="https://wa.me/50937201241?text=Bonjou%20ekip%20H-Pay%2C%20mwen%20bezwen%20%C3%A8d%20ak%20kont%20mwen%20an." target="_blank" rel="noopener noreferrer" className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer">
-              <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                <MessageCircle className="w-6 h-6 text-green-500" />
-              </div>
-              <div className="text-center">
-                <span className="block text-sm font-black uppercase tracking-wider">WhatsApp</span>
-                <span className="block text-[10px] text-zinc-500 font-bold mt-1">+509 3720-1241</span>
-              </div>
-            </a>
-            <a href="mailto:contact@hatexcard.com?subject=Demann%20Sipò%20H-Pay" className="bg-[#0d0e1a] hover:bg-[#111322] border border-white/5 p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all group cursor-pointer">
-              <div className="w-12 h-12 bg-red-600/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Mail className="w-6 h-6 text-red-500" />
-              </div>
-              <div className="text-center">
-                <span className="block text-sm font-black uppercase tracking-wider">Imèl Sipò</span>
-                <span className="block text-[10px] text-zinc-500 font-bold mt-1">contact@hatexcard.com</span>
-              </div>
-            </a>
-          </div>
-        </div>
-
-        <div className="pt-6">
-          <button onClick={handleLogout} className="w-full bg-red-600/10 hover:bg-red-600 border border-red-600/20 hover:border-red-600 text-red-500 hover:text-white py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest transition-all flex items-center justify-center gap-3">
-            <LogOut className="w-5 h-5" /> Dekonekte Kont Mwen
-          </button>
-        </div>
+        <button onClick={handleLogout} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 border border-rose-100">
+          <LogOut size={18} /> Dekonekte
+        </button>
 
       </div>
 
-      {/* ========================================== */}
       {/* MODAL POU CHANJE PIN NAN */}
-      {/* ========================================== */}
       {showUpdatePinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0a0b14] border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 relative shadow-2xl animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-gray-200 w-full max-w-sm rounded-3xl p-8 relative shadow-xl">
             <button 
               onClick={() => {
                 setShowUpdatePinModal(false);
                 setOldPinInput('');
                 setNewPinInput('');
-                setUpdatePinError('');
-                setUpdatePinSuccess('');
               }} 
-              className="absolute top-4 right-4 p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white hover:bg-red-600 transition-colors"
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600"
             >
-              <X className="w-5 h-5" />
+              <X size={20} />
             </button>
             
             <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-3 border border-red-600/20">
-                <Lock className="w-6 h-6 text-red-500" />
-              </div>
-              <h3 className="text-xl font-black uppercase tracking-tighter">Modifye PIN ou</h3>
+              <h3 className="text-lg font-bold text-slate-900">Modifye PIN ou</h3>
             </div>
 
             <form onSubmit={submitPinUpdate} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[8px] text-zinc-500 font-black uppercase tracking-widest text-center block">Ansyen PIN (4 chif)</label>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Ansyen PIN</label>
                 <input
                   type="password"
                   maxLength={4}
-                  placeholder="••••"
                   value={oldPinInput}
                   onChange={(e) => setOldPinInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-black border border-white/5 p-4 rounded-xl focus:border-red-600 outline-none transition-all font-black text-center tracking-[1em] text-xl"
+                  className="w-full bg-slate-50 border border-gray-200 p-3 rounded-xl text-center font-mono text-lg outline-none focus:border-indigo-500"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-[8px] text-zinc-500 font-black uppercase tracking-widest text-center block">Nouvo PIN (4 chif)</label>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Nouvo PIN</label>
                 <input
                   type="password"
                   maxLength={4}
-                  placeholder="••••"
                   value={newPinInput}
                   onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-black border border-white/5 p-4 rounded-xl focus:border-red-600 outline-none transition-all font-black text-center tracking-[1em] text-xl"
+                  className="w-full bg-slate-50 border border-gray-200 p-3 rounded-xl text-center font-mono text-lg outline-none focus:border-indigo-500"
                   required
                 />
               </div>
-
-              {updatePinError && <p className="text-red-500 text-[10px] font-black uppercase text-center">{updatePinError}</p>}
-              {updatePinSuccess && <p className="text-green-500 text-[10px] font-black uppercase text-center">{updatePinSuccess}</p>}
-
+              {updatePinError && <p className="text-rose-600 text-[10px] font-bold text-center">{updatePinError}</p>}
+              {updatePinSuccess && <p className="text-emerald-600 text-[10px] font-bold text-center">{updatePinSuccess}</p>}
               <button
                 type="submit"
                 disabled={isUpdatingPin || oldPinInput.length !== 4 || newPinInput.length !== 4}
-                className="w-full bg-red-600 py-4 rounded-xl font-black uppercase text-[11px] tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-indigo-700 transition-all disabled:opacity-50"
               >
-                {isUpdatingPin ? <Loader2 className="w-4 h-4 animate-spin" /> : "CHANJE PIN NAN"}
+                {isUpdatingPin ? 'Ap chanje...' : 'Konfime'}
               </button>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }

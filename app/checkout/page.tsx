@@ -48,16 +48,13 @@ function CheckoutContent() {
       }
   
       try {
-        console.log('🔍 Verifikasyon token an:', token);
+        console.log('Verifikasyon token an:', token);
         
         const { data: tokenData, error: tokenError } = await supabase
           .from('payment_tokens')
           .select('merchant_id, expires_at')
           .eq('id', token)
           .single();
-  
-        console.log('📦 Token data:', tokenData);
-        console.log('❌ Token error:', tokenError);
   
         if (tokenError || !tokenData) {
           setError('Token pa valid. Tanpri jenere yon nouvo QR kòd.');
@@ -71,16 +68,11 @@ function CheckoutContent() {
           return;
         }
   
-        console.log('✅ Token bon, merchant_id:', tokenData.merchant_id);
-  
         const { data: merchantData, error: merchantError } = await supabase
           .from('profiles')
           .select('id, api_key, business_name, full_name, avatar_url')
           .eq('id', tokenData.merchant_id)
           .single();
-  
-        console.log('📦 Merchant data:', merchantData);
-        console.log('❌ Merchant error:', merchantError);
   
         if (merchantError || !merchantData) {
           setError('Machann pa jwenn. Kontakte sipò.');
@@ -90,7 +82,7 @@ function CheckoutContent() {
   
         setMerchant(merchantData);
       } catch (err) {
-        console.error('💥 Erè inatandi:', err);
+        console.error('Erè inatandi:', err);
         setError('Erè pandan verifikasyon. Tanpri eseye ankò.');
       } finally {
         setLoading(false);
@@ -119,10 +111,7 @@ function CheckoutContent() {
 
   // Load a saved card (only for display – never auto-fill full number or CVV)
   const loadSavedCard = (last4: string) => {
-    // In a real secure implementation, you would have a token from your payment processor
-    // Here, we just show an example – never store full PAN or CVV client-side!
-    alert(`Demo: Sèvi ak kat ki fini pa ${last4}. Tanpri antre CVV la ankò pou sekirite.`);
-    // You could pre-fill the last 4 digits for display, but never the full number
+    alert(`Kat ki fini pa ${last4} chwazi. Tanpri antre CVV la pou sekirite.`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -223,10 +212,10 @@ function CheckoutContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-        <div className="flex flex-col items-center text-white">
-          <Loader2 className="w-8 h-8 animate-spin text-red-600 mb-4" />
-          <p className="text-lg">Verifikasyon...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+          <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Verifikasyon...</p>
         </div>
       </div>
     );
@@ -234,16 +223,16 @@ function CheckoutContent() {
 
   if (error && !merchant) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center p-4">
-        <div className="bg-red-600/10 border border-red-600/30 rounded-2xl p-8 max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Erè</h1>
-          <p className="text-gray-300">{error}</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-8 max-w-md text-center w-full">
+          <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Erè</h1>
+          <p className="text-slate-600 text-sm leading-relaxed">{error}</p>
           <button
             onClick={() => window.location.href = '/'}
-            className="mt-6 px-6 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-white transition"
+            className="mt-6 px-6 py-3 w-full bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-sm text-white transition-all shadow-sm"
           >
-            Ale nan akey
+            Tounen nan Akey
           </button>
         </div>
       </div>
@@ -251,60 +240,63 @@ function CheckoutContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 font-sans text-slate-900">
       <div className="w-full max-w-md">
+        
+        {/* En-tête / Machann */}
         <div className="text-center mb-8">
-          {/* Logo machann nan */}
           {merchant?.avatar_url && (
             <div className="flex justify-center mb-4">
               <img 
                 src={merchant.avatar_url} 
                 alt={merchant.business_name || merchant.full_name}
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-red-600/30"
+                className="w-20 h-20 rounded-2xl object-cover border border-gray-200 shadow-sm bg-white"
               />
             </div>
           )}
           
-          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">
-            Peye <span className="text-red-600">HATEX</span>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Peye ak <span className="text-indigo-600">Hatexcard</span>
           </h1>
-          <p className="text-gray-400 mt-2 flex items-center justify-center gap-2">
-            <Store size={16} className="text-red-600" />
-            <span className="text-white font-bold">{merchant?.business_name || merchant?.full_name || 'Machann'}</span>
+          <p className="text-slate-500 mt-2 flex items-center justify-center gap-1.5 text-sm font-medium">
+            <Store size={16} className="text-indigo-500" />
+            {merchant?.business_name || merchant?.full_name || 'Machann'}
           </p>
         </div>
 
-        {/* Saved cards section (if any) */}
+        {/* Saved cards section */}
         {savedCards.length > 0 && (
-          <div className="mb-6 bg-white/5 rounded-xl p-4 border border-white/10">
-            <div className="flex items-center gap-2 mb-3">
-              <History size={16} className="text-zinc-500" />
-              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider">Kat itilize avan</span>
+          <div className="mb-6 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <History size={16} className="text-slate-400" />
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kat itilize avan</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {savedCards.map((card) => (
                 <button
                   key={card.id}
                   onClick={() => loadSavedCard(card.last4)}
-                  className="w-full flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/5 hover:border-red-600/30 transition-all"
+                  className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <CreditCard size={16} className="text-red-600" />
-                    <span className="text-sm text-white">•••• {card.last4}</span>
+                    <CreditCard size={18} className="text-indigo-600" />
+                    <span className="text-sm font-semibold text-slate-700">•••• {card.last4}</span>
                   </div>
-                  <span className="text-[9px] text-zinc-500">{card.expiry}</span>
+                  <span className="text-xs font-medium text-slate-500">{card.expiry}</span>
                 </button>
               ))}
-              <p className="text-[8px] text-zinc-600 mt-2 text-center">
+              <p className="text-[10px] text-slate-400 mt-3 text-center font-medium">
                 Pou sekirite, ou dwe antre CVV la chak fwa.
               </p>
             </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 shadow-2xl">
+        {/* Fòm Peman an */}
+        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-xl">
+          
           <div className="mb-5">
-            <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
               Montan (HTG)
             </label>
             <input
@@ -314,14 +306,14 @@ function CheckoutContent() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-bold focus:border-red-600 focus:outline-none transition"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-slate-900 text-lg font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all shadow-sm placeholder:text-gray-400"
               required
             />
           </div>
 
           <div className="mb-5">
-            <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
-              <CreditCard size={16} className="text-red-600" /> Nimewo kat
+            <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider flex items-center gap-2">
+              <CreditCard size={16} className="text-indigo-600" /> Nimewo kat
             </label>
             <input
               type="text"
@@ -329,15 +321,15 @@ function CheckoutContent() {
               onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
               placeholder="0000 0000 0000 0000"
               maxLength={19}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white font-mono text-lg focus:border-red-600 focus:outline-none transition"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-slate-900 font-mono text-base focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all shadow-sm placeholder:text-gray-400"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
-                <Calendar size={16} className="text-red-600" /> Eksp.
+              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider flex items-center gap-2">
+                <Calendar size={16} className="text-indigo-600" /> Eksp.
               </label>
               <input
                 type="text"
@@ -345,13 +337,13 @@ function CheckoutContent() {
                 onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                 placeholder="MM/AA"
                 maxLength={5}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono focus:border-red-600 focus:outline-none transition"
+                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-slate-900 text-center font-mono text-base focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all shadow-sm placeholder:text-gray-400"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-2">
-                <Lock size={16} className="text-red-600" /> CVV
+              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider flex items-center gap-2">
+                <Lock size={16} className="text-indigo-600" /> CVV
               </label>
               <input
                 type="password"
@@ -359,7 +351,7 @@ function CheckoutContent() {
                 onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="***"
                 maxLength={4}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-center font-mono focus:border-red-600 focus:outline-none transition"
+                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-slate-900 text-center font-mono text-base focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all shadow-sm placeholder:text-gray-400"
                 required
               />
             </div>
@@ -370,31 +362,31 @@ function CheckoutContent() {
             <button
               type="button"
               onClick={() => setSaveCard(!saveCard)}
-              className="flex items-center gap-2 text-gray-300 hover:text-white transition"
+              className="flex items-center gap-3 text-slate-600 hover:text-slate-900 transition-colors w-full text-left"
             >
               {saveCard ? (
-                <CheckSquare className="w-5 h-5 text-red-600" />
+                <CheckSquare className="w-5 h-5 text-indigo-600" />
               ) : (
-                <Square className="w-5 h-5 text-gray-500" />
+                <Square className="w-5 h-5 text-gray-400" />
               )}
-              <span className="text-sm">Sonje kat sa pou pwochen fwa (sèlman dènye 4 chif)</span>
+              <span className="text-sm font-semibold">Sonje kat sa pou pwochen fwa</span>
             </button>
-            <p className="text-[8px] text-zinc-600 mt-1">
-              CVV pap janm estoke. Ou dwe antre l chak fwa.
+            <p className="text-[10px] text-slate-500 mt-2 ml-8 font-medium">
+              Sèlman dènye 4 chif. CVV pap janm estoke.
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-600/20 border border-red-600/30 rounded-xl p-3 mb-4 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-300">{error}</p>
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-rose-800 leading-relaxed">{error}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={processing}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-sm transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 uppercase tracking-wider"
           >
             {processing ? (
               <>
@@ -406,10 +398,19 @@ function CheckoutContent() {
             )}
           </button>
 
-          <p className="text-xs text-gray-500 text-center mt-4">
-            Peman an pral verifye epi dedwi nan balans ou.
+          <p className="text-xs text-slate-400 font-medium text-center mt-6">
+            Peman an ap fèt an sekirite epi ankripte.
           </p>
         </form>
+        
+        {/* FOOTER MINI */}
+        <div className="mt-8 flex justify-center items-center gap-2">
+           <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-4 h-4 rounded-sm grayscale opacity-50" />
+           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+             Hatexcard Secure Network
+           </p>
+        </div>
+
       </div>
     </div>
   );
@@ -418,10 +419,10 @@ function CheckoutContent() {
 export default function CheckoutPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-        <div className="flex flex-col items-center text-white">
-          <Loader2 className="w-8 h-8 animate-spin text-red-600 mb-4" />
-          <p className="text-lg">Chajman...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+          <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
         </div>
       </div>
     }>

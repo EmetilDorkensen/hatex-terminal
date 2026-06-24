@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { CheckCircle2, ShoppingBag, Hash, Calendar, Download, Store, User, Mail, Phone, Info } from 'lucide-react';
+import { CheckCircle2, Download, Info } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 function SuccessContent() {
@@ -84,14 +84,16 @@ function SuccessContent() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    // Koule Bleu/Indigo pou tit PDF la
     doc.setFontSize(22);
-    doc.setTextColor(230, 46, 4);
+    doc.setTextColor(79, 70, 229); // text-indigo-600
     doc.text('HATEXCARD', pageWidth / 2, 30, { align: 'center' });
+    
     doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(15, 23, 42); // text-slate-900
     doc.text('REÇU DE PAIEMENT', pageWidth / 2, 45, { align: 'center' });
     
-    doc.setDrawColor(230, 46, 4);
+    doc.setDrawColor(226, 232, 240); // text-slate-200
     doc.line(20, 50, pageWidth - 20, 50);
 
     doc.setFontSize(11);
@@ -102,77 +104,102 @@ function SuccessContent() {
     doc.text(`Client: ${payer?.full_name || 'Hatex User'}`, 25, 105);
 
     doc.setFontSize(8);
-    doc.text('Mèsi paske ou itilize HatexCard pou tranzaksyon ou yo.', pageWidth / 2, 280, { align: 'center' });
+    doc.text('Mèsi paske ou itilize Hatexcard pou tranzaksyon ou yo.', pageWidth / 2, 280, { align: 'center' });
     doc.save(`hatex-${transaction.id.slice(0, 8)}.pdf`);
   };
 
-  if (loading) return <div className="min-h-screen bg-[#06070d] flex items-center justify-center text-green-500 font-black animate-pulse">VERIFIKASYON...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm text-center w-full max-w-md">
+          <p className="text-slate-900 font-bold mb-4">{error}</p>
+          <button onClick={() => router.push('/dashboard')} className="text-indigo-600 hover:underline text-sm font-semibold">Tounen nan Akey la</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#06070d] flex items-center justify-center p-4">
-      <div className="w-full max-w-[550px] bg-[#0d0e1a] p-8 md:p-12 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden italic text-white">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-900">
+      <div className="w-full max-w-[500px] bg-white p-8 md:p-12 rounded-[2rem] border border-gray-200 shadow-xl relative overflow-hidden">
         
+        {/* Dekorasyon Koule nan tèt */}
+        <div className="absolute top-0 left-0 right-0 h-2 bg-emerald-500"></div>
+
         <div className="relative z-10 text-center">
           <div className="flex justify-center mb-6">
-            <div className="bg-green-500/20 p-5 rounded-[2rem] border border-green-500/30">
-              <CheckCircle2 className="text-green-500 w-12 h-12" />
+            <div className="bg-emerald-50 p-4 rounded-full border border-emerald-100">
+              <CheckCircle2 className="text-emerald-500 w-12 h-12" />
             </div>
           </div>
 
-          <h1 className="text-3xl font-black uppercase tracking-tighter mb-1">Peman Reyisi !</h1>
-          <p className="text-zinc-500 text-[9px] font-bold uppercase mb-8 tracking-[0.3em]">Konfimasyon Tranzaksyon</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">Peman Reyisi</h1>
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-8">Konfimasyon Tranzaksyon</p>
 
-          {/* BOX DETAY */}
-          <div className="bg-zinc-900/40 p-8 rounded-[2.5rem] mb-6 border border-white/5">
-            <div className="flex justify-between items-center mb-6 pb-6 border-b border-white/5">
-              <span className="text-[10px] font-black text-zinc-500 uppercase">Montan total</span>
-              <span className="text-3xl font-black text-white">{transaction.amount.toLocaleString()} <span className="text-green-500 text-xs">HTG</span></span>
+          {/* BOX DETAY PEMAN AN */}
+          <div className="bg-slate-50 p-6 rounded-2xl mb-6 border border-gray-200">
+            <div className="flex justify-between items-center mb-6 pb-6 border-b border-gray-200">
+              <span className="text-xs font-semibold text-slate-500 uppercase">Montan total</span>
+              <span className="text-3xl font-bold text-slate-900">{transaction.amount.toLocaleString()} <span className="text-emerald-600 text-sm">HTG</span></span>
             </div>
             
             <div className="space-y-4 text-left">
               <div className="flex justify-between items-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-bold">Kliyan</span>
-                <span className="text-xs font-bold text-white">{payer?.full_name || 'Hatex User'}</span>
+                <span className="text-xs text-slate-500 font-medium">Kliyan</span>
+                <span className="text-sm font-semibold text-slate-900">{payer?.full_name || 'Hatex User'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-bold">Machann</span>
-                <span className="text-xs font-bold text-white">{merchant?.business_name || merchant?.full_name}</span>
+                <span className="text-xs text-slate-500 font-medium">Machann</span>
+                <span className="text-sm font-semibold text-slate-900">{merchant?.business_name || merchant?.full_name}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-bold">Kontak Machann</span>
-                <span className="text-xs font-mono text-zinc-400">{merchant ? maskEmail(merchant.email) : '***@***'}</span>
+                <span className="text-xs text-slate-500 font-medium">Kontak Machann</span>
+                <span className="text-sm text-slate-600">{merchant ? maskEmail(merchant.email) : '***@***'}</span>
               </div>
             </div>
           </div>
 
           {/* MESAJ ISTORIK */}
-          <div className="bg-blue-500/5 p-5 rounded-3xl border border-blue-500/10 mb-8 flex gap-3 items-start text-left">
-            <Info className="text-blue-500 shrink-0" size={18} />
-            <p className="text-[10px] text-zinc-400 leading-relaxed">
-              Tranzaksyon sa a anrejistre nan **istorik** ou ak pa machann nan. 
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-8 flex gap-3 items-start text-left">
+            <Info className="text-indigo-600 shrink-0 mt-0.5" size={16} />
+            <p className="text-xs text-indigo-900 font-medium leading-relaxed">
+              Tranzaksyon sa a anrejistre nan istorik ou ak pa machann nan. 
               Machann nan ({merchant?.business_name}) resevwa yon notifikasyon pou lavant sa a.
             </p>
           </div>
 
+          {/* BOUTON YO */}
           <div className="flex flex-col gap-3">
             <button
               onClick={downloadReceipt}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-5 rounded-[1.8rem] font-black text-[11px] uppercase flex items-center justify-center gap-3 transition-all"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm"
             >
-              <Download size={16} /> Telechaje Resi PDF
+              <Download size={18} /> Telechaje Resi PDF
             </button>
 
             <button 
-              onClick={() => router.push('/')}
-              className="w-full bg-white text-black py-5 rounded-[1.8rem] font-black text-[11px] uppercase hover:bg-zinc-200 transition-all"
+              onClick={() => router.push('/dashboard')}
+              className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 py-4 rounded-xl font-bold text-sm transition-all shadow-sm"
             >
-              Tounen nan Dashboard
+              Tounen nan Akey
             </button>
           </div>
 
-          <p className="mt-10 text-[7px] text-zinc-700 font-black uppercase tracking-[0.5em]">
-            HatexCard Secure Network © 2026
-          </p>
+          {/* FOOTER MINI */}
+          <div className="mt-8 flex justify-center items-center gap-2">
+             <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-4 h-4 rounded-sm" />
+             <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+               Hatexcard Secure Network © {new Date().getFullYear()}
+             </p>
+          </div>
         </div>
       </div>
     </div>
@@ -181,7 +208,11 @@ function SuccessContent() {
 
 export default function SuccessPage() {
   return (
-    <Suspense fallback={<div className="bg-[#06070d] min-h-screen"></div>}>
+    <Suspense fallback={
+      <div className="bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
       <SuccessContent />
     </Suspense>
   );
