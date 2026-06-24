@@ -6,8 +6,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
-  Search, Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Settings 
+  Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Settings, Menu 
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -23,6 +23,9 @@ export default function Dashboard() {
   const [showNumbers, setShowNumbers] = useState(false);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  
+  // ETA POU MENI SOU BÒ GÒCH LA (SIDEBAR)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const [announcement, setAnnouncement] = useState("");
   const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
@@ -183,9 +186,6 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // FONKSYON LITIJ AK OTP (Rete Entak)
-  // ==========================================
   const handleOpenRefundModal = async () => {
       setShowRefundModal(true);
       setDisputeStatus("");
@@ -376,47 +376,96 @@ export default function Dashboard() {
   const isAdmin = userData?.email === 'hatexcard@gmail.com';
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
       
       {/* ========================================== */}
-      {/* NAVBAR ANLÈ (RANPLASE MENI ANBA A) */}
+      {/* SIDEBAR (MENI SOU BÒ GÒCH LA) */}
       {/* ========================================== */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-[300] flex">
+          {/* FOND NWA K AP KOUVRI EKRAN AN (Backdrop) */}
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsMenuOpen(false)}
+          ></div>
+          
+          {/* PWENPAL MENI AN (Soti bò gòch la) */}
+          <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-left duration-300 border-r border-gray-200">
+            {/* Header Meni an ak Logo */}
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-3">
+                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-9 h-9 rounded-lg object-cover shadow-sm border border-gray-200" />
+                <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
+              </div>
+              <button onClick={() => setIsMenuOpen(false)} className="text-slate-400 hover:text-slate-700 bg-white rounded-full p-1 border border-gray-200 shadow-sm transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Opsyon Meni yo */}
+            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 px-2">Navigasyon Prensipal</p>
+              
+              <button onClick={() => { router.push('/dashboard'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-indigo-700 bg-indigo-50 font-semibold transition-all border border-indigo-100">
+                <Home size={20} /> Akey
+              </button>
+              
+              <button onClick={() => { router.push('/kat'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
+                <CreditCard size={20} /> Kat
+              </button>
+              
+              <button 
+                onClick={() => {
+                  if (cardFullyActive) {
+                    router.push('/terminal');
+                    setIsMenuOpen(false);
+                  } else {
+                    alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
+                  }
+                }} 
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
+              >
+                <Terminal size={20} /> Terminal
+              </button>
+              
+              <button onClick={() => { router.push('/transactions'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
+                <History size={20} /> Istorik
+              </button>
+              
+              <button onClick={() => { router.push('/setting'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
+                <Settings size={20} /> Paramèt
+              </button>
+            </div>
+
+            {/* Zòn Anba Meni an (Opsyonèl) */}
+            <div className="p-5 border-t border-gray-100 bg-slate-50">
+               <button onClick={() => { router.push('/deposit'); setIsMenuOpen(false); }} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold shadow-sm transition-all">
+                 <Plus size={18} /> Fè yon Depo
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* NAVBAR ANLÈ (AVÈK LOGO AK HAMBURGER) */}
+      {/* ========================================== */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-[100] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             
-            {/* Logo */}
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/dashboard')}>
-              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">H</div>
-              <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
+            {/* Seksyon Gòch: Bouton Meni + Logo */}
+            <div className="flex items-center gap-4">
+              <button onClick={() => setIsMenuOpen(true)} className="text-slate-500 hover:text-indigo-600 transition-colors p-1 rounded-md hover:bg-slate-100">
+                <Menu size={24} />
+              </button>
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/dashboard')}>
+                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm border border-gray-200" />
+                <span className="font-bold text-xl text-slate-900 tracking-tight hidden sm:block">Hatexcard</span>
+              </div>
             </div>
 
-            {/* Menu Desktop */}
-            <div className="hidden md:flex items-center space-x-8">
-              <button onClick={() => router.push('/dashboard')} className="text-indigo-600 font-medium flex items-center gap-2 hover:text-indigo-700 transition">
-                <Home size={18} /> Akey
-              </button>
-              <button onClick={() => router.push('/kat')} className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition">
-                <CreditCard size={18} /> Kat
-              </button>
-              <button 
-                onClick={() => {
-                  if (cardFullyActive) router.push('/terminal');
-                  else alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
-                }} 
-                className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition"
-              >
-                <Terminal size={18} /> Terminal
-              </button>
-              <button onClick={() => router.push('/transactions')} className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition">
-                <History size={18} /> Istorik
-              </button>
-              <button onClick={() => router.push('/setting')} className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition">
-                <Settings size={18} /> Paramèt
-              </button>
-            </div>
-
-            {/* Profil Mobile & Desktop Right */}
+            {/* Seksyon Dwat: Profil & Admin */}
             <div className="flex items-center gap-4">
               {isAdmin && (
                 <button onClick={() => router.push('/admin')} className="hidden sm:block px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md text-sm font-medium border border-indigo-200 hover:bg-indigo-100 transition">
@@ -433,32 +482,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        {/* Menu Mobile (Anba navbar la sou ti ekran) */}
-        <div className="md:hidden border-t border-gray-100 bg-white flex justify-between px-4 py-2 overflow-x-auto">
-          <button onClick={() => router.push('/dashboard')} className="flex flex-col items-center p-2 text-indigo-600 min-w-[60px]">
-            <Home size={20} /> <span className="text-[10px] mt-1 font-medium">Akey</span>
-          </button>
-          <button onClick={() => router.push('/kat')} className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]">
-            <CreditCard size={20} /> <span className="text-[10px] mt-1 font-medium">Kat</span>
-          </button>
-          <button 
-            onClick={() => cardFullyActive ? router.push('/terminal') : alert("Aktive kat la anvan!")} 
-            className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]"
-          >
-            <Terminal size={20} /> <span className="text-[10px] mt-1 font-medium">Terminal</span>
-          </button>
-          <button onClick={() => router.push('/transactions')} className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]">
-            <History size={20} /> <span className="text-[10px] mt-1 font-medium">Istorik</span>
-          </button>
-          <button onClick={() => router.push('/setting')} className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]">
-            <Settings size={20} /> <span className="text-[10px] mt-1 font-medium">Paramèt</span>
-          </button>
-        </div>
       </nav>
 
       {/* ========================================== */}
-      {/* MODAL LITIJ / RANBOUSMAN (Adaptasyon Blan) */}
+      {/* MODAL LITIJ / RANBOUSMAN */}
       {/* ========================================== */}
       {showRefundModal && (
         <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -610,7 +637,7 @@ export default function Dashboard() {
       )}
 
       {/* ========================================== */}
-      {/* MODAL OTP (Adaptasyon Blan) */}
+      {/* MODAL OTP */}
       {/* ========================================== */}
       {showOtpModal && (
         <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -795,12 +822,13 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Kat Fè Fas (Front) - Stripe Style (Dark Blue/Slate Gradient) */}
+                {/* Kat Fè Fas (Front) - LOGO HATEXCARD AJOUTE SOU KAT LA */}
                 <div className={`absolute inset-0 backface-hidden rounded-2xl overflow-hidden bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950 p-6 shadow-xl border border-white/10 ${!cardFullyActive && 'opacity-30 blur-sm'}`}>
                   <div className="flex flex-col h-full justify-between relative z-10">
                     <div className="flex justify-between items-start">
-                      <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white font-bold text-xl">H</div>
-                      <span className="text-sm font-bold text-white/50 tracking-wider">Hatexcard</span>
+                      {/* LOGO SOU KAT LA */}
+                      <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard" className="w-10 h-10 rounded-lg object-cover shadow-sm bg-white/10 backdrop-blur-sm border border-white/20 p-0.5" />
+                      <span className="text-sm font-bold text-white/50 tracking-wider mt-1">Hatexcard</span>
                     </div>
                     <div>
                       <p className="text-xl sm:text-2xl font-mono text-white tracking-widest mb-4">
@@ -856,7 +884,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Recent Transactions List (Stripe Style) */}
+        {/* Recent Transactions List */}
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold text-slate-900">Dènye Tranzaksyon</h2>
@@ -898,15 +926,16 @@ export default function Dashboard() {
       </main>
 
       {/* ========================================== */}
-      {/* GWO FOOTER WEB LA (RANPLASE MENI ANBA A) */}
+      {/* GWO FOOTER WEB LA (AVÈK LOGO HATEXCARD LA) */}
       {/* ========================================== */}
       <footer className="bg-white border-t border-gray-200 mt-20 pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             
             <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">H</div>
+              <div className="flex items-center gap-3 mb-4">
+                {/* LOGO NAN FOOTER A */}
+                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-10 h-10 rounded-lg object-cover shadow-sm border border-gray-200" />
                 <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
               </div>
               <p className="text-sm text-slate-500 leading-relaxed mb-4">
