@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save } from 'lucide-react';
+// Nou ajoute BookOpen isit la pou ikon bouton dokimantasyon an
+import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen } from 'lucide-react';
 
 export default function DeveloperDashboard() {
   const router = useRouter();
@@ -139,13 +140,23 @@ echo $response;
     <div className="min-h-screen bg-[#05060A] text-white p-6 md:p-12 font-sans selection:bg-red-600/30">
       <div className="max-w-5xl mx-auto space-y-12">
         
-        {/* EN-TÈT */}
-        <div>
-          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-4">
-            <Terminal className="text-red-600 w-10 h-10" />
-            API Piblik & Kle Sekrè
-          </h1>
-          <p className="text-zinc-400 mt-2 text-lg">Entegre HatexCard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
+        {/* EN-TÈT AK BOUTON DOKIMANTASYON AN */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
+          <div>
+            <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-4">
+              <Terminal className="text-red-600 w-10 h-10" />
+              API Piblik & Kle Sekrè
+            </h1>
+            <p className="text-zinc-400 mt-2 text-lg">Entegre Hatexcard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
+          </div>
+          
+          <button 
+            onClick={() => router.push('/developer/docs')}
+            className="flex items-center justify-center gap-2 bg-[#1a1d2d] hover:bg-[#23273b] border border-white/10 text-white px-6 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-black/50 w-full md:w-auto"
+          >
+            <BookOpen className="w-5 h-5 text-blue-400" />
+            <span className="uppercase tracking-widest text-[11px] font-black">Gade Dokimantasyon an</span>
+          </button>
         </div>
 
         {/* Bwat KLE SEKRE A */}

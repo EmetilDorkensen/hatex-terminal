@@ -4,7 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
-import { RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, Search, Send, CheckCircle2, MessageSquare } from 'lucide-react'; 
+import { 
+  RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
+  Search, Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Settings 
+} from 'lucide-react'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -36,7 +40,7 @@ export default function Dashboard() {
   const [isRefunding, setIsRefunding] = useState(false);
   
   const [isCheckingId, setIsCheckingId] = useState(false);
-  const [existingDisputeId, setExistingDisputeId] = useState(""); // NOUVO: Kenbe ID litij ki deja la a
+  const [existingDisputeId, setExistingDisputeId] = useState("");
   const [disputeStatus, setDisputeStatus] = useState("");
   const [adminReply, setAdminReply] = useState("");
   const [disputeTableSource, setDisputeTableSource] = useState(""); 
@@ -90,7 +94,7 @@ export default function Dashboard() {
             }
           }
 
-          const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(3);
+          const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(5);
           if (transactions) setRecentTransactions(transactions);
 
           const { data: settings } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
@@ -180,7 +184,7 @@ export default function Dashboard() {
   };
 
   // ==========================================
-  // FONKSYON POU OUVRI MODÈL RANBOUSMAN AK TCHEKE SI GIN LITIJ
+  // FONKSYON LITIJ AK OTP (Rete Entak)
   // ==========================================
   const handleOpenRefundModal = async () => {
       setShowRefundModal(true);
@@ -360,8 +364,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0b14] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -372,122 +376,191 @@ export default function Dashboard() {
   const isAdmin = userData?.email === 'hatexcard@gmail.com';
 
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white font-sans relative flex flex-col italic overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
       
       {/* ========================================== */}
-      {/* MODAL LITIJ / RANBOUSMAN (AK CHAT / KONTINYE KONVÈSASYON) */}
+      {/* NAVBAR ANLÈ (RANPLASE MENI ANBA A) */}
+      {/* ========================================== */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            
+            {/* Logo */}
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/dashboard')}>
+              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">H</div>
+              <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
+            </div>
+
+            {/* Menu Desktop */}
+            <div className="hidden md:flex items-center space-x-8">
+              <button onClick={() => router.push('/dashboard')} className="text-indigo-600 font-medium flex items-center gap-2 hover:text-indigo-700 transition">
+                <Home size={18} /> Akey
+              </button>
+              <button onClick={() => router.push('/kat')} className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition">
+                <CreditCard size={18} /> Kat
+              </button>
+              <button 
+                onClick={() => {
+                  if (cardFullyActive) router.push('/terminal');
+                  else alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
+                }} 
+                className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition"
+              >
+                <Terminal size={18} /> Terminal
+              </button>
+              <button onClick={() => router.push('/transactions')} className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition">
+                <History size={18} /> Istorik
+              </button>
+              <button onClick={() => router.push('/setting')} className="text-slate-600 font-medium flex items-center gap-2 hover:text-indigo-600 transition">
+                <Settings size={18} /> Paramèt
+              </button>
+            </div>
+
+            {/* Profil Mobile & Desktop Right */}
+            <div className="flex items-center gap-4">
+              {isAdmin && (
+                <button onClick={() => router.push('/admin')} className="hidden sm:block px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md text-sm font-medium border border-indigo-200 hover:bg-indigo-100 transition">
+                  Admin Panel
+                </button>
+              )}
+              <div className="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center text-slate-600 font-bold">
+                {userData?.avatar_url ? (
+                  <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  userData?.full_name?.charAt(0) || "U"
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Menu Mobile (Anba navbar la sou ti ekran) */}
+        <div className="md:hidden border-t border-gray-100 bg-white flex justify-between px-4 py-2 overflow-x-auto">
+          <button onClick={() => router.push('/dashboard')} className="flex flex-col items-center p-2 text-indigo-600 min-w-[60px]">
+            <Home size={20} /> <span className="text-[10px] mt-1 font-medium">Akey</span>
+          </button>
+          <button onClick={() => router.push('/kat')} className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]">
+            <CreditCard size={20} /> <span className="text-[10px] mt-1 font-medium">Kat</span>
+          </button>
+          <button 
+            onClick={() => cardFullyActive ? router.push('/terminal') : alert("Aktive kat la anvan!")} 
+            className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]"
+          >
+            <Terminal size={20} /> <span className="text-[10px] mt-1 font-medium">Terminal</span>
+          </button>
+          <button onClick={() => router.push('/transactions')} className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]">
+            <History size={20} /> <span className="text-[10px] mt-1 font-medium">Istorik</span>
+          </button>
+          <button onClick={() => router.push('/setting')} className="flex flex-col items-center p-2 text-slate-500 hover:text-indigo-600 min-w-[60px]">
+            <Settings size={20} /> <span className="text-[10px] mt-1 font-medium">Paramèt</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ========================================== */}
+      {/* MODAL LITIJ / RANBOUSMAN (Adaptasyon Blan) */}
       {/* ========================================== */}
       {showRefundModal && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-[#0a0b14] border border-red-500/30 w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar rounded-[2rem] p-6 shadow-2xl relative flex flex-col">
-            <button 
-              onClick={() => {
-                setShowRefundModal(false);
-                setDisputeStatus(""); 
-              }}
-              className="absolute top-5 right-5 text-zinc-500 hover:text-white transition-colors"
-            >
+        <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white border border-gray-200 w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar rounded-2xl p-6 shadow-2xl relative flex flex-col">
+            <button onClick={() => { setShowRefundModal(false); setDisputeStatus(""); }} className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 transition-colors">
               <X size={20} />
             </button>
             
             <div className="flex items-center gap-3 mb-6 shrink-0">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+              <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
                 <AlertTriangle size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase italic">Mande Ranbousman</h3>
-                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">Sistèm Pwoteksyon Kliyan</p>
+                <h3 className="text-lg font-bold text-slate-900">Mande Ranbousman</h3>
+                <p className="text-xs text-slate-500 font-medium">Sistèm Pwoteksyon Kliyan</p>
               </div>
             </div>
 
             <div className="space-y-4 mb-6 flex-1 flex flex-col min-h-0">
-              
               {isCheckingId ? (
                  <div className="flex justify-center items-center py-10">
-                    <div className="w-6 h-6 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                  </div>
               ) : (disputeStatus === 'disputed' || disputeStatus === 'refunded') ? (
-                /* SI CHAT LA OUVRI -> AFICHE KONVÈSASYON AN */
-                <div className="border border-white/5 bg-zinc-900/50 p-4 rounded-xl animate-in slide-in-from-bottom-4 flex flex-col min-h-[300px]">
-                  <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2 shrink-0">
-                    <p className="text-[10px] uppercase font-bold text-zinc-400">Estati Dosye a:</p>
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md ${disputeStatus === 'refunded' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-500'}`}>
-                      {disputeStatus === 'refunded' ? 'RANBOUSE ✅' : 'AN LITIJ ⚠️ (Jele)'}
+                <div className="border border-gray-200 bg-gray-50 p-4 rounded-xl flex flex-col min-h-[300px]">
+                  <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2 shrink-0">
+                    <p className="text-xs font-semibold text-gray-500 uppercase">Estati Dosye a:</p>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-md ${disputeStatus === 'refunded' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {disputeStatus === 'refunded' ? 'RANBOUSE ✅' : 'AN LITIJ ⚠️'}
                     </span>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto space-y-4 mb-4 custom-scrollbar pr-2 flex flex-col">
-                    <div className="self-end bg-zinc-800 p-3 rounded-2xl rounded-tr-sm max-w-[95%] border border-white/5 ml-auto">
-                      <p className="text-[9px] text-zinc-400 mb-1 font-bold">Ou menm ({storeName})</p>
-                      <p className="text-xs text-white leading-relaxed whitespace-pre-wrap normal-case">{proofText}</p>
+                  <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 flex flex-col">
+                    <div className="self-end bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-sm max-w-[90%] shadow-sm ml-auto">
+                      <p className="text-[10px] text-indigo-200 mb-1 font-medium">Ou menm ({storeName})</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{proofText}</p>
                     </div>
 
-                    <div className="self-start bg-red-900/20 p-3 rounded-2xl rounded-tl-sm max-w-[95%] border border-red-500/20 mr-auto">
-                      <p className="text-[9px] text-red-400 mb-1 font-black flex items-center gap-1">
-                        <ShieldCheck size={10} /> Admin HatexCard
+                    <div className="self-start bg-white p-3 rounded-2xl rounded-tl-sm max-w-[90%] shadow-sm border border-gray-100 mr-auto">
+                      <p className="text-[10px] text-slate-500 mb-1 font-bold flex items-center gap-1">
+                        <ShieldCheck size={12} className="text-indigo-600"/> Admin Hatexcard
                       </p>
-                      <p className="text-xs text-white leading-relaxed normal-case">
-                        {adminReply ? adminReply : <span className="italic text-zinc-500">Nou resevwa dosye w la. Pasyante, n ap reponn ou la a...</span>}
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {adminReply ? adminReply : <span className="italic text-gray-400">Nou resevwa dosye w la. Pasyante, n ap reponn ou la a...</span>}
                       </p>
                     </div>
                   </div>
 
                   {disputeStatus !== 'refunded' && (
-                      <div className="bg-black rounded-xl p-1 flex gap-2 border border-white/10 shrink-0">
+                      <div className="bg-white rounded-xl p-1 flex gap-2 border border-gray-200 shrink-0 shadow-sm">
                           <input 
                               type="text" 
                               placeholder="Ekri yon nouvo mesaj..." 
                               value={chatReply}
                               onChange={(e) => setChatReply(e.target.value)}
-                              className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white normal-case"
+                              className="flex-1 bg-transparent border-none outline-none text-sm p-3 text-slate-900"
                           />
                           <button 
                               onClick={handleClientSendReply} 
                               disabled={isSendingReply || !chatReply} 
-                              className="bg-zinc-800 hover:bg-zinc-700 w-10 rounded-lg flex items-center justify-center text-white disabled:opacity-50 transition-all"
+                              className="bg-indigo-600 hover:bg-indigo-700 w-10 rounded-lg flex items-center justify-center text-white disabled:opacity-50 transition-all"
                           >
-                              {isSendingReply ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={14} />}
+                              {isSendingReply ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}
                           </button>
                       </div>
                   )}
                 </div>
               ) : existingDisputeId ? (
-                /* SI KLIYAN AN GEN LITIJ -> PA BAY RECHÈCH, JUST BAY BOUTON KONTINYE A */
-                <div className="flex flex-col items-center justify-center py-6 px-4 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl animate-in fade-in">
-                    <div className="w-16 h-16 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center mb-4">
+                <div className="flex flex-col items-center justify-center py-8 px-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
                         <MessageSquare size={28} />
                     </div>
-                    <h4 className="text-sm font-black uppercase text-center mb-2">Ou gen yon dosye ki louvri!</h4>
-                    <p className="text-xs text-zinc-400 text-center mb-6 px-2">Nou detekte ou gen yon konvèsasyon ranbousman ki poko fèmen sou sistèm nan. Klike anba a pou w wè repons lan oswa ekri Admin nan.</p>
+                    <h4 className="text-base font-bold text-amber-900 text-center mb-2">Ou gen yon dosye ki louvri!</h4>
+                    <p className="text-sm text-amber-700/80 text-center mb-6 px-2">Nou detekte ou gen yon konvèsasyon ranbousman ki poko fèmen sou sistèm nan.</p>
                     <button 
                         onClick={() => handleCheckOrderDispute(existingDisputeId)}
-                        className="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-yellow-600/20 flex items-center justify-center gap-2"
+                        className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg font-semibold transition-all shadow-sm flex items-center justify-center"
                     >
                         Kontinye Konvèsasyon an
                     </button>
                 </div>
               ) : (
-                /* SI PA GEN ANYEN -> AFICHE FÒMILÈ POU KREYE A (SAN RECHÈCH) */
-                <div className="space-y-4 animate-in fade-in shrink-0">
+                <div className="space-y-4 shrink-0">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">1. Antre ID Kòmand ou an <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">1. Antre ID Kòmand ou an <span className="text-rose-500">*</span></label>
                     <input 
                       type="text" value={refundTxId} onChange={(e) => setRefundTxId(e.target.value)}
-                      placeholder="Eg: 12Chif"
-                      className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 uppercase"
+                      placeholder="Eg: 12Chif oswa CMD-123"
+                      className="w-full bg-white border border-gray-300 text-slate-900 p-3 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">2. Non Boutik la <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">2. Non Boutik la <span className="text-rose-500">*</span></label>
                     <input 
                       type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)}
                       placeholder="Kote w te achte l la"
-                      className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50"
+                      className="w-full bg-white border border-gray-300 text-slate-900 p-3 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">3. Rezon <span className="text-red-500">*</span></label>
-                    <select value={refundReason} onChange={(e) => setRefundReason(e.target.value)} className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50">
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">3. Rezon <span className="text-rose-500">*</span></label>
+                    <select value={refundReason} onChange={(e) => setRefundReason(e.target.value)} className="w-full bg-white border border-gray-300 text-slate-900 p-3 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
                       <option value="Mwen pa resevwa pwodwi a">Mwen pa resevwa pwodwi a</option>
                       <option value="Pwodwi a andomaje">Pwodwi a kraze oswa andomaje</option>
                       <option value="Se pa sa m te kòmande a">Se pa sa m te kòmande a</option>
@@ -495,11 +568,11 @@ export default function Dashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">4. Eksplikasyon & Prèv <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-semibold text-slate-600 mb-1.5 block">4. Eksplikasyon & Prèv <span className="text-rose-500">*</span></label>
                     <textarea 
                       value={proofText} onChange={(e) => setProofText(e.target.value)}
                       placeholder="Esplike kisa k pase a, epi mete lyen foto si w genyen..." rows={3}
-                      className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-red-500/50 resize-none"
+                      className="w-full bg-white border border-gray-300 text-slate-900 p-3 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none"
                     ></textarea>
                   </div>
                 </div>
@@ -511,20 +584,20 @@ export default function Dashboard() {
                   <button 
                       onClick={handleCloseDisputeClient} 
                       disabled={isClosingDispute} 
-                      className="w-full bg-red-600/20 border border-red-500/30 hover:bg-red-600 text-red-500 hover:text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2"
+                      className="w-full bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
                   >
-                      {isClosingDispute ? 'AP FÈMEN...' : <><CheckCircle2 size={16}/> MARKE KÒM REZOUD / FÈMEN DOSYE SA A</>}
+                      {isClosingDispute ? 'AP FÈMEN...' : <><CheckCircle2 size={18}/> MARKE KÒM REZOUD / FÈMEN DOSYE A</>}
                   </button>
               ) : (
                   <>
-                      <button onClick={() => { setShowRefundModal(false); setDisputeStatus(""); }} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">
-                        Fèmen
+                      <button onClick={() => { setShowRefundModal(false); setDisputeStatus(""); }} className="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 py-3 rounded-lg font-semibold text-sm transition-all">
+                        Anile
                       </button>
                       {(disputeStatus === 'pending' || disputeStatus === 'completed' || disputeStatus === 'success' || disputeStatus === '') && !existingDisputeId && !isCheckingId && (
                         <button 
                           onClick={handleSubmitDispute}
                           disabled={isRefunding || !refundTxId || !storeName || !proofText}
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                         >
                           {isRefunding ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Soumèt Dosye a'}
                         </button>
@@ -537,36 +610,35 @@ export default function Dashboard() {
       )}
 
       {/* ========================================== */}
-      {/* MODAL OTP (KONFIME LIVREZON) */}
+      {/* MODAL OTP (Adaptasyon Blan) */}
       {/* ========================================== */}
       {showOtpModal && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-[#0a0b14] border border-green-500/30 w-full max-w-md rounded-[2rem] p-6 shadow-2xl relative">
-            <button onClick={() => setShowOtpModal(false)} className="absolute top-5 right-5 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
+        <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white border border-gray-200 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+            <button onClick={() => setShowOtpModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 transition-colors"><X size={20} /></button>
             
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500"><ShieldCheck size={24} /></div>
+              <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><ShieldCheck size={24} /></div>
               <div>
-                <h3 className="text-lg font-black uppercase italic">Konfime Livrezon</h3>
-                <p className="text-[10px] text-zinc-400 font-bold tracking-widest">Debloke kòb kòmand lan</p>
+                <h3 className="text-lg font-bold text-slate-900">Konfime Livrezon</h3>
+                <p className="text-xs text-slate-500 font-medium">Debloke lajan an nan kont ou</p>
               </div>
             </div>
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">ID Tranzaksyon an</label>
-                <input type="text" value={otpTxId} onChange={(e) => setOtpTxId(e.target.value)} placeholder="Eg: 74 oswa CMD-123" className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-xs outline-none focus:border-green-500/50 transition-colors" />
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">ID Tranzaksyon an</label>
+                <input type="text" value={otpTxId} onChange={(e) => setOtpTxId(e.target.value)} placeholder="Eg: CMD-123" className="w-full bg-white border border-gray-300 text-slate-900 p-3 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors" />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2 block">Kòd Sekrè Kliyan an (4 Chif)</label>
-                <input type="text" maxLength={4} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="0000" className="w-full bg-black border border-white/10 text-white p-4 rounded-xl text-2xl tracking-[1em] text-center font-mono outline-none focus:border-green-500/50 transition-colors" />
-                <p className="text-[9px] text-red-500 mt-2 font-bold uppercase">⚠️ Atansyon: Ou sèlman gen 3 chans si kòd la pa bon!</p>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Kòd Sekrè Kliyan an (OTP)</label>
+                <input type="text" maxLength={4} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="0000" className="w-full bg-gray-50 border border-gray-300 text-slate-900 p-4 rounded-lg text-2xl tracking-[1em] text-center font-mono outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors" />
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setShowOtpModal(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all">Anile</button>
-              <button onClick={handleVerifyOTP} disabled={isVerifying || !otpTxId || otpCode.length !== 4} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-[10px] uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              <button onClick={() => setShowOtpModal(false)} className="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 py-3 rounded-lg font-semibold text-sm transition-all">Anile</button>
+              <button onClick={handleVerifyOTP} disabled={isVerifying || !otpTxId || otpCode.length !== 4} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
                 {isVerifying ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Verifye Kòd la'}
               </button>
             </div>
@@ -574,13 +646,15 @@ export default function Dashboard() {
         </div>
       )}
 
-{/* ========================================== */}
-        {/* HEADER AK MAIN DASHBOARD */}
-        {/* ========================================== */}
-        <div className="w-full max-w-7xl mx-auto p-4 sm:p-5 md:p-6 lg:p-8 pb-32">
-          
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-            <div className="flex items-center gap-3">
+      {/* ========================================== */}
+      {/* MAIN CONTENT AREA */}
+      {/* ========================================== */}
+      <main className="flex-grow w-full max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="relative group cursor-pointer">
               {/* INPUT FILE KACHE POU FOTO A */}
               <input 
                 type="file" 
@@ -590,27 +664,15 @@ export default function Dashboard() {
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file || !userData) return;
-                  
                   setLoading(true);
                   try {
                     const fileExt = file.name.split('.').pop();
                     const fileName = `${userData.id}/${Date.now()}.${fileExt}`;
-                    
-                    // Voye nan Storage
-                    const { error: uploadError } = await supabase.storage
-                      .from('avatars')
-                      .upload(fileName, file, { upsert: true });
-                    
+                    const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true });
                     if (uploadError) throw uploadError;
-
-                    // Jwenn URL piblik la
                     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-
-                    // Mete ajou baz done a
                     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userData.id);
-                    
                     setUserData({...userData, avatar_url: publicUrl});
-                    alert("✅ Foto pwofil ou mete ajou!");
                   } catch (err: any) {
                     alert("Erè nan mete foto a: " + err.message);
                   } finally {
@@ -618,259 +680,280 @@ export default function Dashboard() {
                   }
                 }}
               />
-
-              <label 
-                htmlFor="avatarUpload" 
-                className="w-12 h-12 rounded-full border-2 border-red-600 p-0.5 bg-zinc-900 overflow-hidden flex items-center justify-center font-black shrink-0 cursor-pointer hover:scale-105 transition-all relative group"
-              >
+              <label htmlFor="avatarUpload" className="block w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all relative cursor-pointer">
                 {userData?.avatar_url ? (
                   <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-white">{userData?.full_name?.charAt(0) || "H"}</span>
+                  <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-600 text-2xl font-bold">
+                    {userData?.full_name?.charAt(0) || "H"}
+                  </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-white uppercase font-bold">Edit</div>
+                <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-medium">Edit</div>
               </label>
+            </div>
 
-              <div className="overflow-hidden">
-                <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest leading-none italic">Byenvini 👋</p>
-                <h2 className="font-bold text-[11px] uppercase italic mt-1 tracking-wide truncate max-w-[120px] md:max-w-[200px] lg:max-w-[250px]">
-                  {userData?.full_name || "Kliyan Hatex"}
-                </h2>
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Bonjou,</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight truncate max-w-[200px] sm:max-w-[400px]">
+                {userData?.full_name || "Kliyan Hatexcard"}
+              </h1>
+            </div>
+          </div>
+
+          {/* Quick Actions Desktop */}
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={() => setShowOtpModal(true)} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all">
+              <CheckCircle size={16} /> Konfime Peman
+            </button>
+            <button onClick={handleOpenRefundModal} className="bg-white hover:bg-gray-50 text-slate-700 border border-gray-200 text-sm font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-sm">
+              <RefreshCcw size={16} className="text-indigo-600" /> Litij / Ranbousman
+            </button>
+            <button onClick={() => setShowNumbers(!showNumbers)} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
+              <span className="text-lg">{showNumbers ? "🔒" : "👁️"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-10">
+          
+          {/* Col 1: Balance & Actions */}
+          <div className="lg:col-span-1 space-y-6">
+            
+            {/* Balance Card */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-6 opacity-10">
+                <CreditCard size={100} />
+              </div>
+              <p className="text-sm font-semibold text-slate-500 mb-2">Balans Disponib</p>
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight truncate">
+                  {userData?.wallet_balance ? Number(userData.wallet_balance).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "0.00"}
+                </h3>
+                <span className="text-lg font-semibold text-slate-500">HTG</span>
               </div>
             </div>
-          <div className="flex flex-wrap items-center gap-2">
-            
-            <button onClick={() => setShowOtpModal(true)} className="bg-zinc-900/50 hover:bg-green-600/20 text-green-500 border border-white/5 hover:border-green-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
-              <CheckCircle size={12} /> KONFIME LIVREZON
-            </button>
-            
-            <button onClick={handleOpenRefundModal} className="bg-zinc-900/50 hover:bg-red-600/20 text-red-500 border border-white/5 hover:border-red-500/30 text-[9px] font-black px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-lg">
-              <RefreshCcw size={12} /> RANBOUSE
-            </button>
 
-            {isAdmin && (
-              <button onClick={() => router.push('/admin')} className="bg-red-600 text-[9px] font-black px-3 py-2 rounded-lg animate-bounce shadow-lg shadow-red-600/30">
-                ADMIN
+            {/* Action Buttons */}
+            <div className="grid grid-cols-3 gap-3">
+              <button onClick={() => router.push('/deposit')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <Plus size={20} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">Depo</span>
               </button>
-            )}
-            <button onClick={() => setShowNumbers(!showNumbers)} className="w-9 h-9 bg-zinc-900/50 rounded-full border border-zinc-800 flex items-center justify-center active:scale-90 transition-all shrink-0">
-              <span className="text-sm">{showNumbers ? "🔒" : "👁️"}</span>
-            </button>
+              <button onClick={() => router.push('/withdraw')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <ArrowUpRight size={20} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">Retrè</span>
+              </button>
+              <button onClick={() => router.push('/transfert')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <ArrowRightLeft size={20} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">Transfè</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Balans Wallet */}
-        <div className="bg-zinc-900/30 backdrop-blur-md p-5 sm:p-6 md:p-7 rounded-[2rem] mb-6 border border-white/5 relative overflow-hidden">
-          <p className="text-[11px] uppercase text-zinc-500 font-black mb-1 tracking-[0.2em]">Balans Wallet</p>
-          <div className="flex items-baseline gap-2 overflow-hidden">
-            <h3 className="text-4xl sm:text-5xl md:text-6xl font-black italic tracking-tighter truncate">
-              {userData?.wallet_balance ? Number(userData.wallet_balance).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "0.00"}
-            </h3>
-            <span className="text-[10px] font-bold text-red-600 uppercase italic">Goud</span>
-          </div>
-        </div>
-
-        {/* Aksyon */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-8">
-          <button onClick={() => router.push('/deposit')} className="bg-red-600 py-4 sm:py-5 md:py-6 rounded-[2.5rem] flex items-center justify-center text-white active:scale-95 transition-all shadow-lg shadow-red-600/20">
-            <span className="text-[12px] sm:text-[13px] md:text-[14px] font-black uppercase italic tracking-widest">Depo</span>
-          </button>
-          <button onClick={() => router.push('/withdraw')} className="bg-red-600 py-4 sm:py-5 md:py-6 rounded-[2.5rem] flex items-center justify-center text-white active:scale-95 transition-all shadow-lg shadow-red-600/20">
-            <span className="text-[12px] sm:text-[13px] md:text-[14px] font-black uppercase italic tracking-widest">Retrè</span>
-          </button>
-          <button onClick={() => router.push('/transfert')} className="bg-white py-4 sm:py-5 md:py-6 rounded-[2.5rem] flex items-center justify-center text-red-600 shadow-xl active:scale-95 transition-all">
-            <span className="text-[12px] sm:text-[13px] md:text-[14px] font-black uppercase italic tracking-widest">Transfè</span>
-          </button>
-        </div>
-
-        {/* Kat Vityèl */}
-        <div className="mb-8 perspective-1000">
-          <p className="text-[10px] font-black uppercase italic text-zinc-500 mb-3 ml-2 tracking-widest flex justify-between">
-            <span>Kat Vityèl {cardNeedsActivation && "(Poko Aktive)"}</span>
-            {cardFullyActive && <span className="text-red-600 animate-pulse text-[8px]">Klike pou vire</span>}
-          </p>
-          <div className="relative aspect-[1.58/1] w-full max-w-[500px] mx-auto">
-            
-            {kycPending && (
-              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/80 backdrop-blur-md p-4 text-center border border-white/5">
-                <p className="text-[9px] font-black uppercase mb-3 tracking-widest text-white/90">
-                  {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : "Verifikasyon ID Obligatwa"}
-                </p>
-                <button onClick={() => router.push('/kyc')} className="bg-white text-black px-8 py-3 rounded-full font-black text-[10px] uppercase shadow-2xl active:scale-90 transition-all">
-                  Pase KYC Gratis
-                </button>
+          {/* Col 2: Virtual Card */}
+          <div className="lg:col-span-2 flex justify-center lg:justify-end items-center perspective-1000">
+            <div className="w-full max-w-[480px]">
+              <div className="flex justify-between items-end mb-3 px-1">
+                <p className="text-sm font-semibold text-slate-700">Kat Vityèl {cardNeedsActivation && "(Poko Aktive)"}</p>
+                {cardFullyActive && <button onClick={() => setIsFlipped(!isFlipped)} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><RefreshCcw size={12}/> Vire Kat la</button>}
               </div>
-            )}
-
-            {cardNeedsActivation && (
-              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-[2rem] bg-black/60 backdrop-blur-xl p-6 text-center border border-yellow-500/30">
-                <div className="text-3xl mb-2 drop-shadow-md">🔒</div>
-                <p className="text-[9px] font-bold uppercase mb-2 tracking-widest text-zinc-200 leading-relaxed drop-shadow-md">
-                  Aktive kat ou ak terminal ou pou w kòmanse resevwa lajan, vann abònman, tout sa w vle.
-                </p>
+              
+              <div className="relative aspect-[1.58/1] w-full cursor-pointer transition-all duration-700 preserve-3d" onClick={() => cardFullyActive && setIsFlipped(!isFlipped)}>
                 
-                {discountAmount > 0 && (
-                   <p className="text-[10px] text-green-400 font-black mb-3 animate-pulse uppercase tracking-widest">
-                      🎉 Ou jwenn yon rediksyon {discountAmount} HTG!
-                   </p>
+                {kycPending && (
+                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-white/90 backdrop-blur-sm p-6 text-center border border-gray-200 shadow-sm">
+                    <p className="text-sm font-bold text-slate-900 mb-4">
+                      {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : "Verifikasyon ID Obligatwa"}
+                    </p>
+                    <button onClick={() => router.push('/kyc')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm shadow-md hover:bg-indigo-700 transition-all">
+                      Pase KYC Gratis
+                    </button>
+                  </div>
                 )}
 
-                <button onClick={handleActivateCard} className="bg-yellow-500 text-black px-8 py-4 rounded-full font-black text-[10px] uppercase shadow-2xl shadow-yellow-500/20 active:scale-90 transition-all border border-yellow-400">
-                  AKTIVE POU {uiPriAktivasyon} HTG
-                </button>
-              </div>
-            )}
-
-            <div
-              className={`relative h-full w-full transition-all duration-700 preserve-3d cursor-pointer ${isFlipped && cardFullyActive ? 'rotate-y-180' : ''}`}
-              onClick={() => cardFullyActive && setIsFlipped(!isFlipped)}
-            >
-              <div className="absolute inset-0 backface-hidden rounded-[2rem] overflow-hidden bg-gradient-to-tr from-red-700 via-red-600 to-zinc-950 p-4 sm:p-5 md:p-6 shadow-2xl border border-white/5">
-                <div className={`flex flex-col h-full justify-between ${!cardFullyActive ? 'blur-md opacity-50' : ''}`}>
-                  <div className="flex justify-between items-start">
-                    <div className="w-10 h-10 bg-white/10 rounded-xl border border-white/20 flex items-center justify-center overflow-hidden">
-                      <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-full h-full object-cover" />
-                    </div>
-                    <h2 className="text-[10px] font-black italic tracking-tighter uppercase font-mono">HatexCard</h2>
-                  </div>
-                  <div className="space-y-3">
-                    <p className="text-lg sm:text-xl md:text-2xl font-mono font-bold tracking-[0.2em] break-all">
-                      {formatCardNumber(userData?.card_number)}
+                {cardNeedsActivation && (
+                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-slate-900/80 backdrop-blur-md p-6 text-center shadow-lg border border-slate-700">
+                    <div className="text-4xl mb-3">🔒</div>
+                    <p className="text-sm font-medium text-white mb-4">
+                      Aktive kat ou pou kòmanse resevwa peman.
                     </p>
-                    <div className="flex flex-wrap justify-between items-end gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">Pwopriyetè</p>
-                        <p className="text-[10px] font-black uppercase truncate max-w-[150px] sm:max-w-[200px]">{userData?.full_name}</p>
-                      </div>
-                      <div className="flex gap-3 text-right flex-shrink-0">
+                    {discountAmount > 0 && (
+                       <p className="text-xs text-emerald-400 font-bold mb-3">
+                          🎉 Rediksyon {discountAmount} HTG!
+                       </p>
+                    )}
+                    <button onClick={handleActivateCard} className="bg-white text-slate-900 px-6 py-3 rounded-lg font-bold text-sm shadow-lg hover:bg-gray-100 transition-all">
+                      Aktive pou {uiPriAktivasyon} HTG
+                    </button>
+                  </div>
+                )}
+
+                {/* Kat Fè Fas (Front) - Stripe Style (Dark Blue/Slate Gradient) */}
+                <div className={`absolute inset-0 backface-hidden rounded-2xl overflow-hidden bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950 p-6 shadow-xl border border-white/10 ${!cardFullyActive && 'opacity-30 blur-sm'}`}>
+                  <div className="flex flex-col h-full justify-between relative z-10">
+                    <div className="flex justify-between items-start">
+                      <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white font-bold text-xl">H</div>
+                      <span className="text-sm font-bold text-white/50 tracking-wider">Hatexcard</span>
+                    </div>
+                    <div>
+                      <p className="text-xl sm:text-2xl font-mono text-white tracking-widest mb-4">
+                        {formatCardNumber(userData?.card_number)}
+                      </p>
+                      <div className="flex justify-between items-end">
                         <div>
-                          <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">Exp</p>
-                          <p className="text-[9px] font-bold">{userData?.exp_date || "**/**"}</p>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Non sou Kat la</p>
+                          <p className="text-sm font-medium text-white tracking-wide truncate max-w-[180px]">{userData?.full_name}</p>
                         </div>
-                        <div>
-                          <p className="text-[7px] opacity-60 uppercase font-black mb-0.5">CVV</p>
-                          <p className="text-[9px] font-bold">{showNumbers ? (userData?.cvv || "***") : "***"}</p>
+                        <div className="flex gap-6 text-right">
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Exp</p>
+                            <p className="text-sm font-mono text-white">{userData?.exp_date || "**/**"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">CVV</p>
+                            <p className="text-sm font-mono text-white">{showNumbers ? (userData?.cvv || "***") : "***"}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
+                  {/* Decorative Elements */}
+                  <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                  <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
                 </div>
-              </div>
-              <div className="absolute inset-0 rotate-y-180 backface-hidden rounded-[2rem] bg-zinc-900 p-6 border border-white/10 flex flex-col items-center justify-center">
-                <div className="w-full h-10 bg-black absolute top-6 left-0"></div>
-                <div className="mt-8 bg-white p-2 rounded-xl">
-                  <QRCodeSVG value={`Card:${userData?.card_number || 'INVALID'}`} size={90} />
+
+                {/* Kat Fè Do (Back) */}
+                <div className={`absolute inset-0 rotate-y-180 backface-hidden rounded-2xl bg-slate-800 border border-slate-700 shadow-xl flex flex-col items-center justify-center ${!cardFullyActive && 'hidden'}`}>
+                  <div className="w-full h-12 bg-slate-950 absolute top-6 left-0"></div>
+                  <div className="mt-10 bg-white p-2.5 rounded-xl shadow-sm">
+                    <QRCodeSVG value={`Card:${userData?.card_number || 'INVALID'}`} size={100} />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-400 mt-4">Eskane pou Peye</p>
                 </div>
-                <p className="text-[8px] font-black uppercase mt-4 text-red-600 tracking-widest italic animate-pulse">Eskane pou peye</p>
+
               </div>
             </div>
           </div>
         </div>
 
+        {/* Announcements */}
         {isAnnouncementActive && announcement && (
-          <div className="mb-10 bg-zinc-900/60 border border-blue-500/20 rounded-[2rem] p-5 sm:p-6 relative overflow-hidden shadow-lg shadow-blue-900/10 backdrop-blur-md">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-            
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-xl">📢</span>
-              <span className="text-[9px] font-black uppercase text-blue-400 tracking-[0.2em] bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">
-                Notifikasyon Hatex
-              </span>
+          <div className="mb-10 bg-indigo-50 border border-indigo-100 rounded-2xl p-6 relative overflow-hidden">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-lg">📢</span>
+              <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">Notifikasyon</span>
             </div>
-            
-            <p className="text-[12px] sm:text-[13px] text-white font-bold leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm text-indigo-900 leading-relaxed whitespace-pre-wrap">
               {announcement}
             </p>
           </div>
         )}
 
-        {/* Dènye Aktivite */}
-        <div className="mb-20">
-          <div className="flex justify-between items-center mb-4 px-2">
-            <p className="text-[10px] font-black uppercase italic text-zinc-500 tracking-widest">Dènye Aktivite</p>
-            <button onClick={() => router.push('/transactions')} className="text-[9px] font-bold text-red-500 uppercase italic">Wè tout</button>
+        {/* Recent Transactions List (Stripe Style) */}
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold text-slate-900">Dènye Tranzaksyon</h2>
+            <button onClick={() => router.push('/transactions')} className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">Gade tout</button>
           </div>
 
-          <div className="space-y-3">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
             {loadingRecent ? (
-              <div className="text-center py-4"><div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+              <div className="p-8 flex justify-center"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>
             ) : recentTransactions.length === 0 ? (
-              <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[1.5rem] text-center backdrop-blur-md">
-                <p className="text-[8px] font-black uppercase text-zinc-600 italic tracking-widest">Pa gen aktivite ankò</p>
-              </div>
+              <div className="p-8 text-center text-slate-500 text-sm">Pa gen aktivite ankò.</div>
             ) : (
-              recentTransactions.map((t) => (
-                <div key={t.id} className="bg-zinc-900/40 border border-white/5 p-4 rounded-[2rem] backdrop-blur-md active:scale-95 transition-all">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-zinc-800/80 border border-white/5 flex-shrink-0">
-                        {t.type === 'DEPOSIT' ? '' :
-                         t.type === 'WITHDRAWAL' ? '' :
-                         t.type === 'P2P' ? '' :
-                         t.type === 'CARD_ACTIVATION' ? '' :
-                         t.type === 'CARD_RECHARGE' ? '' : ''}
+              <div className="divide-y divide-gray-100">
+                {recentTransactions.map((t) => (
+                  <div key={t.id} className="p-4 sm:p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.amount > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
+                        {t.amount > 0 ? <ArrowDownToLine size={18} /> : <ArrowUpFromLine size={18} />}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-[10px] font-black uppercase tracking-tight text-zinc-100 truncate max-w-[120px] sm:max-w-[200px] md:max-w-[300px]">
-                          {t.description}
-                        </h3>
-                        {t.user_email && (
-                          <p className="text-[8px] text-zinc-600 font-bold lowercase truncate">
-                            {t.user_email.substring(0, 3)}.....@{t.user_email.split('@')[1]}
-                          </p>
-                        )}
+                        <p className="text-sm font-semibold text-slate-900 truncate">{t.description}</p>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                          {new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          {t.user_email && ` • ${t.user_email.split('@')[0]}...`}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className={`text-[12px] font-black ${t.amount > 0 ? 'text-green-500' : 'text-white'}`}>
-                        {t.amount > 0 ? '+' : ''}{Number(t.amount).toLocaleString()}
-                        <span className="text-[7px] ml-1">HTG</span>
+                    <div className="text-right shrink-0 pl-4">
+                      <p className={`text-sm font-bold ${t.amount > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                        {t.amount > 0 ? '+' : ''}{Number(t.amount).toLocaleString('en-US', {minimumFractionDigits: 2})} <span className="text-[10px] text-slate-500">HTG</span>
                       </p>
                     </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>
-      </div>
+      </main>
 
       {/* ========================================== */}
-      {/* NAVIGASYON ANBA (BOTTOM NAV) */}
+      {/* GWO FOOTER WEB LA (RANPLASE MENI ANBA A) */}
       {/* ========================================== */}
-      <div className="fixed bottom-4 md:bottom-6 left-3 right-3 sm:left-4 sm:right-4 max-w-lg mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/5 h-[4.5rem] rounded-[2rem] flex justify-around sm:justify-between items-center px-4 sm:px-8 z-50 shadow-2xl">
-        <div className="flex flex-col items-center text-red-600 cursor-pointer hover:scale-105 transition-all">
-          <div className="w-1.5 h-1.5 bg-red-600 rounded-full mb-1"></div>
-          <span className="text-[10px] sm:text-[11px] font-black uppercase">Akey</span>
-        </div>
-        <div onClick={() => router.push('/kat')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
-          <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Kat</span>
-        </div>
-        
-        <div onClick={() => {
-            if (cardFullyActive) {
-              router.push('/terminal');
-            } else {
-              alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
-              window.scrollTo({ top: 300, behavior: 'smooth' }); 
-            }
-          }} 
-          className="relative -mt-10 md:-mt-12 cursor-pointer hover:scale-105 transition-all"
-        >
-          <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-lg rotate-45 ${cardFullyActive ? 'bg-red-600 shadow-red-600/40' : 'bg-zinc-700 shadow-black'}`}>
-            <span className={`text-2xl font-black -rotate-45 italic ${cardFullyActive ? 'text-white' : 'text-zinc-500'}`}>
-              {cardFullyActive ? 'T' : '🔒'}
-            </span>
+      <footer className="bg-white border-t border-gray-200 mt-20 pt-16 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+            
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">H</div>
+                <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
+              </div>
+              <p className="text-sm text-slate-500 leading-relaxed mb-4">
+                Platfòm peman sou entènèt ak kat vityèl pou antreprenè, devlopè, ak sitwayen nimerik an Ayiti.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Pwodwi</h3>
+              <ul className="space-y-3">
+                <li><button onClick={() => router.push('/kat')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kat Vityèl</button></li>
+                <li><button onClick={() => router.push('/terminal')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Pòtay Peman (API)</button></li>
+                <li><button onClick={() => router.push('/deposit')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Rechaje Kont</button></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Devlopè</h3>
+              <ul className="space-y-3">
+                <li><button onClick={() => router.push('/developer/docs')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Dokimantasyon API</button></li>
+                <li><button onClick={() => router.push('/plugins')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Plugins (WordPress)</button></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kòd Sous</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Sipò</h3>
+              <ul className="space-y-3">
+                <li><button onClick={handleOpenRefundModal} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kondisyon Ranbousman</button></li>
+                <li><a href="mailto:hatexcard@gmail.com" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kontakte Nou</a></li>
+                <li><button onClick={() => router.push('/setting')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Paramèt Kont</button></li>
+              </ul>
+            </div>
+
+          </div>
+          
+          <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-slate-400">
+              &copy; {new Date().getFullYear()} Hatexcard. Tout dwa rezève.
+            </p>
+            <div className="flex gap-6">
+              <a href="#" className="text-sm text-slate-400 hover:text-slate-600">Tèm ak Kondisyon</a>
+              <a href="#" className="text-sm text-slate-400 hover:text-slate-600">Konfidansyalite</a>
+            </div>
           </div>
         </div>
-
-        <div onClick={() => router.push('/transactions')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
-          <span className="text-[10px] sm:text-[11px] font-black uppercase text-white">Istorik</span>
-        </div>
-        <div onClick={() => router.push('/setting')} className="flex flex-col items-center opacity-50 cursor-pointer hover:opacity-100 hover:scale-105 transition-all">
-          <span className="text-[10px] sm:text-[11px] font-black uppercase text-red-400">Paramèt</span>
-        </div>
-      </div>
+      </footer>
 
       <style jsx>{`
         .perspective-1000 { perspective: 1000px; }
@@ -880,4 +963,12 @@ export default function Dashboard() {
       `}</style>
     </div>
   );
+}
+
+// Ikon Anplis ki itilize nan paj la
+function ArrowDownToLine(props: any) {
+  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg>
+}
+function ArrowUpFromLine(props: any) {
+  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>
 }
