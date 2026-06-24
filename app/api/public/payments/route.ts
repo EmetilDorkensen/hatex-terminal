@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-// Pèmèt nenpòt aplikasyon oswa fichye lokal (tankou teste-api.html) konekte san pwoblèm CORS
+// KOUCH SEKIRITE 1: CORS Strik pou API Pwodiksyon
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': '*', // Ou ka chanje '*' pou 'https://sit-machann-yo.com' pita si w vle
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Idempotency-Key',
 };
 
 export async function OPTIONS() {
@@ -15,25 +15,21 @@ export async function OPTIONS() {
 
 export async function POST(request: Request) {
   try {
-    // 1. OTANTIFIKASYON API KEY (Nou tcheke tou de fòma yo pou evite erè 401)
+    // KOUCH SEKIRITE 2: Otantifikasyon ak verifikasyon Header
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen." }, 
-        { status: 401, headers: corsHeaders }
-      );
+      return NextResponse.json({ error: "Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen." }, { status: 401, headers: corsHeaders });
     }
     
-    const apiKey = authHeader.split(' ')[1]; // Rale kòd hx_live_ la sèlman
+    const apiKey = authHeader.split(' ')[1].trim();
 
-    // Konekte ak Supabase avèk dwa Sèvè (Bypass RLS pou tranzaksyon finansye)
+    // Konekte ak Supabase avèk dwa Sèvè pou tranzaksyon finansye
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // 2. IDANTIFYE AK VERIFYE MACHANN NAN
+    // KOUCH SEKIRITE 3: Verifikasyon Estati Machann nan
     const { data: merchant, error: merchantErr } = await supabase
       .from('profiles')
       .select('id, full_name, is_merchant, account_status, wallet_balance, webhook_url, webhook_secret')
@@ -41,72 +37,93 @@ export async function POST(request: Request) {
       .single();
 
     if (merchantErr || !merchant || !merchant.is_merchant) {
-      return NextResponse.json({ error: "Kle API (Secret Key) sa a pa bon oswa kont lan pa machann." }, { status: 403, headers: corsHeaders });
+      return NextResponse.json({ error: "Kle API sa a pa valab oswa kont lan pa otorize pou resevwa peman." }, { status: 403, headers: corsHeaders });
     }
-    if (merchant.account_status === 'suspended') {
-      return NextResponse.json({ error: "Kont machann sa a sispandi. Tranzaksyon an anile." }, { status: 403, headers: corsHeaders });
+    if (merchant.account_status !== 'active') {
+      return NextResponse.json({ error: "Kont machann sa a pa aktif. Tranzaksyon an anile." }, { status: 403, headers: corsHeaders });
     }
 
-    // 3. RALE EPI NETWAYE DONE KLIYAN AN VOYE YO
+    // Rale done yo ak Pwoteksyon kont kòd malveyan
     const body = await request.json();
     const { amount, currency, order_id, card_info } = body;
 
-    // Retire espas nan nimewo kat la si devlopè a te voye l ak espas (egz: "4550 1234...")
-    const cleanCard = String(card_info?.number || '').replace(/\s/g, '');
-    const expDateInput = String(card_info?.exp || '');
-    const cvvInput = String(card_info?.cvv || '');
-    const safeAmount = Number(amount);
+    // KOUCH SEKIRITE 4: Validasyon Done Strik (Regex)
+    const cleanCard = String(card_info?.number || '').replace(/\D/g, ''); // Sèlman chif
+    const cleanCvv = String(card_info?.cvv || '').replace(/\D/g, '');
+    const rawExp = String(card_info?.exp || '').replace(/\D/g, '');
+    const safeAmount = parseFloat(Number(amount).toFixed(2)); // Evite chif desimal enfini
+    const cleanOrderId = String(order_id || '').trim().substring(0, 50); // Limite longè order_id
 
-    // Validasyon debaz pou asire tout enfòmasyon kat la la
-    if (!cleanCard || !expDateInput || !cvvInput || isNaN(safeAmount) || safeAmount < 10) {
-      return NextResponse.json({ error: "Done yo manke. Ou dwe bay: amount, number, exp, ak cvv." }, { status: 400, headers: corsHeaders });
+    if (cleanCard.length < 15 || cleanCvv.length < 3 || rawExp.length !== 4 || isNaN(safeAmount) || safeAmount <= 0) {
+      return NextResponse.json({ error: "Fòma done yo pa bon. Tcheke kat la, CVV a, Dat la (MMYY), oswa kantite kòb la." }, { status: 400, headers: corsHeaders });
     }
 
-    // 4. VRÈ VERIFIKASYON ENFO KAT YO (NIMEWO / CVV / EXP_DATE)
+    const slashedExp = `${rawExp.slice(0, 2)}/${rawExp.slice(2)}`; // "MM/YY"
+
+    // KOUCH SEKIRITE 5: Anti-Doublon (Idempotency Check)
+    // Tcheke si machann nan pa t deja resevwa yon peman pou menm order_id sa a jodi a
+    if (cleanOrderId && cleanOrderId !== 'N/A') {
+      const { data: existingTx } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('user_id', merchant.id)
+        .like('description', `%Kòmand #${cleanOrderId}%`)
+        .single();
+        
+      if (existingTx) {
+        return NextResponse.json({ error: "Peman sa a fèt deja pou kòmand sa a (Pwoteksyon Anti-Doublon)." }, { status: 409, headers: corsHeaders });
+      }
+    }
+
+    // KOUCH SEKIRITE 6: Verifikasyon Kliyan (Kat)
     const { data: client, error: clientErr } = await supabase
       .from('profiles')
       .select('id, wallet_balance, full_name, account_status')
       .eq('card_number', cleanCard)
-      .eq('cvv', cvvInput)
-      .eq('exp_date', expDateInput) // Verifye dat ekspirasyon egzak la
+      .eq('cvv', cleanCvv)
+      .or(`exp_date.eq.${rawExp},exp_date.eq.${slashedExp}`)
       .single();
 
-    // Si Supabase pa jwenn anyen, sa vle di youn nan 3 enfo yo pa bon
     if (clientErr || !client) {
-      return NextResponse.json({ error: "Kat la pa valab oswa enfòmasyon yo (Nimewo, CVV, Dat EXP) pa koresponn." }, { status: 401, headers: corsHeaders });
+      return NextResponse.json({ error: "Tranzaksyon refize. Enfòmasyon kat yo pa koresponn." }, { status: 401, headers: corsHeaders });
     }
-    if (client.account_status === 'suspended') {
-      return NextResponse.json({ error: "Kont kliyan sa a sispandi." }, { status: 403, headers: corsHeaders });
+    if (client.account_status !== 'active') {
+      return NextResponse.json({ error: "Kont ki asosye ak kat sa a pa aktif." }, { status: 403, headers: corsHeaders });
     }
     if (Number(client.wallet_balance) < safeAmount) {
-      return NextResponse.json({ error: "Balans kat la ensifizan pou fè peman sa a." }, { status: 400, headers: corsHeaders });
+      return NextResponse.json({ error: "Fon ensifizan." }, { status: 400, headers: corsHeaders });
     }
 
-    // 5. EKZEKISYON PEMAN AN (Debite Kliyan, Kredite Machann)
+    // ==================================================
+    // KOUCH SEKIRITE 7: EKZEKISYON FINANSYE
+    // ==================================================
     
-    // A. Retire kòb sou kont Kliyan an
+    // 1. Retire kòb Kliyan an
     const nouvoBalansKliyan = Number(client.wallet_balance) - safeAmount;
-    await supabase.from('profiles').update({ wallet_balance: nouvoBalansKliyan }).eq('id', client.id);
+    const { error: debitErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalansKliyan }).eq('id', client.id);
+    if (debitErr) throw new Error("Echèk nan debi kliyan an");
 
-    // B. Mete kòb la sou kont Machann nan
+    // 2. Kredite Machann nan
     const nouvoBalansMachann = Number(merchant.wallet_balance) + safeAmount;
-    await supabase.from('profiles').update({ wallet_balance: nouvoBalansMachann }).eq('id', merchant.id);
+    const { error: creditErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalansMachann }).eq('id', merchant.id);
+    if (creditErr) throw new Error("Echèk nan kredi machann nan");
 
-    // Kòd Tranzaksyon inik
-    const transactionId = `HTX-${Date.now().toString().slice(-8)}`;
-
-    // C. Ekri istoral Tranzaksyon yo nan Journal la
+    // 3. Jounal Tranzaksyon
+    const transactionId = `HTX-${crypto.randomBytes(4).toString('hex').toUpperCase()}`; // ID inik kripte
+    
     await supabase.from('transactions').insert([
-      { user_id: client.id, amount: -safeAmount, type: 'PURCHASE', description: `Peman API bay ${merchant.full_name} (Kòmand #${order_id || 'N/A'})`, status: 'success' },
-      { user_id: merchant.id, amount: safeAmount, type: 'SALE', description: `Lavant API: Kliyan ${client.full_name} (Kòmand #${order_id || 'N/A'})`, status: 'success' }
+      { user_id: client.id, amount: -safeAmount, type: 'PURCHASE', description: `Peman sou entènèt: ${merchant.full_name} (Kòmand #${cleanOrderId || 'N/A'})`, status: 'success' },
+      { user_id: merchant.id, amount: safeAmount, type: 'SALE', description: `Lavant sou entènèt: Kliyan ${client.full_name} (Kòmand #${cleanOrderId || 'N/A'})`, status: 'success' }
     ]);
 
-    // 6. SISTÈM WEBHOOK OTOMATIK SOU SIT MACHANN NAN (Nan fènwa)
+    // ==================================================
+    // KOUCH SEKIRITE 8: WEBHOOK KRIPTE AK GARANTI (AWAITED)
+    // ==================================================
     if (merchant.webhook_url && merchant.webhook_secret) {
       const payload = {
         event: 'payment.success',
         transaction_id: transactionId,
-        order_id: order_id || 'N/A',
+        order_id: cleanOrderId || 'N/A',
         amount: safeAmount,
         currency: currency || 'HTG',
         customer_name: client.full_name,
@@ -114,17 +131,28 @@ export async function POST(request: Request) {
       };
 
       const payloadString = JSON.stringify(payload);
-      // Siyen mesaj la ak HMAC SHA-256 pou sekirite rezo a
       const signature = crypto.createHmac('sha256', merchant.webhook_secret).update(payloadString).digest('hex');
 
-      fetch(merchant.webhook_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-hatex-signature': signature },
-        body: payloadString
-      }).catch(err => console.error("Echèk voye Webhook:", err));
+      try {
+        // AWAIT obligatwa isit la, sinon Next.js touye demann nan anvan webhook la pati
+        await fetch(merchant.webhook_url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            'x-hatex-signature': signature 
+          },
+          body: payloadString,
+          // Timeout sekirite pou webhook la pa bloke tranzaksyon an twò lontan (5 segonn max)
+          signal: AbortSignal.timeout(5000) 
+        });
+        console.log(`[WEBHOOK SUCCESS] Voye bay machann: ${merchant.full_name}`);
+      } catch (err) {
+        // Nou pa anile peman an si webhook machann nan pa mache (sèvè l ka an pàn), men nou jounalize l
+        console.error(`[WEBHOOK ERROR] Sèvè machann nan pa reponn:`, err);
+      }
     }
 
-    // 7. REYISI: REPONS JSON FINAL LA
+    // REYISI FINAL LA
     return NextResponse.json({ 
       success: true, 
       message: "Peman an fèt ak siksè!",
@@ -134,6 +162,7 @@ export async function POST(request: Request) {
     }, { headers: corsHeaders });
 
   } catch (error: any) {
-    return NextResponse.json({ error: "Sèvè a jwenn yon erè teknik pandan l t ap trete peman an." }, { status: 500, headers: corsHeaders });
+    console.error("[CRITICAL ERROR] HatexCard Payment Gateway:", error);
+    return NextResponse.json({ error: "Sèvè a rankontre yon erè kritik. Tanpri kontakte sipò HatexCard." }, { status: 500, headers: corsHeaders });
   }
 }
