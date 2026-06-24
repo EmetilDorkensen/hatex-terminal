@@ -540,12 +540,7 @@ export default function Dashboard() {
 
           {/* Quick Actions Desktop */}
           <div className="flex flex-wrap items-center gap-3">
-            <button onClick={() => setShowOtpModal(true)} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all">
-              <CheckCircle size={16} /> Konfime Peman
-            </button>
-            <button onClick={handleOpenRefundModal} className="bg-white hover:bg-gray-50 text-slate-700 border border-gray-200 text-sm font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-sm">
-              <RefreshCcw size={16} className="text-indigo-600" /> Litij / Ranbousman
-            </button>
+
             <button onClick={() => setShowNumbers(!showNumbers)} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
               <span className="text-lg">{showNumbers ? "🔒" : "👁️"}</span>
             </button>
