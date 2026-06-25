@@ -466,7 +466,7 @@ export default function LandingPage() {
             {[
               { label: "Frè Tranzaksyon P2P", val: "Gratis", sub: "Peman ant moun" },
               { label: "Vitès Peman", val: "< 10 sek", sub: "Konfirmasyon imedyat" },
-              { label: "Garanti Escrow", val: "24h", sub: "Pwoteksyon achè" },
+            
             ].map(s => (
               <div key={s.label} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "16px 20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", minWidth: "190px" }}>
                 <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "6px", textTransform: "uppercase" }}>{s.label}</div>
