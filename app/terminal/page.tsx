@@ -1036,14 +1036,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
           )}
         </div>
 
-        <button
-          onClick={() => router.push('/dashboard/subscriptions')}
-          className="w-full bg-indigo-600 text-white py-4 md:py-5 rounded-2xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all shadow-sm group active:scale-[0.98]"
-        >
-          <LayoutGrid size={18} />
-          <span>Dashboard Abònman</span>
-          <ArrowUpRight size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-        </button>
+
 
         <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
           <div className="p-6 md:p-8 border-b border-gray-100">
@@ -1292,12 +1285,6 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
             className={`px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all border ${activeTab === 'plugins' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-gray-200'}`}
           >
             Plugins
-          </button>
-          <button 
-            onClick={() => setActiveTab('api')} 
-            className={`px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all border ${activeTab === 'api' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-gray-200'}`}
-          >
-            API & Kle Sekrè
           </button>
         </div>
 
