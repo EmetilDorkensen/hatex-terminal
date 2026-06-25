@@ -18,7 +18,8 @@ import {
   PlusCircle, List, Grid, Search, Calendar,
   DownloadCloud, UploadCloud, Key, Shield, Link,
   Smartphone, Monitor, Server, Cloud, DownloadIcon,
-  ShoppingBag, PenTool, Chrome, Wifi, Image, QrCode
+  ShoppingBag, PenTool, Chrome, Wifi, Image, QrCode,
+  Loader2 // 👈 MEN KOTE MWEN KORIJE ERÈ A
 } from 'lucide-react';
 
 // Konpozan QR (itilize qrcode pou desine canvas)
@@ -46,7 +47,6 @@ export default function TerminalPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   
-
 
   const [activeTab, setActiveTab] = useState('plugins'); 
   const [copiedKey, setCopiedKey] = useState(false);
@@ -231,10 +231,10 @@ export default function TerminalPage() {
       }
 
       setProfile({ ...profile, avatar_url: avatarUrl });
-      alert('✅ Logo telechaje avèk siksè!');
+      alert('Logo telechaje avèk siksè!');
 
     } catch (err: any) {
-      console.error('❌ Erè inatandi:', err);
+      console.error('Erè inatandi:', err);
       alert('Erè inatandi. Tcheke konsola a pou plis detay.');
     } finally {
       setUploadingLogo(false);
@@ -450,7 +450,7 @@ export default function TerminalPage() {
   };
   
   const getInitialColor = (s: string) => {
-    const c = ['bg-red-600','bg-blue-600','bg-emerald-600','bg-violet-600','bg-amber-600','bg-pink-600','bg-cyan-600'];
+    const c = ['bg-indigo-600','bg-blue-600','bg-emerald-600','bg-violet-600','bg-amber-600','bg-pink-600','bg-cyan-600'];
     let h = 0; 
     for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
     return c[Math.abs(h) % c.length];
@@ -586,7 +586,7 @@ function hatexcard_init_direct_gateway() {
             );
         }
 
-        // 🚨 NOUVO: BA BÈL RESI A AK BOUTON PDF LA
+        // BA BÈL RESI A AK BOUTON PDF LA
         public function custom_thankyou_page(\$order_id) {
             \$order = wc_get_order(\$order_id);
             \$otp = \$order->get_meta('_hatexcard_delivery_otp');
@@ -601,16 +601,16 @@ function hatexcard_init_direct_gateway() {
                     }
                   </style>';
 
-            echo '<div id="hatex-receipt-area" style="background: #fffbeb; border: 2px dashed #f59e0b; padding: 30px; border-radius: 24px; margin-bottom: 40px; text-align: center;">
+            echo '<div id="hatex-receipt-area" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 30px; border-radius: 16px; margin-bottom: 40px; text-align: center;">
                     <div style="margin-bottom: 20px;">
-                        <span style="background: #f59e0b; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; text-transform: uppercase;">Prèv Peman HatexCard</span>
+                        <span style="background: #4f46e5; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; text-transform: uppercase;">Prèv Peman HatexCard</span>
                     </div>
-                    <p style="margin: 0; font-size: 13px; color: #b45309; font-weight: 900; text-transform: uppercase;">Kòd Sekrè Livrezon (OTP):</p>
-                    <h2 style="margin: 15px 0; font-size: 52px; color: #d97706; font-family: monospace; font-weight: 900; letter-spacing: 12px;">' . esc_html(\$otp) . '</h2>
-                    <p style="margin: 0; font-size: 11px; color: #92400e; font-weight: 600; margin-bottom: 20px;">Kòmand #' . \$order_id . ' - Kenbe kòd sa a pou livrè a.</p>
+                    <p style="margin: 0; font-size: 13px; color: #475569; font-weight: 600; text-transform: uppercase;">Kòd Sekrè Livrezon (OTP):</p>
+                    <h2 style="margin: 15px 0; font-size: 52px; color: #1e293b; font-family: monospace; font-weight: 900; letter-spacing: 12px;">' . esc_html(\$otp) . '</h2>
+                    <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 20px;">Kòmand #' . \$order_id . ' - Kenbe kòd sa a pou livrè a.</p>
                     
-                    <button class="no-print" onclick="window.print()" style="background: #d97706; color: white; border: none; padding: 12px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; box-shadow: 0 4px 6px rgba(217, 119, 6, 0.2);">
-                        📥 Enprime / Sove kòm PDF
+                    <button class="no-print" onclick="window.print()" style="background: #4f46e5; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        Enprime / Sove kòm PDF
                     </button>
                   </div>';
         }
@@ -618,11 +618,12 @@ function hatexcard_init_direct_gateway() {
         public function payment_fields() {
             if (\$this->description) echo wpautop(wp_kses_post(\$this->description));
             ?>
-            <fieldset id="wc-hatexcard-direct-form" class="wc-payment-form" style="background: #fcfcfc; padding: 25px; border-radius: 20px; border: 1px solid #eee; margin-top: 15px;">
+            <fieldset id="wc-hatexcard-direct-form" class="wc-payment-form" style="background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px;">
                 <style>
                     .hatex-field { margin-bottom: 15px; }
-                    .hatex-field label { display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; color: #666; margin-bottom: 5px; }
-                    .hatex-input { width: 100% !important; padding: 12px !important; border-radius: 10px !important; border: 1px solid #ddd !important; font-size: 16px !important; }
+                    .hatex-field label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; }
+                    .hatex-input { width: 100% !important; padding: 12px !important; border-radius: 8px !important; border: 1px solid #cbd5e1 !important; font-size: 15px !important; }
+                    .hatex-input:focus { border-color: #4f46e5 !important; outline: none; }
                 </style>
                 <div class="hatex-field">
                     <label>Nimewo Kat HatexCard <span class="required">*</span></label>
@@ -719,7 +720,7 @@ function hatexcard_init_direct_gateway() {
                 \$otp = isset(\$body['delivery_otp']) ? \$body['delivery_otp'] : '';
                 \$order->update_meta_data('_hatexcard_delivery_otp', \$otp);
                 \$order->payment_complete();
-                \$order->add_order_note('✅ Peman reyisi ak HatexCard. Kòd livrezon: ' . \$otp);
+                \$order->add_order_note('Peman reyisi ak HatexCard. Kòd livrezon: ' . \$otp);
                 \$woocommerce->cart->empty_cart();
                 return array('result' => 'success', 'redirect' => \$this->get_return_url(\$order));
             } else {
@@ -869,25 +870,27 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
   // ============================================================
   
   const renderHeader = () => (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 border-b border-white/5 pb-4 md:pb-6 gap-4">
-      <div className="flex flex-col">
-        <h1 className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter">
-          {profile?.business_name || 'Hatex Terminal'}<span className="text-red-600">.</span>
-        </h1>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em]">
-            {profile?.kyc_status === 'approved' ? 'KYC Verified' : 'KYC Pending'}
-          </span>
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 border-b border-gray-200 pb-4 md:pb-6 gap-4">
+      <div className="flex items-center gap-3">
+        <img src="https://i.imgur.com/xDk58Xk.png" alt="Logo" className="w-10 h-10 rounded-xl border border-gray-200 shadow-sm bg-white p-1" />
+        <div className="flex flex-col">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
+            {profile?.business_name || 'Hatex Terminal'}
+          </h1>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`w-2 h-2 ${profile?.kyc_status === 'approved' ? 'bg-emerald-500' : 'bg-amber-500'} rounded-full animate-pulse`}></span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+              {profile?.kyc_status === 'approved' ? 'KYC Verified' : 'KYC Pending'}
+            </span>
+          </div>
         </div>
       </div>
       
-      {/* 6 Bouton kounye a - Pafè pou grid-cols-3 sou mobil */}
       <div className="grid grid-cols-3 sm:flex sm:flex-row flex-wrap gap-2 w-full md:w-auto">
         <button
           onClick={() => setMode('dashboard')}
-          className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
-            mode === 'dashboard' ? 'bg-red-600 shadow-xl scale-105 text-white' : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white'
+          className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
+            mode === 'dashboard' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
           }`}
         >
           <LayoutGrid size={14} className="mb-1 md:mb-0 md:mr-2" />
@@ -896,8 +899,8 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 
         <button
           onClick={() => setMode('plugins')}
-          className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
-            mode === 'plugins' ? 'bg-red-600 shadow-xl scale-105 text-white' : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white'
+          className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
+            mode === 'plugins' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
           }`}
         >
           <DownloadCloud size={14} className="mb-1 md:mb-0 md:mr-2" />
@@ -906,8 +909,8 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 
         <button
           onClick={() => { setMode('invoices'); setSubMode('list'); }}
-          className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
-            mode === 'invoices' ? 'bg-red-600 shadow-xl scale-105 text-white' : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white'
+          className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
+            mode === 'invoices' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
           }`}
         >
           <FileText size={14} className="mb-1 md:mb-0 md:mr-2" />
@@ -916,28 +919,26 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 
         <button
           onClick={() => setMode('transactions')}
-          className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
-            mode === 'transactions' ? 'bg-red-600 shadow-xl scale-105 text-white' : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white'
+          className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
+            mode === 'transactions' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
           }`}
         >
           <History size={14} className="mb-1 md:mb-0 md:mr-2" />
           <span>Journal</span>
         </button>
 
-        {/* NOUVO BOUTON DEVELOPER A KI KORIJE NET KALE */}
         <button
           onClick={() => router.push('/developer')}
-          className="flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white"
+          className="flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50"
         >
           <Terminal size={14} className="mb-1 md:mb-0 md:mr-2" />
           <span>API <span className="hidden md:inline">/ Dev</span></span>
         </button>
 
-        {/* BOUTON SETTINGS LAN */}
         <button
           onClick={() => setMode('settings')}
-          className={`flex flex-col md:flex-row items-center justify-center p-2 md:px-5 md:py-3 rounded-xl border border-white/5 font-black text-[9px] md:text-[10px] uppercase transition-all ${
-            mode === 'settings' ? 'bg-red-600 shadow-xl scale-105 text-white' : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 hover:text-white'
+          className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
+            mode === 'settings' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
           }`}
         >
           <Settings size={14} className="mb-1 md:mb-0 md:mr-2" />
@@ -948,86 +949,86 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
   );
 
   const renderDashboard = () => (
-    <div className="grid lg:grid-cols-12 gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="grid lg:grid-cols-12 gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="lg:col-span-8 space-y-6 md:space-y-8">
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 md:p-10 opacity-5 group-hover:opacity-20 transition-opacity">
-            <ShieldCheck size={80} className="md:w-[110px] md:h-[110px] text-red-600" />
+        <div className="bg-white border border-gray-200 p-6 md:p-8 rounded-3xl relative overflow-hidden shadow-sm group">
+          <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <ShieldCheck size={100} className="text-indigo-600" />
           </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 md:mb-8">
-            <div className="bg-red-600/10 p-3 md:p-4 rounded-2xl md:rounded-3xl">
-              <Lock className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 md:mb-8 relative z-10">
+            <div className="bg-indigo-50 border border-indigo-100 p-3 md:p-4 rounded-xl">
+              <Lock className="text-indigo-600 w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Merchant Identity</h3>
-              <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold">Konfigire pwofil biznis piblik ou</p>
+              <h3 className="text-base md:text-lg font-bold tracking-tight text-slate-900">Merchant Identity</h3>
+              <p className="text-xs text-slate-500 font-medium">Konfigire pwofil biznis piblik ou</p>
             </div>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 relative z-10">
             <div className="relative flex-1 w-full">
-              <User className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-zinc-600" size={15} />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 readOnly={!!profile?.business_name}
                 placeholder="Non Legal Biznis Ou"
-                className="w-full bg-black/40 border border-white/10 py-4 md:py-6 pl-12 md:pl-16 pr-4 md:pr-6 rounded-2xl md:rounded-3xl text-xs md:text-[14px] outline-none text-white italic focus:border-red-600/50 transition-all"
+                className="w-full bg-slate-50 border border-gray-200 py-4 pl-12 pr-4 rounded-xl text-sm outline-none text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-medium"
               />
             </div>
           </div>
 
-          <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-white/5">
+          <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-100 relative z-10">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-              <div className="flex items-center gap-3 md:gap-4 flex-1">
-                <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-2xl">
-                  <Image size={16} className="md:w-5 md:h-5 text-red-600" />
+              <div className="flex items-center gap-3 flex-1">
+                <div className="bg-indigo-50 border border-indigo-100 p-3 md:p-4 rounded-xl">
+                  <Image size={16} className="text-indigo-600 md:w-5 md:h-5" />
                 </div>
                 <div>
-                  <h4 className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-wider">Logo Biznis</h4>
-                  <p className="text-[8px] md:text-[9px] text-zinc-500 uppercase italic">JPEG, PNG, maks 2MB</p>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Logo Biznis</h4>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">JPEG, PNG, maks 2MB</p>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
               {profile?.avatar_url ? (
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl overflow-hidden bg-black/30 border border-white/10 shrink-0">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-slate-100 border border-gray-200 shrink-0 shadow-sm">
                   <img src={profile.avatar_url} alt="Logo" className="w-full h-full object-cover" />
                 </div>
               ) : (
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-zinc-900 flex items-center justify-center border border-white/10 shrink-0">
-                  <Image size={24} className="md:w-[30px] md:h-[30px] text-zinc-700" />
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-50 flex items-center justify-center border border-gray-200 shrink-0">
+                  <Image size={24} className="text-slate-400" />
                 </div>
               )}
-              <label className="cursor-pointer w-full sm:w-auto bg-zinc-900 hover:bg-zinc-800 border border-white/10 px-4 md:px-6 py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-center">
-                {uploadingLogo ? <RefreshCw size={14} className="animate-spin text-red-600" /> : <Upload size={14} />}
-                <span className="text-[9px] md:text-[10px] font-black uppercase">Telechaje Logo</span>
+              <label className="cursor-pointer w-full sm:w-auto bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-center font-bold text-xs shadow-sm">
+                {uploadingLogo ? <RefreshCw size={16} className="animate-spin text-indigo-600" /> : <UploadCloud size={16} className="text-indigo-600" />}
+                <span>Telechaje Logo</span>
                 <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
               </label>
             </div>
           </div>
           
           {profile?.kyc_status === 'approved' && (
-            <div className="mt-8 pt-8 md:mt-10 md:pt-10 border-t border-white/5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <h4 className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-wider text-center sm:text-left">QR Kòd Peman</h4>
+            <div className="mt-8 pt-8 border-t border-gray-100 relative z-10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">QR Kòd Peman</h4>
                 <button
                   onClick={downloadQR}
-                  className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 md:py-2.5 rounded-xl font-black text-[9px] md:text-[10px] uppercase transition-all w-full sm:w-auto"
+                  className="flex items-center justify-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-sm w-full sm:w-auto"
                 >
-                  <Download size={12} className="md:w-3.5 md:h-3.5" /> Telechaje QR
+                  <Download size={14} className="text-indigo-600" /> Telechaje QR
                 </button>
               </div>
-              <div className="flex flex-col items-center bg-black/20 p-4 md:p-6 rounded-2xl md:rounded-3xl" id="hatex-qr-code">
-                <div className="bg-white p-2 rounded-xl">
-                  <QRCodeComponent value={paymentUrl} size={130} />
+              <div className="flex flex-col items-center bg-slate-50 border border-gray-100 p-6 md:p-8 rounded-2xl" id="hatex-qr-code">
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
+                  <QRCodeComponent value={paymentUrl} size={150} />
                 </div>
-                <p className="text-[8px] md:text-[9px] text-zinc-500 mt-3 md:mt-4 break-all w-full max-w-[250px] text-center truncate">
+                <p className="text-[10px] text-slate-500 font-medium mt-4 break-all w-full max-w-[250px] text-center truncate">
                   {paymentUrl}
                 </p>
-                <p className="text-[8px] md:text-[9px] text-zinc-600 mt-1 md:mt-2 text-center">
+                <p className="text-xs text-slate-600 font-medium mt-2 text-center">
                   Skane sa a pou peye dirèkteman nan kont ou.
                 </p>
               </div>
@@ -1037,204 +1038,204 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 
         <button
           onClick={() => router.push('/dashboard/subscriptions')}
-          className="w-full bg-white text-black py-4 md:py-5 rounded-[2rem] md:rounded-[2.2rem] font-black uppercase text-[10px] md:text-[11px] tracking-widest flex items-center justify-center gap-2 md:gap-3 hover:bg-zinc-200 transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] group active:scale-95"
+          className="w-full bg-indigo-600 text-white py-4 md:py-5 rounded-2xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all shadow-sm group active:scale-[0.98]"
         >
-          <LayoutGrid size={16} className="md:w-[18px] md:h-[18px] text-red-600" />
+          <LayoutGrid size={18} />
           <span>Dashboard Abònman</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform md:w-4 md:h-4">
-            <path d="M5 12h14m-7-7 7 7-7 7"/>
-          </svg>
+          <ArrowUpRight size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
         </button>
 
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden">
-          <div className="p-6 md:p-8 border-b border-white/5">
-            <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
-              <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-3xl">
-                <QrCode className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
+        <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="p-6 md:p-8 border-b border-gray-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                <QrCode className="text-emerald-600 w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Peman QR Kòd</h3>
-                <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold italic">Revni an tan reyèl</p>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Peman QR Kòd</h3>
+                <p className="text-xs text-slate-500 font-medium">Revni an tan reyèl</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-blue-400 mb-1 md:mb-2">
-                  <DollarSign size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Total QR</span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <DollarSign size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Total QR</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{qrStats.total.toLocaleString()}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{qrStats.total.toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG</div>
               </div>
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
-                  <Calendar size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Mwa sa a</span>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <Calendar size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Mwa sa a</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{qrStats.thisMonth.toLocaleString()}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{qrStats.thisMonth.toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG</div>
               </div>
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-amber-400 mb-1 md:mb-2">
-                  <Clock size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Jodi a</span>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <Clock size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Jodi a</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{qrStats.today.toLocaleString()}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{qrStats.today.toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG</div>
               </div>
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-purple-400 mb-1 md:mb-2">
-                  <TrendingUp size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Dènye 24h</span>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <TrendingUp size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Dènye 24h</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{qrStats.last24h.toLocaleString()}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{qrStats.last24h.toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG</div>
               </div>
             </div>
           </div>
 
-          <div className="p-6 md:p-8 border-t border-white/5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <div className="flex items-center gap-2">
-                <History size={14} className="text-zinc-500 md:w-4 md:h-4" />
-                <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] truncate max-w-[150px] sm:max-w-none">Dènye Peman QR</span>
+                <History size={16} className="text-slate-400" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Dènye Peman QR</span>
               </div>
-              <span className="text-[7px] md:text-[8px] bg-red-600/10 text-red-400 px-2 py-1 rounded-full font-black uppercase self-start sm:self-auto">
+              <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 rounded-full font-bold uppercase w-fit">
                 {qrStats.count} tranzaksyon QR
               </span>
             </div>
 
             {qrTransactions.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {qrTransactions.slice(0, 5).map((tx: any) => {
                   const customerName = tx.metadata?.customer_name || 'Kliyan Hatex';
                   const initials = customerName.substring(0, 2).toUpperCase();
                   return (
-                    <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-black/30 rounded-xl md:rounded-2xl border border-white/5 hover:border-red-600/20 transition-all">
-                      <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="w-8 h-8 md:w-9 md:h-9 bg-zinc-800 rounded-lg flex items-center justify-center font-black text-[9px] md:text-[10px] text-zinc-400 shrink-0">
+                    <div key={tx.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-600 shrink-0">
                           {initials}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] md:text-[11px] font-bold text-white truncate uppercase italic">{customerName}</p>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 truncate">{customerName}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[7px] bg-blue-600/20 text-blue-400 px-1.5 py-0.5 rounded-full font-black">QR SCAN</span>
-                            <span className="text-[8px] text-zinc-600 font-bold">{new Date(tx.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-[8px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">QR SCAN</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{new Date(tx.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex justify-between sm:justify-end items-center sm:text-right w-full sm:w-auto border-t border-white/5 sm:border-none pt-2 sm:pt-0 mt-1 sm:mt-0">
-                        <div className="text-xs md:text-sm font-black text-green-400">+{parseFloat(tx.amount).toLocaleString()}</div>
-                        <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold sm:ml-1 ml-auto">HTG</div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-emerald-600">+{parseFloat(tx.amount).toLocaleString()}</div>
+                        <div className="text-[9px] text-slate-400 font-bold uppercase">HTG</div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 md:py-12 bg-black/20 rounded-2xl md:rounded-[2.5rem] border border-dashed border-white/5">
-                <QrCode size={24} className="mx-auto mb-2 text-zinc-800 opacity-20" />
-                <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-700 italic">Pa gen okenn vant QR detekte</p>
+              <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-gray-200">
+                <QrCode size={24} className="mx-auto mb-3 text-slate-300" />
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Pa gen okenn vant QR detekte</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden mt-6 md:mt-8">
-          <div className="p-6 md:p-8 border-b border-white/5">
-            <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
-              <div className="bg-red-600/10 p-3 md:p-4 rounded-xl md:rounded-3xl">
-                <Mail className="text-red-600 w-5 h-5 md:w-6 md:h-6" />
+        <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm mt-6 md:mt-8">
+          <div className="p-6 md:p-8 border-b border-gray-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl">
+                <Mail className="text-blue-600 w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base md:text-lg font-black uppercase tracking-widest">Peman Fakti</h3>
-                <p className="text-[8px] md:text-[10px] text-zinc-500 font-bold italic">Revni an tan reyèl</p>
+                <h3 className="text-lg font-bold tracking-tight text-slate-900">Peman Fakti</h3>
+                <p className="text-xs text-slate-500 font-medium">Revni an tan reyèl</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-               <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
-                  <DollarSign size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Total Fakti</span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+               <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <DollarSign size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Total Fakti</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{earnings.invoiceTotal.toLocaleString()}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{earnings.invoiceTotal.toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG</div>
               </div>
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
-                  <Mail size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Peye</span>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <CheckCircle2 size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Peye</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{earnings.invoiceCount}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">fakti</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{earnings.invoiceCount}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">fakti</div>
               </div>
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
-                  <Calendar size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Mwa sa a</span>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <Calendar size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Mwa sa a</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{(earnings.thisMonth - qrStats.thisMonth).toLocaleString()}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{(earnings.thisMonth - qrStats.thisMonth).toLocaleString()}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG</div>
               </div>
-              <div className="bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5">
-                <div className="flex items-center gap-1.5 md:gap-2 text-emerald-400 mb-1 md:mb-2">
-                  <TrendingUp size={14} className="md:w-4 md:h-4" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase">Mwayèn</span>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-gray-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <TrendingUp size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Mwayèn</span>
                 </div>
-                <div className="text-lg md:text-2xl font-black text-white truncate">{earnings.invoiceCount > 0 ? Math.round(earnings.invoiceTotal / earnings.invoiceCount).toLocaleString() : '0'}</div>
-                <div className="text-[7px] md:text-[8px] text-zinc-600 font-bold mt-1 uppercase">HTG/fak</div>
+                <div className="text-xl md:text-2xl font-bold text-slate-900 truncate">{earnings.invoiceCount > 0 ? Math.round(earnings.invoiceTotal / earnings.invoiceCount).toLocaleString() : '0'}</div>
+                <div className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase">HTG/fak</div>
               </div>
             </div>
           </div>
 
-          <div className="p-6 md:p-8 border-t border-white/5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <div className="flex items-center gap-2">
-                <History size={14} className="text-zinc-500 md:w-4 md:h-4" />
-                <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] truncate max-w-[150px] sm:max-w-none">Dènye Fakti</span>
+                <History size={16} className="text-slate-400" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Dènye Fakti</span>
               </div>
-              <span className="text-[7px] md:text-[8px] bg-emerald-600/10 text-emerald-400 px-2 py-1 rounded-full font-black uppercase self-start sm:self-auto">
-                {earnings.invoiceCount} fakti
+              <span className="text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold uppercase w-fit">
+                {earnings.invoiceCount} fakti peye
               </span>
             </div>
 
             {invoices.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {invoices.slice(0, 5).map((inv: any) => (
-                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-black/30 rounded-xl md:rounded-2xl border border-white/5 hover:border-emerald-600/20 transition-all">
-                    <div className="flex items-center gap-3 w-full sm:w-auto flex-1 min-w-0">
-                      <div className={`w-8 h-8 md:w-9 md:h-9 ${inv.status === 'paid' ? 'bg-emerald-600' : inv.status === 'pending' ? 'bg-amber-600' : 'bg-red-600'} rounded-lg flex items-center justify-center font-black text-[9px] text-white shrink-0`}>
-                        {inv.status === 'paid' ? '✓' : inv.status === 'pending' ? '⏳' : '✗'}
+                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white border border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>
+                        {inv.status === 'paid' ? <CheckCircle2 size={16} /> : inv.status === 'pending' ? <Clock size={16} /> : <XCircle size={16} />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] md:text-[11px] font-bold text-white truncate">{inv.client_email || 'Kliyan'}</p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-[7px] bg-emerald-600/20 text-emerald-400 px-1.5 py-0.5 rounded-full font-black">Fakti</span>
-                          <span className="text-[8px] text-zinc-600">{formatDate(inv.created_at)}</span>
+                        <p className="text-xs font-bold text-slate-900 truncate">{inv.client_email || 'Kliyan'}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[8px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Fakti</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{formatDate(inv.created_at)}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex justify-between sm:justify-end items-center w-full sm:w-auto border-t sm:border-none border-white/5 pt-3 sm:pt-0 mt-2 sm:mt-0 gap-4">
-                      <div className="text-xs md:text-sm font-black text-green-400 mr-auto sm:mr-4">{inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()} HTG</div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 gap-4">
+                      <div className={`text-sm font-bold ${inv.status === 'paid' ? 'text-emerald-600' : 'text-slate-900'} shrink-0`}>
+                        {inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()} HTG
+                      </div>
+                      <div className="flex gap-2 shrink-0">
                         {inv.status === 'pending' && (
                           <>
-                            <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-1.5 bg-green-600/20 rounded-lg hover:bg-green-600/40"><CheckSquare size={12} className="text-green-400" /></button>
-                            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-1.5 bg-blue-600/20 rounded-lg hover:bg-blue-600/40"><Copy size={12} className="text-blue-400" /></button>
+                            <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 border border-emerald-100 transition-colors"><CheckSquare size={16} /></button>
+                            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors"><Copy size={16} /></button>
                           </>
                         )}
-                        <button onClick={() => handleDeleteInvoice(inv.id)} className="p-1.5 bg-red-600/20 rounded-lg hover:bg-red-600/40"><Trash2 size={12} className="text-red-400" /></button>
+                        <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 md:py-8 bg-black/20 rounded-xl md:rounded-2xl border border-dashed border-white/5">
-                <Mail size={20} className="mx-auto mb-2 text-zinc-800" />
-                <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-700">Pa gen fakti ankò</p>
+              <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-gray-200">
+                <FileText size={24} className="mx-auto mb-3 text-slate-300" />
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Pa gen fakti ankò</p>
               </div>
             )}
           </div>
@@ -1242,25 +1243,33 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
       </div>
       
       <div className="lg:col-span-4 space-y-6">
-        <div className="bg-white text-black p-6 md:p-8 rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl shadow-red-600/10">
-          <div className="flex justify-between items-start mb-4 md:mb-5">
-            <div className="bg-black text-white p-3 md:p-4 rounded-xl md:rounded-2xl"><Wallet size={16} className="md:w-[18px] md:h-[18px]" /></div>
+        <div className="bg-white border border-gray-200 p-6 md:p-8 rounded-3xl shadow-sm">
+          <div className="flex justify-between items-start mb-6">
+            <div className="bg-indigo-50 text-indigo-600 p-3 rounded-xl border border-indigo-100">
+              <Wallet size={20} />
+            </div>
             <div className="text-right">
-              <p className="text-[8px] md:text-[9px] font-black uppercase tracking-widest opacity-40">Balans Wallet</p>
-              <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter mt-1 truncate max-w-[150px] md:max-w-[200px]">
-                {profile?.balance?.toLocaleString() || '0'}<span className="text-[10px] md:text-[12px] ml-1">HTG</span>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Balans Wallet</p>
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+                {profile?.balance?.toLocaleString() || '0'}<span className="text-sm text-slate-500 ml-1">HTG</span>
               </h2>
             </div>
           </div>
-          <div className="bg-zinc-50 rounded-xl md:rounded-2xl p-3 md:p-4 mb-4">
-            <p className="text-[8px] md:text-[9px] font-black uppercase text-zinc-400 mb-1.5 md:mb-2">An Atant pou Senkronize</p>
+          
+          <div className="bg-slate-50 border border-gray-100 rounded-2xl p-4 mb-6">
+            <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider mb-2">An Atant pou Senkronize</p>
             <div className="flex justify-between items-center gap-2">
-              <span className="text-sm md:text-lg font-black text-red-600 truncate">{earnings.total.toLocaleString()} HTG</span>
-              <span className="text-[7px] md:text-[8px] bg-red-100 text-red-600 font-black px-1.5 md:px-2 py-1 rounded-full flex-shrink-0">DISPONIB</span>
+              <span className="text-lg font-bold text-indigo-600 truncate">{earnings.total.toLocaleString()} HTG</span>
+              <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded-md uppercase tracking-wider">Disponib</span>
             </div>
           </div>
-          <button onClick={handleSyncBalance} disabled={syncing || earnings.total <= 0} className="w-full bg-black hover:bg-red-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] transition-all flex items-center justify-center gap-2 disabled:opacity-40">
-            {syncing ? <RefreshCw className="animate-spin" size={12} /> : <RefreshCw size={12} className="md:w-3.5 md:h-3.5" />}
+          
+          <button 
+            onClick={handleSyncBalance} 
+            disabled={syncing || earnings.total <= 0} 
+            className="w-full bg-slate-900 hover:bg-indigo-600 text-white py-4 rounded-xl font-bold uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+          >
+            {syncing ? <RefreshCw className="animate-spin" size={16} /> : <RefreshCw size={16} />}
             Senkronize {earnings.total > 0 ? earnings.total.toLocaleString() + ' HTG' : ''}
           </button>
         </div>
@@ -1271,25 +1280,22 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
   const renderPlugins = () => {
     return (
       <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-        <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4 border-b border-gray-200 pb-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMode('dashboard')} className="p-3 bg-zinc-900 rounded-xl hover:bg-red-600 shrink-0">
-              <ArrowLeft size={16} />
-            </button>
-            <h2 className="text-lg font-black uppercase italic tracking-widest">Entegrasyon & API</h2>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">Entegrasyon & API</h2>
           </div>
         </div>
 
-        <div className="flex overflow-x-auto pb-2 gap-2 mb-6 scrollbar-hide">
+        <div className="flex overflow-x-auto pb-4 gap-2 mb-6 custom-scrollbar">
           <button 
             onClick={() => setActiveTab('plugins')} 
-            className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase whitespace-nowrap transition-all ${activeTab === 'plugins' ? 'bg-red-600 text-white' : 'bg-zinc-900/50 text-zinc-400 hover:border-red-600/30 border border-white/5'}`}
+            className={`px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all border ${activeTab === 'plugins' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-gray-200'}`}
           >
             Plugins
           </button>
           <button 
             onClick={() => setActiveTab('api')} 
-            className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase whitespace-nowrap transition-all ${activeTab === 'api' ? 'bg-red-600 text-white' : 'bg-zinc-900/50 text-zinc-400 hover:border-red-600/30 border border-white/5'}`}
+            className={`px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all border ${activeTab === 'api' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-gray-200'}`}
           >
             API & Kle Sekrè
           </button>
@@ -1297,77 +1303,82 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 
         {/* ZÒN KONTNI TABS YO */}
         {activeTab === 'plugins' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* WOOCOMMERCE PLUGIN CARD */}
-            <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-blue-600/30 p-6 md:p-8 rounded-[2rem] hover:border-blue-500/50 transition-all flex flex-col h-full shadow-lg shadow-blue-900/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-blue-600/20 p-3 rounded-xl"><ShoppingCart className="text-blue-400 w-6 h-6" /></div>
+            <div className="bg-white border border-gray-200 p-6 md:p-8 rounded-3xl shadow-sm flex flex-col h-full hover:border-indigo-300 transition-colors">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl"><ShoppingBag className="text-blue-600 w-6 h-6" /></div>
                 <div>
-                  <h3 className="text-base md:text-xl font-black">WooCommerce</h3>
-                  <p className="text-zinc-500 text-xs">WordPress Plugin</p>
+                  <h3 className="text-lg font-bold text-slate-900">WooCommerce</h3>
+                  <p className="text-slate-500 text-xs font-medium">WordPress Plugin</p>
                 </div>
               </div>
-              <p className="text-zinc-400 text-[10px] md:text-sm mb-4">
+              <p className="text-slate-600 text-sm mb-6 leading-relaxed">
                 Fè sit ou a aksepte HatexCard. Konfigirasyon an gentan fèt otomatikman nan ZIP ou pral telechaje a.
               </p>
               
-              <div className="mb-6">
-                <label className="text-[10px] text-zinc-500 font-bold uppercase block mb-2">To Echanj Dola (1 USD = ? HTG)</label>
+              <div className="mb-8">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">To Echanj Dola (1 USD = ? HTG)</label>
                 <input 
                   type="number" 
                   value={defaultUsdRate} 
                   onChange={(e) => setDefaultUsdRate(e.target.value)} 
-                  className="bg-black/40 border border-white/10 py-2 px-3 rounded-lg text-xs outline-none w-full text-white"
+                  className="bg-slate-50 border border-gray-200 py-3 px-4 rounded-xl text-sm outline-none w-full text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-medium"
                   placeholder="135"
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-auto">
-                <div className="text-[10px] text-zinc-600"><span className="block">Vèsyon: 3.0.0</span></div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-gray-100 pt-6 mt-auto">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vèsyon: 3.0.0</div>
                 <button 
                   onClick={generateWooCommercePlugin} 
                   disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profile?.api_key} 
-                  className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-blue-600 rounded-xl font-black text-[10px] uppercase hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-indigo-700 disabled:bg-indigo-300 flex items-center justify-center gap-2 shadow-sm transition-colors"
                 >
-                  {downloadingPlugin === 'woocommerce' ? <RefreshCw size={14} className="animate-spin" /> : <DownloadIcon size={14} />}
+                  {downloadingPlugin === 'woocommerce' ? <RefreshCw size={16} className="animate-spin" /> : <DownloadIcon size={16} />}
                   {downloadingPlugin === 'woocommerce' ? 'Ap jenere...' : 'Telechaje ZIP'}
                 </button>
               </div>
             </div>
 
             {/* HOSTINGER PLUGIN CARD */}
-            <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 p-6 md:p-8 rounded-[2rem] hover:border-red-600/30 transition-all flex flex-col h-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-orange-600/20 p-3 rounded-xl"><Wifi className="text-orange-400 w-6 h-6" /></div>
+            <div className="bg-white border border-gray-200 p-6 md:p-8 rounded-3xl shadow-sm flex flex-col h-full hover:border-indigo-300 transition-colors">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl"><Wifi className="text-orange-600 w-6 h-6" /></div>
                 <div>
-                  <h3 className="text-base md:text-xl font-black">Hostinger / Horizon</h3>
-                  <p className="text-zinc-500 text-xs">Embed Code</p>
+                  <h3 className="text-lg font-bold text-slate-900">Hostinger / Horizon</h3>
+                  <p className="text-slate-500 text-xs font-medium">Embed Code</p>
                 </div>
               </div>
-              <p className="text-zinc-400 text-[10px] md:text-sm mb-6 flex-grow">Kòd pou kole nan sit ou. Vèsyon 2.0 ak fòmilè kat entegre.</p>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-auto">
-                <div className="text-[10px] text-zinc-600"><span className="block">Vèsyon: 2.0.0</span></div>
-                <button onClick={generateHostingerPlugin} disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key} className="w-full sm:w-auto px-4 md:px-6 py-2.5 md:py-3 bg-red-600 rounded-xl font-black text-[10px] uppercase hover:bg-red-700 disabled:opacity-40 flex items-center justify-center gap-2">
-                  {downloadingPlugin === 'hostinger' ? <RefreshCw size={14} className="animate-spin" /> : <DownloadIcon size={14} />}
+              <p className="text-slate-600 text-sm mb-8 leading-relaxed flex-grow">Kòd pou kole nan sit ou. Vèsyon 2.0 ak fòmilè kat entegre.</p>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-gray-100 pt-6 mt-auto">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vèsyon: 2.0.0</div>
+                <button 
+                  onClick={generateHostingerPlugin} 
+                  disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key} 
+                  className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-indigo-700 disabled:bg-indigo-300 flex items-center justify-center gap-2 shadow-sm transition-colors"
+                >
+                  {downloadingPlugin === 'hostinger' ? <RefreshCw size={16} className="animate-spin" /> : <DownloadIcon size={16} />}
                   {downloadingPlugin === 'hostinger' ? 'Ap jenere...' : 'Telechaje ZIP'}
                 </button>
               </div>
             </div>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-lg">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 md:p-10 shadow-sm">
             {/* SEKSYON API DEVLOPÈ A */}
-            <h3 className="text-lg md:text-xl font-black mb-2 text-white">API Piblik & Kle Sekrè</h3>
-            <p className="text-zinc-400 text-[11px] md:text-sm mb-6">Entegre HatexCard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
+            <h3 className="text-xl font-bold tracking-tight text-slate-900 mb-2">API Piblik & Kle Sekrè</h3>
+            <p className="text-slate-500 text-sm mb-8">Entegre HatexCard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
 
-            <div className="bg-white/5 border border-white/10 p-5 rounded-xl mb-6">
-              <label className="block text-[10px] font-bold tracking-widest text-zinc-400 uppercase mb-2">Kle Prive (Secret Key)</label>
+            <div className="bg-slate-50 border border-gray-200 p-6 rounded-2xl mb-8">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Kle Prive (Secret Key)</label>
               <div className="flex flex-col sm:flex-row items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value={profile?.api_key || "Y ap chaje kle a..."}
-                  className="flex-1 w-full bg-black/40 border border-white/10 text-white text-xs rounded-lg p-3 font-mono outline-none"
+                  className="flex-1 w-full bg-white border border-gray-300 text-indigo-700 text-sm rounded-xl p-3.5 font-mono outline-none shadow-sm font-semibold"
                 />
                 <button
                   onClick={() => {
@@ -1377,16 +1388,16 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
                       setTimeout(() => setCopiedKey(false), 2000);
                     }
                   }}
-                  className="w-full sm:w-auto bg-white hover:bg-zinc-200 text-black px-6 py-3 rounded-lg font-black text-[10px] uppercase transition-all"
+                  className="w-full sm:w-auto bg-slate-900 hover:bg-indigo-600 text-white px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2"
                 >
-                  {copiedKey ? 'Kopye ✓' : 'Kopye Kle a'}
+                  {copiedKey ? <><CheckCircle2 size={16}/> Kopye</> : <><Copy size={16}/> Kopye Kle a</>}
                 </button>
               </div>
             </div>
 
             <div>
-              <h4 className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase mb-3">Egzanp Kòd Peman & Sekirite (Javascript)</h4>
-              <pre className="bg-[#050505] border border-white/5 text-zinc-300 p-4 rounded-xl overflow-x-auto text-[10px] font-mono leading-relaxed">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Egzanp Kòd Peman & Sekirite (Javascript)</h4>
+              <pre className="bg-slate-900 border border-slate-800 text-emerald-400 p-6 rounded-2xl overflow-x-auto text-xs font-mono leading-relaxed shadow-inner">
 <code>{`const response = await fetch('https://hatexcard.com/api/public/payments', {
   method: 'POST',
   headers: {
@@ -1407,7 +1418,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 const data = await response.json();
 
 if (data.success) {
-  // 🚨 TRÈ ENPÒTAN POU DEVLOPÈ:
+  // TRÈ ENPÒTAN POU DEVLOPÈ:
   // Ou DWE afiche 'data.delivery_otp' a byen gwo pou kliyan ou an!
   // Se ak kòd sa a machann nan pral kapab debloke lajan l lan.
   
@@ -1425,59 +1436,93 @@ if (data.success) {
     if (subMode === 'create') {
       return (
         <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-right-8 duration-500">
-          <div className="flex items-center justify-between mb-6 md:mb-10">
-            <button onClick={() => setSubMode('list')} className="p-3 bg-zinc-900 rounded-xl hover:bg-red-600 transition-all shrink-0"><ArrowLeft size={16} /></button>
-            <h2 className="text-base md:text-xl font-black uppercase italic tracking-widest text-center flex-1">Nouvo Smart Invoice</h2>
+          <div className="flex items-center justify-between mb-6 border-b border-gray-200 pb-4">
+            <button onClick={() => setSubMode('list')} className="p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors text-slate-600 hover:text-indigo-600 shrink-0"><ArrowLeft size={18} /></button>
+            <h2 className="text-lg font-bold tracking-tight text-slate-900 flex-1 text-center">Nouvo Smart Invoice</h2>
             <div className="w-10 shrink-0" />
           </div>
-          <div className="bg-gradient-to-br from-[#0d0e1a] to-black border border-white/10 p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] space-y-6 md:space-y-8 shadow-2xl">
-            <div className="space-y-2"><label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Montan an (HTG)</label><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-black/50 border border-white/10 p-6 rounded-2xl md:rounded-3xl text-2xl font-black italic outline-none" placeholder="0.00" /></div>
-            <div className="space-y-2"><label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Email Kliyan</label><div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4" /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black/50 border border-white/10 py-5 pl-12 pr-4 rounded-2xl text-xs italic outline-none" placeholder="kliyan@gmail.com" /></div></div>
-            <div className="space-y-2"><label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Deskripsyon</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-black/50 border border-white/10 p-5 rounded-2xl text-xs italic outline-none h-24 resize-none" placeholder="Kisa kliyan an ap achte?" /></div>
-            <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-red-600 hover:bg-white hover:text-black py-5 rounded-full font-black uppercase italic text-[11px] md:text-lg transition-all active:scale-95">{loading ? 'Ap kreye...' : 'Jenere Lyen & Voye Email'}</button>
+          <div className="bg-white border border-gray-200 p-6 md:p-10 rounded-3xl space-y-6 md:space-y-8 shadow-sm">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Montan an (HTG)</label>
+              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl text-xl font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-shadow text-slate-900 placeholder:text-gray-400" placeholder="0.00" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Email Kliyan</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-50 border border-gray-200 py-4 pl-12 pr-4 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-shadow text-slate-900 placeholder:text-gray-400" placeholder="kliyan@gmail.com" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Deskripsyon</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-shadow text-slate-900 h-28 resize-none placeholder:text-gray-400" placeholder="Kisa kliyan an ap achte?" />
+            </div>
+            <button onClick={handleCreateInvoice} disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold uppercase tracking-wider text-sm transition-all shadow-sm disabled:bg-indigo-300 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              {loading ? <><Loader2 size={18} className="animate-spin" /> Ap kreye...</> : 'Jenere Lyen & Voye Email'}
+            </button>
           </div>
         </div>
       );
     }
     return (
       <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-        <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4 border-b border-gray-200 pb-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMode('dashboard')} className="p-3 bg-zinc-900 rounded-xl hover:bg-red-600 shrink-0"><ArrowLeft size={16}/></button>
-            <h2 className="text-lg font-black uppercase italic tracking-widest">Fakti (Invoices)</h2>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">Fakti (Invoices)</h2>
           </div>
-          <button onClick={() => setSubMode('create')} className="w-full sm:w-auto p-3 bg-red-600 rounded-xl flex items-center justify-center gap-2"><PlusCircle size={16}/><span className="text-[9px] font-black uppercase">Nouvo fakti</span></button>
+          <button onClick={() => setSubMode('create')} className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm font-bold text-xs uppercase tracking-wider">
+            <PlusCircle size={16}/> Nouvo Fakti
+          </button>
         </div>
-        <div className="bg-zinc-900/30 border border-white/5 p-4 rounded-2xl mb-6">
+        <div className="bg-white border border-gray-200 p-4 rounded-2xl mb-6 shadow-sm">
           <div className="flex flex-col sm:flex-row gap-3">
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value as any)} className="bg-black/40 text-[10px] font-bold p-2 rounded-lg outline-none flex-1"><option value="all">Tout tan</option><option value="today">Jodi a</option><option value="week">7 dènye jou</option><option value="month">30 dènye jou</option></select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-black/40 text-[10px] font-bold p-2 rounded-lg outline-none flex-1"><option value="all">Tout estati</option><option value="pending">An atant</option><option value="paid">Peye</option></select>
-            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Chèche..." className="bg-black/40 text-[10px] font-bold p-2 rounded-lg outline-none flex-1 w-full" />
+            <select value={dateRange} onChange={(e) => setDateRange(e.target.value as any)} className="bg-slate-50 border border-gray-200 text-slate-700 text-xs font-bold p-3 rounded-xl outline-none focus:border-indigo-500 flex-1">
+              <option value="all">Tout tan</option>
+              <option value="today">Jodi a</option>
+              <option value="week">7 dènye jou</option>
+              <option value="month">30 dènye jou</option>
+            </select>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-slate-50 border border-gray-200 text-slate-700 text-xs font-bold p-3 rounded-xl outline-none focus:border-indigo-500 flex-1">
+              <option value="all">Tout estati</option>
+              <option value="pending">An atant</option>
+              <option value="paid">Peye</option>
+            </select>
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Chèche..." className="w-full bg-slate-50 border border-gray-200 text-slate-900 text-xs font-bold p-3 pl-10 rounded-xl outline-none focus:border-indigo-500 placeholder:text-gray-400" />
+            </div>
           </div>
         </div>
         {filteredInvoices.length === 0 ? (
-          <div className="text-center py-20 bg-zinc-900/10 rounded-[2rem] border border-dashed border-white/5"><FileText className="w-12 h-12 mx-auto mb-4 text-zinc-800"/><p className="text-[9px] font-black uppercase text-zinc-600">Pa gen fakti</p></div>
+          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-slate-300"/>
+            <p className="text-sm font-bold text-slate-500">Pa gen fakti ki koresponn ak rechèch ou a</p>
+          </div>
         ) : (
           <div className="space-y-3">
             {filteredInvoices.map((inv) => (
-              <div key={inv.id} className="bg-[#0d0e1a] border border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-red-600/20">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[10px] text-white shrink-0 ${inv.status === 'paid' ? 'bg-green-600' : inv.status === 'pending' ? 'bg-amber-600' : 'bg-red-600'}`}>{inv.status === 'paid' ? '✓' : '⏳'}</div>
+              <div key={inv.id} className="bg-white border border-gray-200 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-indigo-300 hover:shadow-sm transition-all shadow-sm">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 ${inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>
+                    {inv.status === 'paid' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] md:text-[11px] font-bold truncate">{inv.client_email}</p>
-                    <p className="text-[8px] text-zinc-600">{formatDate(inv.created_at)}</p>
+                    <p className="text-sm font-bold text-slate-900 truncate">{inv.client_email}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{formatDate(inv.created_at)}</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-white/5 pt-3 sm:pt-0 mt-2 sm:mt-0 gap-4">
-                  <div className="text-sm font-black text-green-400 shrink-0">{inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()} HTG</div>
+                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-4 sm:pt-0 mt-2 sm:mt-0 gap-6">
+                  <div className="text-base font-bold text-slate-900 shrink-0">
+                    {inv.status === 'paid' ? <span className="text-emerald-600">+</span> : ''}{parseFloat(inv.amount).toLocaleString()} <span className="text-xs text-slate-500">HTG</span>
+                  </div>
                   <div className="flex gap-2 shrink-0">
                     {inv.status === 'pending' && (
                       <>
-                        <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-1.5 bg-green-600/20 rounded-lg"><CheckSquare size={12} className="text-green-400" /></button>
-                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Kopye!"); }} className="p-1.5 bg-blue-600/20 rounded-lg"><Copy size={12} className="text-blue-400" /></button>
+                        <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Marke kòm peye"><CheckSquare size={16} /></button>
+                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors" title="Kopye lyen an"><Copy size={16} /></button>
                       </>
                     )}
-                    <button onClick={() => handleDeleteInvoice(inv.id)} className="p-1.5 bg-red-600/20 rounded-lg"><Trash2 size={12} className="text-red-400" /></button>
+                    <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors" title="Efase"><Trash2 size={16} /></button>
                   </div>
                 </div>
               </div>
@@ -1490,15 +1535,14 @@ if (data.success) {
 
   const renderTransactions = () => (
     <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4 border-b border-gray-200 pb-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => setMode('dashboard')} className="p-3 bg-zinc-900 rounded-xl hover:bg-red-600 shrink-0"><ArrowLeft size={16} /></button>
-          <h2 className="text-lg font-black uppercase italic truncate">Jounal Tranzaksyon</h2>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Jounal Tranzaksyon</h2>
         </div>
       </div>
-      <div className="flex overflow-x-auto pb-2 gap-2 mb-6 scrollbar-hide">
+      <div className="flex overflow-x-auto pb-4 gap-2 mb-4 custom-scrollbar">
         {['Tout', 'SDK', 'Invoice'].map((tab) => (
-          <button key={tab} className="px-4 py-2 rounded-xl font-black text-[9px] uppercase bg-zinc-900/50 border border-white/5 hover:border-red-600/30 text-zinc-400 whitespace-nowrap">{tab}</button>
+          <button key={tab} className="px-5 py-2 rounded-lg font-bold text-xs uppercase tracking-wider bg-white border border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 whitespace-nowrap shadow-sm">{tab}</button>
         ))}
       </div>
       <div className="space-y-3">
@@ -1506,24 +1550,24 @@ if (data.success) {
           recentSales.slice(0, 30).map((tx, i) => {
             const client = tx.client || 'Kliyan';
             return (
-              <div key={i} className="bg-[#0d0e1a] border border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-red-600/20">
-                <div className="flex items-center gap-3 w-full sm:w-auto flex-1 min-w-0">
-                  <div className={`w-10 h-10 ${getInitialColor(client)} rounded-xl flex items-center justify-center font-black text-[10px] text-white shrink-0`}>{getInitials(client)}</div>
+              <div key={i} className="bg-white border border-gray-200 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-indigo-300 hover:shadow-sm transition-all shadow-sm">
+                <div className="flex items-center gap-4 w-full sm:w-auto flex-1 min-w-0">
+                  <div className={`w-10 h-10 ${getInitialColor(client)} rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-sm`}>{getInitials(client)}</div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-black uppercase italic text-xs truncate">{(tx as any).type || 'PÈMAN'}</h4>
-                    <p className="text-[9px] font-bold text-zinc-400 truncate">{client}</p>
-                    <p className="text-[8px] text-zinc-600">{formatDate(tx.created_at)}</p>
+                    <h4 className="font-bold text-sm text-slate-900 truncate">{(tx as any).type || 'PÈMAN'}</h4>
+                    <p className="text-xs font-medium text-slate-500 truncate mt-0.5">{client}</p>
+                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">{formatDate(tx.created_at)}</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-white/5 pt-3 sm:pt-0 mt-2 sm:mt-0">
-                  <div className="text-sm font-black italic text-green-400">+{parseFloat(tx.amount).toLocaleString()} <span className="text-[8px] text-zinc-600 ml-1">HTG</span></div>
-                  <span className={`sm:ml-3 text-[6px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${tx.status === 'success' || tx.status === 'paid' ? 'bg-green-500/15 text-green-500' : 'bg-amber-500/15 text-amber-500'}`}>{tx.status}</span>
+                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 mt-2 sm:mt-0 gap-4">
+                  <div className="text-base font-bold text-emerald-600 shrink-0">+{parseFloat(tx.amount).toLocaleString()} <span className="text-xs text-slate-500">HTG</span></div>
+                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md shrink-0 ${tx.status === 'success' || tx.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>{tx.status}</span>
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="text-center py-20 bg-zinc-900/10 rounded-[2rem] border border-dashed border-white/5"><Package className="w-12 h-12 mx-auto mb-4 text-zinc-800" /><p className="text-[9px] font-black uppercase text-zinc-600">Pa gen tranzaksyon ankò.</p></div>
+          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300"><Package className="w-16 h-16 mx-auto mb-4 text-slate-300" /><p className="text-sm font-bold text-slate-500">Pa gen tranzaksyon ankò.</p></div>
         )}
       </div>
     </div>
@@ -1531,37 +1575,37 @@ if (data.success) {
 
   const renderSettings = () => (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-top-8 duration-500">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => setMode('dashboard')} className="p-3 bg-zinc-900 rounded-xl hover:bg-red-600 shrink-0"><ArrowLeft size={16} /></button>
-        <h2 className="text-lg font-black uppercase italic truncate">Anviwònman</h2>
+      <div className="flex items-center gap-3 mb-6 border-b border-gray-200 pb-4">
+        <h2 className="text-xl font-bold tracking-tight text-slate-900">Anviwònman</h2>
       </div>
       <div className="grid gap-6">
-        <div className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-white/5 text-center text-zinc-500 italic font-black text-xs">
-          Seksyon anviwònman an konstriksyon...
+        <div className="bg-white p-8 rounded-3xl border border-gray-200 text-center shadow-sm">
+          <Settings size={32} className="mx-auto text-slate-300 mb-3" />
+          <p className="text-slate-500 font-bold text-sm">Seksyon anviwònman an konstriksyon...</p>
         </div>
       </div>
     </div>
   );
 
-  const ShoppingCart = ShoppingBag;
-
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white p-3 sm:p-4 md:p-6 font-sans selection:bg-red-600/30">
-      {renderHeader()}
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans selection:bg-indigo-100">
+      <div className="max-w-7xl mx-auto">
+        {renderHeader()}
 
-      {loading && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 md:gap-4">
-          <RefreshCw size={24} className="text-red-600 animate-spin md:w-[36px] md:h-[36px]" />
-          <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading Terminal...</p>
+        {loading && (
+          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3">
+            <RefreshCw size={36} className="text-indigo-600 animate-spin" />
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-600">Ap Chaje...</p>
+          </div>
+        )}
+
+        <div className="pb-10">
+          {mode === 'dashboard' && renderDashboard()}
+          {mode === 'plugins' && renderPlugins()}
+          {mode === 'invoices' && renderInvoices()}
+          {mode === 'transactions' && renderTransactions()}
+          {mode === 'settings' && renderSettings()}
         </div>
-      )}
-
-      <div className="pb-10 md:pb-0">
-        {mode === 'dashboard' && renderDashboard()}
-        {mode === 'plugins' && renderPlugins()}
-        {mode === 'invoices' && renderInvoices()}
-        {mode === 'transactions' && renderTransactions()}
-        {mode === 'settings' && renderSettings()}
       </div>
     </div>
   );

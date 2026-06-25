@@ -1,7 +1,9 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Loader2, AlertTriangle, ShieldCheck, Wallet, ArrowUpRight, Lock, CheckCircle2 } from 'lucide-react';
 
 export default function WithdrawPage() {
   const router = useRouter();
@@ -67,7 +69,7 @@ export default function WithdrawPage() {
       // 2. BLOKE SI L SISPANDI
       if (statusCheck.account_status === 'suspended') {
         setLoading(false);
-        return alert("🚫 Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè.");
+        return alert("Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè.");
       }
 
       // 3. KITE L PASE SI L ACTIVE AK LÒT KONDISYON YO
@@ -117,11 +119,11 @@ export default function WithdrawPage() {
       
       // Tcheke yon dènye fwa jis pou sekirite absoli
       if (checkData.account_status === 'suspended') {
-        throw new Error("🚫 Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
+        throw new Error("Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
       }
 
       if (checkData.transaction_pin !== enteredPin) {
-        throw new Error("❌ PIN ou antre a pa bon. Tranzaksyon an anile.");
+        throw new Error("PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
       
       if (currentAmount > Number(checkData.wallet_balance)) {
@@ -170,9 +172,9 @@ export default function WithdrawPage() {
       setShowPinPrompt(false);
       
       if (isLargeWithdrawal) {
-          alert("✅ Demann ou a pase! Tanpri kontakte Sèvis Kliyan pou n bay kote nou dwe voye kòb la pou ou.");
+          alert("Demann ou a pase! Tanpri kontakte Sèvis Kliyan pou n bay kote nou dwe voye kòb la pou ou.");
       } else {
-          alert("✅ Retrè voye! Kòb la retire sou balans ou. N ap voye l nan 15-45 minit.");
+          alert("Retrè voye! Kòb la retire sou balans ou. N ap voye l nan 15-45 minit.");
       }
       
       router.push('/dashboard');
@@ -186,127 +188,164 @@ export default function WithdrawPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white p-6 font-sans italic relative">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 font-sans relative flex flex-col items-center">
       
+      {/* MODAL POU PIN NAN */}
       {showPinPrompt && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-[#121420] border border-white/10 p-8 rounded-[2.5rem] w-full max-w-sm text-center shadow-2xl">
-            <h2 className="text-lg font-black uppercase text-white mb-2">Konfime Retrè a</h2>
-            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-6">
-              Mete PIN 4 chif ou a pou w ka retire {currentAmount.toLocaleString()} HTG sou kont ou.
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 p-8 rounded-3xl w-full max-w-sm text-center shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+              <Lock size={28} />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2 tracking-tight">Konfime Retrè a</h2>
+            <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">
+              Mete PIN 4 chif ou a pou w ka retire <span className="font-bold text-slate-800">{currentAmount.toLocaleString()} HTG</span> sou kont ou.
             </p>
             
             <input 
               type="password" maxLength={4} autoFocus placeholder="••••" 
               value={enteredPin} onChange={(e) => setEnteredPin(e.target.value.replace(/[^0-9]/g, ''))}
-              className="w-full bg-black border border-white/10 p-4 rounded-2xl text-center text-2xl font-black tracking-[1em] outline-none focus:border-red-600 mb-6 text-red-500"
+              className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl text-center text-3xl font-mono tracking-[0.5em] outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 mb-6 text-slate-900 transition-all shadow-sm"
             />
 
             {pinError && (
-               <p className="text-[10px] text-red-500 font-black uppercase mb-4 animate-pulse">{pinError}</p>
+               <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg mb-6">
+                 <p className="text-xs text-rose-600 font-bold uppercase tracking-wider animate-pulse">{pinError}</p>
+               </div>
             )}
             
             <div className="flex gap-3">
               <button 
                 onClick={() => setShowPinPrompt(false)} disabled={loading}
-                className="flex-1 bg-zinc-800 py-4 rounded-2xl font-black uppercase text-[10px] text-white active:scale-95 transition-all"
+                className="flex-1 bg-white border border-gray-300 text-slate-700 py-3.5 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 transition-all shadow-sm"
               >
-                ANILE
+                Anile
               </button>
               <button 
                 onClick={executeWithdrawal} disabled={loading || enteredPin.length !== 4}
-                className="flex-1 bg-red-600 py-4 rounded-2xl font-black uppercase text-[10px] text-white active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 bg-indigo-600 text-white py-3.5 rounded-xl font-bold uppercase text-xs hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm flex items-center justify-center"
               >
-                {loading ? "..." : "KONFIME"}
+                {loading ? <Loader2 size={16} className="animate-spin" /> : "Konfime"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className={`transition-all duration-300 ${showPinPrompt ? 'opacity-30 pointer-events-none blur-sm' : ''}`}>
-          <div className="flex items-center gap-4 mb-8">
-            <button onClick={() => router.back()} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-white/5">←</button>
-            <h1 className="text-xl font-black uppercase text-red-600">Retire Fon</h1>
+      {/* KONTNI PAJ LA */}
+      <div className={`w-full max-w-md transition-all duration-300 ${showPinPrompt ? 'opacity-40 pointer-events-none blur-[2px]' : ''}`}>
+        
+        {/* HEADER */}
+        <div className="flex items-center gap-4 mb-8 mt-2">
+          <button 
+            onClick={() => router.back()} 
+            className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition-colors shadow-sm shrink-0"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Retire Fon</h1>
+            <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest mt-1">Transfè Sekirize</p>
           </div>
+        </div>
 
-          <div className="space-y-6">
-            
-            {profile?.account_status === 'suspended' && (
-               <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center shadow-lg">
-                  <span className="text-2xl mb-2 block">⚠️</span>
-                  <p className="text-[11px] text-red-500 font-black uppercase tracking-widest leading-relaxed">
-                     KONT OU A SISPANDI. OU PA GEN OTORIZASYON POU RETIRE LAJAN.
-                  </p>
+        <div className="space-y-6">
+          
+          {profile?.account_status === 'suspended' && (
+             <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl text-center shadow-sm flex flex-col items-center gap-3">
+                <AlertTriangle size={32} className="text-rose-500" />
+                <p className="text-xs text-rose-700 font-bold uppercase tracking-wider leading-relaxed">
+                   Kont ou a sispandi. Ou pa gen otorizasyon pou retire lajan.
+                </p>
+             </div>
+          )}
+
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-6 opacity-5">
+               <ArrowUpRight size={80} />
+             </div>
+             
+             <div className="relative z-10">
+               <div className="flex items-center justify-center gap-2 mb-6 text-slate-500">
+                 <Wallet size={16} />
+                 <p className="text-xs font-bold uppercase tracking-wider">Balans Disponib: <span className="text-slate-800">{profile?.wallet_balance?.toLocaleString() || 0} HTG</span></p>
                </div>
-            )}
-
-            <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5 shadow-2xl">
-                <p className="text-[10px] text-center mb-4 text-zinc-500 uppercase font-black tracking-widest">Balans ou: {profile?.wallet_balance?.toLocaleString() || 0} HTG</p>
-                <div className="flex items-center justify-center gap-2">
-                   <input 
-                      type="number" 
-                      value={amount} 
-                      onChange={(e) => setAmount(Number(e.target.value))} 
-                      disabled={profile?.account_status === 'suspended'}
-                      className="w-full bg-transparent text-5xl font-black text-center outline-none text-white disabled:opacity-50" 
-                      placeholder="0" 
-                   />
-                </div>
-                
-                {currentAmount > 0 && !isLargeWithdrawal && (
-                  <div className="mt-6 pt-6 border-t border-white/5 text-[10px] uppercase space-y-2">
-                    <div className="flex justify-between text-zinc-500"><span>Frè Hatex (5%):</span><span className="font-bold">-{withdrawFee.toFixed(2)} HTG</span></div>
-                    <div className="flex justify-between font-black text-red-500 text-sm"><span>Nèt pou resevwa:</span><span>{netAmount.toFixed(2)} HTG</span></div>
-                  </div>
-                )}
-                
-                {isLargeWithdrawal && (
-                  <div className="mt-6 pt-6 border-t border-white/5">
-                     <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl text-center">
-                        <span className="text-lg mb-2 block">🌟</span>
-                        <p className="text-[9px] font-black uppercase text-yellow-500 tracking-widest leading-relaxed">
-                          Ou ap retire plis pase 15,000 HTG.<br/>
-                          Transfè sa a p ap gen frè otomatikman, men w ap bezwen bay nou yon kote pou n depoze l.
-                        </p>
-                     </div>
-                  </div>
-                )}
-            </div>
-            
-            {!isLargeWithdrawal && (
-                <div className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 space-y-4">
-                    <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Metòd Pèman</label>
-                    <select 
-                       value={method} 
-                       onChange={(e) => setMethod(e.target.value)} 
-                       disabled={profile?.account_status === 'suspended'}
-                       className="w-full bg-black/50 p-5 rounded-2xl border border-white/5 text-xs font-black italic outline-none disabled:opacity-50"
-                    >
-                        <option value="MonCash">MonCash</option>
-                        <option value="NatCash">NatCash</option>
-                    </select>
-                    
-                    <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Nimewo Kont / Telefòn</label>
-                    <input 
-                       type="text" 
-                       placeholder="EG: 44332211" 
-                       value={phone} 
-                       onChange={(e) => setPhone(e.target.value)} 
-                       disabled={profile?.account_status === 'suspended'}
-                       className="w-full bg-black/50 p-5 rounded-2xl outline-none border border-white/5 text-xs font-black italic disabled:opacity-50" 
-                    />
-                </div>
-            )}
-
-            <button 
-              onClick={initiateWithdrawal} 
-              disabled={loading || currentAmount <= 0 || profile?.account_status === 'suspended'} 
-              className={`w-full py-6 rounded-full font-black uppercase text-sm transition-all shadow-xl flex items-center justify-center ${loading || profile?.account_status === 'suspended' ? 'bg-zinc-800 opacity-50 cursor-not-allowed' : 'bg-red-600 active:scale-95 shadow-red-600/20'}`}
-            >
-              {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "Konfime ak Retire"}
-            </button>
+               
+               <input 
+                  type="number" 
+                  value={amount} 
+                  onChange={(e) => setAmount(Number(e.target.value))} 
+                  disabled={profile?.account_status === 'suspended'}
+                  className="w-full bg-transparent text-4xl sm:text-5xl font-bold text-center outline-none border-b-2 border-gray-200 focus:border-indigo-600 pb-4 transition-colors text-slate-900 placeholder:text-gray-300 disabled:opacity-50" 
+                  placeholder="0" 
+               />
+              
+               {currentAmount > 0 && !isLargeWithdrawal && (
+                 <div className="mt-8 bg-slate-50 border border-gray-100 p-4 rounded-xl space-y-3">
+                   <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                     <span>Frè Hatexcard (5%):</span>
+                     <span className="font-bold text-rose-600">-{withdrawFee.toFixed(2)} HTG</span>
+                   </div>
+                   <div className="h-px bg-gray-200 w-full"></div>
+                   <div className="flex justify-between items-center text-sm font-bold text-slate-800">
+                     <span>Nèt pou resevwa:</span>
+                     <span className="text-indigo-600">{netAmount.toFixed(2)} HTG</span>
+                   </div>
+                 </div>
+               )}
+              
+               {isLargeWithdrawal && (
+                 <div className="mt-8 bg-amber-50 border border-amber-200 p-5 rounded-xl text-center shadow-sm">
+                    <ShieldCheck size={28} className="text-amber-500 mx-auto mb-2" />
+                    {/* 👇 ERÈ A KORIJE LA A 👇 */}
+                    <p className="text-xs font-bold uppercase text-amber-800 tracking-wider leading-relaxed">
+                      Transfè VIP (&gt; 15,000 HTG)
+                    </p>
+                    <p className="text-[10px] font-medium text-amber-700 mt-2 leading-relaxed">
+                      Transfè sa p ap gen frè otomatikman. W ap bezwen kontakte nou pou n voye lajan an pou ou nan bank oswa kote w pito a.
+                    </p>
+                 </div>
+               )}
+             </div>
           </div>
+          
+          {!isLargeWithdrawal && (
+             <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Metòd Pèman</label>
+                  <select 
+                     value={method} 
+                     onChange={(e) => setMethod(e.target.value)} 
+                     disabled={profile?.account_status === 'suspended'}
+                     className="w-full bg-slate-50 p-4 rounded-xl border border-gray-200 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm disabled:opacity-50"
+                  >
+                     <option value="MonCash">MonCash</option>
+                     <option value="NatCash">NatCash</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nimewo Kont / Telefòn</label>
+                  <input 
+                     type="text" 
+                     placeholder="EG: 44332211" 
+                     value={phone} 
+                     onChange={(e) => setPhone(e.target.value)} 
+                     disabled={profile?.account_status === 'suspended'}
+                     className="w-full bg-slate-50 p-4 rounded-xl outline-none border border-gray-200 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm disabled:opacity-50 placeholder:text-gray-400" 
+                  />
+                </div>
+             </div>
+          )}
+
+          <button 
+            onClick={initiateWithdrawal} 
+            disabled={loading || currentAmount <= 0 || profile?.account_status === 'suspended'} 
+            className={`w-full py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 ${loading || currentAmount <= 0 || profile?.account_status === 'suspended' ? 'bg-indigo-100 text-indigo-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-md'}`}
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <><ArrowUpRight size={18} /> Konfime ak Retire</>}
+          </button>
+        </div>
       </div>
     </div>
   );

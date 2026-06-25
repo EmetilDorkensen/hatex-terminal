@@ -1,8 +1,10 @@
 "use client";
+
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 import { useSearchParams } from 'next/navigation';
+import { User, Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -104,47 +106,114 @@ function SignupForm() {
   };
 
   return (
-    <div className="w-full max-w-md bg-zinc-900/30 p-10 rounded-[2.5rem] border border-white/5 shadow-2xl backdrop-blur-md">
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-black tracking-tighter italic text-red-600 mb-2 underline decoration-white/10">HatexCard</h1>
-        <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold tracking-widest">KREYE YON KONT NOUVO</p>
+    <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-3xl border border-gray-200 shadow-xl shadow-slate-200/50">
+      
+      {/* LOGO AK TIT */}
+      <div className="text-center mb-8">
+        <div className="flex justify-center mb-4">
+          <div className="bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
+            <img src="https://i.imgur.com/xDk58Xk.png" alt="HatexCard Logo" className="w-14 h-14 object-contain" />
+          </div>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mb-1">Hatexcard</h1>
+        <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold flex items-center justify-center gap-1.5">
+          <ShieldCheck size={14} className="text-indigo-500" /> Kreye Yon Kont Nouvo
+        </p>
       </div>
 
-      <form onSubmit={handleSignup} className="space-y-4">
-        <div className="space-y-2 text-left">
-          <label className="text-[8px] text-zinc-600 ml-2 font-black">NON KONPLÈ OU</label>
-          <input type="text" placeholder="EX: DORKENSEN EXEMPLE" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs" required />
+      <form onSubmit={handleSignup} className="space-y-5">
+        
+        {/* NON KONPLÈ */}
+        <div className="space-y-1.5 text-left">
+          <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Non Konplè Ou</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <User className="h-5 w-5 text-slate-400" />
+            </div>
+            <input 
+              type="text" 
+              placeholder="Ex: Jean Jacques" 
+              value={fullName} 
+              onChange={(e) => setFullName(e.target.value)} 
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400" 
+              required 
+            />
+          </div>
         </div>
 
-        <div className="space-y-2 text-left">
-          <label className="text-[8px] text-zinc-600 ml-2 font-black">ADRÈS IMÈL</label>
-          <input type="email" placeholder="CLIENT@EMAIL.COM" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs" required />
+        {/* IMÈL */}
+        <div className="space-y-1.5 text-left">
+          <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Adrès Imèl</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-slate-400" />
+            </div>
+            <input 
+              type="email" 
+              placeholder="kliyan@email.com" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400" 
+              required 
+            />
+          </div>
         </div>
 
-        <div className="space-y-2 text-left">
-          <label className="text-[8px] text-zinc-600 ml-2 font-black">MODPAS SEKIRIZE</label>
-          <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs" required />
+        {/* MODPAS */}
+        <div className="space-y-1.5 text-left">
+          <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Modpas Sekirize</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-slate-400" />
+            </div>
+            <input 
+              type="password" 
+              placeholder="••••••••" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium tracking-widest text-slate-900 placeholder:text-slate-400" 
+              required 
+            />
+          </div>
         </div>
 
-        <div className="space-y-2 text-left">
-          <label className="text-[8px] text-purple-500 ml-2 font-black">KÒD PWOMO (OPSYONÈL)</label>
-          <input type="text" placeholder="EX: IZO2026" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} className="w-full bg-black border border-purple-500/30 p-5 rounded-2xl focus:border-purple-600 outline-none transition-all font-bold text-xs text-purple-400 placeholder:text-zinc-700 uppercase" />
+        {/* PWOMO */}
+        <div className="space-y-1.5 text-left">
+          <label className="text-[10px] font-bold uppercase text-indigo-500 tracking-wider ml-1">Kòd Pwomo (Opsyonèl)</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Gift className="h-5 w-5 text-indigo-400" />
+            </div>
+            <input 
+              type="text" 
+              placeholder="EX: IZO2026" 
+              value={promoCode} 
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())} 
+              className="w-full pl-11 pr-4 py-3.5 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all text-sm font-bold text-indigo-700 placeholder:text-indigo-300 uppercase tracking-widest" 
+            />
+          </div>
         </div>
 
+        {/* MESSAGES */}
         {msg.text && (
-          <div className={`p-4 rounded-xl border ${msg.type === 'error' ? 'bg-red-600/10 border-red-600/20 text-red-500' : 'bg-green-600/10 border-green-600/20 text-green-500'}`}>
-             <p className="text-[10px] font-black uppercase text-center">{msg.text}</p>
+          <div className={`p-4 rounded-xl mt-4 flex items-start gap-3 border ${msg.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+             {msg.type === 'error' ? <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />}
+             <p className="text-[11px] font-bold uppercase tracking-wider leading-relaxed">{msg.text}</p>
           </div>
         )}
 
-        <button type="submit" disabled={loading} className="w-full bg-red-600 py-5 rounded-2xl font-black uppercase italic shadow-lg shadow-red-600/20 active:scale-95 transition-all text-sm mt-4 disabled:opacity-50">
-          {loading ? "AP VERIFYE..." : "KREYE KONT MWEN"}
+        <button 
+          type="submit" 
+          disabled={loading} 
+          className="w-full bg-indigo-600 hover:bg-indigo-700 py-4 rounded-xl font-bold uppercase tracking-wider shadow-sm shadow-indigo-200 active:scale-[0.98] transition-all text-xs mt-6 text-white disabled:opacity-70 flex justify-center items-center gap-2"
+        >
+          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Ap Kreye Kont Lan...</> : "Kreye Kont Mwen"}
         </button>
       </form>
 
-      <div className="mt-10 text-center">
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-          Ou gen kont deja? <Link href="/login" className="text-red-600 hover:text-white transition-colors">Konekte la</Link>
+      <div className="mt-8 text-center space-y-4 pt-6 border-t border-gray-100">
+        <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+          Ou gen kont deja? <Link href="/login" className="text-indigo-600 hover:text-indigo-800 transition-colors ml-1">Konekte La</Link>
         </p>
       </div>
     </div>
@@ -153,10 +222,21 @@ function SignupForm() {
 
 export default function Signup() {
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white flex flex-col items-center justify-center p-6 italic uppercase font-black">
-      <Suspense fallback={<div className="text-red-600 text-sm">Ap chaje...</div>}>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+      <Suspense fallback={
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+          <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
+        </div>
+      }>
         <SignupForm />
       </Suspense>
+      
+      <div className="mt-10 flex items-center gap-3 opacity-40">
+         <div className="h-px w-8 bg-slate-400"></div>
+         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Secured by Hatex Group</span>
+         <div className="h-px w-8 bg-slate-400"></div>
+      </div>
     </div>
   );
 }
