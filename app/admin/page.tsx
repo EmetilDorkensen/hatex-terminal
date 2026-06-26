@@ -11,7 +11,8 @@ export default function AdminSuperPage() {
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     const [disputes, setDisputes] = useState<any[]>([]); 
-    
+    const [totalCardBal, setTotalCardBal] = useState(0);
+     
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
     const [searchQuery, setSearchQuery] = useState('');
@@ -148,16 +149,22 @@ export default function AdminSuperPage() {
         }
     };
 
-    // ==========================================
+// ==========================================
     // METÒD SENPLIFYE POU KALKILE FRÈ SOU TAB YO DIREK
     // ==========================================
     const kalkileTotalBiznis = async () => {
         setLoadingBiznis(true);
         try {
-            // 1. Total Kòb sou tout Balans Kliyan yo
-            const { data: profiles } = await supabase.from('profiles').select('wallet_balance');
+            // 1. Total Kòb sou tout Balans Kliyan yo (Wallet + Kat Vityèl)
+            const { data: profiles } = await supabase.from('profiles').select('wallet_balance, card_balance');
+            
+            // Kalkile total pou Wallet yo
             const totalKliyan = (profiles || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
             setTotalClientBal(totalKliyan);
+
+            // NOUVO: Kalkile total pou Kat Vityèl yo
+            const totalKat = (profiles || []).reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
+            setTotalCardBal(totalKat); // 👈 Asire w ou gen state sa a ki kreye anwo nan kòd la
 
             // 2. Chèche Frè sou tout Depo ki reyisi yo
             const { data: depData, error: errDep } = await supabase.from('deposits').select('fee').eq('status', 'approved');
@@ -168,7 +175,6 @@ export default function AdminSuperPage() {
             const totalRetreFee = errWit ? 0 : (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
 
             // 4. Chèche Frè sou tout Transfè ki reyisi yo
-            // Nou tcheke si status la se success oswa completed (depann de kòman ou te anrejistre l nan tab transfers la)
             const { data: traData, error: errTra } = await supabase.from('transfers').select('fee, status');
             const totalTransfeFee = errTra ? 0 : (traData || [])
                 .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
