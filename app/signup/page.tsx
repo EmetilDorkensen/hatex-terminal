@@ -186,7 +186,7 @@ function SignupForm() {
             </div>
             <input 
               type="text" 
-              placeholder="EX: IZO2026" 
+              placeholder="EX: Hatex2026" 
               value={promoCode} 
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())} 
               className="w-full pl-11 pr-4 py-3.5 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all text-sm font-bold text-indigo-700 placeholder:text-indigo-300 uppercase tracking-widest" 

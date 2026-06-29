@@ -7,7 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Settings, Menu 
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu 
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -378,7 +378,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
       
-      {/* ========================================== */}
+{/* ========================================== */}
       {/* SIDEBAR (MENI SOU BÒ GÒCH LA) */}
       {/* ========================================== */}
       {isMenuOpen && (
@@ -426,6 +426,11 @@ export default function Dashboard() {
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
               >
                 <Terminal size={20} /> Terminal
+              </button>
+
+              {/* MEN BOUTON AJAN AN MWEN AJOUTE A */}
+              <button onClick={() => { router.push('/agent'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
+                <Store size={20} /> Ajan
               </button>
               
               <button onClick={() => { router.push('/transactions'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
