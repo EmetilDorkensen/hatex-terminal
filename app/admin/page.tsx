@@ -80,13 +80,15 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            // NOUVO: Rale tout aplikasyon ajan ki an atant yo, ansanm ak enfòmasyon pwofil itilizatè a
-            const { data: agData } = await supabase
-                .from('agent_applications')
-                .select('*, profiles(full_name, email, phone)')
-                .eq('status', 'pending')
-                .order('created_at', { ascending: false });
-            setPendingAgents(agData || []);
+            // NOUVO: Fetch ajan ki an atant yo
+            const { data: agData } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            if (agData && u) {
+                const mergedAgents = agData.map(agent => ({
+                   ...agent,
+                   profiles: u.find(user => user.id === agent.user_id) || {}
+                }));
+                setPendingAgents(mergedAgents);
+            }
             
             const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
@@ -140,9 +142,6 @@ export default function AdminSuperPage() {
         }
     };
 
-    // ==========================================
-    // METÒD SENPLIFYE POU KALKILE FRÈ SOU TAB YO DIREK
-    // ==========================================
     const kalkileTotalBiznis = async () => {
         setLoadingBiznis(true);
         try {
@@ -164,10 +163,14 @@ export default function AdminSuperPage() {
             const totalTransfeFee = errTra ? 0 : (traData || [])
                 .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
                 .reduce((acc, t) => acc + Number(t.fee || 0), 0);
+                
+            // Ajoute frè ki soti nan Ajan yo ki soti nan transactions tab kote type = 'FEE'
+            const { data: feeData } = await supabase.from('transactions').select('amount').eq('type', 'FEE').eq('status', 'success');
+            const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
 
-            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee });
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee + totalAgentFee });
             
-            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee;
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee;
             setTotalBiznisProfit(granTotalPwofi);
 
         } catch (error) {
@@ -296,9 +299,6 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // NOUVO: FONKSYON POU JERE APLIKASYON AJAN YO
-    // ==========================================
     const jereAjan = async (applicationId: string, userId: string, fullName: string, userEmail: string, aksyon: 'approved' | 'rejected') => {
         let rezon = "";
         if (aksyon === 'rejected') {
@@ -310,30 +310,52 @@ export default function AdminSuperPage() {
 
         setProcessingId(applicationId);
         try {
-            // 1. Mizajou aplikasyon an
+            if (aksyon === 'rejected') {
+                const { data: userProf } = await supabase.from('profiles').select('agent_guarantee_paid, wallet_balance').eq('id', userId).single();
+                if (userProf) {
+                    const paidAmount = Number(userProf.agent_guarantee_paid || 0);
+                    if (paidAmount > 0) {
+                        const feePaid = Math.floor((paidAmount / 1000) * 7);
+                        const totalRefund = paidAmount + feePaid;
+                        const newWalletBalance = Number(userProf.wallet_balance || 0) + totalRefund;
+                        
+                        await supabase.from('profiles').update({ 
+                            wallet_balance: newWalletBalance,
+                            agent_balance: 0,
+                            agent_capacity: 0,
+                            agent_guarantee_paid: 0,
+                            agent_status: 'rejected'
+                        }).eq('id', userId);
+
+                        await supabase.from('transactions').insert({
+                            user_id: userId,
+                            type: 'REFUND',
+                            amount: totalRefund,
+                            status: 'success',
+                            description: `Ranbousman Aplikasyon Ajan ki Rejte (+ Frè)`
+                        });
+                    } else {
+                        await supabase.from('profiles').update({ agent_status: 'rejected' }).eq('id', userId);
+                    }
+                }
+            } else {
+                await supabase.from('profiles').update({ agent_status: 'approved' }).eq('id', userId);
+            }
+
             await supabase.from('agent_applications').update({ 
                 status: aksyon,
                 rejection_reason: aksyon === 'rejected' ? rezon : null
             }).eq('id', applicationId);
 
-            // 2. Mizajou pwofil la (Trigger SQL la pral kreye kòd 8 chif la otomatikman si l apwouve)
-            await supabase.from('profiles').update({ 
-                agent_status: aksyon 
-            }).eq('id', userId);
-
-            // 3. Voye imèl bay itilizatè a
             const mesajE = aksyon === 'approved' 
                 ? `Felisitasyon ${fullName}! Aplikasyon w pou vin Ajan Hatexcard la apwouve. Ou ka vizite pòtay ajan w lan kounye a pou w jwenn kòd inik ou a epi kòmanse travay.` 
-                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
+                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Tout garanti ou te depoze yo tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
             
             if (userEmail) await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
             
-            alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); 
+            alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`); 
             
-            // Si nou rejte, nou netwaye bwat tèks la
-            if (aksyon === 'rejected') {
-                setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
-            }
+            if (aksyon === 'rejected') setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
             
             raleDone();
         } catch (err: any) { 
@@ -425,7 +447,6 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     
-                    {/* NOUVO: ONGLÈ AJAN AN */}
                     <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         Ajan 
                         {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
@@ -608,9 +629,6 @@ export default function AdminSuperPage() {
                             </div>
                         )
                     ) : view === 'ajan' ? (
-                        /* ========================================== */
-                        /* NOUVO ONGLÈ: JERE APLIKASYON AJAN YO       */
-                        /* ========================================== */
                         pendingAgents.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
                                 <Store size={48} className="mx-auto mb-4 text-slate-300" />
@@ -621,7 +639,6 @@ export default function AdminSuperPage() {
                                 {pendingAgents.map((agent) => (
                                     <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
                                         
-                                        {/* HEADER INFO */}
                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Store size={24} /></div>
@@ -632,11 +649,10 @@ export default function AdminSuperPage() {
                                             </div>
                                             <div className="flex flex-col items-end">
                                                 <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-bold uppercase tracking-wider border border-indigo-100 mb-2">Plan: {agent.tier}</span>
-                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Peman: {agent.metadata?.payment_plan === 'full' ? 'Entegral' : 'Vèsman'}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Depo + Frè (Wete sou Wallet): {Number((agent.metadata?.initial_deposit || 0) + (agent.metadata?.fee_paid || 0)).toLocaleString()} HTG</span>
                                             </div>
                                         </div>
 
-                                        {/* DOKIMAN YO */}
                                         <div>
                                             <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman Soumèt</p>
                                             <div className="flex flex-wrap gap-3">
@@ -648,7 +664,6 @@ export default function AdminSuperPage() {
                                             </div>
                                         </div>
 
-                                        {/* AKSYON YO */}
                                         <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
                                             <div className="w-full md:flex-1">
                                                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la:</label>
@@ -662,7 +677,7 @@ export default function AdminSuperPage() {
                                             </div>
                                             <div className="flex gap-3 w-full md:w-auto shrink-0">
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'rejected')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    <XCircle size={16} /> Rejte
+                                                    <XCircle size={16} /> Rejte (Ranbouse l)
                                                 </button>
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
                                                     {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
