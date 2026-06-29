@@ -12,7 +12,7 @@ export default function AdminSuperPage() {
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     
-    // NOUVO: State pou ajan yo
+    // State pou ajan yo
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
@@ -24,7 +24,7 @@ export default function AdminSuperPage() {
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis'>('depo'); 
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis'>('ajan'); // Nou mete l sou ajan pa defo
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -80,8 +80,13 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            // NOUVO: Fetch ajan ki an atant yo
-            const { data: agData } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            // NOUVO: Fetch ajan ki an atant yo epi asire nou marye l ak pwofil kliyan an
+            const { data: agData, error: agErr } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            
+            if (agErr) {
+                console.error("Erè rale ajan:", agErr);
+            }
+            
             if (agData && u) {
                 const mergedAgents = agData.map(agent => ({
                    ...agent,
@@ -100,20 +105,16 @@ export default function AdminSuperPage() {
         }
     };
 
-    const handleOpenMaskedUrl = (url: string) => {
-        if (!url) return;
-        const newWindow = window.open('about:blank', '_blank');
-        if (newWindow) {
-            newWindow.document.write(`
-                <html style="background:#f8fafc; display:flex; justify-content:center; align-items:center; margin:0;">
-                    <head><title>Dokiman Sekirize - HatexCard</title></head>
-                    <body>
-                        <img src="${url}" style="max-width:100%; max-height:100vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;"/>
-                    </body>
-                </html>
-            `);
-            newWindow.document.close();
+    // ==========================================
+    // NOUVO FONKSYON POU OUVRI FOTO YO SAN PWOBLÈM
+    // ==========================================
+    const handleOpenDocument = (url: string) => {
+        if (!url) {
+            alert("Pa gen lyen pou dokiman sa a!");
+            return;
         }
+        // Ouvri foto a oswa PDF la dirèkteman nan yon nouvo onglet navigatè a
+        window.open(url, '_blank');
     };
 
     const handleOpenBiznis = async () => {
@@ -153,18 +154,17 @@ export default function AdminSuperPage() {
             const totalKat = (profiles || []).reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
             setTotalCardBal(totalKat);
 
-            const { data: depData, error: errDep } = await supabase.from('deposits').select('fee').eq('status', 'approved');
-            const totalDepoFee = errDep ? 0 : (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
+            const { data: depData } = await supabase.from('deposits').select('fee').eq('status', 'approved');
+            const totalDepoFee = (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
 
-            const { data: witData, error: errWit } = await supabase.from('withdrawals').select('fee').eq('status', 'completed');
-            const totalRetreFee = errWit ? 0 : (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
+            const { data: witData } = await supabase.from('withdrawals').select('fee').eq('status', 'completed');
+            const totalRetreFee = (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
 
-            const { data: traData, error: errTra } = await supabase.from('transfers').select('fee, status');
-            const totalTransfeFee = errTra ? 0 : (traData || [])
+            const { data: traData } = await supabase.from('transfers').select('fee, status');
+            const totalTransfeFee = (traData || [])
                 .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
                 .reduce((acc, t) => acc + Number(t.fee || 0), 0);
                 
-            // Ajoute frè ki soti nan Ajan yo ki soti nan transactions tab kote type = 'FEE'
             const { data: feeData } = await supabase.from('transactions').select('amount').eq('type', 'FEE').eq('status', 'success');
             const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
 
@@ -175,7 +175,7 @@ export default function AdminSuperPage() {
 
         } catch (error) {
             console.error("Erè kalkil biznis:", error);
-            alert("Sistèm nan jwenn yon ti pwoblèm nan rale done yo. Tcheke si tab transfers la ekziste byen.");
+            alert("Sistèm nan jwenn yon ti pwoblèm nan rale done yo.");
         } finally {
             setLoadingBiznis(false);
         }
@@ -233,7 +233,7 @@ export default function AdminSuperPage() {
             await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
             await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
             
-            alert("SIKSÈ! Depo a apwouve, kòb la al sou kont li, epi frè a byen anrejistre pou Kès Biznis la."); 
+            alert("SIKSÈ! Depo a apwouve."); 
             raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -387,40 +387,6 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
     };
 
-    const handleManualBalanceAdjust = async (user: any, action: 'add' | 'subtract') => {
-        if (!user) return;
-        const amtStr = prompt(`Antre montan ou vle ${action === 'add' ? 'AJOUTE sou' : 'RETIRE nan'} kont ${user.full_name} an:`);
-        if (!amtStr) return;
-        
-        const amt = Number(amtStr);
-        if (isNaN(amt) || amt <= 0) return alert("Montan an pa bon!");
-
-        if (!confirm(`W ap ${action === 'add' ? 'AJOUTE' : 'RETIRE'} ${amt} HTG ${action === 'add' ? 'sou' : 'nan'} kont ${user.full_name}. Kontinye?`)) return;
-
-        setProcessingId(`adjust_${user.id}`);
-        try {
-            const { data: dbUser } = await supabase.from('profiles').select('wallet_balance').eq('id', user.id).single();
-            const currentBal = Number(dbUser?.wallet_balance || 0);
-            const newBal = action === 'add' ? currentBal + amt : currentBal - amt;
-
-            await supabase.from('profiles').update({ wallet_balance: newBal }).eq('id', user.id);
-            await supabase.from('transactions').insert([{
-                user_id: user.id,
-                amount: action === 'add' ? amt : -amt,
-                type: 'ADMIN_ADJUSTMENT',
-                description: `Ajusteman Admin: ${action === 'add' ? '+' : '-'}${amt} HTG`,
-                status: 'success'
-            }]);
-
-            alert(`Balans la modifye! Nouvo balans: ${newBal} HTG`);
-            raleDone();
-        } catch (err: any) {
-            alert("Erè nan modifikasyon: " + err.message);
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
@@ -447,6 +413,7 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     
+                    {/* ONGLÈ AJAN AN */}
                     <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         Ajan 
                         {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
@@ -516,7 +483,7 @@ export default function AdminSuperPage() {
                                                 <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.retre).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
                                             <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Transfè</p>
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Transfè & Ajan</p>
                                                 <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.transfe).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
                                         </div>
@@ -610,9 +577,9 @@ export default function AdminSuperPage() {
                                             <h3 className="text-lg font-bold text-slate-900">{user.full_name || 'San Non'}</h3>
                                             <p className="text-xs text-slate-500 mt-1 mb-4">{user.email}</p>
                                             <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                                {user.kyc_front && <button onClick={() => handleOpenMaskedUrl(user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
-                                                {user.kyc_back && <button onClick={() => handleOpenMaskedUrl(user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
-                                                {user.kyc_selfie && <button onClick={() => handleOpenMaskedUrl(user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
+                                                {user.kyc_front && <button onClick={() => handleOpenDocument(user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
+                                                {user.kyc_back && <button onClick={() => handleOpenDocument(user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
+                                                {user.kyc_selfie && <button onClick={() => handleOpenDocument(user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
                                                 {!user.kyc_front && !user.kyc_selfie && <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 font-bold uppercase tracking-wider">Okenn imaj sou sistèm nan</span>}
                                             </div>
                                         </div>
@@ -629,6 +596,9 @@ export default function AdminSuperPage() {
                             </div>
                         )
                     ) : view === 'ajan' ? (
+                        /* ========================================== */
+                        /* ONGLÈ: JERE APLIKASYON AJAN YO       */
+                        /* ========================================== */
                         pendingAgents.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
                                 <Store size={48} className="mx-auto mb-4 text-slate-300" />
@@ -639,34 +609,38 @@ export default function AdminSuperPage() {
                                 {pendingAgents.map((agent) => (
                                     <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
                                         
+                                        {/* HEADER INFO */}
                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Store size={24} /></div>
                                                 <div>
                                                     <h3 className="text-lg font-bold text-slate-900">{agent.profiles?.full_name || 'San Non'}</h3>
                                                     <p className="text-xs text-slate-500 mt-1">{agent.profiles?.email}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1 font-mono">ID Kliyan: {agent.user_id}</p>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end">
-                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-bold uppercase tracking-wider border border-indigo-100 mb-2">Plan: {agent.tier}</span>
-                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Depo + Frè (Wete sou Wallet): {Number((agent.metadata?.initial_deposit || 0) + (agent.metadata?.fee_paid || 0)).toLocaleString()} HTG</span>
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase tracking-wider border border-indigo-100 mb-2">Plan: {agent.tier}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Depo Fèt: {Number(agent.metadata?.initial_deposit || 0).toLocaleString()} HTG</span>
                                             </div>
                                         </div>
 
+                                        {/* DOKIMAN YO */}
                                         <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman Soumèt</p>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman yo soumèt</p>
                                             <div className="flex flex-wrap gap-3">
-                                                {agent.id_doc_url && <button onClick={() => handleOpenMaskedUrl(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
-                                                {agent.address_doc_url && <button onClick={() => handleOpenMaskedUrl(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
-                                                {agent.location_photo_url && <button onClick={() => handleOpenMaskedUrl(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
-                                                {agent.patente_url && <button onClick={() => handleOpenMaskedUrl(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
-                                                {agent.cif_url && <button onClick={() => handleOpenMaskedUrl(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                                {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
+                                                {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
+                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
+                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
+                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
                                             </div>
                                         </div>
 
+                                        {/* AKSYON YO */}
                                         <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
                                             <div className="w-full md:flex-1">
-                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la:</label>
+                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la a (Lajan l ap retounen):</label>
                                                 <input 
                                                     type="text" 
                                                     placeholder="Egz: Foto lokal la pa klè..." 
@@ -677,7 +651,7 @@ export default function AdminSuperPage() {
                                             </div>
                                             <div className="flex gap-3 w-full md:w-auto shrink-0">
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'rejected')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    <XCircle size={16} /> Rejte (Ranbouse l)
+                                                    <XCircle size={16} /> Rejte
                                                 </button>
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
                                                     {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
@@ -801,8 +775,8 @@ export default function AdminSuperPage() {
                                                         <XCircle size={16} /> Anile
                                                     </button>
                                                 </div>
-                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
-                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
+                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenDocument(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
+                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenDocument(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
                                             </div>
                                         )}
                                     </div>
