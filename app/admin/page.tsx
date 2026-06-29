@@ -24,7 +24,7 @@ export default function AdminSuperPage() {
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis'>('ajan'); // Nou mete l sou ajan pa defo
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis'>('ajan'); 
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -80,11 +80,12 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            // NOUVO: Fetch ajan ki an atant yo epi asire nou marye l ak pwofil kliyan an
+            // NOUVO: Fetch ajan ki an atant yo (Ak mesaj alèt si Supabase bloke l)
             const { data: agData, error: agErr } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
             
             if (agErr) {
                 console.error("Erè rale ajan:", agErr);
+                alert("Sistèm nan bloke lekti ajan yo. Asire w ou kouri kòmand SQL pou RLS la! \nErè: " + agErr.message);
             }
             
             if (agData && u) {
@@ -105,15 +106,11 @@ export default function AdminSuperPage() {
         }
     };
 
-    // ==========================================
-    // NOUVO FONKSYON POU OUVRI FOTO YO SAN PWOBLÈM
-    // ==========================================
     const handleOpenDocument = (url: string) => {
         if (!url) {
             alert("Pa gen lyen pou dokiman sa a!");
             return;
         }
-        // Ouvri foto a oswa PDF la dirèkteman nan yon nouvo onglet navigatè a
         window.open(url, '_blank');
     };
 
@@ -387,6 +384,40 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
     };
 
+    const handleManualBalanceAdjust = async (user: any, action: 'add' | 'subtract') => {
+        if (!user) return;
+        const amtStr = prompt(`Antre montan ou vle ${action === 'add' ? 'AJOUTE sou' : 'RETIRE nan'} kont ${user.full_name} an:`);
+        if (!amtStr) return;
+        
+        const amt = Number(amtStr);
+        if (isNaN(amt) || amt <= 0) return alert("Montan an pa bon!");
+
+        if (!confirm(`W ap ${action === 'add' ? 'AJOUTE' : 'RETIRE'} ${amt} HTG ${action === 'add' ? 'sou' : 'nan'} kont ${user.full_name}. Kontinye?`)) return;
+
+        setProcessingId(`adjust_${user.id}`);
+        try {
+            const { data: dbUser } = await supabase.from('profiles').select('wallet_balance').eq('id', user.id).single();
+            const currentBal = Number(dbUser?.wallet_balance || 0);
+            const newBal = action === 'add' ? currentBal + amt : currentBal - amt;
+
+            await supabase.from('profiles').update({ wallet_balance: newBal }).eq('id', user.id);
+            await supabase.from('transactions').insert([{
+                user_id: user.id,
+                amount: action === 'add' ? amt : -amt,
+                type: 'ADMIN_ADJUSTMENT',
+                description: `Ajusteman Admin: ${action === 'add' ? '+' : '-'}${amt} HTG`,
+                status: 'success'
+            }]);
+
+            alert(`Balans la modifye! Nouvo balans: ${newBal} HTG`);
+            raleDone();
+        } catch (err: any) {
+            alert("Erè nan modifikasyon: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
@@ -651,7 +682,7 @@ export default function AdminSuperPage() {
                                             </div>
                                             <div className="flex gap-3 w-full md:w-auto shrink-0">
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'rejected')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    <XCircle size={16} /> Rejte
+                                                    <XCircle size={16} /> Rejte (Ranbouse l)
                                                 </button>
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
                                                     {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
