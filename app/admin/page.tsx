@@ -1,7 +1,8 @@
 "use client";
+
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus, Lock, Briefcase, DollarSign, EyeOff } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, UploadCloud, ChevronRight, XCircle } from 'lucide-react';
 
 export default function AdminSuperPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -10,9 +11,12 @@ export default function AdminSuperPage() {
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
-    const [disputes, setDisputes] = useState<any[]>([]); 
+    
+    // NOUVO: State pou ajan yo
+    const [pendingAgents, setPendingAgents] = useState<any[]>([]);
+    const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
+
     const [totalCardBal, setTotalCardBal] = useState(0);
-     
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
     const [searchQuery, setSearchQuery] = useState('');
@@ -20,13 +24,7 @@ export default function AdminSuperPage() {
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    const [adminReplies, setAdminReplies] = useState<{ [key: string]: string }>({});
-    const [searchDisputeId, setSearchDisputeId] = useState('');
-    const [searchedDispute, setSearchedDispute] = useState<any>(null);
-    const [isSearchingDispute, setIsSearchingDispute] = useState(false);
-    const [actionAmount, setActionAmount] = useState<number>(0);
-
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'litij' | 'biznis'>('litij'); 
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis'>('depo'); 
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -34,7 +32,7 @@ export default function AdminSuperPage() {
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
     // ==========================================
-    // ETA POU KONT BIZNIS LA (NOUVO METÒD SENP LAN)
+    // ETA POU KONT BIZNIS LA
     // ==========================================
     const [businessTabPasswordVerified, setBusinessTabPasswordVerified] = useState(false);
     const [loadingBiznis, setLoadingBiznis] = useState(false);
@@ -82,20 +80,13 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            const { data: disp1 } = await supabase.from('plugin_transactions').select('*').eq('status', 'disputed');
-            const { data: disp2 } = await supabase.from('transactions').select('*').eq('status', 'disputed');
-            
-            const allDisputes = [
-                ...(disp1 || []).map(d => ({ ...d, table_source: 'plugin_transactions' })),
-                ...(disp2 || []).map(d => ({ 
-                    ...d, 
-                    table_source: 'transactions', 
-                    dispute_details: d.metadata?.dispute_details || {}, 
-                    dispute_reason: d.description 
-                }))
-            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            
-            setDisputes(allDisputes);
+            // NOUVO: Rale tout aplikasyon ajan ki an atant yo, ansanm ak enfòmasyon pwofil itilizatè a
+            const { data: agData } = await supabase
+                .from('agent_applications')
+                .select('*, profiles(full_name, email, phone)')
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false });
+            setPendingAgents(agData || []);
             
             const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
@@ -112,10 +103,10 @@ export default function AdminSuperPage() {
         const newWindow = window.open('about:blank', '_blank');
         if (newWindow) {
             newWindow.document.write(`
-                <html style="background:#0a0b14; display:flex; justify-content:center; align-items:center; margin:0;">
+                <html style="background:#f8fafc; display:flex; justify-content:center; align-items:center; margin:0;">
                     <head><title>Dokiman Sekirize - HatexCard</title></head>
                     <body>
-                        <img src="${url}" style="max-width:100%; max-height:100vh; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"/>
+                        <img src="${url}" style="max-width:100%; max-height:100vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;"/>
                     </body>
                 </html>
             `);
@@ -130,7 +121,7 @@ export default function AdminSuperPage() {
             return;
         }
 
-        const pass = prompt("🔒 ANTRE MODPAS SEKRÈ FINANSYE A:");
+        const pass = prompt("ANTRE MODPAS SEKRÈ FINANSYE A:");
         if (!pass) return;
 
         try {
@@ -142,48 +133,40 @@ export default function AdminSuperPage() {
                 setView('biznis');
                 kalkileTotalBiznis();
             } else {
-                alert("❌ Modpas la pa bon! Ou pa gen aksè ak kès biznis la.");
+                alert("Modpas la pa bon! Ou pa gen aksè ak kès biznis la.");
             }
         } catch (e) {
             alert("Erè nan sistèm sekirite a.");
         }
     };
 
-// ==========================================
+    // ==========================================
     // METÒD SENPLIFYE POU KALKILE FRÈ SOU TAB YO DIREK
     // ==========================================
     const kalkileTotalBiznis = async () => {
         setLoadingBiznis(true);
         try {
-            // 1. Total Kòb sou tout Balans Kliyan yo (Wallet + Kat Vityèl)
             const { data: profiles } = await supabase.from('profiles').select('wallet_balance, card_balance');
             
-            // Kalkile total pou Wallet yo
             const totalKliyan = (profiles || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
             setTotalClientBal(totalKliyan);
 
-            // NOUVO: Kalkile total pou Kat Vityèl yo
             const totalKat = (profiles || []).reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
-            setTotalCardBal(totalKat); // 👈 Asire w ou gen state sa a ki kreye anwo nan kòd la
+            setTotalCardBal(totalKat);
 
-            // 2. Chèche Frè sou tout Depo ki reyisi yo
             const { data: depData, error: errDep } = await supabase.from('deposits').select('fee').eq('status', 'approved');
             const totalDepoFee = errDep ? 0 : (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
 
-            // 3. Chèche Frè sou tout Retrè ki reyisi yo
             const { data: witData, error: errWit } = await supabase.from('withdrawals').select('fee').eq('status', 'completed');
             const totalRetreFee = errWit ? 0 : (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
 
-            // 4. Chèche Frè sou tout Transfè ki reyisi yo
             const { data: traData, error: errTra } = await supabase.from('transfers').select('fee, status');
             const totalTransfeFee = errTra ? 0 : (traData || [])
                 .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
                 .reduce((acc, t) => acc + Number(t.fee || 0), 0);
 
-            // Nou mete tout done yo nan state yo
             setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee });
             
-            // Grand Total Pwofi a
             const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee;
             setTotalBiznisProfit(granTotalPwofi);
 
@@ -209,11 +192,11 @@ export default function AdminSuperPage() {
     };
 
     const deleteTranzaksyon = async (id: string, table: string) => {
-        if (!confirm("Èske ou vle efase istovik sa a nèt?")) return;
+        if (!confirm("Èske ou vle efase istwa sa a nèt?")) return;
         setProcessingId(id);
         try {
             await supabase.from(table).delete().eq('id', id);
-            alert("🗑️ Efase nèt!"); raleDone();
+            alert("Efase nèt!"); raleDone();
         } finally { setProcessingId(null); }
     };
 
@@ -221,7 +204,6 @@ export default function AdminSuperPage() {
         const isModified = montanModifye[d.id] !== undefined;
         const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
         
-        // Kalkil frè a: 5% si l modifye, sinon nou pran frè ki sou baz done a
         const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
         const totalPeye = montanFinal + frePouBiznisLa;
 
@@ -232,14 +214,11 @@ export default function AdminSuperPage() {
             const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', d.user_id).single();
             if (pErr || !p) throw new Error("Kliyan pa jwenn nan sistèm nan.");
             
-            // 1. Mete montanFinal la sou balans kliyan an
             const nouvoBalans = Number(p.wallet_balance || 0) + montanFinal;
             await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', d.user_id);
             
-            // 2. Aktyalize estati Depo a ak vrè frè a, konsa Kès Biznis la ap tou jwenn li nan kalkil "kalkileTotalBiznis" lan.
             await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
             
-            // 3. Resi pou kliyan an nan istwa l
             await supabase.from('transactions').insert({ 
                 user_id: d.user_id, 
                 amount: montanFinal, 
@@ -248,10 +227,10 @@ export default function AdminSuperPage() {
                 status: 'success' 
             });
 
-            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "✅ DEPO APWOUVE");
-            await voyeTelegram(`✅ <b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
+            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
+            await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
             
-            alert("✅ SIKSÈ! Depo a apwouve, kòb la al sou kont li, epi frè a byen anrejistre pou Kès Biznis la."); 
+            alert("SIKSÈ! Depo a apwouve, kòb la al sou kont li, epi frè a byen anrejistre pou Kès Biznis la."); 
             raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -263,13 +242,12 @@ export default function AdminSuperPage() {
             const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', w.user_id).single();
             if (pErr || !p) throw new Error("Kliyan pa jwenn.");
             
-            // Isit la asire w w update fee a tou si w te bezwen nan retrè a
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
             
             await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
-            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "💸 RETRÈ KONFIME");
-            await voyeTelegram(`💸 <b>RETRÈ KONFIME</b>\nKliyan: ${p.full_name}\nMontan: ${w.amount} HTG`);
-            alert("✅ RETRÈ FINI!"); raleDone();
+            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
+            await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p.full_name}\nMontan: ${w.amount} HTG`);
+            alert("RETRÈ FINI!"); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -281,27 +259,27 @@ export default function AdminSuperPage() {
             await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
             const { data: p } = await supabase.from('profiles').select('*').eq('id', item.user_id).single();
             if (table === 'withdrawals') {
-                const balansR = Number(p.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); // Ranbouse ak tout frè a si l te peye l deja
+                const balansR = Number(p.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); 
                 await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
             }
             await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
-            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "❌ TRANZAKSYON ANILE");
-            await voyeTelegram(`❌ <b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
-            alert("⚠️ Anile!"); raleDone();
+            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
+            await voyeTelegram(`<b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
+            alert("Anile!"); raleDone();
         } finally { setProcessingId(null); }
     };
 
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id); alert(`✅ Kont ${email} lan aktive!`); raleDone(); } 
+        try { await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id); alert(`Kont ${email} lan aktive!`); raleDone(); } 
         catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
     const sispannKont = async (id: string, email: string) => {
-        if (!confirm(`⚠️ Èske w sèten ou vle SISPANN kont sa a? (${email})`)) return;
+        if (!confirm(`Èske w sèten ou vle SISPANN kont sa a? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); alert(`🚫 Kont ${email} lan sispandi!`); raleDone(); } 
+        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); alert(`Kont ${email} lan sispandi!`); raleDone(); } 
         catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
@@ -313,9 +291,56 @@ export default function AdminSuperPage() {
         try {
             await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezonReje : null }).eq('id', id);
             const mesajE = aksyon === 'approved' ? `Felisitasyon ${full_name}! Dokiman w yo apwouve.` : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
-            if (email) await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE ✅' : 'REJTE ❌'}`);
+            if (email) await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
             alert(`KYC a ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); raleDone();
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+    };
+
+    // ==========================================
+    // NOUVO: FONKSYON POU JERE APLIKASYON AJAN YO
+    // ==========================================
+    const jereAjan = async (applicationId: string, userId: string, fullName: string, userEmail: string, aksyon: 'approved' | 'rejected') => {
+        let rezon = "";
+        if (aksyon === 'rejected') {
+            rezon = agentRejectionReason[applicationId] || "";
+            if (!rezon.trim()) return alert("Tanpri ekri yon rezon pou w ka rejte aplikasyon sa a.");
+        } else {
+            if (!confirm(`Èske w sèten ou vle APWOUVE aplikasyon ajan sa a pou ${fullName}?`)) return;
+        }
+
+        setProcessingId(applicationId);
+        try {
+            // 1. Mizajou aplikasyon an
+            await supabase.from('agent_applications').update({ 
+                status: aksyon,
+                rejection_reason: aksyon === 'rejected' ? rezon : null
+            }).eq('id', applicationId);
+
+            // 2. Mizajou pwofil la (Trigger SQL la pral kreye kòd 8 chif la otomatikman si l apwouve)
+            await supabase.from('profiles').update({ 
+                agent_status: aksyon 
+            }).eq('id', userId);
+
+            // 3. Voye imèl bay itilizatè a
+            const mesajE = aksyon === 'approved' 
+                ? `Felisitasyon ${fullName}! Aplikasyon w pou vin Ajan Hatexcard la apwouve. Ou ka vizite pòtay ajan w lan kounye a pou w jwenn kòd inik ou a epi kòmanse travay.` 
+                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
+            
+            if (userEmail) await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            
+            alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); 
+            
+            // Si nou rejte, nou netwaye bwat tèks la
+            if (aksyon === 'rejected') {
+                setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
+            }
+            
+            raleDone();
+        } catch (err: any) { 
+            alert("Erè nan pwosesis la: " + err.message); 
+        } finally { 
+            setProcessingId(null); 
+        }
     };
 
     const handleCreateCode = async (e: React.FormEvent) => {
@@ -326,7 +351,7 @@ export default function AdminSuperPage() {
         try {
             const { error } = await supabase.from('promo_codes').insert([{ code: cleanCode, reward_amount: parseInt(promoReward) }]);
             if (error) { if (error.code === '23505') throw new Error('Kòd sa a egziste deja!'); throw error; }
-            alert(`✅ Kòd ${cleanCode} la kreye!`); setNewPromoCode(''); setPromoReward('250'); raleDone();
+            alert(`Kòd ${cleanCode} la kreye!`); setNewPromoCode(''); setPromoReward('250'); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -336,7 +361,7 @@ export default function AdminSuperPage() {
         try {
             const { error } = await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
             if (error) throw error;
-            alert("✅ Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
+            alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
         } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
     };
 
@@ -365,18 +390,7 @@ export default function AdminSuperPage() {
                 status: 'success'
             }]);
 
-            alert(`✅ Balans la modifye! Nouvo balans: ${newBal} HTG`);
-            
-            if (searchedDispute) {
-                const updatedDispute = { ...searchedDispute };
-                if (updatedDispute.senderProfile?.id === user.id) {
-                    updatedDispute.senderProfile.wallet_balance = newBal;
-                }
-                if (updatedDispute.receiverProfile?.id === user.id) {
-                    updatedDispute.receiverProfile.wallet_balance = newBal;
-                }
-                setSearchedDispute(updatedDispute);
-            }
+            alert(`Balans la modifye! Nouvo balans: ${newBal} HTG`);
             raleDone();
         } catch (err: any) {
             alert("Erè nan modifikasyon: " + err.message);
@@ -385,451 +399,152 @@ export default function AdminSuperPage() {
         }
     };
 
-    const handleAdminSearchDispute = async () => {
-        if (!searchDisputeId.trim()) return alert("Tanpri mete ID kòmand lan pou w chèche a.");
-        setIsSearchingDispute(true);
-        setSearchedDispute(null);
-        
-        try {
-            const cleanId = searchDisputeId.trim().toLowerCase();
-            let tx = null;
-            
-            let { data: pluginTx } = await supabase.from('plugin_transactions').select('*').ilike('order_id', `${cleanId}%`).maybeSingle();
-            if (!pluginTx) {
-                const { data: pluginTxOld } = await supabase.from('plugin_transactions').select('*').ilike('id', `${cleanId}%`).maybeSingle();
-                pluginTx = pluginTxOld;
-            }
-            
-            if (pluginTx) {
-                tx = { ...pluginTx, table_source: 'plugin_transactions' };
-            } else {
-                let { data: normTx } = await supabase.from('transactions').select('*').ilike('order_id', `${cleanId}%`).maybeSingle();
-                if (!normTx) {
-                    const { data: normTxOld } = await supabase.from('transactions').select('*').ilike('id', `${cleanId}%`).maybeSingle();
-                    normTx = normTxOld;
-                }
-                if (normTx) {
-                    tx = { ...normTx, table_source: 'transactions', dispute_details: normTx.metadata?.dispute_details || {}, dispute_reason: normTx.description };
-                }
-            }
-
-            if (!tx) return alert("Sistèm nan pa jwenn okenn kòmand avèk ID sa a ditou. Tcheke si ID a bon.");
-
-            let senderId = null;
-            let receiverId = null;
-
-            if (tx.table_source === 'plugin_transactions') {
-                receiverId = tx.user_id; 
-                senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id;
-            } else {
-                senderId = tx.user_id;
-                receiverId = tx.metadata?.receiver_id || tx.metadata?.merchant_id;
-            }
-
-            let senderProfile = null;
-            if (senderId) {
-                const { data: s } = await supabase.from('profiles').select('*').eq('id', senderId).maybeSingle();
-                senderProfile = s || allUsers.find(u => u.id === senderId);
-            }
-
-            let receiverProfile = null;
-            let receiverEmail = tx.metadata?.merchant_email || tx.metadata?.receiver_email || tx.customer_info?.email;
-
-            if (receiverId) {
-                const { data: r } = await supabase.from('profiles').select('*').eq('id', receiverId).maybeSingle();
-                receiverProfile = r || allUsers.find(u => u.id === receiverId);
-            } else if (receiverEmail) {
-                const { data: r } = await supabase.from('profiles').select('*').eq('email', receiverEmail).maybeSingle();
-                receiverProfile = r || allUsers.find(u => u.email === receiverEmail);
-            }
-
-            tx.senderProfile = senderProfile;
-            tx.receiverProfile = receiverProfile;
-
-            setActionAmount(Number(tx.amount_htg || Math.abs(tx.amount) || 0));
-            setSearchedDispute(tx);
-            
-        } catch (err: any) {
-            alert("Erè: " + err.message);
-        } finally {
-            setIsSearchingDispute(false);
-        }
-    };
-
-    const balanseLajanKont = async (fromUser: any, toUser: any, tipChanjman: string) => {
-        if (!fromUser && !toUser) return alert("Sistèm nan pa jwenn okenn pwofil ditou! Nou pa ka fè tranzaksyon an.");
-        if (actionAmount <= 0) return alert("Ou dwe mete yon montan ki pi gwo pase zewo.");
-        
-        let mesajKonfimasyon = "";
-        if (!fromUser) {
-            mesajKonfimasyon = `⚠️ MACHANN NAN PA SOU SISTÈM NAN!\n\nÈske w vle FÒSE ajoute ${actionAmount} HTG sou kont kliyan an (${toUser?.full_name}) kanmenm? (Kòb la pap sòti sou okenn lòt kont).`;
-        } else if (!toUser) {
-            mesajKonfimasyon = `⚠️ KLIYAN AN PA SOU SISTÈM NAN!\n\nÈske w vle FÒSE retire ${actionAmount} HTG sou kont ${fromUser?.full_name} kanmenm?`;
-        } else {
-            mesajKonfimasyon = `⚠️ SÈTEN?\n\nOu pral RETIRE ${actionAmount} HTG sou kont: ${fromUser.full_name}\nPou w AJOUTE sou kont: ${toUser.full_name}\n\nKontinye?`;
-        }
-
-        if (!confirm(mesajKonfimasyon)) return;
-
-        setProcessingId('balance_transfer');
-        try {
-            if (fromUser) {
-                const { data: f } = await supabase.from('profiles').select('wallet_balance').eq('id', fromUser.id).single();
-                await supabase.from('profiles').update({ wallet_balance: Number(f?.wallet_balance || 0) - actionAmount }).eq('id', fromUser.id);
-                await supabase.from('transactions').insert([{ user_id: fromUser.id, amount: -actionAmount, type: 'ADMIN_ADJUSTMENT', description: tipChanjman, status: 'success' }]);
-            }
-
-            if (toUser) {
-                const { data: t } = await supabase.from('profiles').select('wallet_balance').eq('id', toUser.id).single();
-                await supabase.from('profiles').update({ wallet_balance: Number(t?.wallet_balance || 0) + actionAmount }).eq('id', toUser.id);
-                await supabase.from('transactions').insert([{ user_id: toUser.id, amount: actionAmount, type: 'ADMIN_ADJUSTMENT', description: tipChanjman, status: 'success' }]);
-            }
-
-            if (searchedDispute?.status === 'disputed') {
-                if (searchedDispute.table_source === 'plugin_transactions') {
-                    await supabase.from('plugin_transactions').update({ status: 'refunded' }).eq('id', searchedDispute.id);
-                } else {
-                    await supabase.from('transactions').update({ status: 'refunded' }).eq('id', searchedDispute.id);
-                }
-            }
-
-            alert(`✅ SIKSÈ! Tranzaksyon an fèt!`);
-            setSearchedDispute(null); 
-            raleDone(); 
-        } catch (err: any) {
-            alert("Erè: " + err.message);
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    const voyeReponsAdmin = async (txId: string, currentDetails: any, tabSource: string) => {
-        const replyText = adminReplies[txId];
-        if (!replyText || replyText.trim() === '') return alert("Tanpri ekri yon mesaj anvan w voye l!");
-        setProcessingId(`reply_${txId}`);
-        try {
-            const updatedDetails = { ...currentDetails, admin_reply: replyText };
-            if (tabSource === 'plugin_transactions') {
-                await supabase.from('plugin_transactions').update({ dispute_details: updatedDetails }).eq('id', txId);
-            } else {
-                const { data: oldTx } = await supabase.from('transactions').select('metadata').eq('id', txId).single();
-                await supabase.from('transactions').update({ metadata: { ...oldTx?.metadata, dispute_details: updatedDetails } }).eq('id', txId);
-            }
-            
-            alert("✅ Mesaj la ale!");
-            setAdminReplies({ ...adminReplies, [txId]: '' }); 
-            raleDone(); 
-            if (searchedDispute && searchedDispute.id === txId) {
-                setSearchedDispute({...searchedDispute, dispute_details: updatedDetails});
-            }
-        } catch (err: any) { alert("Erè nan voye mesaj la: " + err.message); } finally { setProcessingId(null); }
-    };
-
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="bg-black h-screen" />;
+    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
 
     return (
-        <div className="min-h-screen bg-[#0a0b14] text-white p-4 uppercase italic font-bold pb-24">
-            <div className="max-w-6xl mx-auto">
-                <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-4">
-                    <h1 className="text-2xl font-black text-red-600 italic tracking-tighter">HATEX ADMIN</h1>
-                    <button onClick={raleDone} className="bg-zinc-800 p-3 rounded-xl text-[10px] active:scale-95 transition-all">REFRESH</button>
+        <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 border-b border-gray-200 pb-6 gap-4">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck size={28} className="text-indigo-600" />
+                      <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pòtay Prensipal Admin</h1>
+                    </div>
+                    <button onClick={raleDone} className="bg-white border border-gray-200 text-slate-600 hover:text-indigo-600 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm">Rafrechi Done Yo</button>
                 </div>
 
-                <div className="flex gap-2 mb-8 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar whitespace-nowrap custom-scrollbar pb-2">
-                    <button onClick={() => setView('anons')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'anons' ? 'bg-blue-600 shadow-lg shadow-blue-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>📢 ANONS</button>
-                    <button onClick={() => setView('kliyan')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>👥 KLIYAN ({allUsers.length})</button>
-                    <button onClick={() => setView('litij')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all relative ${view === 'litij' ? 'bg-yellow-600 shadow-lg shadow-yellow-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>
-                        ⚠️ LITIJ / CHÈCHE
-                        {disputes.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-full text-[8px] animate-pulse">{disputes.length}</span>}
-                    </button>
-                    <button onClick={() => setView('depo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'depo' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>DEPO ({deposits.filter(d => d.status === 'pending').length})</button>
-                    <button onClick={() => setView('retre')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'retre' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>RETRÈ ({withdrawals.filter(w => w.status === 'pending').length})</button>
-                    <button onClick={() => setView('kyc')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'kyc' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>KYC ({pendingKyc.length})</button>
-                    <button onClick={() => setView('promo')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'promo' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>PWOMO</button>
-                    <button onClick={() => setView('sispandi')} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all ${view === 'sispandi' ? 'bg-red-600 shadow-lg shadow-red-600/20 text-white' : 'text-zinc-500 hover:text-white'}`}>SISPANDI</button>
+                <div className="flex gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-200 overflow-x-auto custom-scrollbar whitespace-nowrap shadow-sm">
+                    <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
+                    <button onClick={() => setView('kliyan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kliyan ({allUsers.length})</button>
+                    <button onClick={() => setView('depo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'depo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Depo ({deposits.filter(d => d.status === 'pending').length})</button>
+                    <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
+                    <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     
-                    <button onClick={handleOpenBiznis} className={`px-5 py-4 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 ${view === 'biznis' ? 'bg-emerald-600 shadow-lg shadow-emerald-600/20 text-white' : 'bg-emerald-900/30 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white'}`}>
+                    {/* NOUVO: ONGLÈ AJAN AN */}
+                    <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        Ajan 
+                        {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
+                    </button>
+                    
+                    <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
+                    <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
+                    
+                    <button onClick={handleOpenBiznis} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'biznis' ? 'bg-emerald-600 shadow-sm text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100'}`}>
                         {businessTabPasswordVerified ? <Briefcase size={14}/> : <Lock size={14}/>} 
-                        KONT BIZNIS
+                        Kès Biznis
                     </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                     {loading ? (
-                        <div className="text-center py-20 animate-pulse text-zinc-500 text-xs">L-AP CHACHE DONE YO...</div>
+                        <div className="flex flex-col items-center justify-center py-32 gap-4">
+                           <Loader2 size={32} className="text-indigo-600 animate-spin" />
+                           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Chaje Done Yo...</p>
+                        </div>
                     ) : view === 'biznis' ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className="p-3 bg-emerald-500/20 rounded-xl text-emerald-500"><Briefcase size={24}/></span>
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="p-4 bg-emerald-50 rounded-2xl text-emerald-600 border border-emerald-100"><Briefcase size={28}/></span>
                                 <div>
-                                    <h2 className="text-2xl font-black uppercase text-white tracking-widest">Kès Jeneral Antrepriz la</h2>
-                                    <p className="text-[10px] text-zinc-400 font-bold tracking-widest flex items-center gap-1"><ShieldCheck size={12}/> Aksè Sekirize (Sèlman Mèt Biznis la)</p>
+                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kès Jeneral Antrepriz la</h2>
+                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Aksè Sekirize (Sèlman Mèt Biznis la)</p>
                                 </div>
                             </div>
 
                             {loadingBiznis ? (
-                                <div className="text-center py-20 animate-pulse text-zinc-500 text-xs flex flex-col items-center justify-center gap-4">
-                                    <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                                    L-AP KALKILE TOUT TRANZAKSYON YO...
+                                <div className="text-center py-20 flex flex-col items-center justify-center gap-4 bg-white rounded-3xl border border-gray-200">
+                                    <Loader2 size={32} className="text-indigo-600 animate-spin" />
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Kalkile Tout Tranzaksyon Yo...</p>
                                 </div>
                             ) : (
                                 <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="bg-[#121420] p-6 rounded-[2rem] border border-blue-500/30 relative overflow-hidden group">
-                                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 flex items-center gap-2"><UserX size={14}/> Total Kòb Kliyan Yo (Lajan Moun Yo)</p>
-                                            <h3 className="text-4xl md:text-5xl font-black italic text-white tracking-tighter">
-                                                {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-blue-500">HTG</span>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-6 opacity-5"><UserX size={80} /></div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Kòb Kliyan Yo (Lajan Moun Yo)</p>
+                                            <h3 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight">
+                                                {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-slate-500">HTG</span>
                                             </h3>
-                                            <p className="text-[9px] text-zinc-500 mt-4 normal-case font-bold">Sa se sòm total tout kòb ki sou kont chak grenn kliyan. Ou pa ka touche sa!</p>
+                                            <p className="text-xs text-slate-400 mt-4 font-medium">Sa se sòm total tout kòb ki sou kont chak grenn kliyan. Ou pa ka touche sa!</p>
                                         </div>
 
-                                        <div className="bg-emerald-900/20 p-6 rounded-[2rem] border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative overflow-hidden group">
-                                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2"><DollarSign size={14}/> Pwofi Biznis La (Kòb Antrepriz La)</p>
-                                            <h3 className="text-4xl md:text-5xl font-black italic text-emerald-400 tracking-tighter">
+                                        <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
+                                            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis La (Kòb Antrepriz La)</p>
+                                            <h3 className="text-4xl md:text-5xl font-bold text-emerald-700 tracking-tight">
                                                 {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-emerald-600">HTG</span>
                                             </h3>
-                                            <p className="text-[9px] text-zinc-400 mt-4 normal-case font-bold">Sa se total tout frè ou fè sou platfòm nan. Se kòb sa a ki pou ou legalman.</p>
+                                            <p className="text-xs text-emerald-600/70 mt-4 font-medium">Sa se total tout frè ou fè sou platfòm nan. Se kòb sa a ki pou ou legalman.</p>
                                         </div>
                                     </div>
 
-                                    <div className="bg-[#121420] p-6 rounded-[2rem] border border-white/5 mt-6">
-                                        <h3 className="text-[12px] font-black text-zinc-400 uppercase tracking-widest mb-6 border-b border-white/5 pb-4">Detay Frè Antrepriz La Fè</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                            <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Kolekte Sou Depo</p>
-                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.depo).toLocaleString()} HTG</p>
+                                    <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm mt-6">
+                                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Detay Frè Antrepriz La Fè</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                            <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Depo</p>
+                                                <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.depo).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
-                                            <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Kolekte Sou Retrè</p>
-                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.retre).toLocaleString()} HTG</p>
+                                            <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Retrè</p>
+                                                <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.retre).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
-                                            <div className="bg-black p-5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                                <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Frè Kolekte Sou Transfè</p>
-                                                <p className="text-xl font-black text-white">{Number(feesBreakdown.transfe).toLocaleString()} HTG</p>
+                                            <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Transfè</p>
+                                                <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.transfe).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-blue-900/20 p-6 rounded-[2rem] border border-blue-500/30 mt-6 flex justify-between items-center">
+                                    <div className="bg-indigo-600 p-8 rounded-3xl shadow-sm mt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                         <div>
-                                            <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest mb-1">Gran Total Sou Sistèm Nan</p>
-                                            <p className="text-[9px] text-zinc-400 normal-case font-bold">Kòb Kliyan + Kòb Biznis (Sa se total jeneral ki sipoze sou kès bank ou toutbon an)</p>
+                                            <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-2">Gran Total Sou Sistèm Nan</p>
+                                            <p className="text-sm text-white font-medium">Kòb Kliyan + Kòb Biznis (Sa se total jeneral ki sipoze sou kès bank ou toutbon an)</p>
                                         </div>
-                                        <p className="text-2xl font-black text-white italic">
+                                        <p className="text-3xl font-bold text-white tracking-tight">
                                             {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
                                         </p>
                                     </div>
                                 </>
                             )}
                         </div>
-                    ) : view === 'litij' ? (
-                        <div className="space-y-8">
-                            <div className="bg-[#121420] p-6 rounded-[2rem] border border-yellow-500/30 shadow-lg shadow-yellow-900/10">
-                                <p className="text-[10px] font-black text-yellow-500 mb-3 tracking-widest uppercase flex items-center gap-2">
-                                    <Search size={14} /> Chèche ID kòmand lan (Acha, Transfè, Depo...)
-                                </p>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        placeholder="Kole ID 12 chif la la a..." 
-                                        value={searchDisputeId} 
-                                        onChange={(e) => setSearchDisputeId(e.target.value)}
-                                        className="flex-1 bg-black border border-white/10 p-4 rounded-xl text-white outline-none focus:border-yellow-500/50 transition-all font-mono uppercase text-sm"
-                                    />
-                                    <button 
-                                        onClick={handleAdminSearchDispute}
-                                        disabled={isSearchingDispute || !searchDisputeId}
-                                        className="bg-yellow-600 hover:bg-yellow-500 text-white px-6 rounded-xl font-black transition-all disabled:opacity-50 flex items-center justify-center min-w-[100px]"
-                                    >
-                                        {isSearchingDispute ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "CHÈCHE"}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {searchedDispute && (() => {
-                                const sender = searchedDispute.senderProfile;
-                                const receiver = searchedDispute.receiverProfile;
-
-                                return (
-                                    <div className="mb-10 relative animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div className="absolute -top-3 left-6 bg-yellow-500 text-black px-3 py-1 rounded-md text-[9px] font-black uppercase z-10 flex items-center gap-1">
-                                            <AlertTriangle size={12}/> JERE TRANZAKSYON #{searchedDispute.order_id || searchedDispute.id.substring(0,8)}
-                                        </div>
-                                        <div className="bg-[#121420] rounded-[2.5rem] border-2 border-yellow-500 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.15)] p-6 pt-10 relative">
-                                            <button onClick={() => setSearchedDispute(null)} className="absolute top-4 right-4 bg-zinc-800 text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500 transition-colors z-10">✕</button>
-
-                                            <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 mb-8 bg-zinc-900/50 p-6 rounded-3xl border border-yellow-500/30 shadow-inner">
-                                                <div className="flex-1 w-full bg-black border border-white/5 p-5 rounded-2xl relative flex flex-col justify-between">
-                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded font-black tracking-widest border border-white/10 shadow-lg">MOUN KI PEYE (KLIYAN)</span>
-                                                    {sender ? (
-                                                        <>
-                                                            <div className="flex items-center gap-4 mt-2 mb-4">
-                                                                <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center text-xl border border-white/10 shrink-0">👤</div>
-                                                                <div className="overflow-hidden">
-                                                                    <p className="text-sm font-black truncate text-white">{sender.full_name}</p>
-                                                                    <p className="text-[10px] text-zinc-500 lowercase truncate">{sender.email}</p>
-                                                                    <p className="text-xs font-black text-green-400 mt-1 flex items-center gap-1">
-                                                                        <span>Balans:</span> 
-                                                                        <span className="bg-green-900/30 px-2 py-0.5 rounded text-green-400">{Number(sender.wallet_balance).toLocaleString()} HTG</span>
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2 mt-auto pt-4 border-t border-white/5">
-                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600"><Plus size={12}/> AJOUTE</button>
-                                                                <button onClick={() => handleManualBalanceAdjust(sender, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600"><Minus size={12}/> RETIRE</button>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <p className="text-[10px] text-red-500 italic mt-4 font-black tracking-widest text-center flex items-center justify-center gap-1"><AlertTriangle size={12}/> Kliyan an pa jwenn sou sistèm nan.</p>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex flex-col items-center justify-center gap-3 shrink-0 w-full lg:w-48 my-4 lg:my-0">
-                                                    <div className="flex flex-col items-center bg-black p-4 rounded-2xl border border-white/5 w-full shadow-lg">
-                                                        <label className="text-[8px] text-zinc-500 uppercase tracking-widest mb-2">Montan an (HTG)</label>
-                                                        <input type="number" value={actionAmount} onChange={(e) => setActionAmount(Number(e.target.value))} className="w-full text-center bg-transparent text-yellow-500 font-black text-2xl outline-none" />
-                                                    </div>
-                                                    <div className="flex gap-2 w-full">
-                                                        <button onClick={() => balanseLajanKont(receiver, sender, `Ranbousman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)} disabled={processingId === 'balance_transfer' || (!receiver && !sender)} className="flex-1 bg-red-600 hover:bg-red-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-red-600/20 group" title="Rale nan Machann, Mete nan Kliyan"><ArrowRightLeft className="rotate-180 group-hover:-translate-x-1 transition-transform" size={16} /><span className="text-[8px] font-black tracking-widest leading-tight text-center">RANBOUSE<br/>KLIYAN</span></button>
-                                                        <button onClick={() => balanseLajanKont(sender, receiver, `Peman LITIJ #${searchedDispute.order_id || searchedDispute.id.substring(0,8)}`)} disabled={processingId === 'balance_transfer' || (!receiver && !sender)} className="flex-1 bg-green-600 hover:bg-green-500 text-white p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 shadow-lg shadow-green-600/20 group" title="Rale nan Kliyan, Mete nan Machann"><ArrowRightLeft className="group-hover:translate-x-1 transition-transform" size={16} /><span className="text-[8px] font-black tracking-widest leading-tight text-center">PEYE<br/>MACHANN</span></button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex-1 w-full bg-black border border-white/5 p-5 rounded-2xl relative flex flex-col justify-between">
-                                                    <span className="absolute -top-3 left-4 bg-zinc-800 text-zinc-300 text-[8px] px-2 py-1 rounded font-black tracking-widest border border-white/10 shadow-lg">MOUN KI RESEVWA (MACHANN)</span>
-                                                    {receiver ? (
-                                                        <>
-                                                            <div className="flex items-center gap-4 mt-2 mb-4">
-                                                                <div className="w-12 h-12 bg-blue-900/20 text-blue-500 rounded-full flex items-center justify-center text-xl border border-blue-500/30 shrink-0"><Store size={20}/></div>
-                                                                <div className="overflow-hidden">
-                                                                    <p className="text-sm font-black truncate text-white">{receiver.full_name}</p>
-                                                                    <p className="text-[10px] text-zinc-500 lowercase truncate">{receiver.email}</p>
-                                                                    <p className="text-xs font-black text-blue-400 mt-1 flex items-center gap-1"><span>Balans:</span><span className="bg-blue-900/30 px-2 py-0.5 rounded text-blue-400">{Number(receiver.wallet_balance).toLocaleString()} HTG</span></p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2 mt-auto pt-4 border-t border-white/5">
-                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'add')} className="flex-1 flex items-center justify-center gap-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-green-600/20 hover:border-green-600"><Plus size={12}/> AJOUTE</button>
-                                                                <button onClick={() => handleManualBalanceAdjust(receiver, 'subtract')} className="flex-1 flex items-center justify-center gap-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-2.5 rounded-xl text-[9px] font-black transition-all border border-red-600/20 hover:border-red-600"><Minus size={12}/> RETIRE</button>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <p className="text-[10px] text-red-500 italic mt-4 font-black tracking-widest text-center flex items-center justify-center gap-1"><AlertTriangle size={12}/> Machann nan pa jwenn sou sistèm nan.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-8 pt-8 border-t border-white/5">
-                                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-4">Mesaj Ak Kliyan an / Prèv Litij</p>
-                                                <div className="bg-black border border-white/5 rounded-2xl p-4 max-h-[250px] overflow-y-auto mb-4 space-y-4">
-                                                    <div className="flex flex-col items-start max-w-[85%]">
-                                                        <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm text-white text-xs whitespace-pre-wrap normal-case border border-white/5">{searchedDispute.dispute_details?.proof_text || searchedDispute.dispute_reason || 'Pa gen mesaj kliyan.'}</div>
-                                                    </div>
-                                                    {searchedDispute.dispute_details?.admin_reply && (
-                                                        <div className="flex flex-col items-end max-w-[85%] ml-auto">
-                                                            <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-2xl rounded-tr-sm text-white text-xs whitespace-pre-wrap normal-case">{searchedDispute.dispute_details?.admin_reply}</div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="bg-zinc-900 rounded-xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
-                                                    <textarea placeholder="Voye yon mesaj bay kliyan an..." value={adminReplies[searchedDispute.id] || ''} onChange={(e) => setAdminReplies({ ...adminReplies, [searchedDispute.id]: e.target.value })} className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white normal-case resize-none min-h-[40px]"></textarea>
-                                                    <button onClick={() => voyeReponsAdmin(searchedDispute.id, searchedDispute.dispute_details || {}, searchedDispute.table_source)} className="bg-red-600 hover:bg-red-500 w-12 rounded-lg flex items-center justify-center text-white transition-all"><Send size={16} /></button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {disputes.length > 0 && !searchedDispute && (
-                                <>
-                                    <h2 className="text-xl font-black text-white border-b border-white/10 pb-2">TOUT PLENT KI LOUVRI YO ({disputes.length})</h2>
-                                    {disputes.map((tx) => {
-                                        let senderId = tx.dispute_details?.client_id || tx.metadata?.customer_id || tx.user_id;
-                                        const client = allUsers.find(u => u.id === senderId) || allUsers.find(u => u.id === tx.user_id);
-                                        return (
-                                            <div key={tx.id} className="bg-[#121420] rounded-[2.5rem] border border-zinc-800 overflow-hidden shadow-lg flex flex-col lg:flex-row opacity-80 hover:opacity-100 transition-opacity">
-                                                <div className="w-full lg:w-1/3 bg-zinc-900/50 p-6 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-between">
-                                                    <div>
-                                                        <div className="flex items-center gap-3 mb-6"><div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500 border border-yellow-500/30"><AlertTriangle size={20} /></div><div><h3 className="text-lg font-black text-white">LITIJ #{tx.order_id || tx.id.substring(0,8)}</h3><p className="text-[10px] text-zinc-400 font-bold tracking-widest">{new Date(tx.created_at).toLocaleDateString()}</p></div></div>
-                                                        {client ? (
-                                                            <div className="bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
-                                                                <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-3 font-black flex items-center gap-2"><UserX size={12} /> Enfòmasyon Kliyan</p>
-                                                                <p className="text-sm font-black text-white mb-1 truncate">{client.full_name}</p>
-                                                                <p className="text-[10px] text-zinc-400 mb-3 lowercase truncate">{client.email}</p>
-                                                                <div className="bg-zinc-900 px-3 py-2 rounded-xl inline-block border border-white/5"><span className="text-[9px] text-zinc-500">BALANS: </span><span className="text-xs text-green-400">{Number(client.wallet_balance).toLocaleString()} HTG</span></div>
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-xs text-red-400 mb-6">Enfòmasyon kliyan an pa disponib.</p>
-                                                        )}
-                                                        <div className="space-y-3">
-                                                            <div><p className="text-[9px] text-zinc-500">BOUTIK LA / TIP:</p><p className="text-xs text-white">{tx.dispute_details?.store_name || tx.metadata?.merchant_name || tx.type || 'Enkoni'}</p></div>
-                                                            <div><p className="text-[9px] text-zinc-500">REZON PLENT LAN:</p><p className="text-xs text-red-400">{tx.dispute_reason || 'Enkoni'}</p></div>
-                                                            <div><p className="text-[9px] text-zinc-500">MONTAN AN JÈ:</p><p className="text-2xl font-black text-white italic">{tx.amount_htg || Math.abs(tx.amount)} <span className="text-xs text-yellow-500">HTG</span></p></div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-8 pt-6 border-t border-white/5"><button onClick={() => { setSearchDisputeId(tx.order_id || tx.id); handleAdminSearchDispute(); }} className="w-full bg-yellow-600 hover:bg-yellow-500 py-4 rounded-xl text-[10px] font-black text-white shadow-lg shadow-yellow-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">🔍 LOUVRI DOSYE A POU REZOUD LI</button></div>
-                                                </div>
-                                                <div className="w-full lg:w-2/3 flex flex-col p-6 bg-black relative">
-                                                    <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-6 custom-scrollbar">
-                                                        <div className="flex flex-col items-start max-w-[85%]">
-                                                            <div className="flex items-center gap-2 mb-1 pl-1"><div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs">👤</div><span className="text-[10px] text-zinc-400 lowercase">{client?.full_name || 'Kliyan'}</span></div>
-                                                            <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-sm border border-white/5 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">{tx.dispute_details?.proof_text || tx.dispute_reason || 'Pa gen detay prèv.'}</div>
-                                                        </div>
-                                                        {tx.dispute_details?.admin_reply && (
-                                                            <div className="flex flex-col items-end max-w-[85%] ml-auto">
-                                                                <div className="flex items-center gap-2 mb-1 pr-1"><span className="text-[10px] text-red-500 lowercase">Admin</span><div className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center text-xs text-red-500 border border-red-500/30"><ShieldCheck size={12}/></div></div>
-                                                                <div className="bg-red-900/20 p-4 rounded-2xl rounded-tr-sm border border-red-500/30 text-white text-xs leading-relaxed lowercase normal-case whitespace-pre-wrap">{tx.dispute_details?.admin_reply}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-auto bg-zinc-900 rounded-2xl p-2 flex gap-2 border border-white/10 focus-within:border-red-500/50 transition-colors">
-                                                        <textarea placeholder="Tape repons ou an pou kliyan an la a..." value={adminReplies[tx.id] || ''} onChange={(e) => setAdminReplies({ ...adminReplies, [tx.id]: e.target.value })} className="flex-1 bg-transparent border-none outline-none text-xs p-3 text-white lowercase normal-case resize-none min-h-[50px]" rows={2}></textarea>
-                                                        <button onClick={() => voyeReponsAdmin(tx.id, tx.dispute_details || {}, tx.table_source)} disabled={processingId === `reply_${tx.id}`} className="bg-red-600 hover:bg-red-500 w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-red-600/20 transition-all active:scale-90">{processingId === `reply_${tx.id}` ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </>
-                            )}
-                        </div>
                     ) : view === 'kliyan' ? (
                         <div className="space-y-6">
-                            <div className="bg-[#121420] p-4 rounded-3xl border border-indigo-500/30 shadow-lg shadow-indigo-900/10 flex items-center gap-3">
-                                <span className="text-xl ml-2">🔍</span>
-                                <input type="text" placeholder="CHÈCHE YON KLIYAN AK IMÈL LI OSWA NON L..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-transparent border-none p-2 text-white outline-none font-black tracking-widest placeholder:text-zinc-600 text-xs sm:text-sm" />
-                                {searchQuery && <button onClick={() => setSearchQuery('')} className="bg-zinc-800 text-zinc-400 p-2 rounded-xl text-[10px] hover:text-white hover:bg-zinc-700 transition-all">EFASE</button>}
+                            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
+                                <Search size={20} className="text-slate-400 ml-2" />
+                                <input type="text" placeholder="Chèche yon kliyan ak imèl li oswa non l..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-transparent border-none p-2 text-slate-900 outline-none font-bold placeholder:text-slate-400 text-sm" />
+                                {searchQuery && <button onClick={() => setSearchQuery('')} className="bg-slate-100 text-slate-500 hover:text-slate-900 p-2.5 rounded-xl text-xs font-bold transition-all">EFASE</button>}
                             </div>
                             <div className="space-y-4">
                                 {filteredUsers.length === 0 ? (
-                                    <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa jwenn okenn kliyan ak non oswa imèl sa a</div>
+                                    <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa jwenn okenn kliyan ak non oswa imèl sa a</div>
                                 ) : (
                                     filteredUsers.map(user => (
-                                        <div key={user.id} className={`bg-zinc-900 p-5 sm:p-6 rounded-[2.5rem] border ${user.account_status === 'suspended' ? 'border-red-600/50 bg-red-950/10' : 'border-white/5'} relative flex flex-col md:flex-row gap-6 items-center justify-between transition-all`}>
-                                            <div className="flex items-center gap-4 w-full md:w-auto">
-                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl border shrink-0 ${user.account_status === 'suspended' ? 'bg-red-900/40 text-red-500 border-red-500/30' : 'bg-zinc-800 text-white border-white/10'}`}>{user.full_name ? user.full_name.charAt(0).toUpperCase() : '👤'}</div>
+                                        <div key={user.id} className={`bg-white p-6 rounded-3xl border ${user.account_status === 'suspended' ? 'border-rose-200 bg-rose-50/30' : 'border-gray-200'} relative flex flex-col md:flex-row gap-6 items-center justify-between transition-all shadow-sm`}>
+                                            <div className="flex items-center gap-5 w-full md:w-auto">
+                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl shrink-0 ${user.account_status === 'suspended' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                                    {user.full_name ? user.full_name.charAt(0).toUpperCase() : <UserX size={24} />}
+                                                </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="text-sm sm:text-base font-black text-white truncate w-full">{user.full_name || 'San Non'}</h3><p className="text-[10px] text-zinc-400 lowercase truncate w-full">{user.email}</p>
-                                                    <div className="flex flex-wrap gap-2 mt-2">
-                                                        <span className="text-[9px] bg-zinc-800 text-zinc-300 px-2 py-1 rounded-md">BALANS: <span className="text-white">{Number(user.wallet_balance || 0).toLocaleString()} HTG</span></span>
-                                                        <span className={`text-[9px] px-2 py-1 rounded-md ${user.kyc_status === 'approved' ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-500'}`}>KYC: {user.kyc_status}</span>
-                                                        {user.is_card_activated && <span className="text-[9px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded-md">KAT AKTIVE</span>}
+                                                    <h3 className="text-base font-bold text-slate-900 truncate w-full">{user.full_name || 'San Non'}</h3>
+                                                    <p className="text-xs text-slate-500 truncate w-full mt-0.5">{user.email}</p>
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-bold tracking-wider">BALANS: <span className="text-slate-900">{Number(user.wallet_balance || 0).toLocaleString()} HTG</span></span>
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase ${user.kyc_status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>KYC: {user.kyc_status}</span>
+                                                        {user.is_card_activated && <span className="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-bold tracking-wider uppercase">KAT AKTIVE</span>}
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
                                                 {user.account_status === 'suspended' ? (
-                                                    <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-green-600 px-6 py-4 rounded-2xl text-[10px] font-black text-white hover:bg-green-500 transition-all shadow-lg shadow-green-600/20">AKTIVE KONT</button>
+                                                    <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-emerald-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-emerald-700 transition-all shadow-sm">AKTIVE KONT</button>
                                                 ) : (
-                                                    <button onClick={() => sispannKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-red-600/20 border border-red-600/30 text-red-500 px-6 py-4 rounded-2xl text-[10px] font-black hover:bg-red-600 hover:text-white transition-all">SISPANN KONT</button>
+                                                    <button onClick={() => sispannKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm">SISPANN KONT</button>
                                                 )}
                                             </div>
                                         </div>
@@ -838,115 +553,249 @@ export default function AdminSuperPage() {
                             </div>
                         </div>
                     ) : view === 'anons' ? (
-                        <div className="bg-[#121420] p-6 rounded-3xl border border-blue-500/30 mb-8 shadow-lg shadow-blue-900/10">
-                            <div className="flex items-center gap-3 mb-6"><span className="text-2xl drop-shadow-md">📢</span><h2 className="text-xl font-black uppercase text-blue-400 tracking-widest">Jere Notifikasyon Global</h2></div>
+                        <div className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 shadow-sm">
+                            <div className="flex items-center gap-3 mb-6">
+                                <span className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Send size={24} /></span>
+                                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Jere Notifikasyon Global</h2>
+                            </div>
                             <form onSubmit={handleSaveAnons} className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] text-zinc-400 font-black uppercase tracking-widest ml-2">Tèks k ap parèt sou paj kliyan yo:</label>
-                                    <textarea value={anonsText} onChange={(e) => setAnonsText(e.target.value)} placeholder="Ekri mesaj ou vle tout kliyan wè a la a..." className="w-full bg-black border border-white/10 p-5 rounded-2xl focus:border-blue-500 outline-none transition-all font-bold text-sm min-h-[150px] text-white whitespace-pre-wrap normal-case" required />
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Tèks k ap parèt sou paj kliyan yo:</label>
+                                    <textarea value={anonsText} onChange={(e) => setAnonsText(e.target.value)} placeholder="Ekri mesaj ou vle tout kliyan wè a la a..." className="w-full bg-slate-50 border border-gray-200 p-5 rounded-2xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm min-h-[150px] text-slate-900 placeholder:text-slate-400 resize-none" required />
                                 </div>
-                                <div className="flex items-center gap-3 p-4 bg-black rounded-2xl border border-white/5 cursor-pointer" onClick={() => setAnonsActive(!anonsActive)}>
-                                    <input type="checkbox" checked={anonsActive} onChange={(e) => setAnonsActive(e.target.checked)} className="w-6 h-6 accent-blue-600 cursor-pointer" onClick={(e) => e.stopPropagation()}/>
-                                    <div className="flex flex-col"><span className="text-[11px] font-black uppercase tracking-widest text-white">Afiche notifikasyon an?</span><span className="text-[9px] text-zinc-500 normal-case italic">Si bwat sa pa make, notifikasyon an pap parèt pou kliyan yo.</span></div>
+                                <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-gray-200 cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => setAnonsActive(!anonsActive)}>
+                                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 border ${anonsActive ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                       {anonsActive && <CheckCircle2 size={16} />}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900">Afiche notifikasyon an?</span>
+                                        <span className="text-xs text-slate-500 font-medium mt-0.5">Si bwat sa pa make, notifikasyon an pap parèt pou kliyan yo.</span>
+                                    </div>
                                 </div>
-                                <button type="submit" disabled={processingId === 'saving_anons'} className="w-full bg-blue-600 hover:bg-blue-500 px-8 py-5 rounded-2xl font-black uppercase italic active:scale-95 transition-all text-white shadow-lg shadow-blue-600/20">{processingId === 'saving_anons' ? "AP SOVE..." : "SOVE NOTIFIKASYON AN"}</button>
+                                <button type="submit" disabled={processingId === 'saving_anons'} className="w-full bg-indigo-600 hover:bg-indigo-700 px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all text-white shadow-sm flex items-center justify-center gap-2">
+                                    {processingId === 'saving_anons' ? <Loader2 size={18} className="animate-spin" /> : "Sove Notifikasyon an"}
+                                </button>
                             </form>
                         </div>
                     ) : view === 'kyc' ? (
                         pendingKyc.length === 0 ? (
-                            <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn KYC k ap tann</div>
+                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn KYC k ap tann</div>
                         ) : (
-                            pendingKyc.map((user) => (
-                                <div key={user.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-white/5 relative overflow-hidden flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-2xl border border-white/10 shrink-0">👤</div>
-                                    <div className="flex-1 text-center md:text-left">
-                                        <h3 className="text-lg font-black text-white">{user.full_name || 'San Non'}</h3><p className="text-[10px] text-zinc-400 mb-4 lowercase">{user.email}</p>
-                                        <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                            {user.kyc_front && <button onClick={() => handleOpenMaskedUrl(user.kyc_front)} className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> DEVAN</button>}
-                                            {user.kyc_back && <button onClick={() => handleOpenMaskedUrl(user.kyc_back)} className="text-[9px] bg-blue-600/20 px-4 py-2 rounded-lg text-blue-400 border border-blue-600/30 hover:bg-blue-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> DÈYÈ</button>}
-                                            {user.kyc_selfie && <button onClick={() => handleOpenMaskedUrl(user.kyc_selfie)} className="text-[9px] bg-purple-600/20 px-4 py-2 rounded-lg text-purple-400 border border-purple-600/30 hover:bg-purple-600 hover:text-white transition-all font-black tracking-widest flex items-center gap-1"><EyeOff size={10}/> SELFIE</button>}
-                                            {!user.kyc_front && !user.kyc_selfie && <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded border border-yellow-500/20">OKENN IMAJ SOU SISTÈM NAN</span>}
+                            <div className="space-y-4">
+                                {pendingKyc.map((user) => (
+                                    <div key={user.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col md:flex-row gap-6 items-center transition-all hover:shadow-md">
+                                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0"><UserX size={32} /></div>
+                                        <div className="flex-1 text-center md:text-left w-full">
+                                            <h3 className="text-lg font-bold text-slate-900">{user.full_name || 'San Non'}</h3>
+                                            <p className="text-xs text-slate-500 mt-1 mb-4">{user.email}</p>
+                                            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                                {user.kyc_front && <button onClick={() => handleOpenMaskedUrl(user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
+                                                {user.kyc_back && <button onClick={() => handleOpenMaskedUrl(user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
+                                                {user.kyc_selfie && <button onClick={() => handleOpenMaskedUrl(user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
+                                                {!user.kyc_front && !user.kyc_selfie && <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 font-bold uppercase tracking-wider">Okenn imaj sou sistèm nan</span>}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-2 md:mt-0 shrink-0">
+                                            <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'approved')} disabled={processingId === user.id} className="bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                {processingId === user.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
+                                            </button>
+                                            <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'rejected')} disabled={processingId === user.id} className="bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                <XCircle size={16} /> Rejte
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
-                                        <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'approved')} disabled={processingId === user.id} className="flex-1 md:flex-none bg-green-600 px-6 py-4 rounded-2xl text-[10px] font-black text-white hover:bg-green-500 transition-all shadow-lg shadow-green-600/20">✅ APWOUVE</button>
-                                        <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'rejected')} disabled={processingId === user.id} className="flex-1 md:flex-none bg-red-600/20 border border-red-600/30 text-red-500 px-6 py-4 rounded-2xl text-[10px] font-black hover:bg-red-600 hover:text-white transition-all">❌ REJTE</button>
+                                ))}
+                            </div>
+                        )
+                    ) : view === 'ajan' ? (
+                        /* ========================================== */
+                        /* NOUVO ONGLÈ: JERE APLIKASYON AJAN YO       */
+                        /* ========================================== */
+                        pendingAgents.length === 0 ? (
+                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
+                                <Store size={48} className="mx-auto mb-4 text-slate-300" />
+                                Pa gen okenn aplikasyon Ajan k ap tann
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {pendingAgents.map((agent) => (
+                                    <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
+                                        
+                                        {/* HEADER INFO */}
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Store size={24} /></div>
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900">{agent.profiles?.full_name || 'San Non'}</h3>
+                                                    <p className="text-xs text-slate-500 mt-1">{agent.profiles?.email}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-bold uppercase tracking-wider border border-indigo-100 mb-2">Plan: {agent.tier}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Peman: {agent.metadata?.payment_plan === 'full' ? 'Entegral' : 'Vèsman'}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* DOKIMAN YO */}
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman Soumèt</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                {agent.id_doc_url && <button onClick={() => handleOpenMaskedUrl(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
+                                                {agent.address_doc_url && <button onClick={() => handleOpenMaskedUrl(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
+                                                {agent.location_photo_url && <button onClick={() => handleOpenMaskedUrl(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
+                                                {agent.patente_url && <button onClick={() => handleOpenMaskedUrl(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
+                                                {agent.cif_url && <button onClick={() => handleOpenMaskedUrl(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                            </div>
+                                        </div>
+
+                                        {/* AKSYON YO */}
+                                        <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
+                                            <div className="w-full md:flex-1">
+                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la:</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Egz: Foto lokal la pa klè..." 
+                                                    value={agentRejectionReason[agent.id] || ''}
+                                                    onChange={(e) => setAgentRejectionReason({...agentRejectionReason, [agent.id]: e.target.value})}
+                                                    className="w-full bg-slate-50 border border-gray-200 py-3 px-4 rounded-xl text-sm outline-none focus:border-rose-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div className="flex gap-3 w-full md:w-auto shrink-0">
+                                                <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'rejected')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    <XCircle size={16} /> Rejte
+                                                </button>
+                                                <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
+                                                </button>
+                                            </div>
+                                        </div>
+
                                     </div>
-                                </div>
-                            ))
+                                ))}
+                            </div>
                         )
                     ) : view === 'promo' ? (
                         <div>
-                            <form onSubmit={handleCreateCode} className="bg-[#121420] p-6 rounded-3xl border border-purple-500/30 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-lg shadow-purple-900/10">
-                                <div className="flex-1 w-full space-y-2"><label className="text-[9px] text-purple-400 font-black uppercase tracking-widest ml-2">Nouvo Kòd (Ex: IZO2026)</label><input type="text" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} placeholder="NON ATIS LA" className="w-full bg-black border border-white/10 p-4 rounded-xl focus:border-purple-500 outline-none transition-all font-bold text-sm uppercase" required /></div>
-                                <div className="w-full md:w-48 space-y-2"><label className="text-[9px] text-purple-400 font-black uppercase tracking-widest ml-2">Rediksyon (HTG)</label><input type="number" value={promoReward} onChange={(e) => setPromoReward(e.target.value)} className="w-full bg-black border border-white/10 p-4 rounded-xl focus:border-purple-500 outline-none transition-all font-bold text-sm" required min="0" /></div>
-                                <button type="submit" disabled={processingId === 'creating_promo'} className="w-full md:w-auto bg-purple-600 px-8 py-4 rounded-xl font-black uppercase italic active:scale-95 transition-all">{processingId === 'creating_promo' ? "AP KREYE..." : "KREYE KÒD LA"}</button>
+                            <form onSubmit={handleCreateCode} className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-sm">
+                                <div className="flex-1 w-full space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Nouvo Kòd (Ex: IZO2026)</label>
+                                    <input type="text" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} placeholder="NON ATIS LA" className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold text-sm uppercase text-slate-900" required />
+                                </div>
+                                <div className="w-full md:w-48 space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Rediksyon (HTG)</label>
+                                    <input type="number" value={promoReward} onChange={(e) => setPromoReward(e.target.value)} className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold text-sm text-slate-900" required min="0" />
+                                </div>
+                                <button type="submit" disabled={processingId === 'creating_promo'} className="w-full md:w-auto bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold uppercase tracking-wider active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2">
+                                    {processingId === 'creating_promo' ? <Loader2 size={18} className="animate-spin" /> : "Kreye Kòd La"}
+                                </button>
                             </form>
-                            <div className="overflow-x-auto bg-[#121420] rounded-3xl border border-white/5">
+                            <div className="overflow-x-auto bg-white rounded-3xl border border-gray-200 shadow-sm">
                                 <table className="w-full text-left border-collapse">
-                                    <thead><tr className="border-b border-white/5 bg-black/20"><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest">Kòd Pwomo</th><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest text-center">Rediksyon (HTG)</th><th className="p-4 text-[10px] font-black uppercase text-zinc-400 tracking-widest text-center">Moun Mennen</th></tr></thead>
+                                    <thead>
+                                        <tr className="border-b border-gray-100 bg-slate-50">
+                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider">Kòd Pwomo</th>
+                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider text-center">Rediksyon (HTG)</th>
+                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider text-center">Moun Mennen</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
-                                        {promoCodes.length === 0 ? (<tr><td colSpan={3} className="p-8 text-center text-[10px] font-black uppercase text-zinc-600">Pa gen kòd kreye ankò.</td></tr>) : (
-                                            promoCodes.map((promo) => (<tr key={promo.code} className="border-b border-white/5"><td className="p-4 font-black text-purple-500">{promo.code}</td><td className="p-4 text-center font-bold text-white">{promo.reward_amount} HTG</td><td className="p-4 text-center"><span className="bg-green-500/20 text-green-500 px-3 py-1 rounded-lg font-black text-[12px]">{promo.usage_count}</span></td></tr>))
+                                        {promoCodes.length === 0 ? (
+                                            <tr><td colSpan={3} className="p-10 text-center text-sm font-bold uppercase text-slate-400 tracking-wider">Pa gen kòd kreye ankò.</td></tr>
+                                        ) : (
+                                            promoCodes.map((promo) => (
+                                                <tr key={promo.code} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
+                                                    <td className="p-5 font-bold text-indigo-600">{promo.code}</td>
+                                                    <td className="p-5 text-center font-bold text-slate-900">{promo.reward_amount} HTG</td>
+                                                    <td className="p-5 text-center"><span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg font-bold text-xs border border-emerald-100">{promo.usage_count}</span></td>
+                                                </tr>
+                                            ))
                                         )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     ) : view === 'sispandi' ? (
-                        suspendedAccounts.map((account) => (
-                            <div key={account.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-red-600/30 relative overflow-hidden flex flex-col items-center text-center">
-                                <div className="w-12 h-12 bg-red-600/20 text-red-500 rounded-full flex items-center justify-center mb-4 border border-red-600/50"><span className="text-xl">⚠️</span></div>
-                                <h3 className="text-lg font-black truncate w-full">{account.full_name || 'San Non'}</h3><p className="text-[10px] text-zinc-400 mb-6 lowercase">{account.email}</p>
-                                <button onClick={() => deblokeKont(account.id, account.email)} disabled={processingId === account.id} className="w-full bg-green-600 py-4 rounded-2xl text-[10px] font-black tracking-widest transition-all">{processingId === account.id ? 'AP AKTIVE...' : 'AKTIVE KONT SA A'}</button>
-                            </div>
-                        ))
-                    ) : (
-                        (view === 'depo' ? deposits : withdrawals).map((item) => {
-                            const isDepo = view === 'depo';
-                            const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
-                            
-                            return (
-                                <div key={item.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
-                                    {item.status !== 'pending' && <button onClick={() => deleteTranzaksyon(item.id, isDepo ? 'deposits' : 'withdrawals')} className="absolute top-5 right-5 text-red-600 text-[9px] bg-red-600/10 px-2 py-1 rounded hover:bg-red-600 hover:text-white transition-colors">EFASE</button>}
-                                    <div className="flex justify-between mb-4 pr-12"><div className="flex flex-col"><span className="text-[9px] text-zinc-500">KLIYAN ID: {item.user_id?.slice(0,8)}...</span><span className="text-[9px] text-zinc-400">METÒD: {item.method}</span></div><span className={`text-[8px] h-fit px-3 py-1 rounded-full font-black ${item.status === 'pending' ? 'bg-yellow-500 text-black' : item.status === 'approved' || item.status === 'completed' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{item.status}</span></div>
-                                    
-                                    <div className="mb-6 border-b border-white/5 pb-6">
-                                        <p className="text-[9px] text-zinc-500 mb-1">MONTAN {isDepo ? 'KLIYAN AN DECLARE (SAN FRÈ)' : 'KLIYAN MANDE A'}:</p>
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-4xl font-black italic tracking-tighter text-white">{aficheMontan} <span className="text-xs text-red-600">HTG</span></p>
-                                            {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan san frè a:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-zinc-800 text-white px-3 py-2 rounded-xl text-[8px] font-black tracking-widest hover:bg-zinc-700">MODIFYE</button>}
+                        <div className="space-y-4">
+                            {suspendedAccounts.length === 0 ? (
+                                <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn kont ki sispandi</div>
+                            ) : (
+                                suspendedAccounts.map((account) => (
+                                    <div key={account.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-rose-200 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                                        <div className="flex items-center gap-5 w-full md:w-auto">
+                                            <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center border border-rose-200 shrink-0"><AlertTriangle size={24} /></div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold text-slate-900 truncate w-full">{account.full_name || 'San Non'}</h3>
+                                                <p className="text-xs text-slate-500 truncate w-full mt-0.5">{account.email}</p>
+                                            </div>
                                         </div>
+                                        <button onClick={() => deblokeKont(account.id, account.email)} disabled={processingId === account.id} className="w-full md:w-auto bg-emerald-600 text-white px-8 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all hover:bg-emerald-700 shadow-sm flex items-center justify-center gap-2">
+                                            {processingId === account.id ? <Loader2 size={16} className="animate-spin" /> : "Aktive Kont Sa a"}
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {(view === 'depo' ? deposits : withdrawals).map((item) => {
+                                const isDepo = view === 'depo';
+                                const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
+                                
+                                return (
+                                    <div key={item.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 relative overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                        {item.status !== 'pending' && <button onClick={() => deleteTranzaksyon(item.id, isDepo ? 'deposits' : 'withdrawals')} className="absolute top-6 right-6 text-rose-600 text-[10px] font-bold uppercase tracking-wider bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg hover:bg-rose-600 hover:text-white transition-colors">EFASE</button>}
+                                        
+                                        <div className="flex justify-between mb-6 pr-16 border-b border-gray-100 pb-4">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kliyan: {item.user_id?.slice(0,8)}...</span>
+                                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded w-fit border border-indigo-100">Metòd: {item.method}</span>
+                                            </div>
+                                            <span className={`text-[10px] h-fit px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider border ${item.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'approved' || item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                                                {item.status}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="mb-6">
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">MONTAN {isDepo ? 'KLIYAN AN DECLARE (SAN FRÈ)' : 'KLIYAN MANDE A'}:</p>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-4xl font-bold tracking-tight text-slate-900">{aficheMontan} <span className="text-sm text-slate-500">HTG</span></p>
+                                                {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan san frè a:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-colors">MODIFYE</button>}
+                                            </div>
 
-                                        {isDepo && item.fee !== undefined && (
-                                            <div className="mt-4 space-y-1">
-                                                <div className="flex justify-between items-center p-2 bg-emerald-900/10 rounded-lg">
-                                                    <span className="text-[9px] text-zinc-400">FRÈ BIZNIS LA (5%):</span>
-                                                    <span className="text-[10px] text-emerald-500 font-black">+{montanModifye[item.id] ? (montanModifye[item.id] * 0.05).toFixed(2) : item.fee} HTG</span>
+                                            {isDepo && item.fee !== undefined && (
+                                                <div className="mt-6 space-y-2">
+                                                    <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Frè Biznis La (5%):</span>
+                                                        <span className="text-xs text-emerald-700 font-bold">+{montanModifye[item.id] ? (montanModifye[item.id] * 0.05).toFixed(2) : item.fee} HTG</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                                        <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Total Kliyan te dwe voye a:</span>
+                                                        <span className="text-sm text-indigo-700 font-bold">{montanModifye[item.id] ? (montanModifye[item.id] * 1.05).toFixed(2) : item.total_to_pay || (Number(item.amount) + Number(item.fee))} HTG</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-between items-center p-2 bg-zinc-800 rounded-lg border border-white/5">
-                                                    <span className="text-[9px] text-white font-black">TOTAL KLIYAN TE DWE VOYE A:</span>
-                                                    <span className="text-sm text-yellow-500 font-black">{montanModifye[item.id] ? (montanModifye[item.id] * 1.05).toFixed(2) : item.total_to_pay || (Number(item.amount) + Number(item.fee))} HTG</span>
+                                            )}
+                                        </div>
+                                        
+                                        {item.status === 'pending' && (
+                                            <div className="space-y-4 pt-6 border-t border-gray-100">
+                                                <div className="flex gap-3">
+                                                    <button disabled={processingId === item.id} onClick={() => isDepo ? apwouveDepo(item) : apwouveRetre(item)} className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                        <CheckCircle2 size={16} /> Konfime Apwouve
+                                                    </button>
+                                                    <button disabled={processingId === item.id} onClick={() => anileTranzaksyon(item, isDepo ? 'deposits' : 'withdrawals')} className="bg-white text-rose-600 border border-rose-200 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                        <XCircle size={16} /> Anile
+                                                    </button>
                                                 </div>
+                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
+                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
                                             </div>
                                         )}
                                     </div>
-                                    
-                                    {item.status === 'pending' && (
-                                        <div className="space-y-4">
-                                            <div className="flex gap-2">
-                                                <button disabled={processingId === item.id} onClick={() => isDepo ? apwouveDepo(item) : apwouveRetre(item)} className="flex-1 bg-white text-black py-4 rounded-2xl text-[10px] font-black hover:bg-green-500 hover:text-white transition-all">KONFIME APWOUVE</button>
-                                                <button disabled={processingId === item.id} onClick={() => anileTranzaksyon(item, isDepo ? 'deposits' : 'withdrawals')} className="bg-red-600/20 text-red-600 border border-red-600/30 px-5 py-4 rounded-2xl text-[10px] hover:bg-red-600 hover:text-white transition-all">ANILE</button>
-                                            </div>
-                                            {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_1)} className="w-full block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest flex items-center justify-center gap-2"><EyeOff size={12}/> GADE FOTO PRÈV 1</button>)}
-                                            {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenMaskedUrl(item.proof_img_2)} className="w-full block text-center bg-zinc-800 py-4 rounded-2xl text-[9px] text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-all font-black tracking-widest flex items-center justify-center gap-2"><EyeOff size={12}/> GADE FOTO PRÈV 2</button>)}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
+                                );
+                            })}
+                            {!loading && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn {view} pou kounye a</div>}
+                        </div>
                     )}
-                    {!loading && view !== 'biznis' && view !== 'sispandi' && view !== 'litij' && view !== 'kliyan' && view !== 'kyc' && view !== 'promo' && view !== 'anons' && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-20 text-zinc-600 text-xs uppercase">Pa gen okenn {view} pou kounye a</div>}
                 </div>
             </div>
         </div>
