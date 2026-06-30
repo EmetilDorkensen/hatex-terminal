@@ -758,7 +758,7 @@ export default function Dashboard() {
               <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Pwodwi</h3>
               <ul className="space-y-3">
                 <li><button onClick={() => router.push('/kat')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kat Vityèl</button></li>
-                <li><button onClick={() => router.push('/terminal')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Pòtay Peman (API)</button></li>
+                <li><button onClick={() => router.push('/developer/docs')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Pòtay Peman (API)</button></li>
                 <li><button onClick={() => router.push('/deposit')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Rechaje Kont</button></li>
               </ul>
             </div>

@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, AlertTriangle, ShieldCheck, Wallet, ArrowUpRight, Lock, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle, ShieldCheck, Wallet, ArrowUpRight, Lock, CheckCircle2, Store } from 'lucide-react';
 
 export default function WithdrawPage() {
   const router = useRouter();
   const [amount, setAmount] = useState<number | ''>('');
   const [phone, setPhone] = useState('');
+  const [agentCode, setAgentCode] = useState('');
   const [method, setMethod] = useState('MonCash');
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -48,16 +49,16 @@ export default function WithdrawPage() {
   }, [supabase, router]);
 
   // ==========================================
-  // LOJIK POU TCHEKE BAZ DONE A FRECH
+  // LOJIK POU TCHEKE LIMIT LA AK BAZ DONE A
   // ==========================================
   const initiateWithdrawal = async () => {
     setLoading(true);
 
     try {
-      // 1. AL CHÈCHE ESTATI A DIRÈK NAN TAB PROFILES LA KOUNYE A
+      // 1. TCHEKE ESTATI A DIRÈK NAN BAZ DONE A KOUNYE A
       const { data: statusCheck, error: statusErr } = await supabase
         .from('profiles')
-        .select('account_status')
+        .select('account_status, account_type')
         .eq('id', profile.id)
         .single();
 
@@ -72,26 +73,54 @@ export default function WithdrawPage() {
         return alert("Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè.");
       }
 
-      // 3. KITE L PASE SI L ACTIVE AK LÒT KONDISYON YO
-      if (statusCheck.account_status === 'active') {
-        if (currentAmount < 500) {
-          setLoading(false);
-          return alert("Minimòm retrè se 500 HTG");
-        }
-        if (currentAmount > (profile?.wallet_balance || 0)) {
-          setLoading(false);
-          return alert("Ou pa gen ase kòb sou kont ou.");
-        }
-        if (!phone && !isLargeWithdrawal) {
-          setLoading(false);
-          return alert("Tanpri mete nimewo telefòn ou"); 
-        }
+      // 3. TCHEKE LIMIT 25,000 HTG PA JOU POU KONT ENDIVIDYÈL YO
+      if (statusCheck.account_type !== 'business') {
+        const bugun = new Date();
+        bugun.setHours(0, 0, 0, 0);
 
-        // Tout bagay fre, nou mande PIN nan
-        setPinError('');
-        setEnteredPin('');
-        setShowPinPrompt(true);
+        const { data: todayTxs } = await supabase
+            .from('transactions')
+            .select('amount')
+            .eq('user_id', profile.id)
+            .in('type', ['WITHDRAWAL', 'AGENT_WITHDRAWAL_CLIENT'])
+            .gte('created_at', bugun.toISOString());
+
+        const withdrawnToday = (todayTxs || []).reduce((acc, tx) => acc + Math.abs(Number(tx.amount)), 0);
+
+        if (withdrawnToday + currentAmount > 25000) {
+            setLoading(false);
+            return alert(`Kont endividyèl yo gen limit 25,000 HTG pa jou pou retrè.\nOu gentan retire ${withdrawnToday.toLocaleString()} HTG jodi a deja. Fè rès la demen oswa pase nan kont antrepriz (Business).`);
+        }
       }
+
+      // 4. KONDISYON DEBAZ YO
+      if (currentAmount < 500) {
+        setLoading(false);
+        return alert("Minimòm retrè se 500 HTG");
+      }
+      if (currentAmount > (profile?.wallet_balance || 0)) {
+        setLoading(false);
+        return alert("Ou pa gen ase kòb sou kont ou pou montan sa a.");
+      }
+      
+      // Valide Enfòmasyon Metòd yo
+      if (method === 'Ajan') {
+          if (!agentCode || agentCode.length !== 8) {
+              setLoading(false);
+              return alert("Tanpri mete Kòd 8-Chif Ajan an kòrèkteman.");
+          }
+      } else {
+          if (!phone && !isLargeWithdrawal) {
+              setLoading(false);
+              return alert("Tanpri mete nimewo telefòn ou"); 
+          }
+      }
+
+      // Tout bagay fre, nou mande PIN nan
+      setPinError('');
+      setEnteredPin('');
+      setShowPinPrompt(true);
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -117,7 +146,6 @@ export default function WithdrawPage() {
         
       if (checkErr || !checkData) throw new Error("Nou pa jwenn kont ou.");
       
-      // Tcheke yon dènye fwa jis pou sekirite absoli
       if (checkData.account_status === 'suspended') {
         throw new Error("Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
       }
@@ -130,11 +158,54 @@ export default function WithdrawPage() {
          throw new Error("Ou pa gen ase kòb pou tranzaksyon sa a.");
       }
 
+      // ==============================================
+      // CHEMEN 1: RETRÈ NAN MEN YON AJAN (KÒD 8 CHIF)
+      // ==============================================
+      if (method === 'Ajan') {
+         // Chèche ajan an
+         const { data: agent, error: agentErr } = await supabase
+            .from('profiles')
+            .select('id, agent_balance, agent_status, full_name')
+            .eq('agent_code', agentCode)
+            .single();
+
+         if (agentErr || !agent) throw new Error("Sistèm nan pa jwenn okenn ajan ak kòd sa a.");
+         if (agent.agent_status !== 'approved') throw new Error("Ajan sa a pa aktif kounye a.");
+         if (agent.id === profile.id) throw new Error("Ou pa ka fè retrè sou pwòp kòd ajan pa w la.");
+
+         // Tranzaksyon An: Koupe sou kliyan, Mete sou Ajan
+         const newClientBal = Number(checkData.wallet_balance) - currentAmount;
+         const newAgentBal = Number(agent.agent_balance) + currentAmount; // Ajan an jwenn tout kòb la (Net la + Frè a kòm pwofi l)
+
+         // 1. Retire lajan sou Kliyan an
+         const { error: err1 } = await supabase.from('profiles').update({ wallet_balance: newClientBal }).eq('id', profile.id);
+         if (err1) throw new Error("Erè nan debite kòb la sou kont ou.");
+
+         // 2. Mete lajan an sou Balans Ajan an
+         const { error: err2 } = await supabase.from('profiles').update({ agent_balance: newAgentBal }).eq('id', agent.id);
+         if (err2) {
+             // Rollback si l pa pase
+             await supabase.from('profiles').update({ wallet_balance: checkData.wallet_balance }).eq('id', profile.id);
+             throw new Error("Erè nan voye kòb la bay ajan an. Lajan w lan ranbouse.");
+         }
+
+         // 3. Ekri Jounal Tranzaksyon an
+         await supabase.from('transactions').insert([
+            { user_id: profile.id, type: 'AGENT_WITHDRAWAL_CLIENT', amount: -currentAmount, status: 'success', description: `Retrè kach kay ajan: ${agentCode}` },
+            { user_id: agent.id, type: 'AGENT_WITHDRAWAL', amount: currentAmount, status: 'success', description: `Retrè Kliyan: ${profile.email}`, metadata: { client_email: profile.email } }
+         ]);
+
+         setShowPinPrompt(false);
+         alert(`Tranzaksyon an reyisi!\n\nAjan ${agent.full_name} resevwa lajan an sou sistèm nan.\nTanpri mande ajan an ${netAmount.toLocaleString()} HTG kach ou a kounye a.`);
+         router.push('/dashboard');
+         return; // NOU FINI AK CHEMEN AJAN AN LA A
+      }
+
+      // ==============================================
+      // CHEMEN 2: RETRÈ NÒMAL SOU MONCASH / NATCASH
+      // ==============================================
       const nouvoBalans = Number(checkData.wallet_balance) - currentAmount;
-      const { error: balanceError } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: nouvoBalans })
-        .eq('id', profile.id);
+      const { error: balanceError } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', profile.id);
 
       if (balanceError) throw new Error("Erè nan mizajou balans ou an. Tanpri re-eseye.");
 
@@ -283,21 +354,23 @@ export default function WithdrawPage() {
                {currentAmount > 0 && !isLargeWithdrawal && (
                  <div className="mt-8 bg-slate-50 border border-gray-100 p-4 rounded-xl space-y-3">
                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-                     <span>Frè Hatexcard (5%):</span>
+                     <span>{method === 'Ajan' ? 'Frè Ajan an (5%):' : 'Frè Hatexcard (5%):'}</span>
                      <span className="font-bold text-rose-600">-{withdrawFee.toFixed(2)} HTG</span>
                    </div>
                    <div className="h-px bg-gray-200 w-full"></div>
                    <div className="flex justify-between items-center text-sm font-bold text-slate-800">
-                     <span>Nèt pou resevwa:</span>
-                     <span className="text-indigo-600">{netAmount.toFixed(2)} HTG</span>
+                     <span>Nèt ou pral resevwa:</span>
+                     <span className={method === 'Ajan' ? "text-emerald-600" : "text-indigo-600"}>{netAmount.toFixed(2)} HTG</span>
                    </div>
+                   {method === 'Ajan' && (
+                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2">Ajan an ap ba ou {netAmount.toFixed(2)} HTG nan men w kach.</p>
+                   )}
                  </div>
                )}
               
                {isLargeWithdrawal && (
                  <div className="mt-8 bg-amber-50 border border-amber-200 p-5 rounded-xl text-center shadow-sm">
                     <ShieldCheck size={28} className="text-amber-500 mx-auto mb-2" />
-                    {/* 👇 ERÈ A KORIJE LA A 👇 */}
                     <p className="text-xs font-bold uppercase text-amber-800 tracking-wider leading-relaxed">
                       Transfè VIP (&gt; 15,000 HTG)
                     </p>
@@ -312,29 +385,49 @@ export default function WithdrawPage() {
           {!isLargeWithdrawal && (
              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm space-y-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Metòd Pèman</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chwazi Kote W Ap Retire Lajan an</label>
                   <select 
                      value={method} 
                      onChange={(e) => setMethod(e.target.value)} 
                      disabled={profile?.account_status === 'suspended'}
                      className="w-full bg-slate-50 p-4 rounded-xl border border-gray-200 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm disabled:opacity-50"
                   >
+                     <option value="Ajan">Kach nan Pwen Ajan Hatex</option>
                      <option value="MonCash">MonCash</option>
                      <option value="NatCash">NatCash</option>
                   </select>
                 </div>
                 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nimewo Kont / Telefòn</label>
-                  <input 
-                     type="text" 
-                     placeholder="EG: 44332211" 
-                     value={phone} 
-                     onChange={(e) => setPhone(e.target.value)} 
-                     disabled={profile?.account_status === 'suspended'}
-                     className="w-full bg-slate-50 p-4 rounded-xl outline-none border border-gray-200 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm disabled:opacity-50 placeholder:text-gray-400" 
-                  />
-                </div>
+                {method === 'Ajan' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kòd 8-Chif Ajan an</label>
+                    <div className="relative">
+                      <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                      <input 
+                         type="text" 
+                         placeholder="EG: 04958123" 
+                         maxLength={8}
+                         value={agentCode} 
+                         onChange={(e) => setAgentCode(e.target.value.replace(/[^0-9]/g, ''))} 
+                         disabled={profile?.account_status === 'suspended'}
+                         className="w-full bg-slate-50 p-4 pl-12 rounded-xl outline-none border border-gray-200 text-sm font-bold text-slate-800 font-mono tracking-widest focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm disabled:opacity-50 placeholder:text-gray-300 placeholder:tracking-normal" 
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-medium mt-2">Mande ajan an kòd li a epi asire w li korèk pou kòb la pa pèdi.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nimewo Kont / Telefòn</label>
+                    <input 
+                       type="text" 
+                       placeholder="EG: 44332211" 
+                       value={phone} 
+                       onChange={(e) => setPhone(e.target.value)} 
+                       disabled={profile?.account_status === 'suspended'}
+                       className="w-full bg-slate-50 p-4 rounded-xl outline-none border border-gray-200 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm disabled:opacity-50 placeholder:text-gray-400" 
+                    />
+                  </div>
+                )}
              </div>
           )}
 
