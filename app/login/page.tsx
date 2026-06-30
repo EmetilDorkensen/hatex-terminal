@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { createBrowserClient } from '@supabase/ssr';
-import { Mail, Lock, KeyRound, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, KeyRound, AlertCircle, Loader2, ShieldCheck, Briefcase } from 'lucide-react';
 
 export default function Login() {
   const [loginMethod, setLoginMethod] = useState<'password' | 'pin'>('password');
@@ -65,10 +65,10 @@ export default function Login() {
         }
 
         if (data?.user) {
-          // VERIFYE SI KONT LAN TE SISPANDI ANVAN L ANTRE SOU DASHBOARD LA
+          // VERIFYE ESTATI AK WÒL ITILIZATÈ A
           const { data: profile } = await supabase
             .from('profiles')
-            .select('account_status')
+            .select('account_status, role')
             .eq('id', data.user.id)
             .single();
 
@@ -82,8 +82,14 @@ export default function Login() {
           // 🚨 PRAN IP AK APARÈY LA ANVAN L ALE 🚨
           await trackDeviceAndIP(email);
 
-          // Sèvi ak replace epi fose yon refresh pou Middleware la wè nouvo Cookie a
-          window.location.href = '/dashboard';
+          // REDIREKSYON ENTELIJAN BAZE SOU WÒL LA
+          if (profile?.role === 'super_admin') {
+              window.location.href = '/admin';
+          } else if (profile?.role && ['finance', 'compliance', 'support'].includes(profile.role)) {
+              window.location.href = '/workspace';
+          } else {
+              window.location.href = '/dashboard';
+          }
         }
 
       } else {
@@ -114,9 +120,22 @@ export default function Login() {
           // 🚨 PRAN IP AK APARÈY LA ANVAN L ALE 🚨
           await trackDeviceAndIP(email);
           
-          window.location.href = '/dashboard';
+          // Chèche wòl moun nan pou nou konnen ki kote pou n voye l
+          const { data: profile } = await supabase
+             .from('profiles')
+             .select('role')
+             .eq('email', email.trim().toLowerCase())
+             .single();
+
+          if (profile?.role === 'super_admin') {
+              window.location.href = '/admin';
+          } else if (profile?.role && ['finance', 'compliance', 'support'].includes(profile.role)) {
+              window.location.href = '/workspace';
+          } else {
+              window.location.href = '/dashboard';
+          }
         } else {
-          // Afiche mesaj erè a ki soti dirèk nan baz done a (ex: "Ou rete 2 chans" oswa "Kont ou sispandi")
+          // Afiche mesaj erè a ki soti dirèk nan baz done a
           setErrorMsg(rpcData.message); 
           setLoading(false);
         }
@@ -245,10 +264,20 @@ export default function Login() {
         </div>
       </div>
       
-      <div className="mt-10 flex items-center gap-3 opacity-40">
-         <div className="h-px w-8 bg-slate-400"></div>
-         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Secured by Hatex Group</span>
-         <div className="h-px w-8 bg-slate-400"></div>
+      {/* BOUTON POU ADMIN / ESPAS TRAVAY LA */}
+      <div className="mt-8 flex flex-col items-center gap-4">
+        <Link href="/admin">
+           <button className="flex items-center gap-2 bg-slate-200/50 hover:bg-slate-200 text-slate-600 px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all">
+              <Briefcase size={14} />
+              Pòtay Anplwaye / Admin
+           </button>
+        </Link>
+        
+        <div className="flex items-center gap-3 opacity-40 mt-2">
+           <div className="h-px w-8 bg-slate-400"></div>
+           <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Secured by Hatex Group</span>
+           <div className="h-px w-8 bg-slate-400"></div>
+        </div>
       </div>
     </div>
   );
