@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, UploadCloud, ChevronRight, XCircle } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, UploadCloud, ChevronRight, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon } from 'lucide-react';
 
 export default function AdminSuperPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -16,6 +16,10 @@ export default function AdminSuperPage() {
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
+    // NOUVO: State pou Anboche Ekip la
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteRole, setInviteRole] = useState('support');
+
     const [totalCardBal, setTotalCardBal] = useState(0);
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
@@ -24,7 +28,8 @@ export default function AdminSuperPage() {
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis'>('ajan'); 
+    // NOUVO: Ajoute 'ekip' nan view a
+    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis' | 'ekip'>('ekip'); 
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -32,13 +37,13 @@ export default function AdminSuperPage() {
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
     // ==========================================
-    // ETA POU KONT BIZNIS LA
+    // ETA POU KONT BIZNIS LA 
     // ==========================================
     const [businessTabPasswordVerified, setBusinessTabPasswordVerified] = useState(false);
     const [loadingBiznis, setLoadingBiznis] = useState(false);
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
-    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0 });
+    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,7 +54,7 @@ export default function AdminSuperPage() {
     const CHAT_ID = "5352352512";
 
     useEffect(() => {
-        const pass = prompt("Antre modpas Admin lan:");
+        const pass = prompt("Antre modpas Sipè Admin lan:");
         if (pass === "@fiokes1234") {
             setAccessGranted(true);
             raleDone();
@@ -80,7 +85,7 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            // NOUVO: Fetch ajan ki an atant yo (Ak mesaj alèt si Supabase bloke l)
+            // Fetch ajan ki an atant yo
             const { data: agData, error: agErr } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
             
             if (agErr) {
@@ -165,7 +170,7 @@ export default function AdminSuperPage() {
             const { data: feeData } = await supabase.from('transactions').select('amount').eq('type', 'FEE').eq('status', 'success');
             const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
 
-            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee + totalAgentFee });
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee });
             
             const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee;
             setTotalBiznisProfit(granTotalPwofi);
@@ -362,6 +367,73 @@ export default function AdminSuperPage() {
         }
     };
 
+    // ==========================================
+    // NOUVO: JERE EKIP LA (ANBOCHE / REVOKE)
+    // ==========================================
+    const jereAnplwaye = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inviteEmail) return alert("Ou dwe mete yon imèl.");
+
+        setProcessingId('invite_staff');
+        try {
+            // Chèche si moun nan gen yon kont sou platfòm nan
+            const userToPromote = allUsers.find(u => u.email?.toLowerCase() === inviteEmail.toLowerCase().trim());
+            
+            if (!userToPromote) {
+                throw new Error("Nou pa jwenn okenn moun ki gen imèl sa a sou platfòm nan. Anplwaye a dwe kreye yon kont Hatexcard anvan w ba l aksè a.");
+            }
+
+            if (userToPromote.role === inviteRole) {
+                throw new Error("Moun sa a gentan gen wòl sa a.");
+            }
+
+            // Chanje wòl li nan baz done a
+            const { error } = await supabase.from('profiles').update({ role: inviteRole }).eq('id', userToPromote.id);
+            if (error) throw error;
+
+            // Prepare Imèl Notifikasyon an
+            const roleNames: Record<string, string> = {
+                'super_admin': 'Sipè Admin (CEO)',
+                'finance': 'Depatman Finans',
+                'compliance': 'Depatman Konfòmite (KYC & Ajan)',
+                'support': 'Sèvis Kliyan (Support)'
+            };
+            
+            const msg = `Felisitasyon ${userToPromote.full_name}!\n\nAdministrasyon an sot ba ou aksè ofisyèl kòm anplwaye nan depatman: "${roleNames[inviteRole]}" sou Hatexcard.\n\nKonekte sou kont ou kounye a pou w wè nouvo espas travay ou a.`;
+            
+            await voyeEmailKliyan(userToPromote.email, userToPromote.full_name, msg, "NOUVO WÒL ANPLWAYE HATEXCARD");
+
+            alert(`Wòl la bay ak siksè! ${userToPromote.full_name} resevwa yon imèl notifikasyon.`);
+            setInviteEmail('');
+            raleDone();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const revokeAnplwaye = async (id: string, email: string) => {
+        if (!confirm(`Èske w sèten ou vle revoke aksè anplwaye sa a (${email}) ? L ap tounen yon senp kliyan imedyatman.`)) return;
+        
+        setProcessingId(`revoke_${id}`);
+        try {
+            const { error } = await supabase.from('profiles').update({ role: 'client' }).eq('id', id);
+            if (error) throw error;
+            
+            alert(`Aksè a revoke nèt pou ${email}.`);
+            raleDone();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    // Filtre Lis Anplwaye yo sèlman
+    const staffMembers = allUsers.filter(u => u.role && ['super_admin', 'finance', 'compliance', 'support'].includes(u.role));
+
+
     const handleCreateCode = async (e: React.FormEvent) => {
         e.preventDefault();
         setProcessingId('creating_promo');
@@ -382,40 +454,6 @@ export default function AdminSuperPage() {
             if (error) throw error;
             alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
         } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
-    };
-
-    const handleManualBalanceAdjust = async (user: any, action: 'add' | 'subtract') => {
-        if (!user) return;
-        const amtStr = prompt(`Antre montan ou vle ${action === 'add' ? 'AJOUTE sou' : 'RETIRE nan'} kont ${user.full_name} an:`);
-        if (!amtStr) return;
-        
-        const amt = Number(amtStr);
-        if (isNaN(amt) || amt <= 0) return alert("Montan an pa bon!");
-
-        if (!confirm(`W ap ${action === 'add' ? 'AJOUTE' : 'RETIRE'} ${amt} HTG ${action === 'add' ? 'sou' : 'nan'} kont ${user.full_name}. Kontinye?`)) return;
-
-        setProcessingId(`adjust_${user.id}`);
-        try {
-            const { data: dbUser } = await supabase.from('profiles').select('wallet_balance').eq('id', user.id).single();
-            const currentBal = Number(dbUser?.wallet_balance || 0);
-            const newBal = action === 'add' ? currentBal + amt : currentBal - amt;
-
-            await supabase.from('profiles').update({ wallet_balance: newBal }).eq('id', user.id);
-            await supabase.from('transactions').insert([{
-                user_id: user.id,
-                amount: action === 'add' ? amt : -amt,
-                type: 'ADMIN_ADJUSTMENT',
-                description: `Ajusteman Admin: ${action === 'add' ? '+' : '-'}${amt} HTG`,
-                status: 'success'
-            }]);
-
-            alert(`Balans la modifye! Nouvo balans: ${newBal} HTG`);
-            raleDone();
-        } catch (err: any) {
-            alert("Erè nan modifikasyon: " + err.message);
-        } finally {
-            setProcessingId(null);
-        }
     };
 
     const filteredUsers = allUsers.filter(user => {
@@ -439,12 +477,17 @@ export default function AdminSuperPage() {
 
                 <div className="flex gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-200 overflow-x-auto custom-scrollbar whitespace-nowrap shadow-sm">
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
+                    
+                    {/* ONGLÈ JERE EKIP NOUVO A */}
+                    <button onClick={() => setView('ekip')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'ekip' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <span className="flex items-center gap-1"><Users size={14}/> Jere Ekip</span>
+                    </button>
+
                     <button onClick={() => setView('kliyan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kliyan ({allUsers.length})</button>
                     <button onClick={() => setView('depo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'depo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Depo ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     
-                    {/* ONGLÈ AJAN AN */}
                     <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         Ajan 
                         {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
@@ -464,6 +507,112 @@ export default function AdminSuperPage() {
                         <div className="flex flex-col items-center justify-center py-32 gap-4">
                            <Loader2 size={32} className="text-indigo-600 animate-spin" />
                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Chaje Done Yo...</p>
+                        </div>
+                    ) : view === 'ekip' ? (
+                        /* ========================================== */
+                        /* ONGLÈ: JERE EKIP LA (ANBOCHE & REVOKE)     */
+                        /* ========================================== */
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            
+                            <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-100">
+                                        <UserPlus size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Anboche yon Anplwaye</h2>
+                                        <p className="text-xs text-slate-500 font-medium mt-1">
+                                            Asire w moun nan te deja kreye yon kont sou Hatexcard kòm kliyan anvan w ba l yon wòl anplwaye.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={jereAnplwaye} className="flex flex-col md:flex-row items-end gap-4">
+                                    <div className="w-full flex-1">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Imèl Kliyan an</label>
+                                        <div className="relative">
+                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                                            <input 
+                                                type="email" 
+                                                placeholder="anplwaye@imel.com" 
+                                                value={inviteEmail} 
+                                                onChange={(e) => setInviteEmail(e.target.value)} 
+                                                className="w-full bg-slate-50 border border-gray-200 py-3.5 pl-12 pr-4 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900" 
+                                                required 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full md:w-64">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Chwazi Depatman</label>
+                                        <select 
+                                            value={inviteRole} 
+                                            onChange={(e) => setInviteRole(e.target.value)} 
+                                            className="w-full bg-slate-50 border border-gray-200 py-3.5 px-4 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                                        >
+                                            <option value="support">🎧 Sèvis Kliyan</option>
+                                            <option value="compliance">🛡️ Konfòmite & Ajan</option>
+                                            <option value="finance">💰 Finans (Kesye)</option>
+                                            <option value="super_admin">👑 Sipè Admin</option>
+                                        </select>
+                                    </div>
+
+                                    <button 
+                                        type="submit" 
+                                        disabled={processingId === 'invite_staff'} 
+                                        className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-sm flex justify-center items-center gap-2 h-[50px] shrink-0"
+                                    >
+                                        {processingId === 'invite_staff' ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sove Wòl la'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
+                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Anplwaye ki aktif yo ({staffMembers.length})</h3>
+                                
+                                <div className="space-y-4">
+                                    {staffMembers.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-400 text-sm font-bold">Pa gen okenn anplwaye anrejistre ankò.</div>
+                                    ) : (
+                                        staffMembers.map(staff => (
+                                            <div key={staff.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border border-gray-100 bg-slate-50 hover:bg-white hover:shadow-sm transition-all shadow-sm">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${
+                                                        staff.role === 'super_admin' ? 'bg-slate-900' :
+                                                        staff.role === 'finance' ? 'bg-emerald-600' :
+                                                        staff.role === 'compliance' ? 'bg-blue-600' : 'bg-indigo-600'
+                                                    }`}>
+                                                        {staff.role === 'super_admin' ? <ShieldCheck size={20} /> :
+                                                         staff.role === 'finance' ? <DollarSign size={20} /> :
+                                                         staff.role === 'compliance' ? <UserCheckIcon size={20} /> : <Users size={20} />}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-slate-900">{staff.full_name || 'San Non'}</h4>
+                                                        <p className="text-xs text-slate-500">{staff.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 border-t sm:border-none border-gray-200 pt-3 sm:pt-0">
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border ${
+                                                        staff.role === 'super_admin' ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                                                        staff.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                        staff.role === 'compliance' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                    }`}>
+                                                        {staff.role.replace('_', ' ')}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => revokeAnplwaye(staff.id, staff.email)}
+                                                        disabled={processingId === `revoke_${staff.id}`}
+                                                        className="text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-2 rounded-lg transition-colors border border-rose-100"
+                                                        title="Revoke aksè sa"
+                                                    >
+                                                        {processingId === `revoke_${staff.id}` ? <Loader2 size={16} className="animate-spin" /> : <UserMinus size={16} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ) : view === 'biznis' ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -502,20 +651,26 @@ export default function AdminSuperPage() {
                                         </div>
                                     </div>
 
+                                    {/* SEPARASYON FRÈ YO */}
                                     <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm mt-6">
                                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Detay Frè Antrepriz La Fè</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                             <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Depo</p>
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Sou Depo</p>
                                                 <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.depo).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
                                             <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Retrè</p>
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Sou Retrè</p>
                                                 <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.retre).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
                                             </div>
                                             <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Kolekte Sou Transfè & Ajan</p>
+                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Sou Transfè</p>
                                                 <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.transfe).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
+                                            </div>
+                                            {/* Bwat espesyal pou Frè Ajan yo */}
+                                            <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+                                                <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-2">Frè Ajan (7 HTG/1000)</p>
+                                                <p className="text-2xl font-bold text-indigo-700">{Number(feesBreakdown.ajan).toLocaleString()} <span className="text-sm text-indigo-500">HTG</span></p>
                                             </div>
                                         </div>
                                     </div>

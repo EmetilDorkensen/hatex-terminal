@@ -373,7 +373,7 @@ export default function Dashboard() {
   const kycPending = userData?.kyc_status !== 'approved';
   const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
   const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
-  const isAdmin = userData?.email === 'hatexcard@gmail.com';
+  const isAdmin = userData?.email === 'adminhatexcard@gmail.com';
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
