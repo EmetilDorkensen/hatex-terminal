@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, ArrowRightLeft, Store, Plus, Minus, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, UploadCloud, ChevronRight, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard } from 'lucide-react';
 
 export default function AdminSuperPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -12,11 +12,9 @@ export default function AdminSuperPage() {
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     
-    // State pou ajan yo
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
-    // NOUVO: State pou Anboche Ekip la
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('support');
 
@@ -28,19 +26,15 @@ export default function AdminSuperPage() {
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    // NOUVO: Ajoute 'ekip' nan view a
-    const [view, setView] = useState<'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'biznis' | 'ekip'>('ekip'); 
+    // NOUVO: 'dashboard' se paj prensipal Admin nan kounye a
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'ekip'>('dashboard'); 
     
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [accessGranted, setAccessGranted] = useState(false);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
-    // ==========================================
     // ETA POU KONT BIZNIS LA 
-    // ==========================================
-    const [businessTabPasswordVerified, setBusinessTabPasswordVerified] = useState(false);
-    const [loadingBiznis, setLoadingBiznis] = useState(false);
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
     const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
@@ -54,14 +48,25 @@ export default function AdminSuperPage() {
     const CHAT_ID = "5352352512";
 
     useEffect(() => {
-        const pass = prompt("Antre modpas Sipè Admin lan:");
-        if (pass === "@fiokes1234") {
-            setAccessGranted(true);
-            raleDone();
-        } else {
-            alert("Ou pa gen otorizasyon!");
-            window.location.href = "/";
-        }
+        const checkAccess = async () => {
+             // 1. Asire mèt la konekte anvan l ka wè paj la
+             const { data: { user } } = await supabase.auth.getUser();
+             if (!user) {
+                 window.location.href = "/login";
+                 return;
+             }
+
+             // 2. Mande Modpas Sipè Admin nan
+             const pass = prompt("Antre modpas Sipè Admin lan:");
+             if (pass === "@fiokes1234") {
+                 setAccessGranted(true);
+                 raleDone();
+             } else {
+                 alert("Ou pa gen otorizasyon!");
+                 window.location.href = "/dashboard"; // Voye l tounen nan paj nòmal si modpas la pa bon
+             }
+        };
+        checkAccess();
     }, []);
 
     const raleDone = async () => {
@@ -85,14 +90,7 @@ export default function AdminSuperPage() {
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
             setPromoCodes(p || []);
 
-            // Fetch ajan ki an atant yo
-            const { data: agData, error: agErr } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-            
-            if (agErr) {
-                console.error("Erè rale ajan:", agErr);
-                alert("Sistèm nan bloke lekti ajan yo. Asire w ou kouri kòmand SQL pou RLS la! \nErè: " + agErr.message);
-            }
-            
+            const { data: agData } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
             if (agData && u) {
                 const mergedAgents = agData.map(agent => ({
                    ...agent,
@@ -106,54 +104,23 @@ export default function AdminSuperPage() {
                 setAnonsText(anonsData.announcement_text || '');
                 setAnonsActive(anonsData.announcement_active);
             }
+
+            // Kounye a nou tou kalkile done Biznis yo (Kès Global) a chak fwa paj la rafrechi
+            await kalkileTotalBiznis(u || []);
+
+        } catch (e: any) {
+             console.error("Erè rale done:", e);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleOpenDocument = (url: string) => {
-        if (!url) {
-            alert("Pa gen lyen pou dokiman sa a!");
-            return;
-        }
-        window.open(url, '_blank');
-    };
-
-    const handleOpenBiznis = async () => {
-        if (businessTabPasswordVerified) {
-            setView('biznis');
-            kalkileTotalBiznis();
-            return;
-        }
-
-        const pass = prompt("ANTRE MODPAS SEKRÈ FINANSYE A:");
-        if (!pass) return;
-
+    const kalkileTotalBiznis = async (profiles: any[]) => {
         try {
-            const { data: settings } = await supabase.from('global_settings').select('finance_password').eq('id', 1).maybeSingle();
-            const validPass = settings?.finance_password || '@fiokes1234';
-
-            if (pass === validPass) {
-                setBusinessTabPasswordVerified(true);
-                setView('biznis');
-                kalkileTotalBiznis();
-            } else {
-                alert("Modpas la pa bon! Ou pa gen aksè ak kès biznis la.");
-            }
-        } catch (e) {
-            alert("Erè nan sistèm sekirite a.");
-        }
-    };
-
-    const kalkileTotalBiznis = async () => {
-        setLoadingBiznis(true);
-        try {
-            const { data: profiles } = await supabase.from('profiles').select('wallet_balance, card_balance');
-            
-            const totalKliyan = (profiles || []).reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
+            const totalKliyan = profiles.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
             setTotalClientBal(totalKliyan);
 
-            const totalKat = (profiles || []).reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
+            const totalKat = profiles.reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
             setTotalCardBal(totalKat);
 
             const { data: depData } = await supabase.from('deposits').select('fee').eq('status', 'approved');
@@ -177,38 +144,32 @@ export default function AdminSuperPage() {
 
         } catch (error) {
             console.error("Erè kalkil biznis:", error);
-            alert("Sistèm nan jwenn yon ti pwoblèm nan rale done yo.");
-        } finally {
-            setLoadingBiznis(false);
         }
+    };
+
+    const handleOpenDocument = (url: string) => {
+        if (!url) { alert("Pa gen lyen pou dokiman sa a!"); return; }
+        window.open(url, '_blank');
     };
 
     const voyeEmailKliyan = async (email: string, non: string, mesaj: string, subject: string) => {
         if (!email) return;
-        try {
-            await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: email.trim(), subject, non, mesaj }), });
-        } catch (error) { console.error("Erè email:", error); }
+        try { await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: email.trim(), subject, non, mesaj }), }); } catch (error) {}
     };
 
     const voyeTelegram = async (msg: string) => {
-        try {
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'HTML' }), });
-        } catch (e) { console.error("Telegram error", e); }
+        try { await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'HTML' }), }); } catch (e) {}
     };
 
     const deleteTranzaksyon = async (id: string, table: string) => {
         if (!confirm("Èske ou vle efase istwa sa a nèt?")) return;
         setProcessingId(id);
-        try {
-            await supabase.from(table).delete().eq('id', id);
-            alert("Efase nèt!"); raleDone();
-        } finally { setProcessingId(null); }
+        try { await supabase.from(table).delete().eq('id', id); alert("Efase nèt!"); raleDone(); } finally { setProcessingId(null); }
     };
 
     const apwouveDepo = async (d: any) => {
         const isModified = montanModifye[d.id] !== undefined;
         const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
-        
         const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
         const totalPeye = montanFinal + frePouBiznisLa;
 
@@ -216,27 +177,15 @@ export default function AdminSuperPage() {
         
         setProcessingId(d.id);
         try {
-            const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', d.user_id).single();
-            if (pErr || !p) throw new Error("Kliyan pa jwenn nan sistèm nan.");
-            
-            const nouvoBalans = Number(p.wallet_balance || 0) + montanFinal;
-            await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', d.user_id);
-            
+            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, email').eq('id', d.user_id).single();
+            await supabase.from('profiles').update({ wallet_balance: Number(p?.wallet_balance || 0) + montanFinal }).eq('id', d.user_id);
             await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
-            
-            await supabase.from('transactions').insert({ 
-                user_id: d.user_id, 
-                amount: montanFinal, 
-                type: 'DEPOSIT', 
-                description: `Depo konfime: +${montanFinal} HTG`, 
-                status: 'success' 
-            });
+            await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
 
-            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
-            await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
+            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
+            await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p?.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
             
-            alert("SIKSÈ! Depo a apwouve."); 
-            raleDone();
+            alert("SIKSÈ! Depo a apwouve."); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -244,14 +193,12 @@ export default function AdminSuperPage() {
         if (!confirm(`Konfime retrè ${w.amount} HTG sa a?`)) return;
         setProcessingId(w.id);
         try {
-            const { data: p, error: pErr } = await supabase.from('profiles').select('*').eq('id', w.user_id).single();
-            if (pErr || !p) throw new Error("Kliyan pa jwenn.");
-            
+            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', w.user_id).single();
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
-            
             await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
-            await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
-            await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p.full_name}\nMontan: ${w.amount} HTG`);
+            
+            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
+            await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p?.full_name}\nMontan: ${w.amount} HTG`);
             alert("RETRÈ FINI!"); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -262,13 +209,15 @@ export default function AdminSuperPage() {
         setProcessingId(item.id);
         try {
             await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
-            const { data: p } = await supabase.from('profiles').select('*').eq('id', item.user_id).single();
+            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, email').eq('id', item.user_id).single();
+            
             if (table === 'withdrawals') {
-                const balansR = Number(p.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); 
+                const balansR = Number(p?.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); 
                 await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
             }
+            
             await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
-            if (p?.email) await voyeEmailKliyan(p.email, p.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
+            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
             await voyeTelegram(`<b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
             alert("Anile!"); raleDone();
         } finally { setProcessingId(null); }
@@ -296,7 +245,7 @@ export default function AdminSuperPage() {
         try {
             await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezonReje : null }).eq('id', id);
             const mesajE = aksyon === 'approved' ? `Felisitasyon ${full_name}! Dokiman w yo apwouve.` : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
-            if (email) await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
             alert(`KYC a ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); raleDone();
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
@@ -319,23 +268,16 @@ export default function AdminSuperPage() {
                     if (paidAmount > 0) {
                         const feePaid = Math.floor((paidAmount / 1000) * 7);
                         const totalRefund = paidAmount + feePaid;
-                        const newWalletBalance = Number(userProf.wallet_balance || 0) + totalRefund;
                         
                         await supabase.from('profiles').update({ 
-                            wallet_balance: newWalletBalance,
+                            wallet_balance: Number(userProf.wallet_balance || 0) + totalRefund,
                             agent_balance: 0,
                             agent_capacity: 0,
                             agent_guarantee_paid: 0,
                             agent_status: 'rejected'
                         }).eq('id', userId);
 
-                        await supabase.from('transactions').insert({
-                            user_id: userId,
-                            type: 'REFUND',
-                            amount: totalRefund,
-                            status: 'success',
-                            description: `Ranbousman Aplikasyon Ajan ki Rejte (+ Frè)`
-                        });
+                        await supabase.from('transactions').insert({ user_id: userId, type: 'REFUND', amount: totalRefund, status: 'success', description: `Ranbousman Aplikasyon Ajan ki Rejte (+ Frè)` });
                     } else {
                         await supabase.from('profiles').update({ agent_status: 'rejected' }).eq('id', userId);
                     }
@@ -344,54 +286,31 @@ export default function AdminSuperPage() {
                 await supabase.from('profiles').update({ agent_status: 'approved' }).eq('id', userId);
             }
 
-            await supabase.from('agent_applications').update({ 
-                status: aksyon,
-                rejection_reason: aksyon === 'rejected' ? rezon : null
-            }).eq('id', applicationId);
+            await supabase.from('agent_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
 
             const mesajE = aksyon === 'approved' 
                 ? `Felisitasyon ${fullName}! Aplikasyon w pou vin Ajan Hatexcard la apwouve. Ou ka vizite pòtay ajan w lan kounye a pou w jwenn kòd inik ou a epi kòmanse travay.` 
                 : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Tout garanti ou te depoze yo tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
             
-            if (userEmail) await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            
+            await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
             alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`); 
-            
             if (aksyon === 'rejected') setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
-            
             raleDone();
-        } catch (err: any) { 
-            alert("Erè nan pwosesis la: " + err.message); 
-        } finally { 
-            setProcessingId(null); 
-        }
+        } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // NOUVO: JERE EKIP LA (ANBOCHE / REVOKE)
-    // ==========================================
     const jereAnplwaye = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inviteEmail) return alert("Ou dwe mete yon imèl.");
 
         setProcessingId('invite_staff');
         try {
-            // Chèche si moun nan gen yon kont sou platfòm nan
             const userToPromote = allUsers.find(u => u.email?.toLowerCase() === inviteEmail.toLowerCase().trim());
-            
-            if (!userToPromote) {
-                throw new Error("Nou pa jwenn okenn moun ki gen imèl sa a sou platfòm nan. Anplwaye a dwe kreye yon kont Hatexcard anvan w ba l aksè a.");
-            }
+            if (!userToPromote) throw new Error("Nou pa jwenn okenn moun ki gen imèl sa a sou platfòm nan. Anplwaye a dwe kreye yon kont Hatexcard kòm kliyan anvan w ba l aksè a.");
+            if (userToPromote.role === inviteRole) throw new Error("Moun sa a gentan gen wòl sa a.");
 
-            if (userToPromote.role === inviteRole) {
-                throw new Error("Moun sa a gentan gen wòl sa a.");
-            }
+            await supabase.from('profiles').update({ role: inviteRole }).eq('id', userToPromote.id);
 
-            // Chanje wòl li nan baz done a
-            const { error } = await supabase.from('profiles').update({ role: inviteRole }).eq('id', userToPromote.id);
-            if (error) throw error;
-
-            // Prepare Imèl Notifikasyon an
             const roleNames: Record<string, string> = {
                 'super_admin': 'Sipè Admin (CEO)',
                 'finance': 'Depatman Finans',
@@ -400,39 +319,22 @@ export default function AdminSuperPage() {
             };
             
             const msg = `Felisitasyon ${userToPromote.full_name}!\n\nAdministrasyon an sot ba ou aksè ofisyèl kòm anplwaye nan depatman: "${roleNames[inviteRole]}" sou Hatexcard.\n\nKonekte sou kont ou kounye a pou w wè nouvo espas travay ou a.`;
-            
             await voyeEmailKliyan(userToPromote.email, userToPromote.full_name, msg, "NOUVO WÒL ANPLWAYE HATEXCARD");
 
             alert(`Wòl la bay ak siksè! ${userToPromote.full_name} resevwa yon imèl notifikasyon.`);
             setInviteEmail('');
             raleDone();
-        } catch (err: any) {
-            alert(err.message);
-        } finally {
-            setProcessingId(null);
-        }
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
     const revokeAnplwaye = async (id: string, email: string) => {
         if (!confirm(`Èske w sèten ou vle revoke aksè anplwaye sa a (${email}) ? L ap tounen yon senp kliyan imedyatman.`)) return;
-        
         setProcessingId(`revoke_${id}`);
         try {
-            const { error } = await supabase.from('profiles').update({ role: 'client' }).eq('id', id);
-            if (error) throw error;
-            
-            alert(`Aksè a revoke nèt pou ${email}.`);
-            raleDone();
-        } catch (err: any) {
-            alert(err.message);
-        } finally {
-            setProcessingId(null);
-        }
+            await supabase.from('profiles').update({ role: 'client' }).eq('id', id);
+            alert(`Aksè a revoke nèt pou ${email}.`); raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
-
-    // Filtre Lis Anplwaye yo sèlman
-    const staffMembers = allUsers.filter(u => u.role && ['super_admin', 'finance', 'compliance', 'support'].includes(u.role));
-
 
     const handleCreateCode = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -450,19 +352,19 @@ export default function AdminSuperPage() {
         e.preventDefault();
         setProcessingId('saving_anons');
         try {
-            const { error } = await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
-            if (error) throw error;
+            await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
             alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
-        } catch (err: any) { alert("Erè nan sove notifikasyon an: " + err.message); } finally { setProcessingId(null); }
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
+    const staffMembers = allUsers.filter(u => u.role && ['super_admin', 'finance', 'compliance', 'support'].includes(u.role));
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
+    if (!accessGranted) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-600"/></div>;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
@@ -470,17 +372,18 @@ export default function AdminSuperPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-8 border-b border-gray-200 pb-6 gap-4">
                     <div className="flex items-center gap-3">
                       <ShieldCheck size={28} className="text-indigo-600" />
-                      <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pòtay Prensipal Admin</h1>
+                      <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pòtay Sipè Admin</h1>
                     </div>
                     <button onClick={raleDone} className="bg-white border border-gray-200 text-slate-600 hover:text-indigo-600 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm">Rafrechi Done Yo</button>
                 </div>
 
                 <div className="flex gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-200 overflow-x-auto custom-scrollbar whitespace-nowrap shadow-sm">
-                    <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
+                    <button onClick={() => setView('dashboard')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'dashboard' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Activity size={14}/> Tablodbò
+                    </button>
                     
-                    {/* ONGLÈ JERE EKIP NOUVO A */}
-                    <button onClick={() => setView('ekip')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'ekip' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
-                        <span className="flex items-center gap-1"><Users size={14}/> Jere Ekip</span>
+                    <button onClick={() => setView('ekip')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'ekip' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Users size={14}/> Jere Ekip
                     </button>
 
                     <button onClick={() => setView('kliyan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kliyan ({allUsers.length})</button>
@@ -492,14 +395,10 @@ export default function AdminSuperPage() {
                         Ajan 
                         {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
                     </button>
-                    
+
+                    <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
                     <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
                     <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
-                    
-                    <button onClick={handleOpenBiznis} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'biznis' ? 'bg-emerald-600 shadow-sm text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100'}`}>
-                        {businessTabPasswordVerified ? <Briefcase size={14}/> : <Lock size={14}/>} 
-                        Kès Biznis
-                    </button>
                 </div>
 
                 <div className="space-y-6">
@@ -507,6 +406,83 @@ export default function AdminSuperPage() {
                         <div className="flex flex-col items-center justify-center py-32 gap-4">
                            <Loader2 size={32} className="text-indigo-600 animate-spin" />
                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Chaje Done Yo...</p>
+                        </div>
+                    ) : view === 'dashboard' ? (
+                        /* ========================================== */
+                        /* ONGLÈ: DASHBOARD GLOBAL POU SIPÈ ADMIN AN  */
+                        /* ========================================== */
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            
+                            <div className="flex items-center gap-4 mb-6">
+                                <span className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 border border-indigo-100"><Activity size={28}/></span>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kès Global & Aktivite</h2>
+                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Aksè Rezève (Sipè Admin)</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* BWAT 1: KÒB KLIYAN YO */}
+                                <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-6 opacity-5"><Users size={80} /></div>
+                                    <div className="relative z-10 mb-6">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Kòb Kliyan Yo (Wallet)</p>
+                                        <h3 className="text-4xl font-bold text-slate-900 tracking-tight break-all">
+                                            {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-500">HTG</span>
+                                        </h3>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-500">Total Kliyan ki Enskri:</span>
+                                        <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">{allUsers.length} Moun</span>
+                                    </div>
+                                </div>
+
+                                {/* BWAT 2: PWOFI ANTREPRIZ LA */}
+                                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
+                                    <div className="relative z-10 mb-6">
+                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis La (Frè Kolèkte)</p>
+                                        <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
+                                            {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
+                                        </h3>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan</p>
+                                            <p className="font-bold text-emerald-800">{feesBreakdown.ajan.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt Frè (Dep/Ret)</p>
+                                            <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* BWAT 3: KÒB SOU KAT YO */}
+                                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10 text-white"><CreditCard size={80} /></div>
+                                    <div className="relative z-10 mb-6">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Lajan Kap Woule Sou Kat Yo</p>
+                                        <h3 className="text-4xl font-bold text-white tracking-tight break-all">
+                                            {Number(totalCardBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-400">HTG</span>
+                                        </h3>
+                                    </div>
+                                    <div className="bg-white/10 p-4 rounded-xl border border-white/5 flex items-center justify-between mt-auto backdrop-blur-sm">
+                                        <span className="text-xs font-medium text-slate-300">Kat Vityèl ki Kreye:</span>
+                                        <span className="text-sm font-bold text-white">{allUsers.filter(u => u.is_card_activated).length}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-600 p-8 rounded-3xl shadow-sm mt-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                                <div>
+                                    <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-2">GRAN TOTAL KI SIPOZE NAN BANK LA (Kliyan + Biznis)</p>
+                                    <p className="text-sm text-white font-medium">Sa se sòm Kòb Wallet yo ak Pwofi konpayi an sèlman.</p>
+                                </div>
+                                <p className="text-3xl font-bold text-white tracking-tight">
+                                    {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
+                                </p>
+                            </div>
                         </div>
                     ) : view === 'ekip' ? (
                         /* ========================================== */
@@ -614,79 +590,6 @@ export default function AdminSuperPage() {
                                 </div>
                             </div>
                         </div>
-                    ) : view === 'biznis' ? (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="p-4 bg-emerald-50 rounded-2xl text-emerald-600 border border-emerald-100"><Briefcase size={28}/></span>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kès Jeneral Antrepriz la</h2>
-                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Aksè Sekirize (Sèlman Mèt Biznis la)</p>
-                                </div>
-                            </div>
-
-                            {loadingBiznis ? (
-                                <div className="text-center py-20 flex flex-col items-center justify-center gap-4 bg-white rounded-3xl border border-gray-200">
-                                    <Loader2 size={32} className="text-indigo-600 animate-spin" />
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Kalkile Tout Tranzaksyon Yo...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 p-6 opacity-5"><UserX size={80} /></div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Kòb Kliyan Yo (Lajan Moun Yo)</p>
-                                            <h3 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight">
-                                                {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-slate-500">HTG</span>
-                                            </h3>
-                                            <p className="text-xs text-slate-400 mt-4 font-medium">Sa se sòm total tout kòb ki sou kont chak grenn kliyan. Ou pa ka touche sa!</p>
-                                        </div>
-
-                                        <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
-                                            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis La (Kòb Antrepriz La)</p>
-                                            <h3 className="text-4xl md:text-5xl font-bold text-emerald-700 tracking-tight">
-                                                {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-lg text-emerald-600">HTG</span>
-                                            </h3>
-                                            <p className="text-xs text-emerald-600/70 mt-4 font-medium">Sa se total tout frè ou fè sou platfòm nan. Se kòb sa a ki pou ou legalman.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* SEPARASYON FRÈ YO */}
-                                    <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm mt-6">
-                                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Detay Frè Antrepriz La Fè</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Sou Depo</p>
-                                                <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.depo).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
-                                            </div>
-                                            <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Sou Retrè</p>
-                                                <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.retre).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
-                                            </div>
-                                            <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100">
-                                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Frè Sou Transfè</p>
-                                                <p className="text-2xl font-bold text-slate-900">{Number(feesBreakdown.transfe).toLocaleString()} <span className="text-sm text-slate-500">HTG</span></p>
-                                            </div>
-                                            {/* Bwat espesyal pou Frè Ajan yo */}
-                                            <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
-                                                <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-2">Frè Ajan (7 HTG/1000)</p>
-                                                <p className="text-2xl font-bold text-indigo-700">{Number(feesBreakdown.ajan).toLocaleString()} <span className="text-sm text-indigo-500">HTG</span></p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-indigo-600 p-8 rounded-3xl shadow-sm mt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                        <div>
-                                            <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-2">Gran Total Sou Sistèm Nan</p>
-                                            <p className="text-sm text-white font-medium">Kòb Kliyan + Kòb Biznis (Sa se total jeneral ki sipoze sou kès bank ou toutbon an)</p>
-                                        </div>
-                                        <p className="text-3xl font-bold text-white tracking-tight">
-                                            {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
-                                        </p>
-                                    </div>
-                                </>
-                            )}
-                        </div>
                     ) : view === 'kliyan' ? (
                         <div className="space-y-6">
                             <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
@@ -782,9 +685,6 @@ export default function AdminSuperPage() {
                             </div>
                         )
                     ) : view === 'ajan' ? (
-                        /* ========================================== */
-                        /* ONGLÈ: JERE APLIKASYON AJAN YO       */
-                        /* ========================================== */
                         pendingAgents.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
                                 <Store size={48} className="mx-auto mb-4 text-slate-300" />
@@ -795,7 +695,6 @@ export default function AdminSuperPage() {
                                 {pendingAgents.map((agent) => (
                                     <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
                                         
-                                        {/* HEADER INFO */}
                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Store size={24} /></div>
@@ -811,7 +710,6 @@ export default function AdminSuperPage() {
                                             </div>
                                         </div>
 
-                                        {/* DOKIMAN YO */}
                                         <div>
                                             <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman yo soumèt</p>
                                             <div className="flex flex-wrap gap-3">
@@ -823,7 +721,6 @@ export default function AdminSuperPage() {
                                             </div>
                                         </div>
 
-                                        {/* AKSYON YO */}
                                         <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
                                             <div className="w-full md:flex-1">
                                                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la a (Lajan l ap retounen):</label>
