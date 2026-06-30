@@ -11,9 +11,11 @@ export default function AdminSuperPage() {
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
-    
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
+
+    // NOUVO: Ekip travay ki soti nan staff_users
+    const [staffMembers, setStaffMembers] = useState<any[]>([]);
 
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('support');
@@ -26,7 +28,6 @@ export default function AdminSuperPage() {
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
     
-    // NOUVO: 'dashboard' se paj prensipal Admin nan kounye a
     const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'ekip'>('dashboard'); 
     
     const [loading, setLoading] = useState(true);
@@ -34,7 +35,6 @@ export default function AdminSuperPage() {
     const [accessGranted, setAccessGranted] = useState(false);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
-    // ETA POU KONT BIZNIS LA 
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
     const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
@@ -49,21 +49,13 @@ export default function AdminSuperPage() {
 
     useEffect(() => {
         const checkAccess = async () => {
-             // 1. Asire mèt la konekte anvan l ka wè paj la
-             const { data: { user } } = await supabase.auth.getUser();
-             if (!user) {
-                 window.location.href = "/login";
-                 return;
-             }
-
-             // 2. Mande Modpas Sipè Admin nan
              const pass = prompt("Antre modpas Sipè Admin lan:");
              if (pass === "@fiokes1234") {
                  setAccessGranted(true);
                  raleDone();
              } else {
                  alert("Ou pa gen otorizasyon!");
-                 window.location.href = "/dashboard"; // Voye l tounen nan paj nòmal si modpas la pa bon
+                 window.location.href = "/dashboard";
              }
         };
         checkAccess();
@@ -98,6 +90,10 @@ export default function AdminSuperPage() {
                 }));
                 setPendingAgents(mergedAgents);
             }
+
+            // RALE LIS ANPLWAYE YO NAN NOUVO TAB LA
+            const { data: stData } = await supabase.from('staff_users').select('*').order('created_at', { ascending: false });
+            setStaffMembers(stData || []);
             
             const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
             if (anonsData) {
@@ -105,7 +101,6 @@ export default function AdminSuperPage() {
                 setAnonsActive(anonsData.announcement_active);
             }
 
-            // Kounye a nou tou kalkile done Biznis yo (Kès Global) a chak fwa paj la rafrechi
             await kalkileTotalBiznis(u || []);
 
         } catch (e: any) {
@@ -142,9 +137,7 @@ export default function AdminSuperPage() {
             const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee;
             setTotalBiznisProfit(granTotalPwofi);
 
-        } catch (error) {
-            console.error("Erè kalkil biznis:", error);
-        }
+        } catch (error) {}
     };
 
     const handleOpenDocument = (url: string) => {
@@ -299,17 +292,31 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
     };
 
+    // ==========================================
+    // JERE EKIP LA (AK NOUVO TAB STAFF_USERS LA)
+    // ==========================================
     const jereAnplwaye = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inviteEmail) return alert("Ou dwe mete yon imèl.");
 
         setProcessingId('invite_staff');
         try {
-            const userToPromote = allUsers.find(u => u.email?.toLowerCase() === inviteEmail.toLowerCase().trim());
-            if (!userToPromote) throw new Error("Nou pa jwenn okenn moun ki gen imèl sa a sou platfòm nan. Anplwaye a dwe kreye yon kont Hatexcard kòm kliyan anvan w ba l aksè a.");
-            if (userToPromote.role === inviteRole) throw new Error("Moun sa a gentan gen wòl sa a.");
+            // Tcheke si moun nan gentan nan ekip la
+            const { data: existing } = await supabase.from('staff_users').select('*').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
+            if (existing) throw new Error("Imèl sa a gentan sourejistre nan ekip la.");
 
-            await supabase.from('profiles').update({ role: inviteRole }).eq('id', userToPromote.id);
+            // Eseye pran non l nan pwofil kliyan si l te gen kont nòmal
+            const { data: profile } = await supabase.from('profiles').select('full_name').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
+            const staffName = profile?.full_name || 'Anplwaye';
+
+            // Anrejistre l nan nouvo tab ekip la san l pa touche kont kliyan l lan
+            const { error } = await supabase.from('staff_users').insert({
+                email: inviteEmail.trim().toLowerCase(),
+                full_name: staffName,
+                role: inviteRole,
+                status: 'pending' // ap chanje lè l mete modpas li
+            });
+            if (error) throw error;
 
             const roleNames: Record<string, string> = {
                 'super_admin': 'Sipè Admin (CEO)',
@@ -318,20 +325,23 @@ export default function AdminSuperPage() {
                 'support': 'Sèvis Kliyan (Support)'
             };
             
-            const msg = `Felisitasyon ${userToPromote.full_name}!\n\nAdministrasyon an sot ba ou aksè ofisyèl kòm anplwaye nan depatman: "${roleNames[inviteRole]}" sou Hatexcard.\n\nKonekte sou kont ou kounye a pou w wè nouvo espas travay ou a.`;
-            await voyeEmailKliyan(userToPromote.email, userToPromote.full_name, msg, "NOUVO WÒL ANPLWAYE HATEXCARD");
+            // Lyen Setup pou Anplwaye a kreye modpas espas travay li
+            const setupLink = `${window.location.origin}/workspace-setup?email=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
+            const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon an envite w vin travay kòm anplwaye Hatexcard nan depatman: "${roleNames[inviteRole]}".\n\nKlike sou lyen anba a pou w kreye Modpas Espas Travay ou a (Workspace Password). Modpas sa a pa gen okenn rapò ak kont kliyan nòmal ou a:\n\n${setupLink}`;
+            
+            await voyeEmailKliyan(inviteEmail, staffName, msg, "ENVITASYON ESPAS TRAVAY HATEXCARD");
 
-            alert(`Wòl la bay ak siksè! ${userToPromote.full_name} resevwa yon imèl notifikasyon.`);
+            alert(`Envitasyon an ale! ${staffName} ap resevwa lyen an nan imèl li pou l kreye modpas espas travay li.`);
             setInviteEmail('');
             raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
     const revokeAnplwaye = async (id: string, email: string) => {
-        if (!confirm(`Èske w sèten ou vle revoke aksè anplwaye sa a (${email}) ? L ap tounen yon senp kliyan imedyatman.`)) return;
+        if (!confirm(`Èske w sèten ou vle revoke aksè anplwaye sa a (${email}) nèt?`)) return;
         setProcessingId(`revoke_${id}`);
         try {
-            await supabase.from('profiles').update({ role: 'client' }).eq('id', id);
+            await supabase.from('staff_users').delete().eq('id', id);
             alert(`Aksè a revoke nèt pou ${email}.`); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -357,14 +367,13 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
-    const staffMembers = allUsers.filter(u => u.role && ['super_admin', 'finance', 'compliance', 'support'].includes(u.role));
     const filteredUsers = allUsers.filter(user => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-600"/></div>;
+    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
@@ -498,14 +507,14 @@ export default function AdminSuperPage() {
                                     <div>
                                         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Anboche yon Anplwaye</h2>
                                         <p className="text-xs text-slate-500 font-medium mt-1">
-                                            Asire w moun nan te deja kreye yon kont sou Hatexcard kòm kliyan anvan w ba l yon wòl anplwaye.
+                                            Voye yon lyen sekrè bay moun nan pou l ka kreye yon modpas espas travay ki izole nèt.
                                         </p>
                                     </div>
                                 </div>
 
                                 <form onSubmit={jereAnplwaye} className="flex flex-col md:flex-row items-end gap-4">
                                     <div className="w-full flex-1">
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Imèl Kliyan an</label>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Imèl Moun W Ap Anboche a</label>
                                         <div className="relative">
                                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                                             <input 
@@ -538,13 +547,13 @@ export default function AdminSuperPage() {
                                         disabled={processingId === 'invite_staff'} 
                                         className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-sm flex justify-center items-center gap-2 h-[50px] shrink-0"
                                     >
-                                        {processingId === 'invite_staff' ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sove Wòl la'}
+                                        {processingId === 'invite_staff' ? <Loader2 className="animate-spin w-4 h-4" /> : 'Voye Envitasyon an'}
                                     </button>
                                 </form>
                             </div>
 
                             <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Anplwaye ki aktif yo ({staffMembers.length})</h3>
+                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Anplwaye ki anrejistre yo ({staffMembers.length})</h3>
                                 
                                 <div className="space-y-4">
                                     {staffMembers.length === 0 ? (
@@ -575,10 +584,11 @@ export default function AdminSuperPage() {
                                                     }`}>
                                                         {staff.role.replace('_', ' ')}
                                                     </span>
+                                                    {staff.status === 'pending' && <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold uppercase">Ap tann modpas</span>}
                                                     <button 
                                                         onClick={() => revokeAnplwaye(staff.id, staff.email)}
                                                         disabled={processingId === `revoke_${staff.id}`}
-                                                        className="text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-2 rounded-lg transition-colors border border-rose-100"
+                                                        className="text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-2 rounded-lg transition-colors border border-rose-100 ml-2"
                                                         title="Revoke aksè sa"
                                                     >
                                                         {processingId === `revoke_${staff.id}` ? <Loader2 size={16} className="animate-spin" /> : <UserMinus size={16} />}

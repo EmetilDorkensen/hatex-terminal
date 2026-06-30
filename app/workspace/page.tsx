@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
     ShieldCheck, DollarSign, UserCheck as UserCheckIcon, Users, 
     Search, Loader2, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, 
-    XCircle, AlertTriangle, Store, EyeOff, FileText, LogOut
+    XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send
 } from 'lucide-react';
 
 export default function WorkspacePage() {
@@ -27,15 +27,32 @@ export default function WorkspacePage() {
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
+    
+    // Done pou Support (Tchat)
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
+    const [selectedTicket, setSelectedTicket] = useState<any>(null);
+    const [replyMessage, setReplyMessage] = useState('');
+    const [sendingReply, setSendingReply] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
-    // Views pou Finans ak Konfòmite
+    // Views pou anplwaye yo (Support gen 'clients' oswa 'tickets')
     const [activeTab, setActiveTab] = useState('main');
 
     useEffect(() => {
         checkAuthAndFetchData();
     }, []);
+
+    useEffect(() => {
+        if (selectedTicket) scrollToBottom();
+    }, [messages, selectedTicket]);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
 
     const checkAuthAndFetchData = async () => {
         setLoading(true);
@@ -64,8 +81,13 @@ export default function WorkspacePage() {
 
         // Rale done selon wòl anplwaye a
         if (profile.role === 'support') {
+            setActiveTab('tickets');
             const { data: u } = await supabase.from('profiles').select('id, full_name, email, account_status, wallet_balance, kyc_status, created_at').order('created_at', { ascending: false });
             setUsers(u || []);
+            
+            // Rale Tickets yo (Pwoblèm Kliyan yo)
+            const { data: t } = await supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false });
+            setTickets(t || []);
         } 
         else if (profile.role === 'finance') {
             setActiveTab('deposits');
@@ -104,6 +126,69 @@ export default function WorkspacePage() {
             alert("Estati kont lan chanje!");
             checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const loadTicketChat = async (ticket: any) => {
+        setSelectedTicket(ticket);
+        setProcessingId(`loading_ticket_${ticket.id}`);
+        try {
+            const { data: m } = await supabase.from('support_messages').select('*').eq('ticket_id', ticket.id).order('created_at', { ascending: true });
+            setMessages(m || []);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleSendSupportReply = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!replyMessage.trim() || !selectedTicket) return;
+        setSendingReply(true);
+
+        try {
+            const { error } = await supabase.from('support_messages').insert({
+                ticket_id: selectedTicket.id,
+                sender_id: staffProfile.id,
+                message: replyMessage.trim(),
+                is_staff_reply: true // Anplwaye a ap reponn
+            });
+            if (error) throw error;
+
+            // Chanje estati a fè kliyan an konnen yo reponn li
+            await supabase.from('support_tickets').update({ status: 'answered' }).eq('id', selectedTicket.id);
+
+            setMessages([...messages, { 
+                id: Date.now().toString(), 
+                ticket_id: selectedTicket.id, 
+                sender_id: staffProfile.id, 
+                message: replyMessage.trim(), 
+                is_staff_reply: true, 
+                created_at: new Date().toISOString() 
+            }]);
+
+            // Mete a jou nan lis la sou kote a pou l chanje koulè a
+            setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'answered' } : t));
+            setReplyMessage('');
+        } catch (err: any) {
+            alert("Erè nan voye repons lan.");
+        } finally {
+            setSendingReply(false);
+        }
+    };
+
+    const handleCloseTicket = async () => {
+        if (!confirm("Èske w sèten ou rezoud pwoblèm kliyan sa a epi w vle fèmen dosye a?")) return;
+        setProcessingId(`closing_${selectedTicket.id}`);
+        try {
+            await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', selectedTicket.id);
+            setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'closed' } : t));
+            setSelectedTicket({ ...selectedTicket, status: 'closed' });
+        } catch (err) {
+            alert("Erè nan fèmen dosye a.");
+        } finally {
+            setProcessingId(null);
+        }
     };
 
     // ==========================================
@@ -193,7 +278,7 @@ export default function WorkspacePage() {
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
-    if (loading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600 w-12 h-12" /></div>;
+    if (loading && !staffProfile) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600 w-12 h-12" /></div>;
     if (!staffProfile) return null;
 
     const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchQuery.toLowerCase()) || u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -232,50 +317,183 @@ export default function WorkspacePage() {
                 {/* ==================================================== */}
                 {staffProfile.role === 'support' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
-                            <Search size={20} className="text-slate-400 ml-2" />
-                            <input type="text" placeholder="Chèche kliyan ak non oswa imèl pou w ede l..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-transparent border-none p-2 text-slate-900 outline-none font-medium text-sm" />
+                        <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit mb-4">
+                            <button onClick={() => { setActiveTab('tickets'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'tickets' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Mesaj Kliyan ({tickets.filter(t => t.status === 'open').length})</button>
+                            <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Jere Kont</button>
                         </div>
 
-                        <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-gray-200">
-                                        <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Kliyan</th>
-                                        <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Estati Kont</th>
-                                        <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider text-right">Aksyon</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredUsers.map(user => (
-                                        <tr key={user.id} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                                            <td className="p-4">
-                                                <p className="font-bold text-slate-900 text-sm">{user.full_name || 'San Non'}</p>
-                                                <p className="text-xs text-slate-500">{user.email}</p>
-                                            </td>
-                                            <td className="p-4">
-                                                <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase border ${
-                                                    user.account_status === 'suspended' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                }`}>
-                                                    {user.account_status}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-right">
-                                                <button 
-                                                    onClick={() => toggleAccountStatus(user.id, user.account_status, user.email)}
-                                                    disabled={processingId === user.id}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-                                                        user.account_status === 'suspended' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-white border border-rose-200 text-rose-600 hover:bg-rose-50'
-                                                    }`}
-                                                >
-                                                    {processingId === user.id ? <Loader2 size={14} className="animate-spin inline" /> : user.account_status === 'suspended' ? 'Debloke' : 'Sispann'}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        {activeTab === 'clients' ? (
+                            <>
+                                <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
+                                    <Search size={20} className="text-slate-400 ml-2" />
+                                    <input type="text" placeholder="Chèche kliyan ak non oswa imèl pou w ede l..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-transparent border-none p-2 text-slate-900 outline-none font-medium text-sm" />
+                                </div>
+
+                                <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-gray-200">
+                                                <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Kliyan</th>
+                                                <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Estati Kont</th>
+                                                <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider text-right">Aksyon</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredUsers.map(user => (
+                                                <tr key={user.id} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
+                                                    <td className="p-4">
+                                                        <p className="font-bold text-slate-900 text-sm">{user.full_name || 'San Non'}</p>
+                                                        <p className="text-xs text-slate-500">{user.email}</p>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase border ${
+                                                            user.account_status === 'suspended' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                        }`}>
+                                                            {user.account_status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        <button 
+                                                            onClick={() => toggleAccountStatus(user.id, user.account_status, user.email)}
+                                                            disabled={processingId === user.id}
+                                                            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
+                                                                user.account_status === 'suspended' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-white border border-rose-200 text-rose-600 hover:bg-rose-50'
+                                                            }`}
+                                                        >
+                                                            {processingId === user.id ? <Loader2 size={14} className="animate-spin inline" /> : user.account_status === 'suspended' ? 'Debloke' : 'Sispann'}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="grid lg:grid-cols-12 gap-6 items-start">
+                                {/* Lis Mesaj yo */}
+                                <div className={`lg:col-span-4 space-y-3 ${selectedTicket ? 'hidden lg:block' : 'block'}`}>
+                                    {tickets.length === 0 ? (
+                                        <p className="text-center text-slate-400 py-10 text-xs font-bold uppercase">Pa gen okenn mesaj</p>
+                                    ) : (
+                                        tickets.map(ticket => (
+                                            <div 
+                                                key={ticket.id}
+                                                onClick={() => loadTicketChat(ticket)}
+                                                className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                                    selectedTicket?.id === ticket.id ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-gray-200 hover:border-indigo-300'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <p className="text-xs font-bold text-slate-900 truncate pr-2">{ticket.profiles?.full_name}</p>
+                                                    <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded border ${
+                                                        ticket.status === 'open' ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse' :
+                                                        ticket.status === 'answered' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                                                    }`}>
+                                                        {ticket.status === 'open' ? 'Nouvo' : ticket.status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm font-semibold text-slate-700 truncate">{ticket.subject}</p>
+                                                <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1"><Clock size={10}/> {new Date(ticket.created_at).toLocaleDateString('fr-HT')}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Tchat Anplwaye a */}
+                                <div className={`lg:col-span-8 bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm h-[75vh] flex flex-col ${!selectedTicket ? 'hidden lg:flex items-center justify-center bg-slate-50' : 'flex'}`}>
+                                    {!selectedTicket ? (
+                                        <div className="text-center text-slate-400">
+                                            <MessageSquare size={40} className="mx-auto mb-3 opacity-20" />
+                                            <p className="text-xs font-bold uppercase tracking-widest">Chwazi yon mesaj pou w reponn</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* Chat Header */}
+                                            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
+                                                <div>
+                                                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Kliyan: {selectedTicket.profiles?.full_name}</p>
+                                                    <h3 className="font-bold text-slate-900 truncate">{selectedTicket.subject}</h3>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {selectedTicket.status !== 'closed' && (
+                                                        <button 
+                                                            onClick={handleCloseTicket}
+                                                            disabled={processingId === `closing_${selectedTicket.id}`}
+                                                            className="text-[10px] font-bold uppercase bg-white border border-gray-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                                                        >
+                                                            {processingId === `closing_${selectedTicket.id}` ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />} Fèmen Dosye a
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => setSelectedTicket(null)} className="lg:hidden p-1.5 bg-slate-200 text-slate-600 rounded-lg"><XCircle size={16} /></button>
+                                                </div>
+                                            </div>
+
+                                            {/* Chat Messages */}
+                                            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50">
+                                                {processingId === `loading_ticket_${selectedTicket.id}` ? (
+                                                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-400" /></div>
+                                                ) : (
+                                                    messages.map((msg, index) => {
+                                                        if (!msg.is_staff_reply) {
+                                                            // Kliyan an ap pale (Agoch)
+                                                            return (
+                                                                <div key={index} className="flex justify-start">
+                                                                    <div className="max-w-[85%] bg-white border border-gray-200 text-slate-800 p-4 rounded-2xl rounded-tl-sm shadow-sm">
+                                                                        <p className="text-xs font-bold text-slate-500 mb-1">{selectedTicket.profiles?.full_name}</p>
+                                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                                                        <p className="text-[9px] text-slate-400 text-right mt-2 font-medium">{new Date(msg.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}</p>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        } else {
+                                                            // Anplwaye a ap pale (Adwat)
+                                                            return (
+                                                                <div key={index} className="flex justify-end">
+                                                                    <div className="max-w-[85%] bg-indigo-600 text-white p-4 rounded-2xl rounded-tr-sm shadow-sm">
+                                                                        <p className="text-xs font-bold text-indigo-200 mb-1">Mwen (Support)</p>
+                                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                                                        <p className="text-[9px] text-indigo-300 text-right mt-2 font-medium">{new Date(msg.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}</p>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                    })
+                                                )}
+                                                <div ref={messagesEndRef} />
+                                            </div>
+
+                                            {/* Chat Input */}
+                                            {selectedTicket.status !== 'closed' ? (
+                                                <div className="p-3 sm:p-4 border-t border-gray-100 bg-white">
+                                                    <form onSubmit={handleSendSupportReply} className="flex gap-2 relative">
+                                                        <input 
+                                                            type="text" 
+                                                            value={replyMessage}
+                                                            onChange={(e) => setReplyMessage(e.target.value)}
+                                                            placeholder="Ekri yon repons pou kliyan an..."
+                                                            className="flex-1 bg-slate-50 border border-gray-200 rounded-full py-3.5 pl-5 pr-14 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all text-slate-900"
+                                                            required
+                                                        />
+                                                        <button 
+                                                            type="submit" 
+                                                            disabled={sendingReply || !replyMessage.trim()}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {sendingReply ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-1" />}
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            ) : (
+                                                <div className="bg-slate-100 p-4 border-t border-gray-200 text-center">
+                                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Ticket sa a fèmen.</p>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

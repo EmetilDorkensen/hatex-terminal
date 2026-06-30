@@ -7,7 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu 
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase 
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -378,7 +378,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
       
-{/* ========================================== */}
+      {/* ========================================== */}
       {/* SIDEBAR (MENI SOU BÒ GÒCH LA) */}
       {/* ========================================== */}
       {isMenuOpen && (
@@ -390,24 +390,28 @@ export default function Dashboard() {
           ></div>
           
           {/* PWENPAL MENI AN (Soti bò gòch la) */}
-          <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-left duration-300 border-r border-gray-200">
+          <div className="relative w-[280px] max-w-sm bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left duration-300 z-10 border-r border-gray-200">
             {/* Header Meni an ak Logo */}
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-9 h-9 rounded-lg object-cover shadow-sm border border-gray-200" />
-                <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
+                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-sm">
+                  {userData?.full_name ? userData.full_name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm truncate w-32">{userData?.full_name || 'Kliyan'}</h3>
+                  <p className="text-[10px] text-slate-500 font-medium truncate w-32">{userData?.email}</p>
+                </div>
               </div>
-              <button onClick={() => setIsMenuOpen(false)} className="text-slate-400 hover:text-slate-700 bg-white rounded-full p-1 border border-gray-200 shadow-sm transition-colors">
-                <X size={20} />
+              <button onClick={() => setIsMenuOpen(false)} className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-full text-slate-500 hover:text-rose-500 shadow-sm transition-colors">
+                <X size={16} />
               </button>
             </div>
-            
-            {/* Opsyon Meni yo */}
+
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 px-2">Navigasyon Prensipal</p>
               
               <button onClick={() => { router.push('/dashboard'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-indigo-700 bg-indigo-50 font-semibold transition-all border border-indigo-100">
-                <Home size={20} /> Akey
+                <Home size={20} /> Akèy
               </button>
               
               <button onClick={() => { router.push('/kat'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
@@ -428,7 +432,6 @@ export default function Dashboard() {
                 <Terminal size={20} /> Terminal
               </button>
 
-              {/* MEN BOUTON AJAN AN MWEN AJOUTE A */}
               <button onClick={() => { router.push('/agent'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
                 <Store size={20} /> Ajan
               </button>
@@ -436,16 +439,34 @@ export default function Dashboard() {
               <button onClick={() => { router.push('/transactions'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
                 <History size={20} /> Istorik
               </button>
+
+              {/* BOUTON ASISTANS (SIPÒ KLIYAN) */}
+              <button onClick={() => { router.push('/support'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
+                <Headset size={20} /> Asistans / Sipò
+              </button>
               
               <button onClick={() => { router.push('/setting'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
                 <Settings size={20} /> Paramèt
               </button>
+
+              {/* 👇 NOUVO BOUTON PÒTAY ADMIN NAN (SÈLMAN POU OU) 👇 */}
+              {userData?.role === 'super_admin' && (
+                <button 
+                   onClick={() => { 
+                       const pass = prompt("Antre modpas Sipè Admin lan:");
+                       if (pass === "@fiokes1234") { window.location.href = "/admin"; } 
+                       else { alert("Modpas la pa bon! Ou pa gen otorizasyon."); }
+                   }} 
+                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 hover:bg-rose-50 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-4"
+                >
+                  <Briefcase size={16} /> Pòtay Admin
+                </button>
+              )}
             </div>
 
-            {/* Zòn Anba Meni an (Opsyonèl) */}
             <div className="p-5 border-t border-gray-100 bg-slate-50">
-               <button onClick={() => { router.push('/deposit'); setIsMenuOpen(false); }} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold shadow-sm transition-all">
-                 <Plus size={18} /> Fè yon Depo
+               <button onClick={() => { router.push('/deposit'); setIsMenuOpen(false); }} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs shadow-sm transition-all">
+                 <Plus size={16} /> Fè yon Depo
                </button>
             </div>
           </div>
@@ -470,13 +491,8 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Seksyon Dwat: Profil & Admin */}
+            {/* Seksyon Dwat: Profil */}
             <div className="flex items-center gap-4">
-              {isAdmin && (
-                <button onClick={() => router.push('/admin')} className="hidden sm:block px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md text-sm font-medium border border-indigo-200 hover:bg-indigo-100 transition">
-                  Admin Panel
-                </button>
-              )}
               <div className="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center text-slate-600 font-bold">
                 {userData?.avatar_url ? (
                   <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
@@ -545,7 +561,6 @@ export default function Dashboard() {
 
           {/* Quick Actions Desktop */}
           <div className="flex flex-wrap items-center gap-3">
-
             <button onClick={() => setShowNumbers(!showNumbers)} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
               <span className="text-lg">{showNumbers ? "🔒" : "👁️"}</span>
             </button>
@@ -624,7 +639,7 @@ export default function Dashboard() {
                     </p>
                     {discountAmount > 0 && (
                        <p className="text-xs text-emerald-400 font-bold mb-3">
-                          🎉 Rediksyon {discountAmount} HTG!
+                         🎉 Rediksyon {discountAmount} HTG!
                        </p>
                     )}
                     <button onClick={handleActivateCard} className="bg-white text-slate-900 px-6 py-3 rounded-lg font-bold text-sm shadow-lg hover:bg-gray-100 transition-all">
@@ -633,11 +648,10 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Kat Fè Fas (Front) - LOGO HATEXCARD AJOUTE SOU KAT LA */}
+                {/* Kat Fè Fas (Front) */}
                 <div className={`absolute inset-0 backface-hidden rounded-2xl overflow-hidden bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950 p-6 shadow-xl border border-white/10 ${!cardFullyActive && 'opacity-30 blur-sm'}`}>
                   <div className="flex flex-col h-full justify-between relative z-10">
                     <div className="flex justify-between items-start">
-                      {/* LOGO SOU KAT LA */}
                       <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard" className="w-10 h-10 rounded-lg object-cover shadow-sm bg-white/10 backdrop-blur-sm border border-white/20 p-0.5" />
                       <span className="text-sm font-bold text-white/50 tracking-wider mt-1">Hatexcard</span>
                     </div>
@@ -663,7 +677,6 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
-                  {/* Decorative Elements */}
                   <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
                   <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
                 </div>
@@ -775,9 +788,9 @@ export default function Dashboard() {
             <div>
               <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Sipò</h3>
               <ul className="space-y-3">
+                <li><button onClick={() => router.push('/support')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Sèvis Kliyan</button></li>
                 <li><button onClick={handleOpenRefundModal} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kondisyon Ranbousman</button></li>
                 <li><a href="mailto:hatexcard@gmail.com" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kontakte Nou</a></li>
-                <li><button onClick={() => router.push('/setting')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Paramèt Kont</button></li>
               </ul>
             </div>
 
@@ -807,7 +820,7 @@ export default function Dashboard() {
 
 // Ikon Anplis ki itilize nan paj la
 function ArrowDownToLine(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg>
+  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 17V3"/><path d="m6 11 6 6-6"/><path d="M19 21H5"/></svg>
 }
 function ArrowUpFromLine(props: any) {
   return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>
