@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { findProfileByCardSimple } from '@/lib/security/card-lookup';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +16,12 @@ export async function OPTIONS() {
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rl = await rateLimit(`secure-gateway:${ip}`, 60, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429, headers: corsHeaders });
+    }
+
     const apiKey = request.headers.get('x-api-key');
     
     // 1. OTANTIFIKASYON MACHANN NAN (Nan yon vrè sistèm, w ap tcheke API KEY sa nan baz done a pou w konn kiyès machann nan ye)
@@ -34,18 +42,12 @@ export async function POST(request: Request) {
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 2. TCHEKE KAT LA AK ESTATI KONT LAN
-    const { data: profile, error: profileErr } = await supabase
-      .from('profiles')
-      .select('id, wallet_balance, full_name, account_status')
-      .eq('card_number', cleanCard)
-      .eq('cvv', String(cvv))
-      .single();
+    const { profile, error: cardError } = await findProfileByCardSimple(supabase, cleanCard, String(cvv));
 
-    if (profileErr || !profile) return NextResponse.json({ error: "Kat la pa rekonèt." }, { status: 401, headers: corsHeaders });
+    if (!profile) return NextResponse.json({ error: cardError || "Kat la pa rekonèt." }, { status: 401, headers: corsHeaders });
     if (profile.account_status === 'suspended') return NextResponse.json({ error: "🚫 Kont sa sispandi." }, { status: 403, headers: corsHeaders });
     if (Number(profile.wallet_balance) < safeAmount) return NextResponse.json({ error: "Balans ensifizan." }, { status: 400, headers: corsHeaders });
 

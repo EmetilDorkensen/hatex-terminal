@@ -56,7 +56,7 @@ export default function SettingsPage() {
       if (userProfile) {
         setProfile(userProfile);
         setPinEnabled(userProfile.pin_enabled || false);
-        setHasPin(!!userProfile.pin_code);
+        setHasPin(!!(userProfile.pin_code_hash || userProfile.pin_code));
       }
       setLoading(false);
     }
@@ -69,15 +69,16 @@ export default function SettingsPage() {
       return;
     }
     setIsSavingPin(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ pin_code: newPin, pin_enabled: true })
-      .eq('id', user.id);
-
+    const res = await fetch('/api/auth/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set', pin: newPin, type: 'wallet' }),
+    });
+    const data = await res.json();
     setIsSavingPin(false);
 
-    if (error) {
-      alert("Erè: " + error.message);
+    if (!res.ok || !data.success) {
+      alert("Erè: " + (data.message || 'Echèk'));
     } else {
       setHasPin(true);
       setPinEnabled(true);
@@ -99,26 +100,13 @@ export default function SettingsPage() {
     setIsUpdatingPin(true);
 
     try {
-      const { data: checkProfile, error: checkErr } = await supabase
-        .from('profiles')
-        .select('pin_code')
-        .eq('id', user.id)
-        .single();
-
-      if (checkErr || !checkProfile) throw new Error("Erè lè n ap verifye kont ou a.");
-
-      if (checkProfile.pin_code !== oldPinInput) {
-        setUpdatePinError("Ansyen PIN lan pa bon!");
-        setIsUpdatingPin(false);
-        return;
-      }
-
-      const { error: updateErr } = await supabase
-        .from('profiles')
-        .update({ pin_code: newPinInput })
-        .eq('id', user.id);
-
-      if (updateErr) throw updateErr;
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', oldPin: oldPinInput, pin: newPinInput }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Ansyen PIN lan pa bon!");
 
       setUpdatePinSuccess("PIN ou an chanje avèk siksè!");
       

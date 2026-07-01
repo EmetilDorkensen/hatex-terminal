@@ -100,6 +100,14 @@ export default function Login() {
 
     try {
 
+      const guardRes = await fetch('/api/auth/login-guard', { method: 'POST' });
+      if (guardRes.status === 429) {
+        const guardData = await guardRes.json();
+        setErrorMsg(guardData.message || "Twòp tantativ koneksyon. Eseye pita.");
+        setLoading(false);
+        return;
+      }
+
       if (loginMethod === 'password') {
 
         // ==========================================
@@ -194,53 +202,34 @@ export default function Login() {
 
 
 
-        // Rele fonksyon entelijan nou kreye nan baz done a
+        // Rele API sekirize pou verifye PIN (hash + lockout + rate limit)
+        const pinRes = await fetch('/api/auth/pin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), pin }),
+        });
+        const rpcData = await pinRes.json();
 
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('verify_wallet_pin', {
+        if (!pinRes.ok || !rpcData.success) {
+          setErrorMsg(rpcData.message || "Gen yon pwoblèm nan verifye PIN ou an. Eseye ankò.");
+          setLoading(false);
+          return;
+        }
 
-          p_email: email.trim().toLowerCase(),
-
-          p_pin: pin
-
+        const { error: otpErr } = await supabase.auth.verifyOtp({
+          email: rpcData.email,
+          token: rpcData.token_hash,
+          type: 'email',
         });
 
-
-
-        if (rpcErr) {
-
-          setErrorMsg("Gen yon pwoblèm nan verifye PIN ou an. Eseye ankò.");
-
+        if (otpErr) {
+          setErrorMsg("Pa kapab kreye sesyon. Eseye ak modpas.");
           setLoading(false);
-
           return;
-
         }
 
-
-
-        if (rpcData.success) {
-
-          // PIN lan bon e kont lan pa sispandi.
-
-         
-
-          // 🚨 PRAN IP AK APARÈY LA ANVAN L ALE 🚨
-
-          await trackDeviceAndIP(email);
-
-         
-
-          window.location.href = '/dashboard';
-
-        } else {
-
-          // Afiche mesaj erè a ki soti dirèk nan baz done a (ex: "Ou rete 2 chans" oswa "Kont ou sispandi")
-
-          setErrorMsg(rpcData.message);
-
-          setLoading(false);
-
-        }
+        await trackDeviceAndIP(email);
+        window.location.href = '/dashboard';
 
       }
 

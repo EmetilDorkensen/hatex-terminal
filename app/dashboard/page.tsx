@@ -63,14 +63,11 @@ export default function Dashboard() {
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
-      const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
-      const newCardNum = `4550${random4()}${random4()}${random4()}`;
-      const newCvv = Math.floor(100 + Math.random() * 900).toString();
-      const now = new Date();
-      const newExp = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
-
-      await supabase.from('profiles').update({ card_number: newCardNum, cvv: newCvv, exp_date: newExp }).eq('id', userId);
-      return { ...currentProfile, card_number: newCardNum, cvv: newCvv, exp_date: newExp };
+      const res = await fetch('/api/card/ensure', { method: 'POST' });
+      const data = await res.json();
+      if (data.card) {
+        return { ...currentProfile, card_number: data.card.card_number, cvv: data.card.cvv, exp_date: data.card.exp_date };
+      }
     }
     return currentProfile;
   };
@@ -452,9 +449,17 @@ export default function Dashboard() {
               {/* 👇 NOUVO BOUTON PÒTAY ADMIN NAN (SÈLMAN POU OU) 👇 */}
               {userData?.role === 'super_admin' && (
                 <button 
-                   onClick={() => { 
+                   onClick={async () => { 
+                       const gateRes = await fetch('/api/admin/verify-gate');
+                       if (gateRes.ok) { window.location.href = "/admin"; return; }
                        const pass = prompt("Antre modpas Sipè Admin lan:");
-                       if (pass === "@fiokes1234") { window.location.href = "/admin"; } 
+                       if (!pass) return;
+                       const verifyRes = await fetch('/api/admin/verify-gate', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ password: pass }),
+                       });
+                       if (verifyRes.ok) { window.location.href = "/admin"; }
                        else { alert("Modpas la pa bon! Ou pa gen otorizasyon."); }
                    }} 
                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 hover:bg-rose-50 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-4"

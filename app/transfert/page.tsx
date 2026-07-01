@@ -37,13 +37,13 @@ export default function TransferPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('transaction_pin')
-          .eq('id', user.id)
-          .single();
-          
-        if (!profile?.transaction_pin) {
+        const statusRes = await fetch('/api/auth/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'status' }),
+        });
+        const statusData = await statusRes.json();
+        if (!statusData.hasTransactionPin) {
           setHasPin(false);
           setShowCreatePin(true); // Fòse l kreye youn
         }
@@ -67,12 +67,13 @@ export default function TransferPage() {
     
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ transaction_pin: newPin })
-        .eq('id', userId);
-        
-      if (error) throw error;
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', pin: newPin, type: 'transaction' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Erè');
       
       alert("PIN ou an anrejistre avèk siksè! Ou ka fè transfè kounye a.");
       setHasPin(true);
@@ -128,18 +129,16 @@ export default function TransferPage() {
     setStatus({ type: '', msg: '' });
     
     try {
-      // A) Nou verifye PIN nan dirèkteman nan baz done a anvan!
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('transaction_pin')
-        .eq('id', userId)
-        .single();
-
-      if (profile?.transaction_pin !== enteredPin) {
-         throw new Error("PIN ou antre a pa bon. Tranzaksyon an anile.");
+      const pinRes = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', pin: enteredPin }),
+      });
+      const pinData = await pinRes.json();
+      if (!pinRes.ok || !pinData.success) {
+         throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
 
-      // B) Si PIN nan bon, nou pèmèt tranzaksyon an fèt
       const { error: rpcError } = await supabase.rpc('process_transfer_by_email', {
         p_sender_id: userId,
         p_receiver_email: email.toLowerCase().trim(),

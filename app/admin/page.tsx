@@ -44,13 +44,26 @@ export default function AdminSuperPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const BOT_TOKEN = "7547464134:AAH3M_R89D0UuN-WlOclj2D-Hj9S9I_K28Y";
-    const CHAT_ID = "5352352512";
-
     useEffect(() => {
         const checkAccess = async () => {
+             const gateRes = await fetch('/api/admin/verify-gate');
+             if (gateRes.ok) {
+                 setAccessGranted(true);
+                 raleDone();
+                 return;
+             }
              const pass = prompt("Antre modpas Sipè Admin lan:");
-             if (pass === "@fiokes1234") {
+             if (!pass) {
+                 alert("Ou pa gen otorizasyon!");
+                 window.location.href = "/dashboard";
+                 return;
+             }
+             const verifyRes = await fetch('/api/admin/verify-gate', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ password: pass }),
+             });
+             if (verifyRes.ok) {
                  setAccessGranted(true);
                  raleDone();
              } else {
@@ -151,7 +164,7 @@ export default function AdminSuperPage() {
     };
 
     const voyeTelegram = async (msg: string) => {
-        try { await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'HTML' }), }); } catch (e) {}
+        try { await fetch('/api/notifications/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel: 'admin', message: msg, parseMode: 'HTML' }) }); } catch (e) {}
     };
 
     const deleteTranzaksyon = async (id: string, table: string) => {

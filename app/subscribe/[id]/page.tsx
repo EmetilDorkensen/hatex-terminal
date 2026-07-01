@@ -105,15 +105,24 @@ export default function SubscribePage() {
       const cleanCard = cardNumber.replace(/\s/g, '');
 
       // 1. Chache pwofil kliyan an
-      const { data: clientProfile, error: cardErr } = await supabase
-        .from('profiles') 
-        .select('id, card_balance, is_activated, full_name, email') 
-        .eq('card_number', cleanCard)
-        .eq('cvv', cvv)
-        .eq('exp_date', expiry)
-        .single();
+      const verifyRes = await fetch('/api/payments/verify-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardNumber: cleanCard, cvv, expiry }),
+      });
+      const verifyData = await verifyRes.json();
 
-      if (cardErr || !clientProfile) throw new Error("Kat sa a pa anrejistre nan sistèm H-Pay oswa enfòmasyon yo pa bon.");
+      if (!verifyRes.ok || !verifyData.valid) {
+        throw new Error(verifyData.error || "Kat sa a pa anrejistre nan sistèm H-Pay oswa enfòmasyon yo pa bon.");
+      }
+
+      const clientProfile = {
+        id: verifyData.clientId,
+        card_balance: verifyData.card_balance,
+        is_activated: verifyData.is_activated,
+        full_name: verifyData.full_name,
+        email: verifyData.email,
+      };
       if (clientProfile.is_activated === false) throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
       if (clientProfile.card_balance < product.price) throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
 

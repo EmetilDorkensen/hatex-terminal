@@ -95,14 +95,12 @@ export default function DepositPage() {
             if (error) throw error;
 
             // 4. Notifikasyon Telegram (Opsyonèl men itil pou admin)
-            const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY';
-            const CHAT_ID = '8392894841';
             const msg = `🔔 *DEPO HATEX NOUVO*\n👤: ${profile?.full_name || 'Kliyan'}\n📧: ${user.email}\n💰: ${amount} HTG\n🆔: ${txnId}`;
             
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            await fetch('/api/notifications/telegram', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: CHAT_ID, photo: url1, caption: msg, parse_mode: 'Markdown' })
+                body: JSON.stringify({ channel: 'finance', message: msg, photoUrl: url1, parseMode: 'Markdown' }),
             });
     
             alert("Bravo! Depo w lan anrejistre. N ap verifye l talè.");

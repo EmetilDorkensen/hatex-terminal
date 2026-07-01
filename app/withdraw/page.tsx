@@ -36,7 +36,7 @@ export default function WithdrawPage() {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (data) {
            setProfile(data);
-           if (!data.transaction_pin) {
+           if (!data.transaction_pin && !data.transaction_pin_hash) {
                alert("Ou dwe gen yon kòd PIN pou sekirize kont ou anvan ou ka retire lajan.");
                router.push('/setting'); 
            }
@@ -138,22 +138,28 @@ export default function WithdrawPage() {
     setPinError('');
 
     try {
+      const pinRes = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', pin: enteredPin }),
+      });
+      const pinData = await pinRes.json();
+      if (!pinRes.ok || !pinData.success) {
+        throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
+      }
+
       const { data: checkData, error: checkErr } = await supabase
         .from('profiles')
-        .select('transaction_pin, wallet_balance, account_status')
+        .select('wallet_balance, account_status')
         .eq('id', profile.id)
         .single();
-        
+      
       if (checkErr || !checkData) throw new Error("Nou pa jwenn kont ou.");
       
       if (checkData.account_status === 'suspended') {
         throw new Error("Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
       }
 
-      if (checkData.transaction_pin !== enteredPin) {
-        throw new Error("PIN ou antre a pa bon. Tranzaksyon an anile.");
-      }
-      
       if (currentAmount > Number(checkData.wallet_balance)) {
          throw new Error("Ou pa gen ase kòb pou tranzaksyon sa a.");
       }
@@ -228,16 +234,14 @@ export default function WithdrawPage() {
         throw new Error("Sistèm nan jwenn yon pwoblèm. Nou remèt kòb la sou balans ou.");
       }
 
-      const BOT_TOKEN = '8395029585:AAEZKtLVQhuwk8drzziAIJeDtHuhjl77bPY';
-      const CHAT_ID = '8392894841';
       const msg = isLargeWithdrawal 
         ? `🚨 *GWO DEMANN RETRÈ VIP*\n\n👤: ${profile.full_name}\n💰 Montan: ${currentAmount} HTG\n⚠️ _Montan an plis pase 15,000 HTG._`
         : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (5%): ${withdrawFee} HTG\n✅ Nèt pou voye: ${netAmount} HTG\n📲: ${method} (${phone})`;
-      
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+
+      await fetch('/api/notifications/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
+        body: JSON.stringify({ channel: 'finance', message: msg, parseMode: 'Markdown' }),
       });
 
       setShowPinPrompt(false);

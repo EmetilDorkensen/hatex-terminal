@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { findProfileByCard } from '@/lib/security/card-lookup';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 // KOUCH SEKIRITE 1: CORS Strik pou API Pwodiksyon
 const corsHeaders = {
@@ -15,6 +17,12 @@ export async function OPTIONS() {
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rl = await rateLimit(`public-payments:${ip}`, 40, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429, headers: corsHeaders });
+    }
+
     // KOUCH SEKIRITE 2: Otantifikasyon ak verifikasyon Header
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -26,7 +34,7 @@ export async function POST(request: Request) {
     // Konekte ak Supabase avèk dwa Sèvè pou tranzaksyon finansye
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     // KOUCH SEKIRITE 3: Verifikasyon Estati Machann nan
@@ -76,16 +84,16 @@ export async function POST(request: Request) {
     }
 
     // KOUCH SEKIRITE 6: Verifikasyon Kliyan (Kat)
-    const { data: client, error: clientErr } = await supabase
-      .from('profiles')
-      .select('id, wallet_balance, full_name, account_status')
-      .eq('card_number', cleanCard)
-      .eq('cvv', cleanCvv)
-      .or(`exp_date.eq.${rawExp},exp_date.eq.${slashedExp}`)
-      .single();
+    const { profile: client, error: cardError } = await findProfileByCard(
+      supabase,
+      cleanCard,
+      cleanCvv,
+      rawExp,
+      slashedExp
+    );
 
-    if (clientErr || !client) {
-      return NextResponse.json({ error: "Tranzaksyon refize. Enfòmasyon kat yo pa koresponn." }, { status: 401, headers: corsHeaders });
+    if (!client) {
+      return NextResponse.json({ error: cardError || "Tranzaksyon refize. Enfòmasyon kat yo pa koresponn." }, { status: 401, headers: corsHeaders });
     }
     if (client.account_status !== 'active') {
       return NextResponse.json({ error: "Kont ki asosye ak kat sa a pa aktif." }, { status: 403, headers: corsHeaders });

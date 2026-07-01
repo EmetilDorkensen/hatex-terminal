@@ -51,17 +51,13 @@ export default function UpdatePinPage() {
     setIsSaving(true);
 
     try {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          pin_code: newPin, 
-          pin_enabled: true, 
-          failed_pin_attempts: 0, 
-          account_status: 'active' // Debloke kont lan otomatikman si l te bloke
-        })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', pin: newPin, type: 'wallet' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Echèk');
 
       setMessage("✅ PIN ou an chanje avèk siksè!");
       setTimeout(() => {
