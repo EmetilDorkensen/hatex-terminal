@@ -39,7 +39,7 @@ export default function WorkspacePage() {
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
-    // Views pou anplwaye yo
+    // Views pou anplwaye yo (Support gen 'clients' oswa 'tickets')
     const [activeTab, setActiveTab] = useState('main');
 
     useEffect(() => {
@@ -54,29 +54,19 @@ export default function WorkspacePage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // 👇 MEN KÒD OU TE MANDE M METE A 👇
     const checkAuthAndFetchData = async () => {
         setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
         
-        if (!user) {
-            router.push('/login');
+        // Li done anplwaye a nan kach navigatè a ki te sove nan Workspace Login nan
+        const sessionStr = localStorage.getItem('staff_session');
+        
+        if (!sessionStr) {
+            router.push('/workspace-login');
             return;
         }
 
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
-        if (!profile || profile.role === 'client') {
-            alert("Aksè Refize! Ou pa yon anplwaye Hatexcard.");
-            router.push('/dashboard');
-            return;
-        }
-
-        if (profile.role === 'super_admin') {
-            alert("Ou se Sipè Admin, n ap voye w nan gwo pòtay la.");
-            router.push('/admin');
-            return;
-        }
-
+        const profile = JSON.parse(sessionStr);
         setStaffProfile(profile);
 
         // Rale done selon wòl anplwaye a
@@ -85,7 +75,6 @@ export default function WorkspacePage() {
             const { data: u } = await supabase.from('profiles').select('id, full_name, email, account_status, wallet_balance, kyc_status, created_at').order('created_at', { ascending: false });
             setUsers(u || []);
             
-            // Rale Tickets yo epi melanje l ak tab profile la pou gen non kliyan an
             const { data: t } = await supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false });
             setTickets(t || []);
         } 
@@ -108,10 +97,12 @@ export default function WorkspacePage() {
         setLoading(false);
     };
 
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-        router.push('/login');
+    const handleLogout = () => {
+        // Retiye sesyon anplwaye a
+        localStorage.removeItem('staff_session');
+        router.push('/workspace-login');
     };
+    // 👆 FEN KÒD OU TE MANDE M NAN 👆
 
     // ==========================================
     // FONKSYON POU SÈVIS KLIYAN (SUPPORT)
@@ -155,6 +146,7 @@ export default function WorkspacePage() {
             });
             if (error) throw error;
 
+            // Chanje estati a fè kliyan an konnen yo reponn li
             await supabase.from('support_tickets').update({ status: 'answered' }).eq('id', selectedTicket.id);
 
             setMessages([...messages, { 
@@ -166,6 +158,7 @@ export default function WorkspacePage() {
                 created_at: new Date().toISOString() 
             }]);
 
+            // Mete a jou nan lis la sou kote a pou l chanje koulè a
             setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'answered' } : t));
             setReplyMessage('');
         } catch (err: any) {
