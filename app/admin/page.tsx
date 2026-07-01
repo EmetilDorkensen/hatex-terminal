@@ -14,7 +14,7 @@ export default function AdminSuperPage() {
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
-    // Ekip travay ki soti nan staff_users
+    // NOUVO: Ekip travay ki soti nan staff_users
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
 
     const [inviteEmail, setInviteEmail] = useState('');
@@ -45,7 +45,8 @@ export default function AdminSuperPage() {
     );
 
     useEffect(() => {
-        // 👇 SOLISYON AN LA: Li mande modpas la dirèk depi paj la chaje, kèlkeswa jan w rive la!
+        // Mwen retire tout ti vye API ki tap voye w nan login nan. 
+        // L ap mande modpas la dirèk kou w modifye URL la!
         const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
         if (pass === "@fiokes1234") {
             setAccessGranted(true);
@@ -361,7 +362,7 @@ export default function AdminSuperPage() {
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="min-h-screen bg-slate-50 h-screen" />; // Nou kite l blan pou l pa flache, li jis ap tann modpas la!
+    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
