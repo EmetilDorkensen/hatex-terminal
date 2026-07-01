@@ -1,832 +1,874 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { QRCodeSVG } from 'qrcode.react';
+import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { 
-  RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
-  Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase 
-} from 'lucide-react'; 
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard } from 'lucide-react';
 
-export default function Dashboard() {
-  const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+export default function AdminSuperPage() {
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [deposits, setDeposits] = useState<any[]>([]);
+    const [withdrawals, setWithdrawals] = useState<any[]>([]);
+    const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
+    const [pendingKyc, setPendingKyc] = useState<any[]>([]);
+    const [promoCodes, setPromoCodes] = useState<any[]>([]);
+    const [pendingAgents, setPendingAgents] = useState<any[]>([]);
+    const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [showNumbers, setShowNumbers] = useState(false);
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-  const [loadingRecent, setLoadingRecent] = useState(true);
-  
-  // ETA POU MENI SOU BÒ GÒCH LA (SIDEBAR)
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  const [announcement, setAnnouncement] = useState("");
-  const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
-  
-  const [discountAmount, setDiscountAmount] = useState(0);
+    // NOUVO: Ekip travay ki soti nan staff_users
+    const [staffMembers, setStaffMembers] = useState<any[]>([]);
 
-  // ==========================================
-  // ETA POU LITIJ / CHAT KLIYAN AN
-  // ==========================================
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [refundTxId, setRefundTxId] = useState("");
-  const [refundReason, setRefundReason] = useState("Mwen pa resevwa pwodwi a");
-  const [storeName, setStoreName] = useState("");
-  const [proofText, setProofText] = useState("");
-  const [isRefunding, setIsRefunding] = useState(false);
-  
-  const [isCheckingId, setIsCheckingId] = useState(false);
-  const [existingDisputeId, setExistingDisputeId] = useState("");
-  const [disputeStatus, setDisputeStatus] = useState("");
-  const [adminReply, setAdminReply] = useState("");
-  const [disputeTableSource, setDisputeTableSource] = useState(""); 
-  const [disputeDetailsFull, setDisputeDetailsFull] = useState<any>(null);
-  
-  const [chatReply, setChatReply] = useState("");
-  const [isSendingReply, setIsSendingReply] = useState(false);
-  const [isClosingDispute, setIsClosingDispute] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteRole, setInviteRole] = useState('support');
 
-  // ==========================================
-  // ETA POU KONFIME LIVREZON (OTP)
-  // ==========================================
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpTxId, setOtpTxId] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-
-  const generateMissingCard = async (userId: string, currentProfile: any) => {
-    if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
-      const res = await fetch('/api/card/ensure', { method: 'POST' });
-      const data = await res.json();
-      if (data.card) {
-        return { ...currentProfile, card_number: data.card.card_number, cvv: data.card.cvv, exp_date: data.card.exp_date };
-      }
-    }
-    return currentProfile;
-  };
-
-  useEffect(() => {
-    const fetchUserAndProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          let { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-
-          if (profile) {
-            profile = await generateMissingCard(user.id, profile);
-            setUserData({ ...profile, email: user.email });
-            
-            const { data: discountData } = await supabase
-              .from('user_discounts')
-              .select('discount_amount')
-              .eq('user_id', user.id)
-              .maybeSingle();
-              
-            if (discountData) {
-              setDiscountAmount(discountData.discount_amount || 0);
-            }
-          }
-
-          const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(5);
-          if (transactions) setRecentTransactions(transactions);
-
-          const { data: settings } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
-          if (settings) {
-            setAnnouncement(settings.announcement_text || "");
-            setIsAnnouncementActive(settings.announcement_active);
-          }
-
-          const channel = supabase.channel(`profile_realtime_${user.id}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, async (payload) => {
-              let updatedProfile = payload.new;
-              updatedProfile = await generateMissingCard(user.id, updatedProfile);
-              setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'global_settings', filter: `id=eq.1` }, (payload) => {
-               setAnnouncement(payload.new.announcement_text);
-               setIsAnnouncementActive(payload.new.announcement_active);
-            }).subscribe();
-
-          setLoading(false);
-          setLoadingRecent(false);
-
-          return () => { supabase.removeChannel(channel); };
-        } else {
-          router.push('/login');
-        }
-      } catch (err) {
-        console.error("Erè Dashboard:", err);
-        setLoading(false);
-        setLoadingRecent(false);
-      }
-    };
-    fetchUserAndProfile();
-  }, [supabase, router]);
-
-  const formatCardNumber = (num: string) => {
-    if (!num) return "**** **** **** ****";
-    if (showNumbers) return num.match(/.{1,4}/g)?.join(' ') || num;
-    return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
-  };
-
-  const priBase = 520;
-  const uiPriAktivasyon = Math.max(0, priBase - discountAmount);
-
-  const handleActivateCard = async () => {
-    if (!userData) return;
-    setLoading(true);
-
-    try {
-      const { data: realProfile, error: profileErr } = await supabase.from('profiles').select('wallet_balance').eq('id', userData.id).single();
-      if (profileErr || !realProfile) throw new Error("Nou pa ka jwenn enfòmasyon w yo kounye a.");
-
-      let dbDiscountAmount = 0;
-      const { data: realDiscountData } = await supabase.from('user_discounts').select('discount_amount').eq('user_id', userData.id).maybeSingle();
-      if (realDiscountData) dbDiscountAmount = realDiscountData.discount_amount || 0;
-
-      const realActivationPrice = Math.max(0, priBase - dbDiscountAmount);
-      const realWalletBalance = Number(realProfile.wallet_balance || 0);
-
-      if (realWalletBalance < realActivationPrice) {
-        setLoading(false);
-        alert(`Ou pa gen ase kòb sou balans ou!\n\nOu bezwen omwen ${realActivationPrice} HTG pou aktive kat la.\nTanpri fè yon depo anvan.`);
-        router.push('/deposit');
-        return;
-      }
-
-      if (!window.confirm(`Èske w sèten ou vle peye ${realActivationPrice} HTG pou aktive Kat Vityèl la ak Terminal ou a?`)) {
-        setLoading(false);
-        return;
-      }
-
-      const nouvoBalans = realWalletBalance - realActivationPrice;
-      const { error: updateErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans, is_card_activated: true }).eq('id', userData.id);
-      if (updateErr) throw updateErr;
-
-      await supabase.from('transactions').insert({
-        user_id: userData.id, amount: -realActivationPrice, type: 'CARD_ACTIVATION',
-        description: dbDiscountAmount > 0 ? `Aktivasyon Kat (Ak Rediksyon -${dbDiscountAmount} HTG)` : 'Frè Aktivasyon Kat Vityèl', status: 'success'
-      });
-
-      alert("✅ Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
-    } catch (err: any) {
-      alert("Erè: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenRefundModal = async () => {
-      setShowRefundModal(true);
-      setDisputeStatus("");
-      setRefundTxId("");
-      setExistingDisputeId("");
-      setIsCheckingId(true);
-      
-      try {
-          const { data: recentTxs } = await supabase.from('plugin_transactions')
-            .select('order_id, dispute_details')
-            .in('status', ['disputed', 'refunded'])
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-          let foundId = null;
-          if (recentTxs) {
-              const myDispute = recentTxs.find(t => t.dispute_details?.client_id === userData.id);
-              if (myDispute) foundId = myDispute.order_id;
-          }
-
-          if (!foundId) {
-             const { data: nTx } = await supabase.from('transactions')
-                .select('order_id')
-                .eq('user_id', userData.id)
-                .in('status', ['disputed', 'refunded'])
-                .order('created_at', { ascending: false })
-                .limit(1);
-             if (nTx && nTx.length > 0) foundId = nTx[0].order_id;
-          }
-
-          if (foundId) {
-             setExistingDisputeId(foundId);
-          }
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setIsCheckingId(false);
-      }
-  };
-
-  const handleCheckOrderDispute = async (overrideId?: string) => {
-    const targetId = overrideId || refundTxId;
-    if (!targetId) return alert("Tanpri mete ID kòmand lan anvan.");
-    setIsCheckingId(true);
-    setDisputeStatus("");
-    setAdminReply("");
-    setDisputeTableSource("");
-    if (overrideId) setRefundTxId(overrideId);
+    const [totalCardBal, setTotalCardBal] = useState(0);
+    const [newPromoCode, setNewPromoCode] = useState('');
+    const [promoReward, setPromoReward] = useState('250');
+    const [searchQuery, setSearchQuery] = useState('');
     
-    try {
-      const cleanId = targetId.toString().replace('#', '').trim();
-      let foundData = null;
-      let source = "";
+    const [anonsText, setAnonsText] = useState('');
+    const [anonsActive, setAnonsActive] = useState(true);
+    
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'ekip'>('dashboard'); 
+    
+    const [loading, setLoading] = useState(true);
+    const [processingId, setProcessingId] = useState<string | null>(null);
+    const [accessGranted, setAccessGranted] = useState(false);
+    const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
-      const { data: pData } = await supabase.from('plugin_transactions').select('status, dispute_details').eq('order_id', cleanId).maybeSingle();
-      if (pData) { 
-        foundData = pData; 
-        source = "plugin_transactions"; 
-      } else {
-        const { data: nData } = await supabase.from('transactions').select('status, metadata').eq('order_id', cleanId).maybeSingle();
-        if (nData) { 
-          foundData = { status: nData.status, dispute_details: nData.metadata?.dispute_details }; 
-          source = "transactions"; 
-        }
-      }
+    const [totalClientBal, setTotalClientBal] = useState(0);
+    const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
+    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
 
-      if (foundData) {
-        setDisputeStatus(foundData.status);
-        setDisputeTableSource(source);
-        if (foundData.dispute_details) {
-          setDisputeDetailsFull(foundData.dispute_details);
-          setStoreName(foundData.dispute_details.store_name || "");
-          setProofText(foundData.dispute_details.proof_text || "");
-          setAdminReply(foundData.dispute_details.admin_reply || "");
-        } else if (foundData.status === 'pending' || foundData.status === 'success' || foundData.status === 'completed') {
-          alert("Kòmand sa a anfòm, ou ka ouvè yon litij sou li.");
-        }
-      } else {
-        alert("Sistèm nan pa jwenn kòmand sa a. Tcheke ID a ankò.");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsCheckingId(false);
-    }
-  };
-
-  const handleSubmitDispute = async (e: any) => {
-    e.preventDefault();
-    if (!refundTxId || refundTxId.trim() === '') return alert("Tanpri mete ID kòmand lan (12 chif).");
-    setIsRefunding(true);
-
-    try {
-      const response = await fetch('/api/dispute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: refundTxId.trim(), reason: refundReason, proofText: proofText, clientId: userData?.id, storeName: storeName }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        alert("Erè: " + data.error);
-      } else {
-        alert("✅ Siksè: " + data.message);
-        handleCheckOrderDispute(); 
-      }
-    } catch (error) {
-      alert("Gen yon pwoblèm rezo. Tanpri eseye ankò.");
-    } finally {
-      setIsRefunding(false);
-    }
-  };
-
-  const handleClientSendReply = async () => {
-    if (!chatReply.trim() || !disputeTableSource) return;
-    setIsSendingReply(true);
-    try {
-        const newHistory = proofText + `\n\n[NOUVO MESAJ - KLIYAN]: ${chatReply}`;
-        const updatedDetails = { ...disputeDetailsFull, proof_text: newHistory };
-        
-        if (disputeTableSource === 'plugin_transactions') {
-            await supabase.from('plugin_transactions').update({ dispute_details: updatedDetails }).eq('order_id', refundTxId.replace('#', '').trim());
-        } else {
-            const { data: oldTx } = await supabase.from('transactions').select('metadata').eq('order_id', refundTxId.replace('#', '').trim()).single();
-            await supabase.from('transactions').update({ metadata: { ...oldTx?.metadata, dispute_details: updatedDetails } }).eq('order_id', refundTxId.replace('#', '').trim());
-        }
-        setProofText(newHistory);
-        setChatReply("");
-    } catch(e) {
-        alert("Erè nan voye mesaj la."); 
-    } finally { 
-        setIsSendingReply(false); 
-    }
-  };
-
-  const handleCloseDisputeClient = async () => {
-    if (!confirm("Èske w sèten ou vle fèmen dosye sa a nèt? Ou p ap ka poze pwoblèm sou kòmand sa a ankò.")) return;
-    setIsClosingDispute(true);
-    try {
-        await supabase.from(disputeTableSource).update({ status: 'completed' }).eq('order_id', refundTxId.replace('#', '').trim());
-        alert("✅ Ou fèmen dosye sa a ak siksè.");
-        setShowRefundModal(false);
-        setDisputeStatus("");
-        setRefundTxId("");
-    } catch(e) { 
-        alert("Erè lè w t ap fèmen dosye a."); 
-    } finally { 
-        setIsClosingDispute(false); 
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!otpTxId || !otpCode) return alert("Tanpri ranpli tout bwat yo!");
-    setIsVerifying(true);
-    try {
-      const res = await fetch('/api/verify-delivery', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: otpTxId.trim(), merchant_id: userData.id, otp_code: otpCode.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Echèk nan verifikasyon kòd la.");
-      
-      alert(`✅ ${data.message}`);
-      setShowOtpModal(false);
-      setOtpTxId('');
-      setOtpCode('');
-    } catch (err: any) {
-      alert(`❌ Erè: ${err.message}`);
-      if (err.message.includes("sispann") || err.message.includes("bloke")) {
-          window.location.reload();
-      }
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-  }
 
-  const kycPending = userData?.kyc_status !== 'approved';
-  const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
-  const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
-  const isAdmin = userData?.email === 'adminhatexcard@gmail.com';
+    useEffect(() => {
+        // Mwen retire tout ti vye API ki tap voye w nan login nan. 
+        // L ap mande modpas la dirèk kou w modifye URL la!
+        const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
+        if (pass === "@fiokes1234") {
+            setAccessGranted(true);
+            raleDone();
+        } else {
+            alert("Modpas la pa bon! Ou pa gen otorizasyon.");
+            window.location.href = "/dashboard";
+        }
+    }, []);
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
-      
-      {/* ========================================== */}
-      {/* SIDEBAR (MENI SOU BÒ GÒCH LA) */}
-      {/* ========================================== */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-[300] flex">
-          {/* FOND NWA K AP KOUVRI EKRAN AN (Backdrop) */}
-          <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
-            onClick={() => setIsMenuOpen(false)}
-          ></div>
-          
-          {/* PWENPAL MENI AN (Soti bò gòch la) */}
-          <div className="relative w-[280px] max-w-sm bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left duration-300 z-10 border-r border-gray-200">
-            {/* Header Meni an ak Logo */}
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-sm">
-                  {userData?.full_name ? userData.full_name.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm truncate w-32">{userData?.full_name || 'Kliyan'}</h3>
-                  <p className="text-[10px] text-slate-500 font-medium truncate w-32">{userData?.email}</p>
-                </div>
-              </div>
-              <button onClick={() => setIsMenuOpen(false)} className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-full text-slate-500 hover:text-rose-500 shadow-sm transition-colors">
-                <X size={16} />
-              </button>
-            </div>
+    const raleDone = async () => {
+        setLoading(true);
+        try {
+            const { data: u } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+            setAllUsers(u || []);
 
-            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 px-2">Navigasyon Prensipal</p>
-              
-              <button onClick={() => { router.push('/dashboard'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-indigo-700 bg-indigo-50 font-semibold transition-all border border-indigo-100">
-                <Home size={20} /> Akèy
-              </button>
-              
-              <button onClick={() => { router.push('/kat'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
-                <CreditCard size={20} /> Kat
-              </button>
-              
-              <button 
-                onClick={() => {
-                  if (cardFullyActive) {
-                    router.push('/terminal');
-                    setIsMenuOpen(false);
-                  } else {
-                    alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
-                  }
-                }} 
-                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
-              >
-                <Terminal size={20} /> Terminal
-              </button>
+            const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
+            setDeposits(d || []);
 
-              <button onClick={() => { router.push('/agent'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
-                <Store size={20} /> Ajan
-              </button>
-              
-              <button onClick={() => { router.push('/transactions'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
-                <History size={20} /> Istorik
-              </button>
+            const { data: w } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
+            setWithdrawals(w || []);
 
-              {/* BOUTON ASISTANS (SIPÒ KLIYAN) */}
-              <button onClick={() => { router.push('/support'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
-                <Headset size={20} /> Asistans / Sipò
-              </button>
-              
-              <button onClick={() => { router.push('/setting'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
-                <Settings size={20} /> Paramèt
-              </button>
+            const { data: s } = await supabase.from('profiles').select('*').eq('account_status', 'suspended').order('created_at', { ascending: false });
+            setSuspendedAccounts(s || []);
 
-              {/* 👇 NOUVO BOUTON PÒTAY ADMIN NAN (SÈLMAN POU OU) 👇 */}
-              {userData?.role === 'super_admin' && (
-                <button 
-                   onClick={async () => { 
-                       const gateRes = await fetch('/api/admin/verify-gate');
-                       if (gateRes.ok) { window.location.href = "/admin"; return; }
-                       const pass = prompt("Antre modpas Sipè Admin lan:");
-                       if (!pass) return;
-                       const verifyRes = await fetch('/api/admin/verify-gate', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ password: pass }),
-                       });
-                       if (verifyRes.ok) { window.location.href = "/admin"; }
-                       else { alert("Modpas la pa bon! Ou pa gen otorizasyon."); }
-                   }} 
-                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 hover:bg-rose-50 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-4"
-                >
-                  <Briefcase size={16} /> Pòtay Admin
-                </button>
-              )}
-            </div>
+            const { data: k } = await supabase.from('profiles').select('*').eq('kyc_status', 'pending').order('created_at', { ascending: false });
+            setPendingKyc(k || []);
 
-            <div className="p-5 border-t border-gray-100 bg-slate-50">
-               <button onClick={() => { router.push('/deposit'); setIsMenuOpen(false); }} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs shadow-sm transition-all">
-                 <Plus size={16} /> Fè yon Depo
-               </button>
-            </div>
-          </div>
-        </div>
-      )}
+            const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
+            setPromoCodes(p || []);
 
-      {/* ========================================== */}
-      {/* NAVBAR ANLÈ (AVÈK LOGO AK HAMBURGER) */}
-      {/* ========================================== */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-[100] shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+            const { data: agData } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            if (agData && u) {
+                const mergedAgents = agData.map(agent => ({
+                   ...agent,
+                   profiles: u.find(user => user.id === agent.user_id) || {}
+                }));
+                setPendingAgents(mergedAgents);
+            }
+
+            // RALE LIS ANPLWAYE YO NAN NOUVO TAB LA
+            const { data: stData } = await supabase.from('staff_users').select('*').order('created_at', { ascending: false });
+            setStaffMembers(stData || []);
             
-            {/* Seksyon Gòch: Bouton Meni + Logo */}
-            <div className="flex items-center gap-4">
-              <button onClick={() => setIsMenuOpen(true)} className="text-slate-500 hover:text-indigo-600 transition-colors p-1 rounded-md hover:bg-slate-100">
-                <Menu size={24} />
-              </button>
-              <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/dashboard')}>
-                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm border border-gray-200" />
-                <span className="font-bold text-xl text-slate-900 tracking-tight hidden sm:block">Hatexcard</span>
-              </div>
-            </div>
+            const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
+            if (anonsData) {
+                setAnonsText(anonsData.announcement_text || '');
+                setAnonsActive(anonsData.announcement_active);
+            }
 
-            {/* Seksyon Dwat: Profil */}
-            <div className="flex items-center gap-4">
-              <div className="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center text-slate-600 font-bold">
-                {userData?.avatar_url ? (
-                  <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  userData?.full_name?.charAt(0) || "U"
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+            await kalkileTotalBiznis(u || []);
 
-      {/* ========================================== */}
-      {/* MAIN CONTENT AREA */}
-      {/* ========================================== */}
-      <main className="flex-grow w-full max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
-        
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="relative group cursor-pointer">
-              {/* INPUT FILE KACHE POU FOTO A */}
-              <input 
-                type="file" 
-                id="avatarUpload" 
-                className="hidden" 
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !userData) return;
-                  setLoading(true);
-                  try {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${userData.id}/${Date.now()}.${fileExt}`;
-                    const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true });
-                    if (uploadError) throw uploadError;
-                    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-                    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userData.id);
-                    setUserData({...userData, avatar_url: publicUrl});
-                  } catch (err: any) {
-                    alert("Erè nan mete foto a: " + err.message);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-              />
-              <label htmlFor="avatarUpload" className="block w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all relative cursor-pointer">
-                {userData?.avatar_url ? (
-                  <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-600 text-2xl font-bold">
-                    {userData?.full_name?.charAt(0) || "H"}
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-medium">Edit</div>
-              </label>
-            </div>
+        } catch (e: any) {
+             console.error("Erè rale done:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Bonjou,</p>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight truncate max-w-[200px] sm:max-w-[400px]">
-                {userData?.full_name || "Kliyan Hatexcard"}
-              </h1>
-            </div>
-          </div>
+    const kalkileTotalBiznis = async (profiles: any[]) => {
+        try {
+            const totalKliyan = profiles.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
+            setTotalClientBal(totalKliyan);
 
-          {/* Quick Actions Desktop */}
-          <div className="flex flex-wrap items-center gap-3">
-            <button onClick={() => setShowNumbers(!showNumbers)} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
-              <span className="text-lg">{showNumbers ? "🔒" : "👁️"}</span>
-            </button>
-          </div>
-        </div>
+            const totalKat = profiles.reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
+            setTotalCardBal(totalKat);
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-10">
-          
-          {/* Col 1: Balance & Actions */}
-          <div className="lg:col-span-1 space-y-6">
-            
-            {/* Balance Card */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-6 opacity-10">
-                <CreditCard size={100} />
-              </div>
-              <p className="text-sm font-semibold text-slate-500 mb-2">Balans Disponib</p>
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight truncate">
-                  {userData?.wallet_balance ? Number(userData.wallet_balance).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "0.00"}
-                </h3>
-                <span className="text-lg font-semibold text-slate-500">HTG</span>
-              </div>
-            </div>
+            const { data: depData } = await supabase.from('deposits').select('fee').eq('status', 'approved');
+            const totalDepoFee = (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-3">
-              <button onClick={() => router.push('/deposit')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
-                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <Plus size={20} />
-                </div>
-                <span className="text-xs font-semibold text-slate-700">Depo</span>
-              </button>
-              <button onClick={() => router.push('/withdraw')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
-                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <ArrowUpRight size={20} />
-                </div>
-                <span className="text-xs font-semibold text-slate-700">Retrè</span>
-              </button>
-              <button onClick={() => router.push('/transfert')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
-                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <ArrowRightLeft size={20} />
-                </div>
-                <span className="text-xs font-semibold text-slate-700">Transfè</span>
-              </button>
-            </div>
-          </div>
+            const { data: witData } = await supabase.from('withdrawals').select('fee').eq('status', 'completed');
+            const totalRetreFee = (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
 
-          {/* Col 2: Virtual Card */}
-          <div className="lg:col-span-2 flex justify-center lg:justify-end items-center perspective-1000">
-            <div className="w-full max-w-[480px]">
-              <div className="flex justify-between items-end mb-3 px-1">
-                <p className="text-sm font-semibold text-slate-700">Kat Vityèl {cardNeedsActivation && "(Poko Aktive)"}</p>
-                {cardFullyActive && <button onClick={() => setIsFlipped(!isFlipped)} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><RefreshCcw size={12}/> Vire Kat la</button>}
-              </div>
-              
-              <div className="relative aspect-[1.58/1] w-full cursor-pointer transition-all duration-700 preserve-3d" onClick={() => cardFullyActive && setIsFlipped(!isFlipped)}>
+            const { data: traData } = await supabase.from('transfers').select('fee, status');
+            const totalTransfeFee = (traData || [])
+                .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
+                .reduce((acc, t) => acc + Number(t.fee || 0), 0);
                 
-                {kycPending && (
-                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-white/90 backdrop-blur-sm p-6 text-center border border-gray-200 shadow-sm">
-                    <p className="text-sm font-bold text-slate-900 mb-4">
-                      {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : "Verifikasyon ID Obligatwa"}
-                    </p>
-                    <button onClick={() => router.push('/kyc')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm shadow-md hover:bg-indigo-700 transition-all">
-                      Pase KYC Gratis
-                    </button>
-                  </div>
-                )}
+            const { data: feeData } = await supabase.from('transactions').select('amount').eq('type', 'FEE').eq('status', 'success');
+            const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
 
-                {cardNeedsActivation && (
-                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-slate-900/80 backdrop-blur-md p-6 text-center shadow-lg border border-slate-700">
-                    <div className="text-4xl mb-3">🔒</div>
-                    <p className="text-sm font-medium text-white mb-4">
-                      Aktive kat ou pou kòmanse resevwa peman.
-                    </p>
-                    {discountAmount > 0 && (
-                       <p className="text-xs text-emerald-400 font-bold mb-3">
-                         🎉 Rediksyon {discountAmount} HTG!
-                       </p>
-                    )}
-                    <button onClick={handleActivateCard} className="bg-white text-slate-900 px-6 py-3 rounded-lg font-bold text-sm shadow-lg hover:bg-gray-100 transition-all">
-                      Aktive pou {uiPriAktivasyon} HTG
-                    </button>
-                  </div>
-                )}
-
-                {/* Kat Fè Fas (Front) */}
-                <div className={`absolute inset-0 backface-hidden rounded-2xl overflow-hidden bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950 p-6 shadow-xl border border-white/10 ${!cardFullyActive && 'opacity-30 blur-sm'}`}>
-                  <div className="flex flex-col h-full justify-between relative z-10">
-                    <div className="flex justify-between items-start">
-                      <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard" className="w-10 h-10 rounded-lg object-cover shadow-sm bg-white/10 backdrop-blur-sm border border-white/20 p-0.5" />
-                      <span className="text-sm font-bold text-white/50 tracking-wider mt-1">Hatexcard</span>
-                    </div>
-                    <div>
-                      <p className="text-xl sm:text-2xl font-mono text-white tracking-widest mb-4">
-                        {formatCardNumber(userData?.card_number)}
-                      </p>
-                      <div className="flex justify-between items-end">
-                        <div>
-                          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Non sou Kat la</p>
-                          <p className="text-sm font-medium text-white tracking-wide truncate max-w-[180px]">{userData?.full_name}</p>
-                        </div>
-                        <div className="flex gap-6 text-right">
-                          <div>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Exp</p>
-                            <p className="text-sm font-mono text-white">{userData?.exp_date || "**/**"}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">CVV</p>
-                            <p className="text-sm font-mono text-white">{showNumbers ? (userData?.cvv || "***") : "***"}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
-                  <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
-                </div>
-
-                {/* Kat Fè Do (Back) */}
-                <div className={`absolute inset-0 rotate-y-180 backface-hidden rounded-2xl bg-slate-800 border border-slate-700 shadow-xl flex flex-col items-center justify-center ${!cardFullyActive && 'hidden'}`}>
-                  <div className="w-full h-12 bg-slate-950 absolute top-6 left-0"></div>
-                  <div className="mt-10 bg-white p-2.5 rounded-xl shadow-sm">
-                    <QRCodeSVG value={`Card:${userData?.card_number || 'INVALID'}`} size={100} />
-                  </div>
-                  <p className="text-xs font-semibold text-slate-400 mt-4">Eskane pou Peye</p>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Announcements */}
-        {isAnnouncementActive && announcement && (
-          <div className="mb-10 bg-indigo-50 border border-indigo-100 rounded-2xl p-6 relative overflow-hidden">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-lg">📢</span>
-              <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">Notifikasyon</span>
-            </div>
-            <p className="text-sm text-indigo-900 leading-relaxed whitespace-pre-wrap">
-              {announcement}
-            </p>
-          </div>
-        )}
-
-        {/* Recent Transactions List */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold text-slate-900">Dènye Tranzaksyon</h2>
-            <button onClick={() => router.push('/transactions')} className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">Gade tout</button>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-            {loadingRecent ? (
-              <div className="p-8 flex justify-center"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>
-            ) : recentTransactions.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">Pa gen aktivite ankò.</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {recentTransactions.map((t) => (
-                  <div key={t.id} className="p-4 sm:p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.amount > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                        {t.amount > 0 ? <ArrowDownToLine size={18} /> : <ArrowUpFromLine size={18} />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{t.description}</p>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">
-                          {new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                          {t.user_email && ` • ${t.user_email.split('@')[0]}...`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0 pl-4">
-                      <p className={`text-sm font-bold ${t.amount > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                        {t.amount > 0 ? '+' : ''}{Number(t.amount).toLocaleString('en-US', {minimumFractionDigits: 2})} <span className="text-[10px] text-slate-500">HTG</span>
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-
-      {/* ========================================== */}
-      {/* GWO FOOTER WEB LA (AVÈK LOGO HATEXCARD LA) */}
-      {/* ========================================== */}
-      <footer className="bg-white border-t border-gray-200 mt-20 pt-16 pb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee });
             
-            <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-3 mb-4">
-                {/* LOGO NAN FOOTER A */}
-                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-10 h-10 rounded-lg object-cover shadow-sm border border-gray-200" />
-                <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
-              </div>
-              <p className="text-sm text-slate-500 leading-relaxed mb-4">
-                Platfòm peman sou entènèt ak kat vityèl pou antreprenè, devlopè, ak sitwayen nimerik an Ayiti.
-              </p>
-            </div>
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee;
+            setTotalBiznisProfit(granTotalPwofi);
 
-            <div>
-              <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Pwodwi</h3>
-              <ul className="space-y-3">
-                <li><button onClick={() => router.push('/kat')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kat Vityèl</button></li>
-                <li><button onClick={() => router.push('/developer/docs')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Pòtay Peman (API)</button></li>
-                <li><button onClick={() => router.push('/deposit')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Rechaje Kont</button></li>
-              </ul>
-            </div>
+        } catch (error) {}
+    };
 
-            <div>
-              <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Devlopè</h3>
-              <ul className="space-y-3">
-                <li><button onClick={() => router.push('/developer/docs')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Dokimantasyon API</button></li>
-                <li><button onClick={() => router.push('/plugins')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Plugins (WordPress)</button></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kòd Sous</a></li>
-              </ul>
-            </div>
+    const handleOpenDocument = (url: string) => {
+        if (!url) { alert("Pa gen lyen pou dokiman sa a!"); return; }
+        window.open(url, '_blank');
+    };
 
-            <div>
-              <h3 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-wider">Sipò</h3>
-              <ul className="space-y-3">
-                <li><button onClick={() => router.push('/support')} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Sèvis Kliyan</button></li>
-                <li><button onClick={handleOpenRefundModal} className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kondisyon Ranbousman</button></li>
-                <li><a href="mailto:hatexcard@gmail.com" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Kontakte Nou</a></li>
-              </ul>
-            </div>
+    const voyeEmailKliyan = async (email: string, non: string, mesaj: string, subject: string) => {
+        if (!email) return;
+        try { await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: email.trim(), subject, non, mesaj }), }); } catch (error) {}
+    };
 
-          </div>
-          
-          <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-slate-400">
-              &copy; {new Date().getFullYear()} Hatexcard. Tout dwa rezève.
-            </p>
-            <div className="flex gap-6">
-              <a href="#" className="text-sm text-slate-400 hover:text-slate-600">Tèm ak Kondisyon</a>
-              <a href="#" className="text-sm text-slate-400 hover:text-slate-600">Konfidansyalite</a>
+    const voyeTelegram = async (msg: string) => {
+        try { await fetch('/api/notifications/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel: 'admin', message: msg, parseMode: 'HTML' }) }); } catch (e) {}
+    };
+
+    const deleteTranzaksyon = async (id: string, table: string) => {
+        if (!confirm("Èske ou vle efase istwa sa a nèt?")) return;
+        setProcessingId(id);
+        try { await supabase.from(table).delete().eq('id', id); alert("Efase nèt!"); raleDone(); } finally { setProcessingId(null); }
+    };
+
+    const apwouveDepo = async (d: any) => {
+        const isModified = montanModifye[d.id] !== undefined;
+        const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
+        const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
+        const totalPeye = montanFinal + frePouBiznisLa;
+
+        if (!confirm(`TCHEKE DEPO SA BYEN:\n\n- Kliyan an ap resevwa: ${montanFinal} HTG\n- Frè pou Antrepriz la (Biznis): ${frePouBiznisLa} HTG\n- Total kliyan an te dwe voye sou Moncash la se: ${totalPeye} HTG\n\nÈske w wè ${totalPeye} HTG a sou telefòn ou? Si wi, konfime l.`)) return;
+        
+        setProcessingId(d.id);
+        try {
+            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, email').eq('id', d.user_id).single();
+            await supabase.from('profiles').update({ wallet_balance: Number(p?.wallet_balance || 0) + montanFinal }).eq('id', d.user_id);
+            await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
+            await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
+
+            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
+            await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p?.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
+            
+            alert("SIKSÈ! Depo a apwouve."); raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const apwouveRetre = async (w: any) => {
+        if (!confirm(`Konfime retrè ${w.amount} HTG sa a?`)) return;
+        setProcessingId(w.id);
+        try {
+            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', w.user_id).single();
+            await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
+            await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
+            
+            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
+            await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p?.full_name}\nMontan: ${w.amount} HTG`);
+            alert("RETRÈ FINI!"); raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const anileTranzaksyon = async (item: any, table: string) => {
+        const rezon = prompt("Rezon anilasyon?");
+        if (!rezon) return;
+        setProcessingId(item.id);
+        try {
+            await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
+            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, email').eq('id', item.user_id).single();
+            
+            if (table === 'withdrawals') {
+                const balansR = Number(p?.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); 
+                await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
+            }
+            
+            await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
+            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
+            await voyeTelegram(`<b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
+            alert("Anile!"); raleDone();
+        } finally { setProcessingId(null); }
+    };
+
+    const deblokeKont = async (id: string, email: string) => {
+        if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
+        setProcessingId(id);
+        try { await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id); alert(`Kont ${email} lan aktive!`); raleDone(); } 
+        catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+    };
+
+    const sispannKont = async (id: string, email: string) => {
+        if (!confirm(`Èske w sèten ou vle SISPANN kont sa a? (${email})`)) return;
+        setProcessingId(id);
+        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); alert(`Kont ${email} lan sispandi!`); raleDone(); } 
+        catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+    };
+
+    const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
+        let rezonReje = "";
+        if (aksyon === 'rejected') { const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:"); if (!rep) return; rezonReje = rep; } 
+        else { if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}?`)) return; }
+        setProcessingId(id);
+        try {
+            await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezonReje : null }).eq('id', id);
+            const mesajE = aksyon === 'approved' ? `Felisitasyon ${full_name}! Dokiman w yo apwouve.` : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
+            await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            alert(`KYC a ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); raleDone();
+        } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+    };
+
+    const jereAjan = async (applicationId: string, userId: string, fullName: string, userEmail: string, aksyon: 'approved' | 'rejected') => {
+        let rezon = "";
+        if (aksyon === 'rejected') {
+            rezon = agentRejectionReason[applicationId] || "";
+            if (!rezon.trim()) return alert("Tanpri ekri yon rezon pou w ka rejte aplikasyon sa a.");
+        } else {
+            if (!confirm(`Èske w sèten ou vle APWOUVE aplikasyon ajan sa a pou ${fullName}?`)) return;
+        }
+
+        setProcessingId(applicationId);
+        try {
+            if (aksyon === 'rejected') {
+                const { data: userProf } = await supabase.from('profiles').select('agent_guarantee_paid, wallet_balance').eq('id', userId).single();
+                if (userProf) {
+                    const paidAmount = Number(userProf.agent_guarantee_paid || 0);
+                    if (paidAmount > 0) {
+                        const feePaid = Math.floor((paidAmount / 1000) * 7);
+                        const totalRefund = paidAmount + feePaid;
+                        
+                        await supabase.from('profiles').update({ 
+                            wallet_balance: Number(userProf.wallet_balance || 0) + totalRefund,
+                            agent_balance: 0,
+                            agent_capacity: 0,
+                            agent_guarantee_paid: 0,
+                            agent_status: 'rejected'
+                        }).eq('id', userId);
+
+                        await supabase.from('transactions').insert({ user_id: userId, type: 'REFUND', amount: totalRefund, status: 'success', description: `Ranbousman Aplikasyon Ajan ki Rejte (+ Frè)` });
+                    } else {
+                        await supabase.from('profiles').update({ agent_status: 'rejected' }).eq('id', userId);
+                    }
+                }
+            } else {
+                await supabase.from('profiles').update({ agent_status: 'approved' }).eq('id', userId);
+            }
+
+            await supabase.from('agent_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+
+            const mesajE = aksyon === 'approved' 
+                ? `Felisitasyon ${fullName}! Aplikasyon w pou vin Ajan Hatexcard la apwouve. Ou ka vizite pòtay ajan w lan kounye a pou w jwenn kòd inik ou a epi kòmanse travay.` 
+                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Tout garanti ou te depoze yo tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
+            
+            await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`); 
+            if (aksyon === 'rejected') setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
+            raleDone();
+        } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
+    };
+
+    const jereAnplwaye = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inviteEmail) return alert("Ou dwe mete yon imèl.");
+
+        setProcessingId('invite_staff');
+        try {
+            const { data: existing } = await supabase.from('staff_users').select('*').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
+            if (existing) throw new Error("Imèl sa a gentan sourejistre nan ekip la.");
+
+            const { data: profile } = await supabase.from('profiles').select('full_name').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
+            const staffName = profile?.full_name || 'Anplwaye';
+
+            const { error } = await supabase.from('staff_users').insert({
+                email: inviteEmail.trim().toLowerCase(),
+                full_name: staffName,
+                role: inviteRole,
+                status: 'pending'
+            });
+            if (error) throw error;
+
+            const roleNames: Record<string, string> = {
+                'super_admin': 'Sipè Admin (CEO)',
+                'finance': 'Depatman Finans',
+                'compliance': 'Depatman Konfòmite (KYC & Ajan)',
+                'support': 'Sèvis Kliyan (Support)'
+            };
+            
+            const setupLink = `${window.location.origin}/workspace-setup?email=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
+            const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon an envite w vin travay kòm anplwaye Hatexcard nan depatman: "${roleNames[inviteRole]}".\n\nKlike sou lyen anba a pou w kreye Modpas Espas Travay ou a (Workspace Password). Modpas sa a pa gen okenn rapò ak kont kliyan nòmal ou a:\n\n${setupLink}`;
+            
+            await voyeEmailKliyan(inviteEmail, staffName, msg, "ENVITASYON ESPAS TRAVAY HATEXCARD");
+
+            alert(`Envitasyon an ale! ${staffName} ap resevwa lyen an nan imèl li pou l kreye modpas espas travay li.`);
+            setInviteEmail('');
+            raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const revokeAnplwaye = async (id: string, email: string) => {
+        if (!confirm(`Èske w sèten ou vle revoke aksè anplwaye sa a (${email}) nèt?`)) return;
+        setProcessingId(`revoke_${id}`);
+        try {
+            await supabase.from('staff_users').delete().eq('id', id);
+            alert(`Aksè a revoke nèt pou ${email}.`); raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const handleCreateCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setProcessingId('creating_promo');
+        const cleanCode = newPromoCode.trim().toUpperCase();
+        if (!cleanCode) { alert('Mete yon kòd valab.'); setProcessingId(null); return; }
+        try {
+            const { error } = await supabase.from('promo_codes').insert([{ code: cleanCode, reward_amount: parseInt(promoReward) }]);
+            if (error) { if (error.code === '23505') throw new Error('Kòd sa a egziste deja!'); throw error; }
+            alert(`Kòd ${cleanCode} la kreye!`); setNewPromoCode(''); setPromoReward('250'); raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const handleSaveAnons = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setProcessingId('saving_anons');
+        try {
+            await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
+            alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const filteredUsers = allUsers.filter(user => {
+        if (!searchQuery) return true;
+        const lowerQuery = searchQuery.toLowerCase();
+        return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
+    });
+
+    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
+
+    return (
+        <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 border-b border-gray-200 pb-6 gap-4">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck size={28} className="text-indigo-600" />
+                      <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pòtay Sipè Admin</h1>
+                    </div>
+                    <button onClick={raleDone} className="bg-white border border-gray-200 text-slate-600 hover:text-indigo-600 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm">Rafrechi Done Yo</button>
+                </div>
+
+                <div className="flex gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-200 overflow-x-auto custom-scrollbar whitespace-nowrap shadow-sm">
+                    <button onClick={() => setView('dashboard')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'dashboard' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Activity size={14}/> Tablodbò
+                    </button>
+                    
+                    <button onClick={() => setView('ekip')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'ekip' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Users size={14}/> Jere Ekip
+                    </button>
+
+                    <button onClick={() => setView('kliyan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kliyan ({allUsers.length})</button>
+                    <button onClick={() => setView('depo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'depo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Depo ({deposits.filter(d => d.status === 'pending').length})</button>
+                    <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
+                    <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
+                    
+                    <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        Ajan 
+                        {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
+                    </button>
+
+                    <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
+                    <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
+                    <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
+                </div>
+
+                <div className="space-y-6">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-32 gap-4">
+                           <Loader2 size={32} className="text-indigo-600 animate-spin" />
+                           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Chaje Done Yo...</p>
+                        </div>
+                    ) : view === 'dashboard' ? (
+                        /* ========================================== */
+                        /* ONGLÈ: DASHBOARD GLOBAL POU SIPÈ ADMIN AN  */
+                        /* ========================================== */
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            
+                            <div className="flex items-center gap-4 mb-6">
+                                <span className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 border border-indigo-100"><Activity size={28}/></span>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kès Global & Aktivite</h2>
+                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Aksè Rezève (Sipè Admin)</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* BWAT 1: KÒB KLIYAN YO */}
+                                <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-6 opacity-5"><Users size={80} /></div>
+                                    <div className="relative z-10 mb-6">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Kòb Kliyan Yo (Wallet)</p>
+                                        <h3 className="text-4xl font-bold text-slate-900 tracking-tight break-all">
+                                            {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-500">HTG</span>
+                                        </h3>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-500">Total Kliyan ki Enskri:</span>
+                                        <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">{allUsers.length} Moun</span>
+                                    </div>
+                                </div>
+
+                                {/* BWAT 2: PWOFI ANTREPRIZ LA */}
+                                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
+                                    <div className="relative z-10 mb-6">
+                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis La (Frè Kolèkte)</p>
+                                        <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
+                                            {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
+                                        </h3>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan</p>
+                                            <p className="font-bold text-emerald-800">{feesBreakdown.ajan.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt Frè (Dep/Ret)</p>
+                                            <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* BWAT 3: KÒB SOU KAT YO */}
+                                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10 text-white"><CreditCard size={80} /></div>
+                                    <div className="relative z-10 mb-6">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Lajan Kap Woule Sou Kat Yo</p>
+                                        <h3 className="text-4xl font-bold text-white tracking-tight break-all">
+                                            {Number(totalCardBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-400">HTG</span>
+                                        </h3>
+                                    </div>
+                                    <div className="bg-white/10 p-4 rounded-xl border border-white/5 flex items-center justify-between mt-auto backdrop-blur-sm">
+                                        <span className="text-xs font-medium text-slate-300">Kat Vityèl ki Kreye:</span>
+                                        <span className="text-sm font-bold text-white">{allUsers.filter(u => u.is_card_activated).length}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-600 p-8 rounded-3xl shadow-sm mt-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                                <div>
+                                    <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-2">GRAN TOTAL KI SIPOZE NAN BANK LA (Kliyan + Biznis)</p>
+                                    <p className="text-sm text-white font-medium">Sa se sòm Kòb Wallet yo ak Pwofi konpayi an sèlman.</p>
+                                </div>
+                                <p className="text-3xl font-bold text-white tracking-tight">
+                                    {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
+                                </p>
+                            </div>
+                        </div>
+                    ) : view === 'ekip' ? (
+                        /* ========================================== */
+                        /* ONGLÈ: JERE EKIP LA (ANBOCHE & REVOKE)     */
+                        /* ========================================== */
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            
+                            <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-100">
+                                        <UserPlus size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Anboche yon Anplwaye</h2>
+                                        <p className="text-xs text-slate-500 font-medium mt-1">
+                                            Voye yon lyen sekrè bay moun nan pou l ka kreye yon modpas espas travay ki izole nèt.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={jereAnplwaye} className="flex flex-col md:flex-row items-end gap-4">
+                                    <div className="w-full flex-1">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Imèl Moun W Ap Anboche a</label>
+                                        <div className="relative">
+                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                                            <input 
+                                                type="email" 
+                                                placeholder="anplwaye@imel.com" 
+                                                value={inviteEmail} 
+                                                onChange={(e) => setInviteEmail(e.target.value)} 
+                                                className="w-full bg-slate-50 border border-gray-200 py-3.5 pl-12 pr-4 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900" 
+                                                required 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full md:w-64">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Chwazi Depatman</label>
+                                        <select 
+                                            value={inviteRole} 
+                                            onChange={(e) => setInviteRole(e.target.value)} 
+                                            className="w-full bg-slate-50 border border-gray-200 py-3.5 px-4 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                                        >
+                                            <option value="support">🎧 Sèvis Kliyan</option>
+                                            <option value="compliance">🛡️ Konfòmite & Ajan</option>
+                                            <option value="finance">💰 Finans (Kesye)</option>
+                                            <option value="super_admin">👑 Sipè Admin</option>
+                                        </select>
+                                    </div>
+
+                                    <button 
+                                        type="submit" 
+                                        disabled={processingId === 'invite_staff'} 
+                                        className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-sm flex justify-center items-center gap-2 h-[50px] shrink-0"
+                                    >
+                                        {processingId === 'invite_staff' ? <Loader2 className="animate-spin w-4 h-4" /> : 'Voye Envitasyon an'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
+                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-4">Anplwaye ki anrejistre yo ({staffMembers.length})</h3>
+                                
+                                <div className="space-y-4">
+                                    {staffMembers.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-400 text-sm font-bold">Pa gen okenn anplwaye anrejistre ankò.</div>
+                                    ) : (
+                                        staffMembers.map(staff => (
+                                            <div key={staff.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border border-gray-100 bg-slate-50 hover:bg-white hover:shadow-sm transition-all shadow-sm">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${
+                                                        staff.role === 'super_admin' ? 'bg-slate-900' :
+                                                        staff.role === 'finance' ? 'bg-emerald-600' :
+                                                        staff.role === 'compliance' ? 'bg-blue-600' : 'bg-indigo-600'
+                                                    }`}>
+                                                        {staff.role === 'super_admin' ? <ShieldCheck size={20} /> :
+                                                         staff.role === 'finance' ? <DollarSign size={20} /> :
+                                                         staff.role === 'compliance' ? <UserCheckIcon size={20} /> : <Users size={20} />}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-slate-900">{staff.full_name || 'San Non'}</h4>
+                                                        <p className="text-xs text-slate-500">{staff.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 border-t sm:border-none border-gray-200 pt-3 sm:pt-0">
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border ${
+                                                        staff.role === 'super_admin' ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                                                        staff.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                        staff.role === 'compliance' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                    }`}>
+                                                        {staff.role.replace('_', ' ')}
+                                                    </span>
+                                                    {staff.status === 'pending' && <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold uppercase">Ap tann modpas</span>}
+                                                    <button 
+                                                        onClick={() => revokeAnplwaye(staff.id, staff.email)}
+                                                        disabled={processingId === `revoke_${staff.id}`}
+                                                        className="text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-2 rounded-lg transition-colors border border-rose-100 ml-2"
+                                                        title="Revoke aksè sa"
+                                                    >
+                                                        {processingId === `revoke_${staff.id}` ? <Loader2 size={16} className="animate-spin" /> : <UserMinus size={16} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : view === 'kliyan' ? (
+                        <div className="space-y-6">
+                            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
+                                <Search size={20} className="text-slate-400 ml-2" />
+                                <input type="text" placeholder="Chèche yon kliyan ak imèl li oswa non l..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-transparent border-none p-2 text-slate-900 outline-none font-bold placeholder:text-slate-400 text-sm" />
+                                {searchQuery && <button onClick={() => setSearchQuery('')} className="bg-slate-100 text-slate-500 hover:text-slate-900 p-2.5 rounded-xl text-xs font-bold transition-all">EFASE</button>}
+                            </div>
+                            <div className="space-y-4">
+                                {filteredUsers.length === 0 ? (
+                                    <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa jwenn okenn kliyan ak non oswa imèl sa a</div>
+                                ) : (
+                                    filteredUsers.map(user => (
+                                        <div key={user.id} className={`bg-white p-6 rounded-3xl border ${user.account_status === 'suspended' ? 'border-rose-200 bg-rose-50/30' : 'border-gray-200'} relative flex flex-col md:flex-row gap-6 items-center justify-between transition-all shadow-sm`}>
+                                            <div className="flex items-center gap-5 w-full md:w-auto">
+                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl shrink-0 ${user.account_status === 'suspended' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                                    {user.full_name ? user.full_name.charAt(0).toUpperCase() : <UserX size={24} />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-base font-bold text-slate-900 truncate w-full">{user.full_name || 'San Non'}</h3>
+                                                    <p className="text-xs text-slate-500 truncate w-full mt-0.5">{user.email}</p>
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-bold tracking-wider">BALANS: <span className="text-slate-900">{Number(user.wallet_balance || 0).toLocaleString()} HTG</span></span>
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase ${user.kyc_status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>KYC: {user.kyc_status}</span>
+                                                        {user.is_card_activated && <span className="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-bold tracking-wider uppercase">KAT AKTIVE</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                                {user.account_status === 'suspended' ? (
+                                                    <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-emerald-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-emerald-700 transition-all shadow-sm">AKTIVE KONT</button>
+                                                ) : (
+                                                    <button onClick={() => sispannKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm">SISPANN KONT</button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ) : view === 'anons' ? (
+                        <div className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 shadow-sm">
+                            <div className="flex items-center gap-3 mb-6">
+                                <span className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Send size={24} /></span>
+                                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Jere Notifikasyon Global</h2>
+                            </div>
+                            <form onSubmit={handleSaveAnons} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Tèks k ap parèt sou paj kliyan yo:</label>
+                                    <textarea value={anonsText} onChange={(e) => setAnonsText(e.target.value)} placeholder="Ekri mesaj ou vle tout kliyan wè a la a..." className="w-full bg-slate-50 border border-gray-200 p-5 rounded-2xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm min-h-[150px] text-slate-900 placeholder:text-slate-400 resize-none" required />
+                                </div>
+                                <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-gray-200 cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => setAnonsActive(!anonsActive)}>
+                                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 border ${anonsActive ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                       {anonsActive && <CheckCircle2 size={16} />}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900">Afiche notifikasyon an?</span>
+                                        <span className="text-xs text-slate-500 font-medium mt-0.5">Si bwat sa pa make, notifikasyon an pap parèt pou kliyan yo.</span>
+                                    </div>
+                                </div>
+                                <button type="submit" disabled={processingId === 'saving_anons'} className="w-full bg-indigo-600 hover:bg-indigo-700 px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all text-white shadow-sm flex items-center justify-center gap-2">
+                                    {processingId === 'saving_anons' ? <Loader2 size={18} className="animate-spin" /> : "Sove Notifikasyon an"}
+                                </button>
+                            </form>
+                        </div>
+                    ) : view === 'kyc' ? (
+                        pendingKyc.length === 0 ? (
+                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn KYC k ap tann</div>
+                        ) : (
+                            <div className="space-y-4">
+                                {pendingKyc.map((user) => (
+                                    <div key={user.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col md:flex-row gap-6 items-center transition-all hover:shadow-md">
+                                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0"><UserX size={32} /></div>
+                                        <div className="flex-1 text-center md:text-left w-full">
+                                            <h3 className="text-lg font-bold text-slate-900">{user.full_name || 'San Non'}</h3>
+                                            <p className="text-xs text-slate-500 mt-1 mb-4">{user.email}</p>
+                                            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                                {user.kyc_front && <button onClick={() => handleOpenDocument(user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
+                                                {user.kyc_back && <button onClick={() => handleOpenDocument(user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
+                                                {user.kyc_selfie && <button onClick={() => handleOpenDocument(user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
+                                                {!user.kyc_front && !user.kyc_selfie && <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 font-bold uppercase tracking-wider">Okenn imaj sou sistèm nan</span>}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-2 md:mt-0 shrink-0">
+                                            <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'approved')} disabled={processingId === user.id} className="bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                {processingId === user.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
+                                            </button>
+                                            <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'rejected')} disabled={processingId === user.id} className="bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                <XCircle size={16} /> Rejte
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    ) : view === 'ajan' ? (
+                        pendingAgents.length === 0 ? (
+                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
+                                <Store size={48} className="mx-auto mb-4 text-slate-300" />
+                                Pa gen okenn aplikasyon Ajan k ap tann
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {pendingAgents.map((agent) => (
+                                    <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
+                                        
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Store size={24} /></div>
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900">{agent.profiles?.full_name || 'San Non'}</h3>
+                                                    <p className="text-xs text-slate-500 mt-1">{agent.profiles?.email}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1 font-mono">ID Kliyan: {agent.user_id}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase tracking-wider border border-indigo-100 mb-2">Plan: {agent.tier}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Depo Fèt: {Number(agent.metadata?.initial_deposit || 0).toLocaleString()} HTG</span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman yo soumèt</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
+                                                {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
+                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
+                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
+                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
+                                            <div className="w-full md:flex-1">
+                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la a (Lajan l ap retounen):</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Egz: Foto lokal la pa klè..." 
+                                                    value={agentRejectionReason[agent.id] || ''}
+                                                    onChange={(e) => setAgentRejectionReason({...agentRejectionReason, [agent.id]: e.target.value})}
+                                                    className="w-full bg-slate-50 border border-gray-200 py-3 px-4 rounded-xl text-sm outline-none focus:border-rose-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div className="flex gap-3 w-full md:w-auto shrink-0">
+                                                <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'rejected')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    <XCircle size={16} /> Rejte (Ranbouse l)
+                                                </button>
+                                                <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    ) : view === 'promo' ? (
+                        <div>
+                            <form onSubmit={handleCreateCode} className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-sm">
+                                <div className="flex-1 w-full space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Nouvo Kòd (Ex: IZO2026)</label>
+                                    <input type="text" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} placeholder="NON ATIS LA" className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold text-sm uppercase text-slate-900" required />
+                                </div>
+                                <div className="w-full md:w-48 space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Rediksyon (HTG)</label>
+                                    <input type="number" value={promoReward} onChange={(e) => setPromoReward(e.target.value)} className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold text-sm text-slate-900" required min="0" />
+                                </div>
+                                <button type="submit" disabled={processingId === 'creating_promo'} className="w-full md:w-auto bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold uppercase tracking-wider active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2">
+                                    {processingId === 'creating_promo' ? <Loader2 size={18} className="animate-spin" /> : "Kreye Kòd La"}
+                                </button>
+                            </form>
+                            <div className="overflow-x-auto bg-white rounded-3xl border border-gray-200 shadow-sm">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 bg-slate-50">
+                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider">Kòd Pwomo</th>
+                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider text-center">Rediksyon (HTG)</th>
+                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider text-center">Moun Mennen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {promoCodes.length === 0 ? (
+                                            <tr><td colSpan={3} className="p-10 text-center text-sm font-bold uppercase text-slate-400 tracking-wider">Pa gen kòd kreye ankò.</td></tr>
+                                        ) : (
+                                            promoCodes.map((promo) => (
+                                                <tr key={promo.code} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
+                                                    <td className="p-5 font-bold text-indigo-600">{promo.code}</td>
+                                                    <td className="p-5 text-center font-bold text-slate-900">{promo.reward_amount} HTG</td>
+                                                    <td className="p-5 text-center"><span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg font-bold text-xs border border-emerald-100">{promo.usage_count}</span></td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : view === 'sispandi' ? (
+                        <div className="space-y-4">
+                            {suspendedAccounts.length === 0 ? (
+                                <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn kont ki sispandi</div>
+                            ) : (
+                                suspendedAccounts.map((account) => (
+                                    <div key={account.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-rose-200 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                                        <div className="flex items-center gap-5 w-full md:w-auto">
+                                            <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center border border-rose-200 shrink-0"><AlertTriangle size={24} /></div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold text-slate-900 truncate w-full">{account.full_name || 'San Non'}</h3>
+                                                <p className="text-xs text-slate-500 truncate w-full mt-0.5">{account.email}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => deblokeKont(account.id, account.email)} disabled={processingId === account.id} className="w-full md:w-auto bg-emerald-600 text-white px-8 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all hover:bg-emerald-700 shadow-sm flex items-center justify-center gap-2">
+                                            {processingId === account.id ? <Loader2 size={16} className="animate-spin" /> : "Aktive Kont Sa a"}
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {(view === 'depo' ? deposits : withdrawals).map((item) => {
+                                const isDepo = view === 'depo';
+                                const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
+                                
+                                return (
+                                    <div key={item.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 relative overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                        {item.status !== 'pending' && <button onClick={() => deleteTranzaksyon(item.id, isDepo ? 'deposits' : 'withdrawals')} className="absolute top-6 right-6 text-rose-600 text-[10px] font-bold uppercase tracking-wider bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg hover:bg-rose-600 hover:text-white transition-colors">EFASE</button>}
+                                        
+                                        <div className="flex justify-between mb-6 pr-16 border-b border-gray-100 pb-4">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kliyan: {item.user_id?.slice(0,8)}...</span>
+                                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded w-fit border border-indigo-100">Metòd: {item.method}</span>
+                                            </div>
+                                            <span className={`text-[10px] h-fit px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider border ${item.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'approved' || item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                                                {item.status}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="mb-6">
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">MONTAN {isDepo ? 'KLIYAN AN DECLARE (SAN FRÈ)' : 'KLIYAN MANDE A'}:</p>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-4xl font-bold tracking-tight text-slate-900">{aficheMontan} <span className="text-sm text-slate-500">HTG</span></p>
+                                                {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan san frè a:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-colors">MODIFYE</button>}
+                                            </div>
+
+                                            {isDepo && item.fee !== undefined && (
+                                                <div className="mt-6 space-y-2">
+                                                    <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Frè Biznis La (5%):</span>
+                                                        <span className="text-xs text-emerald-700 font-bold">+{montanModifye[item.id] ? (montanModifye[item.id] * 0.05).toFixed(2) : item.fee} HTG</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                                        <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Total Kliyan te dwe voye a:</span>
+                                                        <span className="text-sm text-indigo-700 font-bold">{montanModifye[item.id] ? (montanModifye[item.id] * 1.05).toFixed(2) : item.total_to_pay || (Number(item.amount) + Number(item.fee))} HTG</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {item.status === 'pending' && (
+                                            <div className="space-y-4 pt-6 border-t border-gray-100">
+                                                <div className="flex gap-3">
+                                                    <button disabled={processingId === item.id} onClick={() => isDepo ? apwouveDepo(item) : apwouveRetre(item)} className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                        <CheckCircle2 size={16} /> Konfime Apwouve
+                                                    </button>
+                                                    <button disabled={processingId === item.id} onClick={() => anileTranzaksyon(item, isDepo ? 'deposits' : 'withdrawals')} className="bg-white text-rose-600 border border-rose-200 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                        <XCircle size={16} /> Anile
+                                                    </button>
+                                                </div>
+                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenDocument(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
+                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenDocument(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {!loading && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn {view} pou kounye a</div>}
+                        </div>
+                    )}
+                </div>
             </div>
-          </div>
         </div>
-      </footer>
-
-      <style jsx>{`
-        .perspective-1000 { perspective: 1000px; }
-        .preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden { backface-visibility: hidden; }
-        .rotate-y-180 { transform: rotateY(180deg); }
-      `}</style>
-    </div>
-  );
-}
-
-// Ikon Anplis ki itilize nan paj la
-function ArrowDownToLine(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 17V3"/><path d="m6 11 6 6-6"/><path d="M19 21H5"/></svg>
-}
-function ArrowUpFromLine(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>
+    );
 }
