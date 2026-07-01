@@ -39,7 +39,7 @@ export default function WorkspacePage() {
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
-    // Views pou anplwaye yo (Support gen 'clients' oswa 'tickets')
+    // Views pou anplwaye yo
     const [activeTab, setActiveTab] = useState('main');
 
     useEffect(() => {
@@ -85,7 +85,7 @@ export default function WorkspacePage() {
             const { data: u } = await supabase.from('profiles').select('id, full_name, email, account_status, wallet_balance, kyc_status, created_at').order('created_at', { ascending: false });
             setUsers(u || []);
             
-            // Rale Tickets yo (Pwoblèm Kliyan yo)
+            // Rale Tickets yo epi melanje l ak tab profile la pou gen non kliyan an
             const { data: t } = await supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false });
             setTickets(t || []);
         } 
@@ -155,7 +155,6 @@ export default function WorkspacePage() {
             });
             if (error) throw error;
 
-            // Chanje estati a fè kliyan an konnen yo reponn li
             await supabase.from('support_tickets').update({ status: 'answered' }).eq('id', selectedTicket.id);
 
             setMessages([...messages, { 
@@ -167,7 +166,6 @@ export default function WorkspacePage() {
                 created_at: new Date().toISOString() 
             }]);
 
-            // Mete a jou nan lis la sou kote a pou l chanje koulè a
             setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'answered' } : t));
             setReplyMessage('');
         } catch (err: any) {

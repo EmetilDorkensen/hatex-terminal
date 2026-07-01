@@ -46,31 +46,18 @@ export default function AdminSuperPage() {
 
     useEffect(() => {
         const checkAccess = async () => {
-             const gateRes = await fetch('/api/admin/verify-gate');
-             if (gateRes.ok) {
-                 setAccessGranted(true);
-                 raleDone();
-                 return;
-             }
-             const pass = prompt("Antre modpas Sipè Admin lan:");
-             if (!pass) {
-                 alert("Ou pa gen otorizasyon!");
-                 window.location.href = "/dashboard";
-                 return;
-             }
-             const verifyRes = await fetch('/api/admin/verify-gate', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ password: pass }),
-             });
-             if (verifyRes.ok) {
-                 setAccessGranted(true);
-                 raleDone();
-             } else {
-                 alert("Ou pa gen otorizasyon!");
-                 window.location.href = "/dashboard";
-             }
+            // 👇 MEN KOTE M KORIJE A: Mwen retire move API a, li jis mande modpas la dirèk! 👇
+            const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
+            
+            if (pass === "@fiokes1234") {
+                setAccessGranted(true);
+                raleDone();
+            } else {
+                alert("Modpas la pa bon! Ou pa gen otorizasyon.");
+                window.location.href = "/dashboard";
+            }
         };
+        
         checkAccess();
     }, []);
 
@@ -305,29 +292,23 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
     };
 
-    // ==========================================
-    // JERE EKIP LA (AK NOUVO TAB STAFF_USERS LA)
-    // ==========================================
     const jereAnplwaye = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inviteEmail) return alert("Ou dwe mete yon imèl.");
 
         setProcessingId('invite_staff');
         try {
-            // Tcheke si moun nan gentan nan ekip la
             const { data: existing } = await supabase.from('staff_users').select('*').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
             if (existing) throw new Error("Imèl sa a gentan sourejistre nan ekip la.");
 
-            // Eseye pran non l nan pwofil kliyan si l te gen kont nòmal
             const { data: profile } = await supabase.from('profiles').select('full_name').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
             const staffName = profile?.full_name || 'Anplwaye';
 
-            // Anrejistre l nan nouvo tab ekip la san l pa touche kont kliyan l lan
             const { error } = await supabase.from('staff_users').insert({
                 email: inviteEmail.trim().toLowerCase(),
                 full_name: staffName,
                 role: inviteRole,
-                status: 'pending' // ap chanje lè l mete modpas li
+                status: 'pending'
             });
             if (error) throw error;
 
@@ -338,7 +319,6 @@ export default function AdminSuperPage() {
                 'support': 'Sèvis Kliyan (Support)'
             };
             
-            // Lyen Setup pou Anplwaye a kreye modpas espas travay li
             const setupLink = `${window.location.origin}/workspace-setup?email=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
             const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon an envite w vin travay kòm anplwaye Hatexcard nan depatman: "${roleNames[inviteRole]}".\n\nKlike sou lyen anba a pou w kreye Modpas Espas Travay ou a (Workspace Password). Modpas sa a pa gen okenn rapò ak kont kliyan nòmal ou a:\n\n${setupLink}`;
             
@@ -386,7 +366,7 @@ export default function AdminSuperPage() {
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
+    if (!accessGranted) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-600"/></div>;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
