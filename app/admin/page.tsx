@@ -14,7 +14,7 @@ export default function AdminSuperPage() {
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
-    // Ekip travay ki soti nan staff_users
+    // NOUVO: Ekip travay ki soti nan staff_users
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
 
     const [inviteEmail, setInviteEmail] = useState('');
@@ -47,15 +47,21 @@ export default function AdminSuperPage() {
     useEffect(() => {
         const checkAccess = async () => {
             try {
-                // 1. Nou tcheke si l gentan konekte deja nan API a
+                // 1. Tcheke si w te konekte deja (Si Rate Limit Upstash la bloke w la, l ap di w sa dirèk)
                 const gateRes = await fetch('/api/admin/verify-gate');
                 if (gateRes.ok) {
                     setAccessGranted(true);
                     raleDone();
                     return;
                 }
+                
+                if (gateRes.status === 429) {
+                    alert("Sekirite a bloke w tanporèman paske w eseye twòp fwa (Erè 429). Tanpri tann 1 a 2 minit epi rafrechi paj la.");
+                    window.location.href = "/dashboard";
+                    return;
+                }
 
-                // 2. Si l pa konekte, nou poze l kesyon modpas la dirèk
+                // 2. Si l pa konekte, li mande w modpas la
                 const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
                 
                 if (!pass) {
@@ -63,7 +69,7 @@ export default function AdminSuperPage() {
                     return;
                 }
 
-                // 3. Nou voye modpas li tape a bay API a pou l verifye ak ADMIN_GATE_PASSWORD ki nan Vercel la
+                // 3. Konpare ak Vercel
                 const verifyRes = await fetch('/api/admin/verify-gate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -73,8 +79,11 @@ export default function AdminSuperPage() {
                 if (verifyRes.ok) {
                     setAccessGranted(true);
                     raleDone();
+                } else if (verifyRes.status === 429) {
+                    alert("Sistèm sekirite a bloke w pou yon minit paske w fè twòp tantativ jodi a. Tanpri tann yon ti moman.");
+                    window.location.href = "/dashboard";
                 } else {
-                    alert("Modpas la pa bon! Li pa menm ak sa k nan anviwònman an.");
+                    alert("Modpas la pa bon! Li pa menm ak sa k nan anviwònman Vercel la.");
                     window.location.href = "/dashboard";
                 }
             } catch (e) {
@@ -391,8 +400,7 @@ export default function AdminSuperPage() {
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    // Modpas verifye API a deja, donk nou jis kite yon ti loader pou tranzisyon an dous
-    if (!accessGranted) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-600"/></div>;
+    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
@@ -901,4 +909,12 @@ export default function AdminSuperPage() {
             </div>
         </div>
     );
+}
+
+// Ikon Anplis ki itilize nan paj la (FÈ SÈTEN OU KITE SA POU SVG A PA BAY ERÈ)
+function ArrowDownToLine(props: any) {
+  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg>
+}
+function ArrowUpFromLine(props: any) {
+  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>
 }
