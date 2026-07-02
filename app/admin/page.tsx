@@ -14,7 +14,7 @@ export default function AdminSuperPage() {
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
-    // NOUVO: Ekip travay ki soti nan staff_users
+    // Ekip travay ki soti nan staff_users
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
 
     const [inviteEmail, setInviteEmail] = useState('');
@@ -45,14 +45,41 @@ export default function AdminSuperPage() {
     );
 
     useEffect(() => {
-        // 👇 SOLISYON AN LA: Li mande modpas la dirèk depi paj la chaje san okenn API call kap fose dekonksyon!
-        const checkAccess = () => {
-            const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
-            if (pass === "@fiokes1234") {
-                setAccessGranted(true);
-                raleDone();
-            } else {
-                alert("Modpas la pa bon! Ou pa gen otorizasyon.");
+        const checkAccess = async () => {
+            try {
+                // 1. Nou tcheke si l gentan konekte deja nan API a
+                const gateRes = await fetch('/api/admin/verify-gate');
+                if (gateRes.ok) {
+                    setAccessGranted(true);
+                    raleDone();
+                    return;
+                }
+
+                // 2. Si l pa konekte, nou poze l kesyon modpas la dirèk
+                const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
+                
+                if (!pass) {
+                    window.location.href = "/dashboard";
+                    return;
+                }
+
+                // 3. Nou voye modpas li tape a bay API a pou l verifye ak ADMIN_GATE_PASSWORD ki nan Vercel la
+                const verifyRes = await fetch('/api/admin/verify-gate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pass }),
+                });
+
+                if (verifyRes.ok) {
+                    setAccessGranted(true);
+                    raleDone();
+                } else {
+                    alert("Modpas la pa bon! Li pa menm ak sa k nan anviwònman an.");
+                    window.location.href = "/dashboard";
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Gen yon erè nan sistèm verifikasyon an.");
                 window.location.href = "/dashboard";
             }
         };
@@ -90,7 +117,6 @@ export default function AdminSuperPage() {
                 setPendingAgents(mergedAgents);
             }
 
-            // RALE LIS ANPLWAYE YO NAN NOUVO TAB LA
             const { data: stData } = await supabase.from('staff_users').select('*').order('created_at', { ascending: false });
             setStaffMembers(stData || []);
             
@@ -365,7 +391,8 @@ export default function AdminSuperPage() {
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
+    // Modpas verifye API a deja, donk nou jis kite yon ti loader pou tranzisyon an dous
+    if (!accessGranted) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-600"/></div>;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
@@ -717,9 +744,9 @@ export default function AdminSuperPage() {
                                             <div className="flex flex-wrap gap-3">
                                                 {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
                                                 {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
-                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
-                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
-                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
+                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
+                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
                                             </div>
                                         </div>
 
