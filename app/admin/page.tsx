@@ -45,16 +45,19 @@ export default function AdminSuperPage() {
     );
 
     useEffect(() => {
-        // Mwen retire tout ti vye API ki tap voye w nan login nan. 
-        // L ap mande modpas la dirèk kou w modifye URL la!
-        const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
-        if (pass === "@fiokes1234") {
-            setAccessGranted(true);
-            raleDone();
-        } else {
-            alert("Modpas la pa bon! Ou pa gen otorizasyon.");
-            window.location.href = "/dashboard";
-        }
+        // 👇 SOLISYON AN LA: Li mande modpas la dirèk depi paj la chaje san okenn API call kap fose dekonksyon!
+        const checkAccess = () => {
+            const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
+            if (pass === "@fiokes1234") {
+                setAccessGranted(true);
+                raleDone();
+            } else {
+                alert("Modpas la pa bon! Ou pa gen otorizasyon.");
+                window.location.href = "/dashboard";
+            }
+        };
+        
+        checkAccess();
     }, []);
 
     const raleDone = async () => {
@@ -714,9 +717,9 @@ export default function AdminSuperPage() {
                                             <div className="flex flex-wrap gap-3">
                                                 {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
                                                 {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
-                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
-                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
-                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
+                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
+                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
                                             </div>
                                         </div>
 

@@ -7,7 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase 
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -61,12 +61,28 @@ export default function Dashboard() {
   const [otpCode, setOtpCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
 
+  // ETA POU PÒTAY ADMIN
+  const [isLoggingAdmin, setIsLoggingAdmin] = useState(false);
+
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
-      const res = await fetch('/api/card/ensure', { method: 'POST' });
-      const data = await res.json();
-      if (data.card) {
-        return { ...currentProfile, card_number: data.card.card_number, cvv: data.card.cvv, exp_date: data.card.exp_date };
+      try {
+         const res = await fetch('/api/card/ensure', { method: 'POST' });
+         if (res.ok) {
+           const data = await res.json();
+           if (data.card) {
+             return { ...currentProfile, card_number: data.card.card_number, cvv: data.card.cvv, exp_date: data.card.exp_date };
+           }
+         }
+      } catch (e) {
+          // fallback san api
+          const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
+          const newCardNum = `4550${random4()}${random4()}${random4()}`;
+          const newCvv = Math.floor(100 + Math.random() * 900).toString();
+          const now = new Date();
+          const newExp = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
+          await supabase.from('profiles').update({ card_number: newCardNum, cvv: newCvv, exp_date: newExp }).eq('id', userId);
+          return { ...currentProfile, card_number: newCardNum, cvv: newCvv, exp_date: newExp };
       }
     }
     return currentProfile;
@@ -359,6 +375,31 @@ export default function Dashboard() {
     }
   };
 
+  // 👇 FONKSYON POU BOUTON ADMIN NAN KI ITILIZE API A POU L PASE MIDDLEWARE LA 👇
+  const antreNanAdmin = async () => {
+    const pass = prompt("Antre Modpas Sipè Admin lan pou w ka konekte:");
+    if (!pass) return;
+
+    setIsLoggingAdmin(true);
+    try {
+        const verifyRes = await fetch('/api/admin/verify-gate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pass }),
+        });
+        
+        if (verifyRes.ok) { 
+            window.location.href = "/admin"; 
+        } else { 
+            alert("Modpas la pa bon! Ou pa gen otorizasyon."); 
+        }
+    } catch (e) {
+        alert("Erè nan sistèm nan. Tanpri eseye ankò.");
+    } finally {
+        setIsLoggingAdmin(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -370,6 +411,8 @@ export default function Dashboard() {
   const kycPending = userData?.kyc_status !== 'approved';
   const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
   const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
+  
+  // 👇 BOUTON AN PARÈT SÈLMAN POU IMÈL SA A 👇
   const isAdmin = userData?.email === 'adminhatexcard@gmail.com';
 
   return (
@@ -387,8 +430,18 @@ export default function Dashboard() {
           ></div>
           
           {/* PWENPAL MENI AN (Soti bò gòch la) */}
-          <div className="relative w-[280px] max-w-sm bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left duration-300 z-10 border-r border-gray-200">
+          <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-left duration-300 border-r border-gray-200 z-10">
             {/* Header Meni an ak Logo */}
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-3">
+                <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-9 h-9 rounded-lg object-cover shadow-sm border border-gray-200" />
+                <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
+              </div>
+              <button onClick={() => setIsMenuOpen(false)} className="text-slate-400 hover:text-slate-700 bg-white rounded-full p-1 border border-gray-200 shadow-sm transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-sm">
@@ -399,9 +452,6 @@ export default function Dashboard() {
                   <p className="text-[10px] text-slate-500 font-medium truncate w-32">{userData?.email}</p>
                 </div>
               </div>
-              <button onClick={() => setIsMenuOpen(false)} className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-full text-slate-500 hover:text-rose-500 shadow-sm transition-colors">
-                <X size={16} />
-              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
@@ -414,27 +464,11 @@ export default function Dashboard() {
               <button onClick={() => { router.push('/kat'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
                 <CreditCard size={20} /> Kat
               </button>
-
-              <button 
-   onClick={() => { 
-       const pass = prompt("Antre modpas Sipè Admin lan:");
-       if (pass === "@fiokes1234") { window.location.href = "/admin"; } 
-       else { alert("Modpas la pa bon! Ou pa gen otorizasyon."); }
-   }} 
-   className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wider shadow-sm flex items-center gap-2 transition-colors"
->
-  <Briefcase size={16} /> Admin
-</button>
-
-
+              
               <button 
                 onClick={() => {
-                  if (cardFullyActive) {
-                    router.push('/terminal');
-                    setIsMenuOpen(false);
-                  } else {
-                    alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!");
-                  }
+                  if (cardFullyActive) { router.push('/terminal'); setIsMenuOpen(false); } 
+                  else { alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!"); }
                 }} 
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
               >
@@ -449,7 +483,6 @@ export default function Dashboard() {
                 <History size={20} /> Istorik
               </button>
 
-              {/* BOUTON ASISTANS (SIPÒ KLIYAN) */}
               <button onClick={() => { router.push('/support'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all">
                 <Headset size={20} /> Asistans / Sipò
               </button>
@@ -458,25 +491,15 @@ export default function Dashboard() {
                 <Settings size={20} /> Paramèt
               </button>
 
-              {/* 👇 NOUVO BOUTON PÒTAY ADMIN NAN (SÈLMAN POU OU) 👇 */}
-              {userData?.role === 'super_admin' && (
+              {/* 👇 BOUTON PÒTAY ADMIN NAN ANNDAN MENI AN SÈLMAN POU IMÈL ADMIN NAN 👇 */}
+              {isAdmin && (
                 <button 
-                   onClick={async () => { 
-                       const gateRes = await fetch('/api/admin/verify-gate');
-                       if (gateRes.ok) { window.location.href = "/admin"; return; }
-                       const pass = prompt("Antre modpas Sipè Admin lan:");
-                       if (!pass) return;
-                       const verifyRes = await fetch('/api/admin/verify-gate', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ password: pass }),
-                       });
-                       if (verifyRes.ok) { window.location.href = "/admin"; }
-                       else { alert("Modpas la pa bon! Ou pa gen otorizasyon."); }
-                   }} 
-                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 hover:bg-rose-50 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-4"
+                  onClick={antreNanAdmin} 
+                  disabled={isLoggingAdmin}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-4 shadow-sm"
                 >
-                  <Briefcase size={16} /> Pòtay Admin
+                   {isLoggingAdmin ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />} 
+                   Kès Biznis (Admin)
                 </button>
               )}
             </div>
@@ -578,6 +601,16 @@ export default function Dashboard() {
 
           {/* Quick Actions Desktop */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* 👇 BOUTON PÒTAY ADMIN NAN SOU DASHBOARD PRINCIPAL LA POU IMÈL ADMIN NAN SÈLMAN 👇 */}
+            {isAdmin && (
+                <button 
+                   onClick={antreNanAdmin} 
+                   disabled={isLoggingAdmin}
+                   className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wider shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                >
+                   {isLoggingAdmin ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />} Admin
+                </button>
+            )}
             <button onClick={() => setShowNumbers(!showNumbers)} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
               <span className="text-lg">{showNumbers ? "🔒" : "👁️"}</span>
             </button>
@@ -775,7 +808,6 @@ export default function Dashboard() {
             
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-3 mb-4">
-                {/* LOGO NAN FOOTER A */}
                 <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" className="w-10 h-10 rounded-lg object-cover shadow-sm border border-gray-200" />
                 <span className="font-bold text-xl text-slate-900 tracking-tight">Hatexcard</span>
               </div>
