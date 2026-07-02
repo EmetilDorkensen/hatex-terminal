@@ -2,9 +2,21 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound } from 'lucide-react';
 
 export default function AdminSuperPage() {
+    // ----------------------------------------------------
+    // ETA POU EKRAN SEKIRITE A
+    // ----------------------------------------------------
+    const [accessGranted, setAccessGranted] = useState(false);
+    const [isCheckingSession, setIsCheckingSession] = useState(true);
+    const [adminPassword, setAdminPassword] = useState('');
+    const [isUnlocking, setIsUnlocking] = useState(false);
+    const [unlockError, setUnlockError] = useState('');
+
+    // ----------------------------------------------------
+    // ETA POU DONE ADMIN YO (PANYEN AN)
+    // ----------------------------------------------------
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [deposits, setDeposits] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -13,28 +25,19 @@ export default function AdminSuperPage() {
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
-
-    // NOUVO: Ekip travay ki soti nan staff_users
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
-
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('support');
-
     const [totalCardBal, setTotalCardBal] = useState(0);
     const [newPromoCode, setNewPromoCode] = useState('');
     const [promoReward, setPromoReward] = useState('250');
     const [searchQuery, setSearchQuery] = useState('');
-    
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    
     const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'ekip'>('dashboard'); 
-    
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const [accessGranted, setAccessGranted] = useState(false);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
-
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
     const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
@@ -44,58 +47,56 @@ export default function AdminSuperPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
+    // ====================================================
+    // VERIFIKASYON AK LÒK EKRAN AN
+    // ====================================================
     useEffect(() => {
-        const checkAccess = async () => {
+        const checkExistingSession = async () => {
             try {
-                // 1. Tcheke si w te konekte deja (Si Rate Limit Upstash la bloke w la, l ap di w sa dirèk)
                 const gateRes = await fetch('/api/admin/verify-gate');
                 if (gateRes.ok) {
                     setAccessGranted(true);
                     raleDone();
-                    return;
-                }
-                
-                if (gateRes.status === 429) {
-                    alert("Sekirite a bloke w tanporèman paske w eseye twòp fwa (Erè 429). Tanpri tann 1 a 2 minit epi rafrechi paj la.");
-                    window.location.href = "/dashboard";
-                    return;
-                }
-
-                // 2. Si l pa konekte, li mande w modpas la
-                const pass = prompt("Antre modpas Sipè Admin lan pou w ka konekte:");
-                
-                if (!pass) {
-                    window.location.href = "/dashboard";
-                    return;
-                }
-
-                // 3. Konpare ak Vercel
-                const verifyRes = await fetch('/api/admin/verify-gate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pass }),
-                });
-
-                if (verifyRes.ok) {
-                    setAccessGranted(true);
-                    raleDone();
-                } else if (verifyRes.status === 429) {
-                    alert("Sistèm sekirite a bloke w pou yon minit paske w fè twòp tantativ jodi a. Tanpri tann yon ti moman.");
-                    window.location.href = "/dashboard";
-                } else {
-                    alert("Modpas la pa bon! Li pa menm ak sa k nan anviwònman Vercel la.");
-                    window.location.href = "/dashboard";
                 }
             } catch (e) {
-                console.error(e);
-                alert("Gen yon erè nan sistèm verifikasyon an.");
-                window.location.href = "/dashboard";
+                // Ignore
+            } finally {
+                setIsCheckingSession(false);
             }
         };
-        
-        checkAccess();
+        checkExistingSession();
     }, []);
 
+    const handleUnlock = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsUnlocking(true);
+        setUnlockError('');
+
+        try {
+            const verifyRes = await fetch('/api/admin/verify-gate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: adminPassword }),
+            });
+
+            if (verifyRes.ok) {
+                setAccessGranted(true);
+                raleDone();
+            } else if (verifyRes.status === 429) {
+                setUnlockError("Erè 429: Sekirite Vercel bloke w paske w eseye twòp. Tann 1 minit.");
+            } else {
+                setUnlockError("Modpas la pa bon!");
+            }
+        } catch (err) {
+            setUnlockError("Erè koneksyon. Tcheke entènèt ou.");
+        } finally {
+            setIsUnlocking(false);
+        }
+    };
+
+    // ====================================================
+    // FONKSYON RALE DONE
+    // ====================================================
     const raleDone = async () => {
         setLoading(true);
         try {
@@ -170,7 +171,6 @@ export default function AdminSuperPage() {
             
             const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee;
             setTotalBiznisProfit(granTotalPwofi);
-
         } catch (error) {}
     };
 
@@ -400,8 +400,52 @@ export default function AdminSuperPage() {
         return user.email?.toLowerCase().includes(lowerQuery) || user.full_name?.toLowerCase().includes(lowerQuery);
     });
 
-    if (!accessGranted) return <div className="bg-slate-50 h-screen" />;
+    // ====================================================
+    // UI POU EKRAN SEKIRITE A SI W POKO METE MODPAS LA
+    // ====================================================
+    if (isCheckingSession) {
+        return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-500"/></div>;
+    }
 
+    if (!accessGranted) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-md bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700">
+                    <div className="w-16 h-16 bg-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <KeyRound size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white text-center tracking-tight mb-2">Pòtay Administratè</h2>
+                    <p className="text-slate-400 text-sm text-center mb-8">Sa a se zòn sekrè a. Tanpri rantre modpas Vercel ou a.</p>
+                    
+                    <form onSubmit={handleUnlock} className="space-y-4">
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
+                            <input 
+                                type="password" 
+                                value={adminPassword}
+                                onChange={(e) => setAdminPassword(e.target.value)}
+                                placeholder="••••••••••••"
+                                className="w-full bg-slate-900 border border-slate-700 text-white pl-12 pr-4 py-4 rounded-xl focus:border-rose-500 outline-none transition-colors tracking-widest font-mono"
+                                autoFocus
+                            />
+                        </div>
+                        {unlockError && <p className="text-xs text-rose-400 font-bold text-center animate-pulse">{unlockError}</p>}
+                        <button 
+                            type="submit" 
+                            disabled={isUnlocking || !adminPassword}
+                            className="w-full bg-rose-600 hover:bg-rose-700 text-white py-4 rounded-xl font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex justify-center gap-2"
+                        >
+                            {isUnlocking ? <Loader2 size={20} className="animate-spin" /> : "Ouvri Pòtay La"}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    // ====================================================
+    // UI NÒMAL POU KÈS BIZNIS LA 
+    // ====================================================
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 font-sans pb-24">
             <div className="max-w-7xl mx-auto">
@@ -444,9 +488,6 @@ export default function AdminSuperPage() {
                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ap Chaje Done Yo...</p>
                         </div>
                     ) : view === 'dashboard' ? (
-                        /* ========================================== */
-                        /* ONGLÈ: DASHBOARD GLOBAL POU SIPÈ ADMIN AN  */
-                        /* ========================================== */
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             
                             <div className="flex items-center gap-4 mb-6">
@@ -458,7 +499,6 @@ export default function AdminSuperPage() {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* BWAT 1: KÒB KLIYAN YO */}
                                 <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 p-6 opacity-5"><Users size={80} /></div>
                                     <div className="relative z-10 mb-6">
@@ -473,7 +513,6 @@ export default function AdminSuperPage() {
                                     </div>
                                 </div>
 
-                                {/* BWAT 2: PWOFI ANTREPRIZ LA */}
                                 <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
                                     <div className="relative z-10 mb-6">
@@ -494,7 +533,6 @@ export default function AdminSuperPage() {
                                     </div>
                                 </div>
 
-                                {/* BWAT 3: KÒB SOU KAT YO */}
                                 <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 p-6 opacity-10 text-white"><CreditCard size={80} /></div>
                                     <div className="relative z-10 mb-6">
@@ -521,9 +559,6 @@ export default function AdminSuperPage() {
                             </div>
                         </div>
                     ) : view === 'ekip' ? (
-                        /* ========================================== */
-                        /* ONGLÈ: JERE EKIP LA (ANBOCHE & REVOKE)     */
-                        /* ========================================== */
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             
                             <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
@@ -909,12 +944,4 @@ export default function AdminSuperPage() {
             </div>
         </div>
     );
-}
-
-// Ikon Anplis ki itilize nan paj la (FÈ SÈTEN OU KITE SA POU SVG A PA BAY ERÈ)
-function ArrowDownToLine(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg>
-}
-function ArrowUpFromLine(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>
 }

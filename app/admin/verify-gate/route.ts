@@ -10,24 +10,20 @@ export async function POST(request: Request) {
     const correctPassword = process.env.ADMIN_GATE_PASSWORD;
 
     if (!correctPassword) {
-      return NextResponse.json(
-        { error: "Modpas Vercel la pa konfigire" }, 
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Modpas Vercel la pa konfigire" }, { status: 500 });
     }
 
     if (password === correctPassword) {
-      // 1. Nou kreye repons lan anvan
       const response = NextResponse.json({ success: true, message: "Koneksyon Siksè" });
       
-      // 2. Nou mete Cookie a (Paspò a) dirèkteman sou repons lan (Estanda Next.js 15)
+      // Nou kreye yon Cookie sekrè pou middleware la ka kite w pase alèz
       response.cookies.set({
         name: 'admin_session',
         value: 'true',
-        httpOnly: true, // Kòd sou navigatè a paka vòlè l
+        httpOnly: true,
         path: '/',
-        secure: process.env.NODE_ENV === 'production', // Sèvi ak HTTPS an pwodiksyon
-        maxAge: 60 * 60 * 24, // Valab pou 1 jou
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24, // Valab pou 24 èdtan
       });
 
       return response;
@@ -39,10 +35,8 @@ export async function POST(request: Request) {
   }
 }
 
-// Fonksyon GET a
 export async function GET() {
   try {
-    // Nan Next.js 15, nou dwe itilize "await" devan cookies()
     const cookieStore = await cookies();
     const hasSession = cookieStore.get('admin_session')?.value === 'true';
     
