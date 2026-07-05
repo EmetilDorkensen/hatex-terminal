@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { hashCardNumber } from '@/lib/security/hash';
+
+// Lock-out PA KAT (menm modèl ak lock-out PIN/OTP ki egziste deja):
+// san sa, yon atakè ka gaye tantativ li sou plizyè IP diferan pou kontounen
+// limit ki baze sèlman sou IP epi "bwote" (brute-force) yon nimewo kat presi.
+const MAX_CARD_ATTEMPTS = 6;
+const CARD_LOCK_WINDOW_SEC = 15 * 60;
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -18,6 +25,15 @@ export async function POST(request: Request) {
 
     if (cleanCard.length !== 16 || String(cvv).length < 3) {
       return NextResponse.json({ valid: false, error: 'Kat pa valab.' }, { status: 400 });
+    }
+
+    // 🔐 LOCK-OUT PA KAT: endepandan de IP a, chak nimewo kat gen dwa a yon
+    // kantite tantativ limite pandan 15 minit anvan li bloke tanporèman.
+    const cardHash = hashCardNumber(cleanCard);
+    const cardRl = await rateLimit(`card-verify:${cardHash}`, MAX_CARD_ATTEMPTS, CARD_LOCK_WINDOW_SEC);
+    if (!cardRl.allowed) {
+      const mins = Math.ceil((cardRl.retryAfterSec || CARD_LOCK_WINDOW_SEC) / 60);
+      return NextResponse.json({ valid: false, error: `Twòp tantativ sou kat sa a. Eseye ankò nan ${mins} minit.` }, { status: 429 });
     }
 
     const supabase = createSupabaseAdminClient();

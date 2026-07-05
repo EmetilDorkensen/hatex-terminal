@@ -1,8 +1,12 @@
 {
-    "crons": [
-      {
-        "path": "/api/cron/abonnman",
-        "schedule": "0 0 * * *"
-      }
-    ]
-  }
+  "crons": [
+    {
+      "path": "/api/cron/abonnman",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/developer/webhooks/process-retries",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

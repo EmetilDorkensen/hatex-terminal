@@ -1,25 +1,34 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 
 export async function POST(req: Request) {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    );
+    const ip = getClientIp(req);
+    const rl = await rateLimit(`client-dispute:${ip}`, 15, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+    }
+
+    // 🔐 OTANTIFIKASYON OBLIGATWA: `client_id` PA JANM soti nan kò rekèt la.
+    const supabaseSession = await createSupabaseServerClient();
+    const { data: { user }, error: authErr } = await supabaseSession.auth.getUser();
+    if (authErr || !user) {
+      return NextResponse.json({ error: 'Ou dwe konekte sou kont ou pou ouvè yon litij.' }, { status: 401 });
+    }
+
+    const supabaseAdmin = createSupabaseAdminClient();
 
     const body = await req.json();
-    const { order_id, client_id, reason } = body;
+    const { order_id, reason } = body;
 
-    if (!order_id || !client_id || !reason) {
+    if (!order_id || !reason) {
       return NextResponse.json({ error: 'Manke enfòmasyon pou ouvè litij la.' }, { status: 400 });
     }
 
     const cleanOrderId = order_id.toString().replace('#', '').trim();
 
     // 1. Chèche tranzaksyon an nan Bank Global la
-    // Nou verifye si kòmand sa se pou kliyan sa a vre (li dwe nan customer_info a)
-    // Pou kounye a, n ap jis chèche l ak order_id a pou n wè si l PENDING
     const { data: tx, error: txErr } = await supabaseAdmin
       .from('plugin_transactions')
       .select('*')
@@ -30,7 +39,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nou pa jwenn kòmand sa a nan sistèm nan.' }, { status: 404 });
     }
 
-    // 2. VERIFIKASYON ESTATI
+    // 🔐 2. VERIFIKASYON POSESYON: kòmand la dwe reyèlman apatyen a moun ki
+    // konekte a (matche pa imèl nan customer_info), sinon nenpòt itilizatè
+    // konekte ta ka jele kòb sou kòmand yon lòt moun.
+    if ((tx.customer_info?.email || '').toLowerCase() !== (user.email || '').toLowerCase()) {
+      return NextResponse.json({ error: 'Kòmand sa a pa asosye ak kont ou. Ou pa ka ouvè yon litij sou li.' }, { status: 403 });
+    }
+
+    // 3. VERIFIKASYON ESTATI
     if (tx.status === 'delivered') {
       return NextResponse.json({ error: 'Twò ta! Ou te gentan bay kòd OTP a epi machann nan touche kòb la deja. Kontakte Admin.' }, { status: 403 });
     }
@@ -43,7 +59,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Lajan kòmand sa a te gentan ranbouse deja.' }, { status: 400 });
     }
 
-    // 🚨 3. MAJI ALIEXPRESS LA: JELE KÒB LA (Freeze)
+    // 🚨 4. MAJI ALIEXPRESS LA: JELE KÒB LA (Freeze)
     // Nou chanje estati a fè l vin "disputed" epi nou anrejistre rezon an
     const { error: updateErr } = await supabaseAdmin
       .from('plugin_transactions')

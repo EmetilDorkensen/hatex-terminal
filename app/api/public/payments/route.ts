@@ -1,36 +1,34 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
-import { checkSpendingLimit, checkBalanceCap } from '@/lib/security/spending-limits';
+import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit } from '@/lib/security/spending-limits';
+import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 
-// KOUCH SEKIRITE 1: CORS Strik pou API Pwodiksyon
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Ou ka chanje '*' pou 'https://sit-machann-yo.com' pita si w vle
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Idempotency-Key',
-};
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
-}
+// 🔐 KOUCH SEKIRITE 1: PA GEN CORS OUVÈ
+// Sa a se yon API SÈVÈ-A-SÈVÈ ki otantifye ak yon kle sekrè (Bearer api_key).
+// Pa gen okenn rezon pou yon navigatè (browser) rele l dirèkteman ak kle sa a
+// vizib nan JS kliyan — sa ta ekspoze kle sekrè machann nan bay tout moun.
+// Nou retire `Access-Control-Allow-Origin: '*'` ki te la anvan (li te louvri
+// API a pou nenpòt sit web rele l dirèkteman ak kle machann nan si l ta jwenn
+// li). Entegrasyon reyèl yo (backend machann nan) pa bezwen CORS ditou.
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
     const rl = await rateLimit(`public-payments:${ip}`, 40, 60);
     if (!rl.allowed) {
-      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429, headers: corsHeaders });
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
     }
 
     // KOUCH SEKIRITE 2: Otantifikasyon ak verifikasyon Header
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: "Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen." }, { status: 401, headers: corsHeaders });
+      return NextResponse.json({ error: "Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen." }, { status: 401 });
     }
     
     const apiKey = authHeader.split(' ')[1].trim();
+    const idempotencyKey = (request.headers.get('idempotency-key') || request.headers.get('Idempotency-Key') || '').trim().slice(0, 200);
 
     // Konekte ak Supabase avèk dwa Sèvè pou tranzaksyon finansye
     const supabase = createClient(
@@ -41,15 +39,30 @@ export async function POST(request: Request) {
     // KOUCH SEKIRITE 3: Verifikasyon Estati Machann nan
     const { data: merchant, error: merchantErr } = await supabase
       .from('profiles')
-      .select('id, full_name, is_merchant, account_status, wallet_balance, webhook_url, webhook_secret, account_type')
+      .select('id, full_name, is_merchant, account_status, wallet_balance, account_type')
       .eq('api_key', apiKey)
       .single();
 
     if (merchantErr || !merchant || !merchant.is_merchant) {
-      return NextResponse.json({ error: "Kle API sa a pa valab oswa kont lan pa otorize pou resevwa peman." }, { status: 403, headers: corsHeaders });
+      return NextResponse.json({ error: "Kle API sa a pa valab oswa kont lan pa otorize pou resevwa peman." }, { status: 403 });
     }
     if (merchant.account_status !== 'active') {
-      return NextResponse.json({ error: "Kont machann sa a pa aktif. Tranzaksyon an anile." }, { status: 403, headers: corsHeaders });
+      return NextResponse.json({ error: "Kont machann sa a pa aktif. Tranzaksyon an anile." }, { status: 403 });
+    }
+
+    // KOUCH SEKIRITE 3B: IDEMPOTENCY (tankou Stripe) — si machann nan voye menm
+    // `Idempotency-Key` la de fwa, nou retounen MENM rezilta a san refè peman an.
+    if (idempotencyKey) {
+      const { data: existingIdem } = await supabase
+        .from('api_idempotency_keys')
+        .select('response_body')
+        .eq('merchant_id', merchant.id)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+
+      if (existingIdem?.response_body) {
+        return NextResponse.json(existingIdem.response_body, { status: 200, headers: { 'Idempotent-Replayed': 'true' } });
+      }
     }
 
     // Rale done yo ak Pwoteksyon kont kòd malveyan
@@ -64,13 +77,14 @@ export async function POST(request: Request) {
     const cleanOrderId = String(order_id || '').trim().substring(0, 50); // Limite longè order_id
 
     if (cleanCard.length < 15 || cleanCvv.length < 3 || rawExp.length !== 4 || isNaN(safeAmount) || safeAmount <= 0) {
-      return NextResponse.json({ error: "Fòma done yo pa bon. Tcheke kat la, CVV a, Dat la (MMYY), oswa kantite kòb la." }, { status: 400, headers: corsHeaders });
+      return NextResponse.json({ error: "Fòma done yo pa bon. Tcheke kat la, CVV a, Dat la (MMYY), oswa kantite kòb la." }, { status: 400 });
     }
 
     const slashedExp = `${rawExp.slice(0, 2)}/${rawExp.slice(2)}`; // "MM/YY"
 
-    // KOUCH SEKIRITE 5: Anti-Doublon (Idempotency Check)
-    // Tcheke si machann nan pa t deja resevwa yon peman pou menm order_id sa a jodi a
+    // KOUCH SEKIRITE 5: Anti-Doublon (Idempotency Check) — pre-check rapid.
+    // Chèk final ak garanti a fèt ATOMIKMAN anndan RPC `process_direct_card_payment`
+    // pi ba a (kont yon kous ant 2 rekèt similtane pou menm kòmand lan).
     if (cleanOrderId && cleanOrderId !== 'N/A') {
       const { data: existingTx } = await supabase
         .from('transactions')
@@ -80,7 +94,7 @@ export async function POST(request: Request) {
         .single();
         
       if (existingTx) {
-        return NextResponse.json({ error: "Peman sa a fèt deja pou kòmand sa a (Pwoteksyon Anti-Doublon)." }, { status: 409, headers: corsHeaders });
+        return NextResponse.json({ error: "Peman sa a fèt deja pou kòmand sa a (Pwoteksyon Anti-Doublon)." }, { status: 409 });
       }
     }
 
@@ -94,96 +108,94 @@ export async function POST(request: Request) {
     );
 
     if (!client) {
-      return NextResponse.json({ error: cardError || "Tranzaksyon refize. Enfòmasyon kat yo pa koresponn." }, { status: 401, headers: corsHeaders });
+      return NextResponse.json({ error: cardError || "Tranzaksyon refize. Enfòmasyon kat yo pa koresponn." }, { status: 401 });
     }
     if (client.account_status !== 'active') {
-      return NextResponse.json({ error: "Kont ki asosye ak kat sa a pa aktif." }, { status: 403, headers: corsHeaders });
+      return NextResponse.json({ error: "Kont ki asosye ak kat sa a pa aktif." }, { status: 403 });
     }
     if (Number(client.wallet_balance) < safeAmount) {
-      return NextResponse.json({ error: "Fon ensifizan." }, { status: 400, headers: corsHeaders });
+      return NextResponse.json({ error: "Fon ensifizan." }, { status: 400 });
     }
 
-    // KOUCH SEKIRITE 6B: Limit Depans Jounalye/Mansyèl (kont Antrepriz gen limit pi wo)
+    // KOUCH SEKIRITE 6B: Limit Depans Jounalye/Mansyèl kliyan an (kont Antrepriz gen limit pi wo)
     const limitCheck = await checkSpendingLimit(supabase, client.id, client.account_type, safeAmount, 'card');
     if (!limitCheck.allowed) {
-      return NextResponse.json({ error: limitCheck.message || "Limit depans depase." }, { status: 400, headers: corsHeaders });
+      return NextResponse.json({ error: limitCheck.message || "Limit depans depase." }, { status: 400 });
     }
 
     // KOUCH SEKIRITE 6C: Plafon Balans Maksimòm pou Machann k ap resevwa kòb la
     const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, safeAmount);
     if (!capCheck.allowed) {
-      return NextResponse.json({ error: capCheck.message || "Balans machann nan ta depase limit maksimòm otorize a." }, { status: 400, headers: corsHeaders });
+      return NextResponse.json({ error: capCheck.message || "Balans machann nan ta depase limit maksimòm otorize a." }, { status: 400 });
+    }
+
+    // KOUCH SEKIRITE 6D: Limit RESEPSYON API (pa-tranzaksyon + pa-jou, 50k/2M).
+    // Pre-check rapid; chèk final la fèt ATOMIKMAN anndan RPC a.
+    const receiveCheck = await checkApiReceiveLimit(supabase, merchant.id, merchant.account_type, safeAmount);
+    if (!receiveCheck.allowed) {
+      return NextResponse.json({ error: receiveCheck.message || "Limit resepsyon API depase." }, { status: 400 });
     }
 
     // ==================================================
-    // KOUCH SEKIRITE 7: EKZEKISYON FINANSYE
+    // 🔐 KOUCH SEKIRITE 7: EKZEKISYON FINANSYE ATOMIK
     // ==================================================
-    
-    // 1. Retire kòb Kliyan an
-    const nouvoBalansKliyan = Number(client.wallet_balance) - safeAmount;
-    const { error: debitErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalansKliyan }).eq('id', client.id);
-    if (debitErr) throw new Error("Echèk nan debi kliyan an");
+    // Olye fè 2 UPDATE separe (jan sa te ye anvan — risk kòb disparèt si
+    // sèvè a echwe ant 2 yo, oswa kous ant 2 rekèt similtane), nou rele
+    // yon SÈL fonksyon RPC ki fè chèk balans, chèk limit resepsyon, debi,
+    // kredi, ak jounal tranzaksyon an TOUT ANSANM, ATOMIKMAN, ak veriwou.
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('process_direct_card_payment', {
+      p_client_id: client.id,
+      p_merchant_id: merchant.id,
+      p_amount: safeAmount,
+      p_order_id: cleanOrderId || 'N/A',
+      p_client_name: client.full_name,
+      p_merchant_name: merchant.full_name,
+      p_daily_received_so_far: receiveCheck.todayReceived,
+    });
 
-    // 2. Kredite Machann nan
-    const nouvoBalansMachann = Number(merchant.wallet_balance) + safeAmount;
-    const { error: creditErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalansMachann }).eq('id', merchant.id);
-    if (creditErr) throw new Error("Echèk nan kredi machann nan");
-
-    // 3. Jounal Tranzaksyon
-    const transactionId = `HTX-${crypto.randomBytes(4).toString('hex').toUpperCase()}`; // ID inik kripte
-    
-    await supabase.from('transactions').insert([
-      { user_id: client.id, amount: -safeAmount, type: 'PURCHASE', description: `Peman sou entènèt: ${merchant.full_name} (Kòmand #${cleanOrderId || 'N/A'})`, status: 'success' },
-      { user_id: merchant.id, amount: safeAmount, type: 'SALE', description: `Lavant sou entènèt: Kliyan ${client.full_name} (Kòmand #${cleanOrderId || 'N/A'})`, status: 'success' }
-    ]);
-
-    // ==================================================
-    // KOUCH SEKIRITE 8: WEBHOOK KRIPTE AK GARANTI (AWAITED)
-    // ==================================================
-    if (merchant.webhook_url && merchant.webhook_secret) {
-      const payload = {
-        event: 'payment.success',
-        transaction_id: transactionId,
-        order_id: cleanOrderId || 'N/A',
-        amount: safeAmount,
-        currency: currency || 'HTG',
-        customer_name: client.full_name,
-        timestamp: new Date().toISOString()
-      };
-
-      const payloadString = JSON.stringify(payload);
-      const signature = crypto.createHmac('sha256', merchant.webhook_secret).update(payloadString).digest('hex');
-
-      try {
-        // AWAIT obligatwa isit la, sinon Next.js touye demann nan anvan webhook la pati
-        await fetch(merchant.webhook_url, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'x-hatex-signature': signature 
-          },
-          body: payloadString,
-          // Timeout sekirite pou webhook la pa bloke tranzaksyon an twò lontan (5 segonn max)
-          signal: AbortSignal.timeout(5000) 
-        });
-        console.log(`[WEBHOOK SUCCESS] Voye bay machann: ${merchant.full_name}`);
-      } catch (err) {
-        // Nou pa anile peman an si webhook machann nan pa mache (sèvè l ka an pàn), men nou jounalize l
-        console.error(`[WEBHOOK ERROR] Sèvè machann nan pa reponn:`, err);
-      }
+    if (rpcError || !rpcResult?.success) {
+      const status = rpcResult?.duplicate ? 409 : 400;
+      return NextResponse.json({ error: rpcResult?.message || rpcError?.message || "Echèk nan egzekisyon peman an." }, { status });
     }
 
-    // REYISI FINAL LA
-    return NextResponse.json({ 
-      success: true, 
+    const transactionId: string = rpcResult.transaction_id;
+
+    const successResponse = {
+      success: true,
       message: "Peman an fèt ak siksè!",
       transaction_id: transactionId,
       customer: client.full_name,
-      amount_charged: safeAmount
-    }, { headers: corsHeaders });
+      amount_charged: safeAmount,
+    };
+
+    // Anrejistre repons lan pou idempotency (si yon kle te bay).
+    if (idempotencyKey) {
+      await supabase.from('api_idempotency_keys').insert({
+        merchant_id: merchant.id,
+        idempotency_key: idempotencyKey,
+        response_body: successResponse,
+      });
+    }
+
+    // ==================================================
+    // KOUCH SEKIRITE 8: WEBHOOK MILTI-PWEN SIYEN (deliverWebhookEvent)
+    // ==================================================
+    // Voye evènman an bay TOUT pwen webhook aktif machann nan ki abòne a
+    // `payment.success`, ak siyati HMAC + timestamp (kont replay), epi
+    // anrejistre chak delivrans (pou re-eseye otomatik si l echwe).
+    await deliverWebhookEvent(supabase, merchant.id, 'payment.success', {
+      transaction_id: transactionId,
+      order_id: cleanOrderId || 'N/A',
+      amount: safeAmount,
+      currency: currency || 'HTG',
+      customer_name: client.full_name,
+    });
+
+    // REYISI FINAL LA
+    return NextResponse.json(successResponse);
 
   } catch (error: any) {
     console.error("[CRITICAL ERROR] HatexCard Payment Gateway:", error);
-    return NextResponse.json({ error: "Sèvè a rankontre yon erè kritik. Tanpri kontakte sipò HatexCard." }, { status: 500, headers: corsHeaders });
+    return NextResponse.json({ error: "Sèvè a rankontre yon erè kritik. Tanpri kontakte sipò HatexCard." }, { status: 500 });
   }
 }

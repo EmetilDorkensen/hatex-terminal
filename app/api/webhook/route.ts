@@ -1,28 +1,19 @@
-import { createBrowserClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
-  const body = await request.json();
-  const { transaction_id, status, amount, terminal_id } = body;
+// ============================================================================
+// 🚫 WOUT DEZAKTIVE — KÒD MÒ/DANJERE JWENN PANDAN ODIT
+// ============================================================================
+// Wout sa a te yon stub ki pwente sou yon domèn egzanp ("sit-ou-a.com") ki pa
+// egziste, epi li te "verifye" (`verified: true`) done peman san okenn
+// validasyon reyèl — sa ta ka pèmèt konfime yon fo peman bay nenpòt sistèm
+// ki ta fè konfyans nan repons lan. Pa gen okenn kote nan app la ki rele l.
+//
+// Pou peman machann reyèl, itilize /api/public/payments.
+// ============================================================================
 
-  // URL sit kote ou vle resevwa konfimasyon an
-  const YOUR_SITE_CALLBACK = "https://sit-ou-a.com/api/payment-confirm";
-
-  try {
-    const response = await fetch(YOUR_SITE_CALLBACK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: transaction_id,
-        status: status,
-        amount: amount,
-        terminal: terminal_id,
-        verified: true
-      }),
-    });
-
-    return NextResponse.json({ sent: true, status: response.status });
-  } catch (error) {
-    return NextResponse.json({ error: "Paka kontakte sit ou a" }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Wout sa a dezaktive definitivman pou rezon sekirite. Itilize /api/public/payments.' },
+    { status: 410 }
+  );
 }

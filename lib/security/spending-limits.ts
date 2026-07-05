@@ -28,6 +28,13 @@ export const INDIVIDUAL_INVOICE_DAILY_LIMIT = 85000;
 export const INDIVIDUAL_MAX_WALLET_BALANCE = 105000;
 export const ENTERPRISE_MAX_WALLET_BALANCE = 2000000;
 
+// Limit RESEPSYON via API piblik la (/api/public/payments). Sa a kontwole
+// konbyen kòb yon MACHANN ka resevwa pa API a — apa de plafon balans jeneral
+// la. De nivo verifikasyon: (1) yon sèl peman pa ka depase limit la (pa-tx),
+// (2) total tout peman API resevwa nan yon jou pa ka depase limit la (pa-jou).
+export const API_RECEIVE_INDIVIDUAL_LIMIT = 50000;
+export const API_RECEIVE_ENTERPRISE_LIMIT = 2000000;
+
 export type SpendingChannel = 'transfer' | 'withdraw' | 'card' | 'invoice';
 
 const TRANSFER_TYPES = ['TRANSFER', 'P2P'];
@@ -199,4 +206,70 @@ export function checkBalanceCap(
   }
 
   return { allowed: true, cap };
+}
+
+export interface ApiReceiveLimitResult {
+  allowed: boolean;
+  message?: string;
+  limit: number;
+  todayReceived: number;
+}
+
+// Total kòb yon machann DEJA resevwa via API piblik la jodi a. Nou idantifye
+// peman API yo pa tag `metadata->>'source' = 'public_api'` (nou PA chanje
+// `type = 'SALE'` la pou pa kraze afichaj/kalkil ki egziste deja).
+async function sumApiReceivedToday(
+  supabase: SupabaseClient,
+  merchantId: string,
+  sinceIso: string
+): Promise<number> {
+  const { data } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('user_id', merchantId)
+    .eq('metadata->>source', 'public_api')
+    .gt('amount', 0)
+    .gte('created_at', sinceIso);
+
+  return (data || []).reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+}
+
+/**
+ * Verifye si yon machann ka RESEVWA yon peman via API piblik la, dapre limit
+ * resepsyon an (50,000 HTG kont endividyèl / 2,000,000 HTG kont antrepriz).
+ * Kontwole TOUDE: montan yon sèl peman (pa-tranzaksyon) AK total jounalye.
+ *
+ * ⚠️ Sa a se yon pre-check rapid. Verifikasyon final la (kont kous ant plizyè
+ * rekèt similtane) fèt ATOMIKMAN anndan RPC `process_direct_card_payment`.
+ */
+export async function checkApiReceiveLimit(
+  supabase: SupabaseClient,
+  merchantId: string,
+  accountType: string | null | undefined,
+  amount: number
+): Promise<ApiReceiveLimitResult> {
+  const enterprise = isEnterpriseAccount(accountType);
+  const limit = enterprise ? API_RECEIVE_ENTERPRISE_LIMIT : API_RECEIVE_INDIVIDUAL_LIMIT;
+
+  if (amount > limit) {
+    return {
+      allowed: false,
+      limit,
+      todayReceived: 0,
+      message: `Yon sèl peman pa ka depase ${limit.toLocaleString()} HTG pou ${enterprise ? 'yon Kont Antrepriz' : 'yon Kont Endividyèl'}.`,
+    };
+  }
+
+  const todayReceived = await sumApiReceivedToday(supabase, merchantId, startOfToday().toISOString());
+
+  if (todayReceived + amount > limit) {
+    return {
+      allowed: false,
+      limit,
+      todayReceived,
+      message: `Limit resepsyon jounalye via API a se ${limit.toLocaleString()} HTG. Ou gentan resevwa ${todayReceived.toLocaleString()} HTG jodi a.`,
+    };
+  }
+
+  return { allowed: true, limit, todayReceived };
 }

@@ -8,6 +8,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import QRCode from 'qrcode';
 import { checkSpendingLimit } from '@/lib/security/spending-limits';
+import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -148,23 +149,24 @@ export default function TerminalPage() {
   // FONKSYON POU JENERE API KEY
   // ============================================================
   const generateApiKey = useCallback(async () => {
-    if (!profile?.id || profile?.kyc_status !== 'approved') return null;
-    
+    // 🔐 Egzije KYC apwouve E kat aktive (toude) anvan jenere kredansyèl API.
+    if (!profile?.id) return null;
+
     try {
       setGeneratingApiKey(true);
-      const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({ api_key: apiKey })
-        .eq('id', profile.id);
-      
-      if (error) throw error;
-      
-      setProfile({ ...profile, api_key: apiKey });
-      return apiKey;
+      const result = await ensureMerchantApiCredentials(supabase, profile);
+
+      if (!result.eligibility.eligible) {
+        if (result.eligibility.missingKyc) {
+          alert('KYC ou poko apwouve. Tanpri konplete KYC biznis la anvan.');
+        } else if (result.eligibility.missingCardActivation) {
+          alert('Ou dwe peye frè aktivasyon Kat Vityèl la anvan w jwenn aksè API a.');
+        }
+        return null;
+      }
+
+      setProfile({ ...profile, api_key: result.api_key, is_merchant: true, webhook_secret: result.webhook_secret });
+      return result.api_key;
     } catch (error) {
       console.error('Error generating API key:', error);
       return null;
@@ -285,20 +287,14 @@ export default function TerminalPage() {
         setBusinessName(prof.business_name || '');
         setYoutubeUrl(prof.sdk_tutorial_url || '');
 
-        if (prof.kyc_status === 'approved' && !prof.api_key && !hasGeneratedKey) {
+        // 🔐 Oto-pwovizyone kredansyèl API SÈLMAN si kont lan elijib
+        // (KYC apwouve E kat aktive). Helper la konplete sa ki manke san
+        // regenere api_key ki egziste deja (pou pa kraze entegrasyon k ap mache).
+        if (!hasGeneratedKey && (!prof.api_key || !prof.is_merchant || !prof.webhook_secret)) {
           hasGeneratedKey = true;
-          
-          const apiKey = 'hx_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-          
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ api_key: apiKey })
-            .eq('id', prof.id);
-          
-          if (!updateError && isMounted) {
-            setProfile({ ...prof, api_key: apiKey });
+          const result = await ensureMerchantApiCredentials(supabase, prof);
+          if (result.provisioned && isMounted) {
+            setProfile({ ...prof, api_key: result.api_key, is_merchant: true, webhook_secret: result.webhook_secret });
           }
         }
 
@@ -502,12 +498,159 @@ export default function TerminalPage() {
     setDownloadingPlugin('hostinger');
     try {
       const zip = new JSZip();
-      const hostingerConfig = `{"merchantId": "${profile.api_key}","businessName": "${profile.business_name || 'HATEX Merchant'}","rate": 136,"apiUrl": "https://api.hatexcard.com/v1","version": "2.0.0"}`;
-      const hostingerCode = `<script>/* HATEX Code */</script>`;
 
-      zip.file('hatex-hostinger.json', hostingerConfig);
-      zip.file('embed-code.html', hostingerCode);
-      zip.file('README.md', `# HATEX Payments for Hostinger\n\nVèsyon 2.0 - Fòmilè kat entegre\n`);
+      // 🔧 KORIJE: ansyen vèsyon an te jenere yon config .json ki pwente sou
+      // "https://api.hatexcard.com/v1" (yon domèn/vèsyon ki PA JANM egziste)
+      // ak yon "embed-code.html" ki te yon script vid san okenn fonksyon reyèl.
+      // Kounye a nou jenere yon entegrasyon PHP+HTML FONKSYONÈL ki rele
+      // VRÈ API ofisyèl la (/api/public/payments), ki mache sou tout
+      // ebèjman Hostinger ki sipòte PHP (plan pati aza yo genyen PHP+cURL).
+      const checkoutPhp = `<?php
+/**
+ * HatexCard — Entegrasyon Sekirize pou Hostinger
+ * Machann: ${profile.business_name || 'HATEX Merchant'}
+ *
+ * Fichye sa a rele API OFISYÈL HatexCard la (/api/public/payments) ak kle
+ * sekrè w la GADE SÈLMAN BÒ SÈVÈ a (li pa janm ekspoze nan navigatè kliyan an).
+ * Kole "embed-code.html" nan paj peman w lan, epi telechaje fichye sa a nan
+ * rasin sit ou a sou Hostinger (bò kote fichye HTML/PHP ou yo).
+ */
+
+if (\$_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Metòd sa a pa sipòte.']);
+    exit;
+}
+
+header('Content-Type: application/json');
+
+\$HATEX_API_KEY = '${profile.api_key}';
+\$HATEX_API_URL = 'https://hatexcard.com/api/public/payments';
+
+\$amount = isset(\$_POST['amount']) ? floatval(\$_POST['amount']) : 0;
+\$order_id = isset(\$_POST['order_id']) ? substr(preg_replace('/[^a-zA-Z0-9_-]/', '', \$_POST['order_id']), 0, 50) : ('CMD-' . time());
+\$card_number = isset(\$_POST['card_number']) ? preg_replace('/\\D/', '', \$_POST['card_number']) : '';
+\$card_exp = isset(\$_POST['card_exp']) ? preg_replace('/\\D/', '', \$_POST['card_exp']) : '';
+\$card_cvv = isset(\$_POST['card_cvv']) ? preg_replace('/\\D/', '', \$_POST['card_cvv']) : '';
+
+if (\$amount <= 0 || strlen(\$card_number) < 15 || strlen(\$card_cvv) < 3) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Done kat oswa montan an pa valab.']);
+    exit;
+}
+
+\$payload = json_encode([
+    'amount' => \$amount,
+    'currency' => 'HTG',
+    'order_id' => \$order_id,
+    'card_info' => [
+        'number' => \$card_number,
+        'exp' => \$card_exp,
+        'cvv' => \$card_cvv,
+    ],
+]);
+
+\$ch = curl_init(\$HATEX_API_URL);
+curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt(\$ch, CURLOPT_POST, true);
+curl_setopt(\$ch, CURLOPT_POSTFIELDS, \$payload);
+curl_setopt(\$ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Authorization: Bearer ' . \$HATEX_API_KEY,
+]);
+curl_setopt(\$ch, CURLOPT_TIMEOUT, 30);
+
+\$response = curl_exec(\$ch);
+\$statusCode = curl_getinfo(\$ch, CURLINFO_HTTP_CODE);
+\$curlErr = curl_error(\$ch);
+curl_close(\$ch);
+
+if (\$response === false) {
+    http_response_code(502);
+    echo json_encode(['error' => 'Pa ka kontakte sèvè HatexCard la: ' . \$curlErr]);
+    exit;
+}
+
+http_response_code(\$statusCode ?: 500);
+echo \$response;
+`;
+
+      const embedHtml = `<!-- HatexCard — Fòmilè Peman (kole sa nan paj peman w lan) -->
+<form id="hatex-payment-form" style="max-width:380px;margin:0 auto;font-family:sans-serif;">
+  <div style="margin-bottom:10px;">
+    <label>Nimewo Kat HatexCard</label>
+    <input type="tel" id="hatex-card-number" maxlength="19" placeholder="0000 0000 0000 0000" required style="width:100%;padding:10px;box-sizing:border-box;">
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:10px;">
+    <div style="flex:1;">
+      <label>Dat (MM/YY)</label>
+      <input type="tel" id="hatex-card-exp" maxlength="5" placeholder="MM/YY" required style="width:100%;padding:10px;box-sizing:border-box;">
+    </div>
+    <div style="flex:1;">
+      <label>CVV</label>
+      <input type="password" id="hatex-card-cvv" maxlength="4" placeholder="123" required style="width:100%;padding:10px;box-sizing:border-box;">
+    </div>
+  </div>
+  <button type="submit" style="width:100%;padding:12px;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Peye Kounye a</button>
+  <p id="hatex-payment-status" style="margin-top:10px;font-size:14px;"></p>
+</form>
+
+<script>
+document.getElementById('hatex-payment-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const status = document.getElementById('hatex-payment-status');
+  status.textContent = 'Y ap trete peman an...';
+
+  // ⚠️ RANPLASE valè sa yo ak vrè montan/ID kòmand ou an anvan w mete l an pwodiksyon
+  const AMOUNT_HTG = 1500;
+  const ORDER_ID = 'CMD-' + Date.now();
+
+  const formData = new FormData();
+  formData.append('amount', AMOUNT_HTG);
+  formData.append('order_id', ORDER_ID);
+  formData.append('card_number', document.getElementById('hatex-card-number').value);
+  formData.append('card_exp', document.getElementById('hatex-card-exp').value);
+  formData.append('card_cvv', document.getElementById('hatex-card-cvv').value);
+
+  try {
+    const res = await fetch('/hatex-checkout.php', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      status.style.color = '#16a34a';
+      status.textContent = '✅ Peman reyisi! Referans: ' + data.transaction_id;
+    } else {
+      status.style.color = '#dc2626';
+      status.textContent = '❌ ' + (data.error || 'Peman refize.');
+    }
+  } catch (err) {
+    status.style.color = '#dc2626';
+    status.textContent = '❌ Erè koneksyon ak sèvè a.';
+  }
+});
+</script>`;
+
+      const readme = `# HatexCard — Entegrasyon Hostinger
+
+Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
+
+## Enstalasyon
+
+1. Telechaje \`hatex-checkout.php\` nan rasin sit ou a sou Hostinger (bò kote paj HTML/PHP ou yo). Ebèjman an dwe sipòte PHP ak ekstansyon cURL (aktive pa default sou Hostinger).
+2. Kole kontni \`embed-code.html\` la nan paj peman w lan (kote w vle fòmilè kat la parèt).
+3. Nan \`embed-code.html\`, ranplase \`AMOUNT_HTG\` ak \`ORDER_ID\` ak vrè valè kòmand kliyan an (dinamik, selon panye acha w la).
+4. Sa se sa: fòmilè a rele \`/hatex-checkout.php\` ki limenm rele API ofisyèl HatexCard la (\`https://hatexcard.com/api/public/payments\`) ak kle API w la — kle a rete SÈLMAN bò sèvè a, li pa janm vizib nan navigatè kliyan an.
+
+## Enpòtan
+
+- Sa a se yon PEMAN IMEDYA (kòb la transfere san eskwo/OTP). Si w bezwen yon sistèm eskwo ak kòd livrezon, kontakte sipò HatexCard.
+- Pa janm mete \`hatex-checkout.php\` nan yon dosye piblik ki lis fichye otomatikman.
+- Kle API w la se yon sekrè — pa janm mete l nan kòd JavaScript kliyan (navigatè).
+`;
+
+      zip.file('hatex-checkout.php', checkoutPhp);
+      zip.file('embed-code.html', embedHtml);
+      zip.file('README.md', readme);
 
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, `hatex-hostinger-${profile.id.slice(0,8)}.zip`);
@@ -536,7 +679,7 @@ export default function TerminalPage() {
 /**
  * Plugin Name: HatexCard Direct Gateway PRO
  * Plugin URI: https://hatexcard.com
- * Description: Peman Ultra-Sekirize. Skane foto, size, jere Escrow/OTP, ak Resi PDF pou kliyan an.
+ * Description: Peman Ultra-Sekirize (imedya). Skane foto, size, ak Resi PDF pou kliyan an.
  * Version: 22.0.0
  * Author: Hatex Group
  */
@@ -562,7 +705,7 @@ function hatexcard_init_direct_gateway() {
             \$this->id = 'hatexcard_direct';
             \$this->has_fields = true; 
             \$this->method_title = 'HatexCard';
-            \$this->method_description = 'Peman ak kòd livrezon sekirize (Escrow OTP) epi resi PDF.';
+            \$this->method_description = 'Peman imedya sekirize pa kat HatexCard, ak resi PDF pou kliyan an.';
 
             \$this->init_form_fields();
             \$this->init_settings();
@@ -590,8 +733,8 @@ function hatexcard_init_direct_gateway() {
         // BA BÈL RESI A AK BOUTON PDF LA
         public function custom_thankyou_page(\$order_id) {
             \$order = wc_get_order(\$order_id);
-            \$otp = \$order->get_meta('_hatexcard_delivery_otp');
-            if (!\$otp) return;
+            \$ref = \$order->get_meta('_hatexcard_transaction_id');
+            if (!\$ref) return;
 
             echo '<style>
                     @media print {
@@ -606,9 +749,9 @@ function hatexcard_init_direct_gateway() {
                     <div style="margin-bottom: 20px;">
                         <span style="background: #4f46e5; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; text-transform: uppercase;">Prèv Peman HatexCard</span>
                     </div>
-                    <p style="margin: 0; font-size: 13px; color: #475569; font-weight: 600; text-transform: uppercase;">Kòd Sekrè Livrezon (OTP):</p>
-                    <h2 style="margin: 15px 0; font-size: 52px; color: #1e293b; font-family: monospace; font-weight: 900; letter-spacing: 12px;">' . esc_html(\$otp) . '</h2>
-                    <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 20px;">Kòmand #' . \$order_id . ' - Kenbe kòd sa a pou livrè a.</p>
+                    <p style="margin: 0; font-size: 13px; color: #475569; font-weight: 600; text-transform: uppercase;">Referans Tranzaksyon:</p>
+                    <h2 style="margin: 15px 0; font-size: 32px; color: #1e293b; font-family: monospace; font-weight: 900; letter-spacing: 4px;">' . esc_html(\$ref) . '</h2>
+                    <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 20px;">Kòmand #' . \$order_id . ' - Peman an konfime imedyatman.</p>
                     
                     <button class="no-print" onclick="window.print()" style="background: #4f46e5; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                         Enprime / Sove kòm PDF
@@ -718,10 +861,10 @@ function hatexcard_init_direct_gateway() {
             \$body = json_decode(wp_remote_retrieve_body(\$response), true);
 
             if (isset(\$body['success']) && \$body['success'] === true) {
-                \$otp = isset(\$body['delivery_otp']) ? \$body['delivery_otp'] : '';
-                \$order->update_meta_data('_hatexcard_delivery_otp', \$otp);
+                \$txRef = isset(\$body['transaction_id']) ? \$body['transaction_id'] : '';
+                \$order->update_meta_data('_hatexcard_transaction_id', \$txRef);
                 \$order->payment_complete();
-                \$order->add_order_note('Peman reyisi ak HatexCard. Kòd livrezon: ' . \$otp);
+                \$order->add_order_note('Peman reyisi ak HatexCard. Referans: ' . \$txRef);
                 \$woocommerce->cart->empty_cart();
                 return array('result' => 'success', 'redirect' => \$this->get_return_url(\$order));
             } else {
@@ -1414,11 +1557,11 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 const data = await response.json();
 
 if (data.success) {
-  // TRÈ ENPÒTAN POU DEVLOPÈ:
-  // Ou DWE afiche 'data.delivery_otp' a byen gwo pou kliyan ou an!
-  // Se ak kòd sa a machann nan pral kapab debloke lajan l lan.
-  
-  alert("Peman pase! Men kòd sekrè pou w bay livrè a: " + data.delivery_otp);
+  // Peman an fèt IMEDYATMAN (kòb la deja sou balans ou). Konsève
+  // 'data.transaction_id' la kòm referans pou sipò/verifikasyon.
+  alert("Peman pase ak siksè! Referans: " + data.transaction_id);
+} else {
+  alert("Peman refize: " + data.error);
 }`}</code>
               </pre>
             </div>

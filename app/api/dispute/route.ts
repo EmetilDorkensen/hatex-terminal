@@ -1,15 +1,29 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rl = await rateLimit(`dispute:${ip}`, 15, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+    }
+
+    // 🔐 OTANTIFIKASYON OBLIGATWA: `clientId` PA JANM soti nan kò rekèt la
+    // (sa te pèmèt nenpòt moun ouvri yon litij sou yon kòmand ki pa pou li).
+    // Idantite kliyan an soti SÈLMAN nan sesyon Supabase otantifye a.
+    const supabaseSession = await createSupabaseServerClient();
+    const { data: { user }, error: authErr } = await supabaseSession.auth.getUser();
+    if (authErr || !user) {
+      return NextResponse.json({ error: 'Ou dwe konekte sou kont ou pou ouvè yon litij.' }, { status: 401 });
+    }
+
+    const supabase = createSupabaseAdminClient();
+
     const body = await req.json();
-    const { orderId, reason, proofText, clientId, storeName } = body;
+    const { orderId, reason, proofText, storeName } = body;
+    const clientId = user.id;
 
     if (!orderId) {
       return NextResponse.json({ error: "ID Kòmand lan obligatwa" }, { status: 400 });
@@ -44,6 +58,17 @@ export async function POST(req: Request) {
     // 3. Si l toujou pa jwenn li, se lè sa a nou voye erè a
     if (!tx) {
         return NextResponse.json({ error: "Nou pa jwenn kòmand sa a nan sistèm nan. Tcheke ID a byen." }, { status: 404 });
+    }
+
+    // 🔐 4. VERIFIKASYON POSESYON: sesyon an dwe apatyen a MENM moun ki lye ak
+    // tranzaksyon an — sinon nenpòt itilizatè konekte ta ka jele kòb yon lòt
+    // moun jis paske li konn/devine yon ID kòmand.
+    const isOwner = tableName === 'transactions'
+        ? tx.user_id === clientId
+        : (tx.customer_info?.email || '').toLowerCase() === (user.email || '').toLowerCase();
+
+    if (!isOwner) {
+        return NextResponse.json({ error: "Kòmand sa a pa asosye ak kont ou. Ou pa ka ouvè yon litij sou li." }, { status: 403 });
     }
 
     // Prepare detay yo kèlkeswa estati l te ye (sikse, konfime, vs)

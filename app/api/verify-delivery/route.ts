@@ -1,26 +1,58 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { checkBalanceCap } from '@/lib/security/spending-limits';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 
 export async function POST(req: Request) {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    );
+    const ip = getClientIp(req);
+    const rl = await rateLimit(`verify-delivery:${ip}`, 30, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+    }
+
+    // 🔐 OTANTIFIKASYON OBLIGATWA: `merchant_id` PA JANM dwe soti nan kò
+    // rekèt la (sa te louvri yon twou IDOR kote nenpòt moun ki devine yon
+    // merchant_id + order_id + OTP te ka libere kòb yon lòt machann).
+    // Sipòte 2 fason pou idantifye machann nan an sekirite:
+    //   1. Bearer <api_key> — pou entegrasyon ekstèn (sèvè machann nan)
+    //   2. Sesyon Supabase (cookie) — pou dashboard HatexCard entèn lan
+    const supabaseAdmin = createSupabaseAdminClient();
+    let merchant_id: string | null = null;
+
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const apiKey = authHeader.split(' ')[1].trim();
+      const { data: keyMatch } = await supabaseAdmin
+        .from('profiles')
+        .select('id, is_merchant')
+        .eq('api_key', apiKey)
+        .maybeSingle();
+      if (keyMatch?.is_merchant) merchant_id = keyMatch.id;
+    }
+
+    if (!merchant_id) {
+      const supabaseSession = await createSupabaseServerClient();
+      const { data: { user } } = await supabaseSession.auth.getUser();
+      if (user) merchant_id = user.id;
+    }
+
+    if (!merchant_id) {
+      return NextResponse.json({ error: 'Aksè refize. Konekte sou kont ou oswa itilize yon kle API valab.' }, { status: 401 });
+    }
 
     const body = await req.json();
-    const { transaction_id, merchant_id, otp_code, developer_webhook_url } = body;
+    const { transaction_id, otp_code, developer_webhook_url } = body;
 
     // 1. Tcheke si done yo antre
-    if (!transaction_id || !merchant_id || !otp_code) {
+    if (!transaction_id || !otp_code) {
       return NextResponse.json({ error: 'Manke ID kòmand oswa Kòd OTP.' }, { status: 400 });
     }
 
     // Netwaye ID a pou asire l klè (Egzanp: "74" oswa "DEV-001")
     const cleanId = transaction_id.toString().replace('#', '').trim();
 
-    // 2. VERIFIKASYON MACHANN NAN
+    // 2. VERIFIKASYON MACHANN NAN (idantifye pa kle API/sesyon, pa pa kò rekèt la)
     const { data: merchant, error: mErr } = await supabaseAdmin
       .from('profiles')
       .select('id, wallet_balance, account_status, failed_otp_attempts, account_type')

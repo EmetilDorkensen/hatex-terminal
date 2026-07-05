@@ -1,20 +1,46 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rl = await rateLimit(`notify-cancel:${ip}`, 10, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+    }
+
+    // 🔐 OTANTIFIKASYON OBLIGATWA: `client_id` PA JANM soti nan kò rekèt la
+    // (sa te pèmèt nenpòt moun anmède yon machann ak fo imèl anilasyon).
+    const supabaseSession = await createSupabaseServerClient();
+    const { data: { user }, error: authErr } = await supabaseSession.auth.getUser();
+    if (authErr || !user) {
+      return NextResponse.json({ error: 'Ou dwe konekte sou kont ou.' }, { status: 401 });
+    }
+
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    );
+    const supabaseAdmin = createSupabaseAdminClient();
 
     const body = await req.json();
-    const { merchant_id, plan_name, client_id } = body;
+    const { merchant_id, plan_name } = body;
+    const client_id = user.id;
 
     if (!merchant_id || !plan_name) {
       return NextResponse.json({ error: 'Manke enfòmasyon.' }, { status: 400 });
+    }
+
+    // Verifye itilizatè konekte a te REYÈLMAN gen yon abònman ak machann sa
+    // a (anpeche moun voye fo imèl anilasyon bay machann ki pa gen rapò ak li).
+    const { data: subCheck } = await supabaseAdmin
+      .from('subscriptions_history')
+      .select('id')
+      .eq('client_id', client_id)
+      .eq('merchant_id', merchant_id)
+      .maybeSingle();
+
+    if (!subCheck) {
+      return NextResponse.json({ error: 'Nou pa jwenn okenn abònman ki koresponn ant ou ak machann sa a.' }, { status: 403 });
     }
 
     // 1. Chèche Imèl Machann nan

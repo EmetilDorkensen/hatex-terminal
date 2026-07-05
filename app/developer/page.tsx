@@ -3,21 +3,51 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle } from 'lucide-react';
+import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink } from 'lucide-react';
+import { checkMerchantEligibility, ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
+
+const AVAILABLE_EVENTS = ['payment.success'];
 
 export default function DeveloperDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [savingUrl, setSavingUrl] = useState(false);
   const [merchant, setMerchant] = useState<any>(null);
-  const [webhookUrlInput, setWebhookUrlInput] = useState('');
+  const [eligibility, setEligibility] = useState<{ eligible: boolean; missingKyc: boolean; missingCardActivation: boolean } | null>(null);
   const [copiedKey, setCopiedKey] = useState('');
   const [activeTab, setActiveTab] = useState<'js' | 'php' | 'curl'>('js');
+
+  // Webhook endpoints state
+  const [endpoints, setEndpoints] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [newUrl, setNewUrl] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [creatingEndpoint, setCreatingEndpoint] = useState(false);
+  const [busyEndpoint, setBusyEndpoint] = useState<string | null>(null);
+  const [revealedSecret, setRevealedSecret] = useState<{ url: string; secret: string } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  const loadWebhooks = async () => {
+    try {
+      const [epRes, dlRes] = await Promise.all([
+        fetch('/api/developer/webhooks'),
+        fetch('/api/developer/webhooks/deliveries'),
+      ]);
+      if (epRes.ok) {
+        const epData = await epRes.json();
+        setEndpoints(epData.endpoints || []);
+      }
+      if (dlRes.ok) {
+        const dlData = await dlRes.json();
+        setDeliveries(dlData.deliveries || []);
+      }
+    } catch {
+      /* pa bloke paj la si webhook yo pa chaje */
+    }
+  };
 
   useEffect(() => {
     async function loadDevData() {
@@ -26,38 +56,104 @@ export default function DeveloperDashboard() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('is_merchant, api_key, webhook_secret, webhook_url')
+        .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret')
         .eq('id', user.id)
         .single();
 
-      if (!data?.is_merchant) {
-        alert("Ou dwe konplete KYC Biznis la pou w jwenn aksè ak API a.");
-        return router.push('/kyc');
+      if (!data) {
+        setLoading(false);
+        return;
       }
 
-      setMerchant(data);
-      setWebhookUrlInput(data.webhook_url || '');
+      const elig = checkMerchantEligibility(data);
+      setEligibility(elig);
+
+      // Oto-pwovizyone kredansyèl si kont lan elijib men poko genyen yo.
+      if (elig.eligible) {
+        const result = await ensureMerchantApiCredentials(supabase, data);
+        setMerchant({ ...data, api_key: result.api_key, is_merchant: result.is_merchant, webhook_secret: result.webhook_secret });
+        await loadWebhooks();
+      } else {
+        setMerchant(data);
+      }
+
       setLoading(false);
     }
     loadDevData();
   }, [supabase, router]);
 
   const handleCopy = (text: string, type: string) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedKey(type);
     setTimeout(() => setCopiedKey(''), 2000);
   };
 
-  const handleSaveWebhook = async () => {
-    if (!merchant) return;
-    setSavingUrl(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ webhook_url: webhookUrlInput })
-      .eq('api_key', merchant.api_key);
-    
-    setSavingUrl(false);
-    if (!error) alert("Webhook URL sove avèk siksè!");
+  const handleCreateEndpoint = async () => {
+    if (!newUrl.trim()) return;
+    setCreatingEndpoint(true);
+    try {
+      const res = await fetch('/api/developer/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newUrl.trim(), description: newDesc.trim(), events: AVAILABLE_EVENTS }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erè pandan kreyasyon an.');
+      if (data.secret) setRevealedSecret({ url: data.endpoint?.url || newUrl.trim(), secret: data.secret });
+      setNewUrl('');
+      setNewDesc('');
+      await loadWebhooks();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setCreatingEndpoint(false);
+    }
+  };
+
+  const handleTestEndpoint = async (id: string) => {
+    setBusyEndpoint(id);
+    try {
+      const res = await fetch(`/api/developer/webhooks/${id}/test`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) alert(`Tès reyisi! Sèvè w la reponn ak kòd ${data.response_status}.`);
+      else alert(`Tès echwe: ${data.error || 'sèvè w la pa reponn byen (kòd ' + (data.response_status || 'N/A') + ').'}`);
+      await loadWebhooks();
+    } catch {
+      alert('Erè pandan tès la.');
+    } finally {
+      setBusyEndpoint(null);
+    }
+  };
+
+  const handleRotateSecret = async (id: string, url: string) => {
+    if (!confirm('Wotasyon secret la ap kase ansyen an. Ou sèten?')) return;
+    setBusyEndpoint(id);
+    try {
+      const res = await fetch(`/api/developer/webhooks/${id}/rotate-secret`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erè wotasyon.');
+      if (data.secret) setRevealedSecret({ url, secret: data.secret });
+      await loadWebhooks();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setBusyEndpoint(null);
+    }
+  };
+
+  const handleDeleteEndpoint = async (id: string) => {
+    if (!confirm('Efase pwen webhook sa a nèt?')) return;
+    setBusyEndpoint(id);
+    try {
+      const res = await fetch(`/api/developer/webhooks/${id}`, { method: 'DELETE' });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Erè efasman.'); }
+      await loadWebhooks();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setBusyEndpoint(null);
+    }
   };
 
   if (loading) return (
@@ -69,15 +165,47 @@ export default function DeveloperDashboard() {
     </div>
   );
 
+  // Kont ki poko elijib: montre klèman kisa ki manke (KYC / kat aktive).
+  if (!eligibility?.eligible) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-4">
+      <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl shadow-sm p-8 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-5">
+          <ShieldAlert className="w-7 h-7 text-amber-600" />
+        </div>
+        <h1 className="text-xl font-bold text-slate-900 mb-2">Aksè API poko disponib</h1>
+        <p className="text-sm text-slate-500 mb-6">Pou jwenn kle API w la otomatikman, ou dwe konplete toude etap sa yo:</p>
+        <div className="space-y-3 text-left mb-6">
+          <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingKyc ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+            {eligibility?.missingKyc ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+            <span className="text-sm font-semibold text-slate-700">KYC Biznis apwouve</span>
+          </div>
+          <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingCardActivation ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+            {eligibility?.missingCardActivation ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+            <span className="text-sm font-semibold text-slate-700">Frè aktivasyon Kat Vityèl peye</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          {eligibility?.missingKyc && (
+            <button onClick={() => router.push('/kyc')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Konplete KYC Biznis</button>
+          )}
+          {eligibility?.missingCardActivation && (
+            <button onClick={() => router.push('/kat')} className="w-full bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Aktive Kat Vityèl</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const codeSnippets = {
     js: `const response = await fetch('https://hatexcard.com/api/public/payments', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer ${merchant?.api_key || 'hx_live_...'}',
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Idempotency-Key': 'CMD-123-v1' // opsyonèl — evite doub-chaj
   },
   body: JSON.stringify({
-    amount: 1500, // HTG
+    amount: 1500, // HTG (max 50,000 endividyèl / 2,000,000 antrepriz pa tranzaksyon)
     currency: 'HTG',
     order_id: 'CMD-123',
     card_info: {
@@ -90,9 +218,7 @@ export default function DeveloperDashboard() {
 const data = await response.json();
 
 if (data.success) {
-  // Tranzaksyon an fèt otomatikman!
   console.log("Peman Reyisi! Ref:", data.transaction_id);
-  alert("Peman pase avèk siksè. Kòb la debite.");
 } else {
   alert("Erè: " + data.error);
 }`,
@@ -119,7 +245,8 @@ curl_setopt_array($curl, array(
 }',
   CURLOPT_HTTPHEADER => array(
     'Authorization: Bearer ${merchant?.api_key || 'hx_live_...'}',
-    'Content-Type: application/json'
+    'Content-Type: application/json',
+    'Idempotency-Key: CMD-123-v1'
   ),
 ));
 $response = curl_exec($curl);
@@ -130,6 +257,7 @@ echo $response;
   --url https://hatexcard.com/api/public/payments \\
   --header 'Authorization: Bearer ${merchant?.api_key || 'hx_live_...'}' \\
   --header 'Content-Type: application/json' \\
+  --header 'Idempotency-Key: CMD-123-v1' \\
   --data '{
     "amount": 1500,
     "currency": "HTG",
@@ -191,54 +319,131 @@ echo $response;
           </div>
         </div>
 
-        {/* Bwat WEBHOOK LA */}
+        {/* Bwat WEBHOOK ENDPOINTS (milti-pwen, estil Stripe) */}
+        <div className="bg-white border border-gray-200 p-6 sm:p-8 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <Webhook className="text-indigo-600 w-6 h-6" />
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Pwen Webhook</h2>
+          </div>
+          <p className="text-sm text-slate-500 mb-6 font-medium">Nou voye yon evènman siyen (HMAC SHA-256) sou chak URL lè yon peman reyisi. Chak pwen gen pwòp secret pa li.</p>
+
+          {/* Fòm ajoute yon pwen */}
+          <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <input
+                type="url"
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                placeholder="https://sit-ou.com/api/hatex-webhook"
+                className="lg:col-span-2 bg-white border border-gray-200 p-3.5 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-mono text-slate-900 placeholder:text-slate-400"
+              />
+              <input
+                type="text"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="Deskripsyon (opsyonèl)"
+                className="bg-white border border-gray-200 p-3.5 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <button
+              onClick={handleCreateEndpoint}
+              disabled={creatingEndpoint || !newUrl.trim()}
+              className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold uppercase text-[11px] tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
+            >
+              {creatingEndpoint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Ajoute Pwen
+            </button>
+            <p className="text-xs text-slate-500 mt-2 font-medium">URL la dwe an HTTPS. Evènman: {AVAILABLE_EVENTS.join(', ')}.</p>
+          </div>
+
+          {/* Lis pwen yo */}
+          {endpoints.length === 0 ? (
+            <p className="text-sm text-slate-400 italic text-center py-6">Ou poko gen okenn pwen webhook.</p>
+          ) : (
+            <div className="space-y-3">
+              {endpoints.map((ep) => (
+                <div key={ep.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-200 rounded-xl p-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${ep.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                      <code className="font-mono text-sm text-slate-800 truncate">{ep.url}</code>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{(ep.events || []).join(', ')} {ep.description ? `· ${ep.description}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => handleTestEndpoint(ep.id)} disabled={busyEndpoint === ep.id} className="p-2 bg-white hover:bg-slate-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50" title="Voye tès">
+                      {busyEndpoint === ep.id ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <Send className="w-4 h-4 text-indigo-600" />}
+                    </button>
+                    <button onClick={() => handleRotateSecret(ep.id, ep.url)} disabled={busyEndpoint === ep.id} className="p-2 bg-white hover:bg-slate-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50" title="Wotasyon secret">
+                      <RotateCw className="w-4 h-4 text-amber-600" />
+                    </button>
+                    <button onClick={() => handleDeleteEndpoint(ep.id)} disabled={busyEndpoint === ep.id} className="p-2 bg-white hover:bg-red-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50" title="Efase">
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bwat DELIVRANS RESAN */}
         <div className="bg-white border border-gray-200 p-6 sm:p-8 rounded-2xl shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <Webhook className="text-indigo-600 w-6 h-6" />
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Konfigirasyon Webhook</h2>
+            <ExternalLink className="text-indigo-600 w-6 h-6" />
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Delivrans Resan</h2>
           </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Webhook URL (Kote nou voye alèt la)</label>
-              <div className="flex gap-2">
-                <input 
-                  type="url" 
-                  value={webhookUrlInput}
-                  onChange={(e) => setWebhookUrlInput(e.target.value)}
-                  placeholder="https://sit-ou.com/api/hatex-webhook"
-                  className="flex-1 bg-slate-50 border border-gray-200 p-3.5 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-mono text-slate-900 placeholder:text-slate-400 transition-shadow"
-                />
-                <button 
-                  onClick={handleSaveWebhook}
-                  disabled={savingUrl}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-xl font-bold uppercase text-[10px] tracking-wider transition-all disabled:opacity-50 flex items-center justify-center shadow-sm"
-                  title="Sove URL la"
-                >
-                  {savingUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-2 font-medium">Egzanp: https://sit-ou.com/api/hatex-webhook</p>
+          {deliveries.length === 0 ? (
+            <p className="text-sm text-slate-400 italic text-center py-6">Poko gen okenn delivrans webhook.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-slate-400 border-b border-gray-200">
+                    <th className="py-2 pr-4 font-bold">Evènman</th>
+                    <th className="py-2 pr-4 font-bold">Estati</th>
+                    <th className="py-2 pr-4 font-bold">Kòd</th>
+                    <th className="py-2 pr-4 font-bold">Tantativ</th>
+                    <th className="py-2 font-bold">Dat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deliveries.map((d) => (
+                    <tr key={d.id} className="border-b border-gray-100">
+                      <td className="py-2.5 pr-4 font-mono text-slate-700">{d.event_type}</td>
+                      <td className="py-2.5 pr-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${d.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                          {d.success ? 'Reyisi' : 'Echwe'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-4 text-slate-600">{d.response_status ?? '—'}</td>
+                      <td className="py-2.5 pr-4 text-slate-600">{d.attempt_count}</td>
+                      <td className="py-2.5 text-slate-500">{new Date(d.created_at).toLocaleString('fr-HT')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Webhook Secret (Pou verifye siyati a)</label>
-              <div className="flex items-center justify-between bg-slate-50 border border-gray-200 p-3.5 rounded-xl">
-                <code className="font-mono text-sm text-slate-600 font-semibold truncate pr-4">
-                  {merchant?.webhook_secret ? 'whsec_••••••••••••••••' : 'Poko pwodwi'}
-                </code>
-                <button 
-                  onClick={() => handleCopy(merchant?.webhook_secret, 'webhook')} 
-                  className="p-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
-                  title="Kopye Secret la"
-                >
-                  {copiedKey === 'webhook' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-slate-400 hover:text-indigo-600" />}
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-2 font-medium">Sèvi ak kòd sa a pou verifye HMAC SHA-256 la.</p>
-            </div>
-          </div>
+          )}
         </div>
+
+        {/* MODAL SECRET (montre yon sèl fwa) */}
+        {revealedSecret && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setRevealedSecret(null)}>
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Secret Webhook</h3>
+              <p className="text-sm text-slate-500 mb-4">Kopye secret sa a kounye a — nou p ap montre l ankò. Sèvi avè l pou verifye siyati HMAC SHA-256 la.</p>
+              <p className="text-xs text-slate-400 mb-1 font-mono truncate">{revealedSecret.url}</p>
+              <div className="flex items-center justify-between bg-slate-50 border border-gray-200 p-3.5 rounded-xl mb-5">
+                <code className="font-mono text-sm text-indigo-600 break-all select-all font-semibold pr-3">{revealedSecret.secret}</code>
+                <button onClick={() => handleCopy(revealedSecret.secret, 'reveal')} className="p-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shrink-0" title="Kopye">
+                  {copiedKey === 'reveal' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                </button>
+              </div>
+              <button onClick={() => setRevealedSecret(null)} className="w-full bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Mwen kopye l</button>
+            </div>
+          </div>
+        )}
 
         {/* Bwat EGZANP KÒD LA */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">

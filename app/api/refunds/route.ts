@@ -1,48 +1,81 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rl = await rateLimit(`refunds:${ip}`, 20, 60);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+    }
+
+    // 🔐 OTANTIFIKASYON OBLIGATWA: se sèlman machann ki gen kle API valab la
+    // (Bearer token) ki ka mande yon ranbousman — `merchant_id` PA JANM dwe
+    // soti nan kò rekèt la, sinon nenpòt moun ka fòse yon ranbousman.
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen.' }, { status: 401 });
+    }
+    const apiKey = authHeader.split(' ')[1].trim();
+
     const resend = new Resend(process.env.RESEND_API_KEY);
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     );
 
-    const body = await req.json();
-    const { transaction_id, merchant_id, reason } = body;
+    const { data: merchant, error: merchantErr } = await supabaseAdmin
+      .from('profiles')
+      .select('id, is_merchant, account_status')
+      .eq('api_key', apiKey)
+      .single();
 
-    if (!transaction_id || !merchant_id) {
+    if (merchantErr || !merchant || !merchant.is_merchant) {
+      return NextResponse.json({ error: 'Kle API sa a pa valab oswa kont lan pa otorize.' }, { status: 403 });
+    }
+    if (merchant.account_status === 'suspended') {
+      return NextResponse.json({ error: 'Kont machann sa a pa aktif.' }, { status: 403 });
+    }
+
+    const merchant_id = merchant.id;
+
+    const body = await req.json();
+    const { transaction_id, reason } = body;
+
+    if (!transaction_id) {
       return NextResponse.json({ error: 'Manke enfòmasyon pou tranzaksyon an.' }, { status: 400 });
     }
 
     // 1. CHÈCHE TRANZAKSYON AN EPI TCHEKE SI L POKO RANBOUSE
+    //    (`.eq('merchant_id', merchant_id)` la a se garanti ki anpeche yon
+    //    machann ranbouse yon tranzaksyon ki pa pou li — machann_id soti
+    //    dirèkteman nan kle API otantifye a, pa nan kò rekèt la.)
     const { data: transaction, error: txError } = await supabaseAdmin
       .from('plugin_transactions')
-      .select('*, profiles:merchant_id(email, full_name, card_balance)')
+      .select('*, profiles:merchant_id(email, full_name, wallet_balance)')
       .eq('id', transaction_id)
       .eq('merchant_id', merchant_id)
       .single();
 
-    if (txError || !transaction) return NextResponse.json({ error: 'Tranzaksyon sa pa egziste.' }, { status: 404 });
+    if (txError || !transaction) return NextResponse.json({ error: 'Tranzaksyon sa pa egziste oswa li pa apatyen a kont ou.' }, { status: 404 });
     if (transaction.status === 'refunded') return NextResponse.json({ error: 'Kòb sa te gentan ranbouse deja.' }, { status: 400 });
 
     const refundAmount = Number(transaction.amount_htg);
 
     // 2. TCHEKE SI MACHANN NAN GEN ASE KÒB POU L REMÈT LAJAN AN
-    const merchantBalance = Number(transaction.profiles.card_balance || 0);
+    //    (🔧 Korije: machann kredite sou `wallet_balance` pa /api/public/payments
+    //    ak RPC peman an, se sa ki dwe debite isit la — pa `card_balance`.)
+    const merchantBalance = Number(transaction.profiles.wallet_balance || 0);
     if (merchantBalance < refundAmount) {
       return NextResponse.json({ error: 'Ou pa gen ase kòb sou kont ou pou w fè ranbousman sa a.' }, { status: 400 });
     }
 
     // 3. FÈ MAJI A: RALE KÒB LA SOU MACHANN NAN, VOYE L BAY KLIYAN AN
-    // Remak: Pou sekirite, se yon fonksyon RPC nan Supabase ki dwe fè sa, 
-    // men la a nou fè l nan API a pou l pi fasil pou w teste l.
-    
     // Rale kòb la nan men Machann nan
     await supabaseAdmin.from('profiles')
-      .update({ card_balance: merchantBalance - refundAmount })
+      .update({ wallet_balance: merchantBalance - refundAmount })
       .eq('id', merchant_id);
 
     // Chèche kliyan an (Si l te anrejistre kòm user nan sistèm ou an)

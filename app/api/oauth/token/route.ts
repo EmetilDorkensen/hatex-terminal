@@ -30,16 +30,21 @@ export async function GET(request: Request) {
       }
     );
 
-    // Verifye token an
-    const { data: tokenData, error } = await supabase
+    // 🔐 YON SÈL ITILIZASYON: nou SITIRE (delete) token an atomikman pandan n
+    // ap verifye l, olye nou jis li l epi kite l valab pandan tout 1èdtan an.
+    // `.delete().select()` la a garanti si 2 rekèt rive an menm tan, se sèlman
+    // youn ki ka reyisi jwenn ranje a (Postgres fè operasyon an atomik).
+    const { data: deletedRows, error } = await supabase
       .from('oauth_tokens')
-      .select('user_id')
+      .delete()
       .eq('token', token)
       .gt('expires_at', new Date().toISOString())
-      .single();
+      .select('user_id');
+
+    const tokenData = deletedRows && deletedRows.length > 0 ? deletedRows[0] : null;
 
     if (error || !tokenData) {
-      return NextResponse.json({ error: 'Token pa valab oswa ekspire' }, { status: 401 });
+      return NextResponse.json({ error: 'Token pa valab, ekspire, oswa li gentan itilize.' }, { status: 401 });
     }
 
     return NextResponse.json({ user_id: tokenData.user_id });
