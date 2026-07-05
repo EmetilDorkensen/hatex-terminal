@@ -9,6 +9,7 @@ import {
     XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
     Crown, MessageCircle, Activity, Radio
 } from 'lucide-react';
+import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export default function WorkspacePage() {
     const router = useRouter();
@@ -320,7 +321,14 @@ export default function WorkspacePage() {
         
         setProcessingId(d.id);
         try {
-            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name').eq('id', d.user_id).single();
+            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, account_type').eq('id', d.user_id).single();
+
+            const capCheck = checkBalanceCap(Number(p?.wallet_balance || 0), p?.account_type, montanFinal);
+            if (!capCheck.allowed) {
+                alert(capCheck.message || "Balans kliyan an ta depase limit maksimòm otorize a.");
+                return;
+            }
+
             await supabase.from('profiles').update({ wallet_balance: Number(p?.wallet_balance || 0) + montanFinal }).eq('id', d.user_id);
             await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
             await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });

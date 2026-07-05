@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Search, User, ShieldCheck, ArrowRightLeft, Lock, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
-import { checkSpendingLimit } from '@/lib/security/spending-limits';
+import { checkSpendingLimit, checkBalanceCap } from '@/lib/security/spending-limits';
 
 // ==========================================
 // TABLO FRÈ TRANSFÈ (menm estrikti ak MonCash)
@@ -229,6 +229,26 @@ export default function TransferPage() {
       const pinData = await pinRes.json();
       if (!pinRes.ok || !pinData.success) {
          throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
+      }
+
+      // Plafon Balans Maksimòm: nou chèche pwofil destinatè a AVAN nou rele
+      // RPC transfè a, pou n ka bloke operasyon an si l ta fè balans li
+      // depase limit otorize a (105,000 HTG endividyèl / 2,000,000 HTG antrepriz).
+      // ⚠️ Verifikasyon sa a fèt nan kòd la (pa nan RPC a) — si de transfè rive
+      // resevwa pa menm moun nan menm segonn nan, se RPC a k ap dwe pwoteje
+      // balans final la; n ap ranfòse sa dirèkteman nan baz done a lè n gen kòd
+      // SQL fonksyon 'process_transfer_by_email' la.
+      const { data: receiverProfile } = await supabase
+        .from('profiles')
+        .select('id, wallet_balance, account_type')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle();
+
+      if (receiverProfile) {
+        const capCheck = checkBalanceCap(Number(receiverProfile.wallet_balance || 0), receiverProfile.account_type, amt);
+        if (!capCheck.allowed) {
+          throw new Error(capCheck.message || "Balans destinatè a ta depase limit maksimòm otorize a.");
+        }
       }
 
       const { error: rpcError } = await supabase.rpc('process_transfer_by_email', {

@@ -19,6 +19,15 @@ export const ENTERPRISE_AUTO_AGENT_CAPACITY = 40000;
 // Kont Antrepriz gen dwa voye fakti san limit.
 export const INDIVIDUAL_INVOICE_DAILY_LIMIT = 85000;
 
+// Limit MAKSIMÒM sou BALANS PRENSIPAL (wallet_balance) yon kont ka kenbe.
+// Sa a se yon plafon SOU BALANS, diferan de limit depans/retrè pi wo yo
+// (ki kontwole vitès kòb k ap SÒTI). Plafon sa a kontwole konbyen kòb ki
+// gen dwa REZIDE sou kont lan nenpòt ki moman — pou rezon anti-blanchiman
+// ak jesyon risk. Kont ki DEJA depase plafon an (anvan règ sa a) pa jennen;
+// verifikasyon an aplike sèlman sou NOUVO kòb k ap antre yo.
+export const INDIVIDUAL_MAX_WALLET_BALANCE = 105000;
+export const ENTERPRISE_MAX_WALLET_BALANCE = 2000000;
+
 export type SpendingChannel = 'transfer' | 'withdraw' | 'card' | 'invoice';
 
 const TRANSFER_TYPES = ['TRANSFER', 'P2P'];
@@ -151,4 +160,43 @@ export async function checkSpendingLimit(
   }
 
   return { allowed: true, todayTotal, monthTotal, dailyLimit, monthlyLimit };
+}
+
+export interface BalanceCapResult {
+  allowed: boolean;
+  message?: string;
+  cap: number;
+}
+
+/**
+ * Verifye si kredite yon kont ak NOUVO kòb (depo, transfè resevwa, peman kat
+ * resevwa, elatriye) ta fè balans prensipal li (`wallet_balance`) depase
+ * plafon otorize a, dapre tip kont lan.
+ *
+ * - Kont Endividyèl: plafon 105,000 HTG.
+ * - Kont Antrepriz apwouve: plafon 2,000,000 HTG.
+ *
+ * ⚠️ Sa a SÈLMAN aplike sou operasyon ki bay yon kont NOUVO kòb (depo,
+ * transfè/peman resevwa, elatriye). Li PA dwe aplike sou ranbousman/anilasyon
+ * ki senpleman retabli kòb yon kont te deja genyen anvan (egzanp: anile yon
+ * retrè, ranbouse yon frè rejte) — sa yo pa "nouvo" kòb, se pwòp kòb kliyan an.
+ */
+export function checkBalanceCap(
+  currentBalance: number,
+  accountType: string | null | undefined,
+  incomingAmount: number
+): BalanceCapResult {
+  const enterprise = isEnterpriseAccount(accountType);
+  const cap = enterprise ? ENTERPRISE_MAX_WALLET_BALANCE : INDIVIDUAL_MAX_WALLET_BALANCE;
+
+  const projected = Number(currentBalance || 0) + Number(incomingAmount || 0);
+  if (projected > cap) {
+    return {
+      allowed: false,
+      cap,
+      message: `Balans maksimòm otorize pou ${enterprise ? 'yon Kont Antrepriz' : 'yon Kont Endividyèl'} se ${cap.toLocaleString()} HTG. Operasyon sa a ta fè balans lan rive ${projected.toLocaleString()} HTG, sa depase limit la.`,
+    };
+  }
+
+  return { allowed: true, cap };
 }

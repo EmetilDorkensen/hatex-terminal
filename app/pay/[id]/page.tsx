@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { CreditCard, Lock, Calendar, ShieldCheck } from 'lucide-react';
+import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export default function CheckoutPage() {
   const params = useParams();
@@ -12,6 +13,7 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [paymentData, setPaymentData] = useState<any>(null);
   const [merchantName, setMerchantName] = useState('');
+  const [merchantProfile, setMerchantProfile] = useState<any>(null);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
   // Enfòmasyon Kat la
@@ -41,15 +43,16 @@ export default function CheckoutPage() {
         
         setPaymentData(request);
 
-        // 2. Chèche non Machann nan pou n ka afiche l
-        const { data: merchantProfile } = await supabase
+        // 2. Chèche non Machann nan pou n ka afiche l (+ balans/tip kont pou plafon balans)
+        const { data: merchant } = await supabase
           .from('profiles')
-          .select('business_name, full_name')
+          .select('business_name, full_name, wallet_balance, account_type')
           .eq('id', request.merchant_id)
           .single();
           
-        if (merchantProfile) {
-            setMerchantName(merchantProfile.business_name || merchantProfile.full_name);
+        if (merchant) {
+            setMerchantName(merchant.business_name || merchant.full_name);
+            setMerchantProfile(merchant);
         }
 
       } catch (err: any) {
@@ -94,12 +97,23 @@ export default function CheckoutPage() {
     setMsg({ type: '', text: '' });
 
     try {
+      // Plafon Balans Maksimòm pou machann k ap resevwa kòb la — pre-check
+      // fèt anvan RPC la, an atandan yo ranfòse limit la dirèkteman nan RPC a.
+      if (merchantProfile) {
+        const capCheck = checkBalanceCap(Number(merchantProfile.wallet_balance || 0), merchantProfile.account_type, Number(paymentData?.amount || 0));
+        if (!capCheck.allowed) {
+          throw new Error(capCheck.message || 'Balans machann nan ta depase limit maksimòm otorize a.');
+        }
+      }
+
       // 1. Voye enfòmasyon kat la nan nouvo RPC baz done a
+      // (non paramèt yo dwe matche EGZAKTMAN ak fonksyon SQL la: p_exp_date / p_cvv,
+      // pa p_card_expiry / p_card_cvv — sinon PostgREST pa jwenn fonksyon an.)
       const { data: result, error } = await supabase.rpc('process_merchant_payment_with_card', {
         p_payment_id: paymentId,
         p_card_number: cleanCardNumber,
-        p_card_expiry: cleanExpiry,
-        p_card_cvv: cleanCvv
+        p_exp_date: cleanExpiry,
+        p_cvv: cleanCvv
       });
 
       if (error) throw new Error("Gen yon pwoblèm nan sistèm peman an. Tanpri re-eseye.");

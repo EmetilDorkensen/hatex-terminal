@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
-import { checkSpendingLimit } from '@/lib/security/spending-limits';
+import { checkSpendingLimit, checkBalanceCap } from '@/lib/security/spending-limits';
 
 // KOUCH SEKIRITE 1: CORS Strik pou API Pwodiksyon
 const corsHeaders = {
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     // KOUCH SEKIRITE 3: Verifikasyon Estati Machann nan
     const { data: merchant, error: merchantErr } = await supabase
       .from('profiles')
-      .select('id, full_name, is_merchant, account_status, wallet_balance, webhook_url, webhook_secret')
+      .select('id, full_name, is_merchant, account_status, wallet_balance, webhook_url, webhook_secret, account_type')
       .eq('api_key', apiKey)
       .single();
 
@@ -107,6 +107,12 @@ export async function POST(request: Request) {
     const limitCheck = await checkSpendingLimit(supabase, client.id, client.account_type, safeAmount, 'card');
     if (!limitCheck.allowed) {
       return NextResponse.json({ error: limitCheck.message || "Limit depans depase." }, { status: 400, headers: corsHeaders });
+    }
+
+    // KOUCH SEKIRITE 6C: Plafon Balans Maksimòm pou Machann k ap resevwa kòb la
+    const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, safeAmount);
+    if (!capCheck.allowed) {
+      return NextResponse.json({ error: capCheck.message || "Balans machann nan ta depase limit maksimòm otorize a." }, { status: 400, headers: corsHeaders });
     }
 
     // ==================================================

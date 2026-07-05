@@ -8,6 +8,7 @@ import {
   Receipt, Phone, CalendarIcon, Hash, MessageCircle
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
+import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export default function SubscribePage() {
   const params = useParams();
@@ -125,6 +126,9 @@ export default function SubscribePage() {
       };
       if (clientProfile.is_activated === false) throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
       if (clientProfile.card_balance < product.price) throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
+
+      const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, product.price);
+      if (!capCheck.allowed) throw new Error(capCheck.message || "Balans machann nan ta depase limit maksimòm otorize a.");
 
       // ==========================================
       // 2. TRANZAKSYON KÒB LA

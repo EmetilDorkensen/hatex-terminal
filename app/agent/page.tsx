@@ -9,6 +9,7 @@ import {
   ArrowLeft, Building2, Briefcase, UploadCloud, CheckSquare, ChevronRight,
   RefreshCw, ArrowUpCircle, Filter, Calendar, Clock
 } from 'lucide-react';
+import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 type AppStep = 'loading' | 'kyc_denied' | 'rejected' | 'tier_select' | 'upload_docs' | 'payment_plan' | 'pending' | 'dashboard';
 
@@ -420,9 +421,12 @@ export default function AgentPortal() {
       if (currentAgent.account_status === 'suspended') throw new Error("Kont ou a sispandi.");
       if (currentAgent.agent_balance < amountNum) throw new Error("Ou pa gen ase kòb sou balans Ajan w lan pou fè depo sa.");
 
-      const { data: client, error: clientErr } = await supabase.from('profiles').select('id, wallet_balance, account_status, full_name').eq('email', depositEmail.toLowerCase().trim()).single();
+      const { data: client, error: clientErr } = await supabase.from('profiles').select('id, wallet_balance, account_status, full_name, account_type').eq('email', depositEmail.toLowerCase().trim()).single();
       if (clientErr || !client) throw new Error("Pa jwenn okenn kliyan ak imèl sa a.");
       if (client.account_status === 'suspended') throw new Error("Kont kliyan an sispandi.");
+
+      const capCheck = checkBalanceCap(Number(client.wallet_balance || 0), client.account_type, amountNum);
+      if (!capCheck.allowed) throw new Error(capCheck.message || "Balans kliyan an ta depase limit maksimòm otorize a.");
 
       const newAgentBalance = Number(currentAgent.agent_balance) - amountNum;
       const newClientBalance = Number(client.wallet_balance) + amountNum;

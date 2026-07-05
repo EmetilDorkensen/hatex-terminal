@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { findProfileByCardSimple } from '@/lib/security/card-lookup';
-import { checkSpendingLimit } from '@/lib/security/spending-limits';
+import { checkSpendingLimit, checkBalanceCap } from '@/lib/security/spending-limits';
 
 export async function POST(req: Request) {
   try {
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     }
 
     const { data: merchant, error: merchantErr } = await supabaseAdmin
-      .from('profiles').select('id, account_status, email').eq('api_key', merchant_api_key).single();
+      .from('profiles').select('id, account_status, email, wallet_balance, account_type').eq('api_key', merchant_api_key).single();
 
     if (merchantErr || !merchant) return NextResponse.json({ error: 'Machann pa rekonèt.' }, { status: 404 });
     if (merchant.account_status === 'suspended') return NextResponse.json({ error: 'Kont machann sa bloke.' }, { status: 403 });
@@ -44,6 +44,15 @@ export async function POST(req: Request) {
       if (!limitCheck.allowed) {
         return NextResponse.json({ error: limitCheck.message || 'Limit depans depase.' }, { status: 400 });
       }
+    }
+
+    // Plafon Balans Maksimòm pou machann k ap resevwa kòb la — verifikasyon
+    // fèt AVAN RPC la rele, paske fonksyon SQL 'process_merchant_payment_with_card'
+    // la pa nan repo a (li viv dirèkteman nan Supabase); pre-check sa a se
+    // sekou imedya an atandan yo ranfòse limit la dirèkteman nan RPC a.
+    const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, Number(amount_htg));
+    if (!capCheck.allowed) {
+      return NextResponse.json({ error: capCheck.message || 'Balans machann nan ta depase limit maksimòm otorize a.' }, { status: 400 });
     }
 
     const { data: result, error: rpcError } = await supabaseAdmin.rpc('process_merchant_payment_with_card', {

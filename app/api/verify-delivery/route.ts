@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     // 2. VERIFIKASYON MACHANN NAN
     const { data: merchant, error: mErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, wallet_balance, account_status, failed_otp_attempts')
+      .select('id, wallet_balance, account_status, failed_otp_attempts, account_type')
       .eq('id', merchant_id)
       .single();
 
@@ -60,6 +61,12 @@ export async function POST(req: Request) {
     // ✅ 5. TOUT BAGAY BON: DEBLOKE KÒB LA SOT NAN BANK GLOBAL LA
     // ========================================================================
     const amountToRelease = Number(tx.amount_htg);
+
+    const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, amountToRelease);
+    if (!capCheck.allowed) {
+      return NextResponse.json({ error: capCheck.message || 'Balans ou ta depase limit maksimòm otorize a.' }, { status: 400 });
+    }
+
     const newBalance = Number(merchant.wallet_balance || 0) + amountToRelease;
 
     // Mete kòb la sou kont machann nan epi reset chans OTP yo
