@@ -25,17 +25,34 @@ export default function AgentPortal() {
   
   const [selectedTier, setSelectedTier] = useState<'pro' | 'premium' | null>(null);
   
-  // Fichye Dokiman
+  // Fichye Dokiman (baz - tout tyè)
   const [idDoc, setIdDoc] = useState<File | null>(null);
   const [addressDoc, setAddressDoc] = useState<File | null>(null);
   const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
   const [patenteDoc, setPatenteDoc] = useState<File | null>(null);
   const [cifDoc, setCifDoc] = useState<File | null>(null);
 
+  // Verifikasyon anti-fwod (obligatwa pou tout tyè)
+  const [selfieWithIdDoc, setSelfieWithIdDoc] = useState<File | null>(null);
+  const [idExpiryDate, setIdExpiryDate] = useState('');
+  const [addressProofDate, setAddressProofDate] = useState('');
+  const [referenceName, setReferenceName] = useState('');
+  const [referencePhone, setReferencePhone] = useState('');
+
+  // Dokiman siplemantè (obligatwa sèlman pou PREMIUM)
+  const [criminalRecordDoc, setCriminalRecordDoc] = useState<File | null>(null);
+  const [bankStatementDoc, setBankStatementDoc] = useState<File | null>(null);
+  const [leaseDoc, setLeaseDoc] = useState<File | null>(null);
+  const [confidentialityAccepted, setConfidentialityAccepted] = useState(false);
+
   // Upgrade State
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradePatente, setUpgradePatente] = useState<File | null>(null);
   const [upgradeCif, setUpgradeCif] = useState<File | null>(null);
+  const [upgradeCriminalRecord, setUpgradeCriminalRecord] = useState<File | null>(null);
+  const [upgradeBankStatement, setUpgradeBankStatement] = useState<File | null>(null);
+  const [upgradeLease, setUpgradeLease] = useState<File | null>(null);
+  const [upgradeConfidentiality, setUpgradeConfidentiality] = useState(false);
 
   // Lojik Peman & Rechaj
   const [activationAmount, setActivationAmount] = useState('');
@@ -86,9 +103,54 @@ export default function AgentPortal() {
     }
   };
 
+  // ==========================================
+  // NOTIFYE ADMIN NAN (KÈS GLOBAL) LÈ YON FRÈ AJAN ANTRE
+  // ==========================================
+  const notifyAdminOfAgentFee = async (info: {
+    title: string;
+    agentName: string;
+    tier: string | null;
+    depositAmount: number;
+    fee: number;
+  }) => {
+    const message =
+      `💼 <b>${info.title}</b>\n` +
+      `👤 Ajan: ${info.agentName}\n` +
+      `🏷️ Plan: ${(info.tier || '').toUpperCase()}\n` +
+      `💰 Depo/Vèsman: ${info.depositAmount.toLocaleString()} HTG\n` +
+      `✅ Frè ajoute otomatikman nan Kès Global: ${info.fee.toLocaleString()} HTG`;
+
+    try {
+      await fetch('/api/notifications/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'admin', message, parseMode: 'HTML' }),
+      });
+    } catch {
+      // Si Telegram pa reponn, sa pa dwe bloke tranzaksyon an — frè a deja anrejistre nan baz done a
+    }
+  };
+
   const handleDocsNext = () => {
     if (!idDoc || !addressDoc || !locationPhoto) return alert("Pyès idantite, prèv adrès ak foto lokal la obligatwa.");
-    if (selectedTier === 'premium' && (!patenteDoc || !cifDoc)) return alert("Patant ak CIF obligatwa pou ajan Premium.");
+    if (!selfieWithIdDoc) return alert("Selfie ak pyès idantite a nan men w obligatwa (verifikasyon anti-fwod).");
+    if (!referenceName.trim() || !referencePhone.trim()) return alert("Non ak nimewo telefòn yon moun referans obligatwa.");
+    if (!idExpiryDate) return alert("Dat ekspirasyon pyès idantite a obligatwa.");
+    if (new Date(idExpiryDate) <= new Date()) return alert("Pyès idantite ou soumèt la ekspire deja. Ou dwe mete yon dokiman ki valid.");
+    if (!addressProofDate) return alert("Dat sou dokiman prèv adrès la obligatwa.");
+
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    if (new Date(addressProofDate) < threeMonthsAgo) return alert("Prèv adrès la twò ansyen. Li dwe gen mwens pase 3 mwa.");
+
+    if (selectedTier === 'premium') {
+      if (!patenteDoc || !cifDoc) return alert("Patant ak CIF obligatwa pou ajan Premium.");
+      if (!criminalRecordDoc) return alert("Ekstrè kazye jidisyè a obligatwa pou ajan Premium.");
+      if (!bankStatementDoc) return alert("Relve bankè oswa prèv kapital la obligatwa pou ajan Premium.");
+      if (!leaseDoc) return alert("Kontra lokasyon oswa tit pwopriyete lokal la obligatwa pou ajan Premium.");
+      if (!confidentialityAccepted) return alert("Ou dwe aksepte Angajman Konfidansyalite a pou w kontinye.");
+    }
+
     setAppStep('payment_plan');
   };
 
@@ -125,8 +187,12 @@ export default function AgentPortal() {
       const idUrl = await uploadFile(idDoc!, 'id');
       const addressUrl = await uploadFile(addressDoc!, 'address');
       const locationUrl = await uploadFile(locationPhoto!, 'location');
+      const selfieUrl = await uploadFile(selfieWithIdDoc!, 'selfie_with_id');
       const patenteUrl = selectedTier === 'premium' && patenteDoc ? await uploadFile(patenteDoc, 'patente') : null;
       const cifUrl = selectedTier === 'premium' && cifDoc ? await uploadFile(cifDoc, 'cif') : null;
+      const criminalRecordUrl = selectedTier === 'premium' && criminalRecordDoc ? await uploadFile(criminalRecordDoc, 'criminal_record') : null;
+      const bankStatementUrl = selectedTier === 'premium' && bankStatementDoc ? await uploadFile(bankStatementDoc, 'bank_statement') : null;
+      const leaseUrl = selectedTier === 'premium' && leaseDoc ? await uploadFile(leaseDoc, 'lease_doc') : null;
 
       const newWalletBal = Number(profile.wallet_balance) - totalDeduction;
       
@@ -154,8 +220,27 @@ export default function AgentPortal() {
         location_photo_url: locationUrl,
         patente_url: patenteUrl,
         cif_url: cifUrl,
+        selfie_with_id_url: selfieUrl,
+        criminal_record_url: criminalRecordUrl,
+        bank_statement_url: bankStatementUrl,
+        lease_doc_url: leaseUrl,
+        id_expiry_date: idExpiryDate,
+        address_proof_date: addressProofDate,
+        reference_name: referenceName.trim(),
+        reference_phone: referencePhone.trim(),
+        confidentiality_accepted: selectedTier === 'premium' ? confidentialityAccepted : null,
+        confidentiality_accepted_at: selectedTier === 'premium' && confidentialityAccepted ? new Date().toISOString() : null,
         metadata: { initial_deposit: amount, fee_paid: fee }
       }]);
+
+      // Notifye Admin nan: frè sa a fèk antre otomatikman nan Kès Global antrepriz la
+      await notifyAdminOfAgentFee({
+        title: 'FRÈ AKTIVASYON AJAN',
+        agentName: profile.full_name,
+        tier: selectedTier,
+        depositAmount: amount,
+        fee,
+      });
 
       fetchAgentData();
     } catch (err: any) { alert("Erè: " + err.message); } finally { setActionLoading(false); }
@@ -233,8 +318,17 @@ export default function AgentPortal() {
 
       await supabase.from('transactions').insert([
           { user_id: profile.id, type: 'AGENT_GUARANTEE', amount: -amount, status: 'success', description: `Ogmante kapasite ajan` },
-          { user_id: profile.id, type: 'FEE', amount: -fee, status: 'success', description: `Frè ogmantasyon kapasite (7/1000 HTG)` }
+          { user_id: profile.id, type: 'FEE', amount: -fee, status: 'success', description: `Frè ogmantasyon kapasite ajan (7/1000 HTG)` }
       ]);
+
+      // Notifye Admin nan: frè sa a fèk antre otomatikman nan Kès Global antrepriz la
+      await notifyAdminOfAgentFee({
+        title: 'FRÈ OGMANTASYON KAPASITE AJAN',
+        agentName: profile.full_name,
+        tier: profile.agent_tier,
+        depositAmount: amount,
+        fee,
+      });
 
       alert(`Kapasite w ogmante ak siksè!`);
       setInstallmentAmount('');
@@ -252,6 +346,18 @@ export default function AgentPortal() {
     if (!upgradePatente || !upgradeCif) {
        return alert("Patant ak CIF obligatwa pou ajan Premium.");
     }
+    if (!upgradeCriminalRecord) {
+       return alert("Ekstrè kazye jidisyè a obligatwa pou ajan Premium.");
+    }
+    if (!upgradeBankStatement) {
+       return alert("Relve bankè oswa prèv kapital la obligatwa pou ajan Premium.");
+    }
+    if (!upgradeLease) {
+       return alert("Kontra lokasyon oswa tit pwopriyete lokal la obligatwa pou ajan Premium.");
+    }
+    if (!upgradeConfidentiality) {
+       return alert("Ou dwe aksepte Angajman Konfidansyalite a pou w kontinye.");
+    }
 
     setActionLoading(true);
     try {
@@ -265,6 +371,9 @@ export default function AgentPortal() {
 
       const patUrl = await uploadFile(upgradePatente, 'patente_upg');
       const cifUrl = await uploadFile(upgradeCif, 'cif_upg');
+      const criminalRecordUrl = await uploadFile(upgradeCriminalRecord, 'criminal_record_upg');
+      const bankStatementUrl = await uploadFile(upgradeBankStatement, 'bank_statement_upg');
+      const leaseUrl = await uploadFile(upgradeLease, 'lease_doc_upg');
 
       await supabase.from('agent_applications').insert([{
         user_id: profile.id,
@@ -272,13 +381,24 @@ export default function AgentPortal() {
         status: 'pending',
         application_type: 'upgrade',
         patente_url: patUrl,
-        cif_url: cifUrl
+        cif_url: cifUrl,
+        criminal_record_url: criminalRecordUrl,
+        bank_statement_url: bankStatementUrl,
+        lease_doc_url: leaseUrl,
+        confidentiality_accepted: true,
+        confidentiality_accepted_at: new Date().toISOString()
       }]);
 
       await supabase.from('profiles').update({ upgrade_status: 'pending' }).eq('id', profile.id);
 
       alert("Demann pou pase PREMIUM nan soumèt ak siksè! Admin nan ap verifye l.");
       setShowUpgradeModal(false);
+      setUpgradePatente(null);
+      setUpgradeCif(null);
+      setUpgradeCriminalRecord(null);
+      setUpgradeBankStatement(null);
+      setUpgradeLease(null);
+      setUpgradeConfidentiality(false);
       fetchAgentData();
     } catch (err: any) { alert(err.message); } finally { setActionLoading(false); }
   };
@@ -345,25 +465,206 @@ export default function AgentPortal() {
 
   if (appStep === 'loading') return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600 w-12 h-12" /></div>;
 
-  if (appStep === 'kyc_denied') return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="bg-white p-8 rounded-3xl text-center max-w-md w-full shadow-sm"><ShieldCheck size={40} className="text-amber-500 mx-auto mb-4" /><h2 className="text-2xl font-bold mb-3">Verifikasyon Obligatwa</h2><p className="text-sm text-slate-500 mb-8">Pase KYC w anvan w ka aplike kòm ajan.</p><button onClick={() => router.push('/dashboard')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase transition-all shadow-sm">Dashboard</button></div></div>
-  );
+  if (appStep === 'kyc_denied') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white p-8 rounded-3xl text-center max-w-md w-full shadow-sm">
+          <ShieldCheck size={40} className="text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-3">Verifikasyon Obligatwa</h2>
+          <p className="text-sm text-slate-500 mb-8">Pase KYC w anvan w ka aplike kòm ajan.</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase transition-all shadow-sm"
+          >
+            Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  if (appStep === 'rejected') return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="bg-white p-8 rounded-3xl text-center max-w-md w-full shadow-sm"><AlertTriangle size={60} className="text-rose-500 mx-auto mb-4" /><h2 className="text-xl font-bold mb-3">Aplikasyon Rejte</h2><p className="text-sm text-slate-500 mb-8">Admin nan rejte dokiman yo. Lajan w lan te ranbouse.</p><button onClick={restartApplication} disabled={actionLoading} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-xs uppercase shadow-sm flex justify-center">{actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Rekòmanse Aplikasyon an'}</button></div></div>
-  );
+  if (appStep === 'rejected') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white p-8 rounded-3xl text-center max-w-md w-full shadow-sm">
+          <AlertTriangle size={60} className="text-rose-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-3">Aplikasyon Rejte</h2>
+          <p className="text-sm text-slate-500 mb-8">Admin nan rejte dokiman yo. Lajan w lan te ranbouse.</p>
+          <button
+            onClick={restartApplication}
+            disabled={actionLoading}
+            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-xs uppercase shadow-sm flex justify-center"
+          >
+            {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Rekòmanse Aplikasyon an'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  if (appStep === 'pending') return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="bg-white p-8 sm:p-10 rounded-3xl shadow-sm text-center max-w-lg w-full"><Store size={40} className="text-indigo-600 mx-auto mb-4" /><h2 className="text-2xl font-bold mb-4">Verifikasyon ankou...</h2><p className="text-sm text-slate-600 mb-6">Ekip Admin nan ap verifye dokiman w yo. Sa pran 1 a 3 jou ouvrab.</p><button onClick={() => router.push('/dashboard')} className="w-full bg-slate-100 text-slate-700 py-4 rounded-xl font-bold text-xs uppercase shadow-sm">Dashboard</button></div></div>
-  );
+  if (appStep === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-sm text-center max-w-lg w-full">
+          <Store size={40} className="text-indigo-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Verifikasyon ankou...</h2>
+          <p className="text-sm text-slate-600 mb-6">Ekip Admin nan ap verifye dokiman w yo. Sa pran 1 a 3 jou ouvrab.</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-full bg-slate-100 text-slate-700 py-4 rounded-xl font-bold text-xs uppercase shadow-sm"
+          >
+            Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  if (appStep === 'tier_select') return (
-    <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center pt-12"><div className="text-center mb-10"><Store size={32} className="text-indigo-600 mx-auto mb-4" /><h1 className="text-3xl font-bold text-slate-900">Vin Ajan Hatexcard</h1></div><div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full"><div className="bg-white p-8 rounded-3xl shadow-sm flex flex-col hover:border-indigo-300 transition-all border border-gray-200"><h2 className="text-2xl font-bold mb-4">Ajan PRO</h2><div className="text-3xl font-bold mb-6">40,000 <span className="text-sm text-slate-500">HTG</span></div><button onClick={() => { setSelectedTier('pro'); setAppStep('upload_docs'); }} className="w-full bg-indigo-50 text-indigo-700 py-4 rounded-xl font-bold text-xs uppercase">Chwazi PRO</button></div><div className="bg-slate-900 p-8 rounded-3xl shadow-xl flex flex-col border border-slate-800"><h2 className="text-2xl font-bold text-white mb-4">Ajan PREMIUM</h2><div className="text-3xl font-bold text-white mb-6">110,000 <span className="text-sm text-slate-400">HTG</span></div><button onClick={() => { setSelectedTier('premium'); setAppStep('upload_docs'); }} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase">Chwazi PREMIUM</button></div></div></div>
-  );
+  if (appStep === 'tier_select') {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center pt-12">
+        <div className="text-center mb-10">
+          <Store size={32} className="text-indigo-600 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-slate-900">Vin Ajan Hatexcard</h1>
+        </div>
 
-  if (appStep === 'upload_docs') return (
-    <div className="min-h-screen bg-slate-50 p-6"><div className="max-w-2xl mx-auto"><button onClick={() => setAppStep('tier_select')} className="flex items-center gap-2 text-slate-500 mb-6 font-bold text-xs"><ArrowLeft size={16} /> Tounen</button><div className="bg-white p-8 rounded-3xl shadow-sm"><h2 className="text-2xl font-bold mb-8">Dokiman {selectedTier?.toUpperCase()}</h2><div className="space-y-6"><div><label className="block text-xs font-bold mb-2">Pyès Idantite *</label><input type="file" onChange={(e) => setIdDoc(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" /></div><div><label className="block text-xs font-bold mb-2">Prèv Adrès *</label><input type="file" onChange={(e) => setAddressDoc(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" /></div><div><label className="block text-xs font-bold mb-2">Foto Lokal La *</label><input type="file" onChange={(e) => setLocationPhoto(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" /></div>{selectedTier === 'premium' && (<><div className="pt-4"><label className="block text-xs font-bold text-indigo-600 mb-2">Patant Biznis la *</label><input type="file" onChange={(e) => setPatenteDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" /></div><div><label className="block text-xs font-bold text-indigo-600 mb-2">CIF Biznis la *</label><input type="file" onChange={(e) => setCifDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" /></div></>)}</div><button onClick={handleDocsNext} className="w-full mt-10 bg-slate-900 text-white py-4 rounded-xl font-bold text-xs uppercase flex justify-center gap-2">Kontinye <ChevronRight size={16} /></button></div></div></div>
-  );
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
+          {/* PLAN PRO */}
+          <div className="bg-white p-8 rounded-3xl shadow-sm flex flex-col hover:border-indigo-300 transition-all border border-gray-200">
+            <h2 className="text-2xl font-bold mb-4">Ajan PRO</h2>
+            <div className="text-3xl font-bold mb-6">
+              40,000 <span className="text-sm text-slate-500">HTG</span>
+            </div>
+            <button
+              onClick={() => { setSelectedTier('pro'); setAppStep('upload_docs'); }}
+              className="w-full bg-indigo-50 text-indigo-700 py-4 rounded-xl font-bold text-xs uppercase"
+            >
+              Chwazi PRO
+            </button>
+          </div>
+
+          {/* PLAN PREMIUM */}
+          <div className="bg-slate-900 p-8 rounded-3xl shadow-xl flex flex-col border border-slate-800">
+            <h2 className="text-2xl font-bold text-white mb-4">Ajan PREMIUM</h2>
+            <div className="text-3xl font-bold text-white mb-6">
+              110,000 <span className="text-sm text-slate-400">HTG</span>
+            </div>
+            <button
+              onClick={() => { setSelectedTier('premium'); setAppStep('upload_docs'); }}
+              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase"
+            >
+              Chwazi PREMIUM
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (appStep === 'upload_docs') {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => setAppStep('tier_select')} className="flex items-center gap-2 text-slate-500 mb-6 font-bold text-xs">
+            <ArrowLeft size={16} /> Tounen
+          </button>
+
+          <div className="bg-white p-8 rounded-3xl shadow-sm">
+            <h2 className="text-2xl font-bold mb-8">Dokiman {selectedTier?.toUpperCase()}</h2>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold mb-2">Pyès Idantite *</label>
+                <input type="file" onChange={(e) => setIdDoc(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-2">Prèv Adrès *</label>
+                <input type="file" onChange={(e) => setAddressDoc(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-2">Foto Lokal La *</label>
+                <input type="file" onChange={(e) => setLocationPhoto(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-2">Dat Ekspirasyon Pyès Idantite a *</label>
+                <input type="date" value={idExpiryDate} onChange={(e) => setIdExpiryDate(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+                <p className="text-[10px] text-slate-400 mt-1.5">Pyès idantite a dwe toujou valid, li pa dwe deja ekspire.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-2">Dat sou Dokiman Prèv Adrès la *</label>
+                <input type="date" value={addressProofDate} onChange={(e) => setAddressProofDate(e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+                <p className="text-[10px] text-slate-400 mt-1.5">Dokiman an dwe gen mwens pase 3 mwa (fakti EDH, DINEPA, oswa let labank).</p>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100">
+                <label className="block text-xs font-bold mb-2">Selfie ak Pyès Idantite a nan Men w *</label>
+                <input type="file" accept="image/*" onChange={(e) => setSelfieWithIdDoc(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+                <p className="text-[10px] text-slate-400 mt-1.5">Verifikasyon anti-fwod: montre figi w ansanm ak pyès idantite a byen klè.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                <div>
+                  <label className="block text-xs font-bold mb-2">Non yon Moun Referans *</label>
+                  <input type="text" value={referenceName} onChange={(e) => setReferenceName(e.target.value)} placeholder="Non Prenon" className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-2">Telefòn Referans lan *</label>
+                  <input type="tel" value={referencePhone} onChange={(e) => setReferencePhone(e.target.value)} placeholder="+509 XXXX XXXX" className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+                </div>
+                <p className="text-[10px] text-slate-400 sm:col-span-2">Yon moun nou ka rele pou konfime idantite w si gen dout.</p>
+              </div>
+
+              {selectedTier === 'premium' && (
+                <>
+                  <div className="pt-4 border-t border-indigo-100">
+                    <label className="block text-xs font-bold text-indigo-600 mb-2">Patant Biznis la *</label>
+                    <input type="file" onChange={(e) => setPatenteDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-indigo-600 mb-2">CIF Biznis la *</label>
+                    <input type="file" onChange={(e) => setCifDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-indigo-600 mb-2">Ekstrè Kazye Jidisyè *</label>
+                    <input type="file" onChange={(e) => setCriminalRecordDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" />
+                    <p className="text-[10px] text-slate-400 mt-1.5">Pwoteksyon kont blanchiman lajan pou gwo volim tranzaksyon.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-indigo-600 mb-2">Relve Bankè / Prèv Kapital *</label>
+                    <input type="file" onChange={(e) => setBankStatementDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-indigo-600 mb-2">Kontra Lokasyon oswa Tit Pwopriyete Lokal la *</label>
+                    <input type="file" onChange={(e) => setLeaseDoc(e.target.files?.[0] || null)} className="w-full bg-indigo-50 p-3 rounded-xl text-sm border border-indigo-100" />
+                    <p className="text-[10px] text-slate-400 mt-1.5">Konfime lokal biznis la reyèl e li pa vityèl.</p>
+                  </div>
+                  <label className="flex items-start gap-3 bg-indigo-50 border border-indigo-100 p-4 rounded-xl cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={confidentialityAccepted}
+                      onChange={(e) => setConfidentialityAccepted(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-xs text-indigo-700 font-medium">
+                      Mwen aksepte Angajman Konfidansyalite a — mwen konprann mwen ap manyen done kliyan Hatexcard yo epi m dwe pwoteje yo.
+                    </span>
+                  </label>
+                </>
+              )}
+            </div>
+
+            <button onClick={handleDocsNext} className="w-full mt-10 bg-slate-900 text-white py-4 rounded-xl font-bold text-xs uppercase flex justify-center gap-2">
+              Kontinye <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (appStep === 'payment_plan') {
     const requiredAmount = selectedTier === 'premium' ? 110000 : 40000;
@@ -372,7 +673,49 @@ export default function AgentPortal() {
     const totalWithFee = currentInput + calculatedFee;
 
     return (
-      <div className="min-h-screen bg-slate-50 p-6"><div className="max-w-2xl mx-auto"><button onClick={() => setAppStep('upload_docs')} className="flex items-center gap-2 text-slate-500 mb-6 font-bold text-xs"><ArrowLeft size={16} /> Tounen</button><div className="bg-white p-8 rounded-3xl shadow-sm"><h2 className="text-2xl font-bold mb-8">Peman Aktivasyon</h2><div className="mb-8"><label className="block text-xs font-bold mb-2">Montan w ap peye a (HTG)</label><input type="number" value={activationAmount} onChange={(e) => setActivationAmount(e.target.value)} placeholder="0" className="w-full bg-slate-50 p-4 rounded-xl text-lg font-bold border" /></div>{currentInput > 0 && (<div className="bg-slate-50 p-5 rounded-xl border mb-8"><div className="flex justify-between text-xs font-bold mb-2"><span>Frè (7 HTG / 1000 HTG):</span><span className="text-rose-600">+{calculatedFee} HTG</span></div><div className="flex justify-between text-sm font-black border-t pt-2 mt-2"><span>Total k ap soti a:</span><span>{totalWithFee} HTG</span></div></div>)}<button onClick={submitApplication} disabled={actionLoading || currentInput <= 0} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase flex justify-center">{actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sove Dokiman & Peye'}</button></div></div></div>
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => setAppStep('upload_docs')} className="flex items-center gap-2 text-slate-500 mb-6 font-bold text-xs">
+            <ArrowLeft size={16} /> Tounen
+          </button>
+
+          <div className="bg-white p-8 rounded-3xl shadow-sm">
+            <h2 className="text-2xl font-bold mb-8">Peman Aktivasyon</h2>
+
+            <div className="mb-8">
+              <label className="block text-xs font-bold mb-2">Montan w ap peye a (HTG)</label>
+              <input
+                type="number"
+                value={activationAmount}
+                onChange={(e) => setActivationAmount(e.target.value)}
+                placeholder="0"
+                className="w-full bg-slate-50 p-4 rounded-xl text-lg font-bold border"
+              />
+            </div>
+
+            {currentInput > 0 && (
+              <div className="bg-slate-50 p-5 rounded-xl border mb-8">
+                <div className="flex justify-between text-xs font-bold mb-2">
+                  <span>Frè (7 HTG / 1000 HTG):</span>
+                  <span className="text-rose-600">+{calculatedFee} HTG</span>
+                </div>
+                <div className="flex justify-between text-sm font-black border-t pt-2 mt-2">
+                  <span>Total k ap soti a:</span>
+                  <span>{totalWithFee} HTG</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={submitApplication}
+              disabled={actionLoading || currentInput <= 0}
+              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase flex justify-center"
+            >
+              {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sove Dokiman & Peye'}
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -386,13 +729,42 @@ export default function AgentPortal() {
         
         {/* MODAL UPGRADE PREMIUM */}
         {showUpgradeModal && (
-           <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto py-10">
              <div className="bg-white border border-gray-200 p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ArrowUpCircle className="text-indigo-600" /> Pase nan PREMIUM</h2>
-               <p className="text-xs text-slate-500 mb-6">Pou w pase Premium, ou dwe gen 10,000 HTG sou Wallet ou, epi soumèt Patant ak CIF ou a.</p>
+               <p className="text-xs text-slate-500 mb-6">Pou w pase Premium, ou dwe gen 10,000 HTG sou Wallet ou, epi soumèt tout dokiman anba yo.</p>
                <div className="space-y-4 mb-8">
-                 <div><label className="block text-xs font-bold mb-2 text-indigo-600">Patant Biznis la *</label><input type="file" onChange={(e) => setUpgradePatente(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" /></div>
-                 <div><label className="block text-xs font-bold mb-2 text-indigo-600">CIF Biznis la *</label><input type="file" onChange={(e) => setUpgradeCif(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" /></div>
+                 <div>
+                   <label className="block text-xs font-bold mb-2 text-indigo-600">Patant Biznis la *</label>
+                   <input type="file" onChange={(e) => setUpgradePatente(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-bold mb-2 text-indigo-600">CIF Biznis la *</label>
+                   <input type="file" onChange={(e) => setUpgradeCif(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-bold mb-2 text-indigo-600">Ekstrè Kazye Jidisyè *</label>
+                   <input type="file" onChange={(e) => setUpgradeCriminalRecord(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-bold mb-2 text-indigo-600">Relve Bankè / Prèv Kapital *</label>
+                   <input type="file" onChange={(e) => setUpgradeBankStatement(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" />
+                 </div>
+                 <div>
+                   <label className="block text-xs font-bold mb-2 text-indigo-600">Kontra Lokasyon / Tit Pwopriyete *</label>
+                   <input type="file" onChange={(e) => setUpgradeLease(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-lg border text-sm" />
+                 </div>
+                 <label className="flex items-start gap-3 bg-indigo-50 border border-indigo-100 p-4 rounded-xl cursor-pointer">
+                   <input
+                     type="checkbox"
+                     checked={upgradeConfidentiality}
+                     onChange={(e) => setUpgradeConfidentiality(e.target.checked)}
+                     className="mt-0.5"
+                   />
+                   <span className="text-xs text-indigo-700 font-medium">
+                     Mwen aksepte Angajman Konfidansyalite a pou manyen done kliyan yo.
+                   </span>
+                 </label>
                </div>
                <div className="flex gap-3">
                  <button onClick={() => setShowUpgradeModal(false)} className="flex-1 py-3 rounded-xl border text-xs font-bold uppercase">Anile</button>

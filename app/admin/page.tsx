@@ -41,6 +41,7 @@ export default function AdminSuperPage() {
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
     const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
+    const [agentFeeHistory, setAgentFeeHistory] = useState<any[]>([]);
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -164,8 +165,24 @@ export default function AdminSuperPage() {
                 .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
                 .reduce((acc, t) => acc + Number(t.fee || 0), 0);
                 
-            const { data: feeData } = await supabase.from('transactions').select('amount').eq('type', 'FEE').eq('status', 'success');
+            // Chak frè ajan (aktivasyon oswa ogmantasyon kapasite) antre otomatikman nan Kès Global la
+            // paske li anrejistre kòm yon tranzaksyon 'FEE' — nou rale l isit pou n kalkile total la
+            // EPI pou n bati yon istorik li pou Sipè Admin ka wè chak evènman apa.
+            const { data: feeData } = await supabase
+                .from('transactions')
+                .select('id, user_id, amount, description, created_at')
+                .eq('type', 'FEE')
+                .eq('status', 'success')
+                .order('created_at', { ascending: false });
+
             const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
+
+            const enrichedHistory = (feeData || []).slice(0, 25).map(f => ({
+                ...f,
+                agentName: profiles.find(u => u.id === f.user_id)?.full_name || 'Ajan Enkoni',
+                agentEmail: profiles.find(u => u.id === f.user_id)?.email || '',
+            }));
+            setAgentFeeHistory(enrichedHistory);
 
             setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee });
             
@@ -557,6 +574,41 @@ export default function AdminSuperPage() {
                                     {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
                                 </p>
                             </div>
+
+                            {/* ISTORIK FRÈ AJAN — Chak fwa yon ajan aktive kont li oswa ogmante kapasite l,
+                                frè a antre otomatikman nan Kès Global la (anwo a) EPI parèt isit kòm mesaj istorik. */}
+                            <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-900">Istorik Frè Ajan (Kès Global)</h3>
+                                        <p className="text-xs text-slate-500 mt-1">Chak aktivasyon oswa ogmantasyon kapasite ajan ajoute otomatikman nan pwofi biznis la anwo a.</p>
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg">
+                                        Total: {feesBreakdown.ajan.toLocaleString()} HTG
+                                    </span>
+                                </div>
+                                <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
+                                    {agentFeeHistory.length === 0 ? (
+                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè ajan anrejistre pou kounye a.</p>
+                                    ) : (
+                                        agentFeeHistory.map(item => (
+                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                                        <DollarSign size={18} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.agentName}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ) : view === 'ekip' ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -788,9 +840,39 @@ export default function AdminSuperPage() {
                                                 {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
                                                 {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
                                                 {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
+                                                {agent.selfie_with_id_url && <button onClick={() => handleOpenDocument(agent.selfie_with_id_url)} className="text-[10px] bg-amber-50 px-4 py-2.5 rounded-lg text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie + ID</button>}
                                                 {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
                                                 {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                                {agent.criminal_record_url && <button onClick={() => handleOpenDocument(agent.criminal_record_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kazye Jidisyè</button>}
+                                                {agent.bank_statement_url && <button onClick={() => handleOpenDocument(agent.bank_statement_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Relve Bankè</button>}
+                                                {agent.lease_doc_url && <button onClick={() => handleOpenDocument(agent.lease_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kontra Lokal</button>}
                                             </div>
+                                        </div>
+
+                                        <div className="grid sm:grid-cols-2 gap-4 bg-slate-50 border border-gray-100 rounded-2xl p-4">
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Dat Ekspirasyon ID</p>
+                                                <p className="text-sm font-bold text-slate-800">{agent.id_expiry_date ? new Date(agent.id_expiry_date).toLocaleDateString('fr-HT') : '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Dat Prèv Adrès</p>
+                                                <p className="text-sm font-bold text-slate-800">{agent.address_proof_date ? new Date(agent.address_proof_date).toLocaleDateString('fr-HT') : '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Referans</p>
+                                                <p className="text-sm font-bold text-slate-800">{agent.reference_name || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Telefòn Referans</p>
+                                                <p className="text-sm font-bold text-slate-800">{agent.reference_phone || '—'}</p>
+                                            </div>
+                                            {agent.tier === 'premium' && (
+                                                <div className="sm:col-span-2">
+                                                    <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md border ${agent.confidentiality_accepted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                                                        {agent.confidentiality_accepted ? '✓ Angajman Konfidansyalite Siyen' : '✗ Angajman Konfidansyalite Poko Siyen'}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
