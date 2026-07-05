@@ -772,7 +772,7 @@ export default function AdminSuperPage() {
                                     <div>
                                         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Anboche yon Anplwaye</h2>
                                         <p className="text-xs text-slate-500 font-medium mt-1">
-                                            Voye yon lyen sekrè bay moun nan pou l ka kreye yon modpas espas travay ki izole nèt.
+                                            Chwazi depatman moun nan ap travay ladan. Li ap resevwa yon mesaj (san lyen) pou l konekte sou Dashboard li e kreye yon modpas espas travay ki izole nèt. "Sipè Admin" bay aksè TOTAL sou tout depatman anndan Espas Travay la (Sèvis Kliyan + Finans + Konfòmite + Jounal Odit).
                                         </p>
                                     </div>
                                 </div>

@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { 
     ShieldCheck, DollarSign, UserCheck as UserCheckIcon, Users, 
     Search, Loader2, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, 
-    XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2
+    XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
+    Crown, MessageCircle, Activity, Radio
 } from 'lucide-react';
 
 export default function WorkspacePage() {
@@ -44,6 +45,25 @@ export default function WorkspacePage() {
     // Views pou anplwaye yo (Support gen 'clients' oswa 'tickets')
     const [activeTab, setActiveTab] = useState('main');
 
+    // ==========================================
+    // ETA POU DEPATMAN (Sipè Admin gen aksè total)
+    // ==========================================
+    const [activeDept, setActiveDept] = useState<'support' | 'finance' | 'compliance' | 'team' | 'activity'>('support');
+
+    // ==========================================
+    // ETA POU CHAT EKIP LA (Kominikasyon Ant Anplwaye)
+    // ==========================================
+    const [teamMessages, setTeamMessages] = useState<any[]>([]);
+    const [teamMessageInput, setTeamMessageInput] = useState('');
+    const [sendingTeamMessage, setSendingTeamMessage] = useState(false);
+    const teamMessagesEndRef = useRef<HTMLDivElement>(null);
+
+    // ==========================================
+    // ETA POU JOUNAL ODIT (Sipè Admin sèlman)
+    // ==========================================
+    const [activityLog, setActivityLog] = useState<any[]>([]);
+    const [loadingActivity, setLoadingActivity] = useState(false);
+
     useEffect(() => {
         checkAuthAndFetchData();
     }, []);
@@ -51,6 +71,24 @@ export default function WorkspacePage() {
     useEffect(() => {
         if (selectedTicket) scrollToBottom();
     }, [messages, selectedTicket]);
+
+    useEffect(() => {
+        if (activeDept === 'team') teamMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [teamMessages, activeDept]);
+
+    // Chat ekip la an tan reyèl — chak nouvo mesaj yon anplwaye voye parèt
+    // pou tout lòt anplwaye ki konekte a san yo pa bezwen rafrechi paj la.
+    useEffect(() => {
+        if (!staffProfile) return;
+        const channel = supabase
+            .channel('staff_messages_realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'staff_messages' }, (payload) => {
+                setTeamMessages((prev) => (prev.some((m) => m.id === payload.new.id) ? prev : [...prev, payload.new]));
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [staffProfile?.id]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,35 +121,104 @@ export default function WorkspacePage() {
         const profile = staff;
         setStaffProfile(profile);
 
-        // Rale done selon wòl anplwaye a
-        if (profile.role === 'support') {
+        // 👑 Sipè Admin (wòl entèn 'super_admin') gen AKSÈ TOTAL sou tout
+        // depatman yo — Sèvis Kliyan, Finans, ak Konfòmite — anplis Jounal
+        // Odit la. Chak lòt wòl gen aksè sèlman sou pwòp depatman li.
+        const isSuperAdmin = profile.role === 'super_admin';
+        const canSeeSupport = isSuperAdmin || profile.role === 'support';
+        const canSeeFinance = isSuperAdmin || profile.role === 'finance';
+        const canSeeCompliance = isSuperAdmin || profile.role === 'compliance';
+
+        setActiveDept(canSeeSupport ? 'support' : canSeeFinance ? 'finance' : canSeeCompliance ? 'compliance' : 'team');
+
+        const tasks: PromiseLike<any>[] = [];
+
+        if (canSeeSupport) {
             setActiveTab('tickets');
-            const { data: u } = await supabase.from('profiles').select('id, full_name, email, account_status, wallet_balance, kyc_status, created_at').order('created_at', { ascending: false });
-            setUsers(u || []);
-            
-            const { data: t } = await supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false });
-            setTickets(t || []);
-        } 
-        else if (profile.role === 'finance') {
-            setActiveTab('deposits');
-            const { data: d } = await supabase.from('deposits').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-            const { data: w } = await supabase.from('withdrawals').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-            setDeposits(d || []);
-            setWithdrawals(w || []);
-        } 
-        else if (profile.role === 'compliance') {
-            setActiveTab('kyc');
-            const { data: k } = await supabase.from('profiles').select('*').eq('kyc_status', 'pending').order('created_at', { ascending: false });
-            setPendingKyc(k || []);
-
-            const { data: agData } = await supabase.from('agent_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false });
-            setPendingAgents(agData || []);
-
-            const { data: entData } = await supabase.from('enterprise_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false });
-            setPendingEnterprises(entData || []);
+            tasks.push(
+                supabase.from('profiles').select('id, full_name, email, account_status, wallet_balance, kyc_status, created_at').order('created_at', { ascending: false })
+                    .then(({ data }) => setUsers(data || [])),
+                supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false })
+                    .then(({ data }) => setTickets(data || []))
+            );
         }
 
+        if (canSeeFinance) {
+            tasks.push(
+                supabase.from('deposits').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+                    .then(({ data }) => setDeposits(data || [])),
+                supabase.from('withdrawals').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+                    .then(({ data }) => setWithdrawals(data || []))
+            );
+        }
+
+        if (canSeeCompliance) {
+            tasks.push(
+                supabase.from('profiles').select('*').eq('kyc_status', 'pending').order('created_at', { ascending: false })
+                    .then(({ data }) => setPendingKyc(data || [])),
+                supabase.from('agent_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false })
+                    .then(({ data }) => setPendingAgents(data || [])),
+                supabase.from('enterprise_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false })
+                    .then(({ data }) => setPendingEnterprises(data || []))
+            );
+        }
+
+        // Chat Ekip la disponib pou TOUT anplwaye, kèlkeswa depatman yo.
+        tasks.push(
+            supabase.from('staff_messages').select('*').order('created_at', { ascending: true }).limit(200)
+                .then(({ data }) => setTeamMessages(data || []))
+        );
+
+        if (isSuperAdmin) {
+            setLoadingActivity(true);
+            tasks.push(
+                supabase.from('staff_activity_log').select('*').order('created_at', { ascending: false }).limit(100)
+                    .then(({ data }) => { setActivityLog(data || []); setLoadingActivity(false); })
+            );
+        }
+
+        await Promise.all(tasks);
         setLoading(false);
+    };
+
+    // Jounal Odit: chak aksyon kritik yon anplwaye fè anrejistre isit la
+    // pou responsablite ak sekirite (menm prensip ak zouti entèn Stripe/PayPal).
+    const logActivity = async (action: string, targetType: string, targetId: string, details?: Record<string, unknown>) => {
+        if (!staffProfile) return;
+        try {
+            await supabase.from('staff_activity_log').insert({
+                staff_id: staffProfile.id,
+                staff_name: staffProfile.full_name,
+                staff_role: staffProfile.role,
+                action,
+                target_type: targetType,
+                target_id: targetId,
+                details: details || null,
+            });
+        } catch {
+            // Pa bloke aksyon prensipal la si jounal odit la echwe pou yon rezon rezo.
+        }
+    };
+
+    const handleSendTeamMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!teamMessageInput.trim() || !staffProfile) return;
+        setSendingTeamMessage(true);
+        try {
+            const { data, error } = await supabase.from('staff_messages').insert({
+                sender_id: staffProfile.id,
+                sender_name: staffProfile.full_name || staffProfile.email,
+                sender_role: staffProfile.role,
+                message: teamMessageInput.trim(),
+            }).select().single();
+            if (error) throw error;
+            setTeamMessages((prev) => (prev.some((m) => m.id === data.id) ? prev : [...prev, data]));
+            setTeamMessageInput('');
+        } catch {
+            alert("Erè pandan voye mesaj la nan chat ekip la.");
+        } finally {
+            setSendingTeamMessage(false);
+        }
     };
 
     const handleLogout = async () => {
@@ -190,6 +297,7 @@ export default function WorkspacePage() {
         setProcessingId(`closing_${selectedTicket.id}`);
         try {
             await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', selectedTicket.id);
+            await logActivity('TICKET_CLOSED', 'support_ticket', selectedTicket.id, { subject: selectedTicket.subject });
             setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'closed' } : t));
             setSelectedTicket({ ...selectedTicket, status: 'closed' });
         } catch (err) {
@@ -216,6 +324,7 @@ export default function WorkspacePage() {
             await supabase.from('profiles').update({ wallet_balance: Number(p?.wallet_balance || 0) + montanFinal }).eq('id', d.user_id);
             await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
             await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
+            await logActivity('DEPOSIT_APPROVED', 'deposit', d.id, { amount: montanFinal, fee: frePouBiznisLa, user_id: d.user_id });
             alert("Depo apwouve!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -232,6 +341,7 @@ export default function WorkspacePage() {
                 await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
             }
             await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
+            await logActivity(`${table.toUpperCase()}_CANCELLED`, table, item.id, { reason: rezon, amount: item.amount, user_id: item.user_id });
             alert("Anile avèk siksè."); checkAuthAndFetchData();
         } finally { setProcessingId(null); }
     };
@@ -242,6 +352,7 @@ export default function WorkspacePage() {
         try {
             await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
             await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
+            await logActivity('WITHDRAWAL_APPROVED', 'withdrawal', w.id, { amount: w.amount, user_id: w.user_id });
             alert("Retrè Fini!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -259,6 +370,7 @@ export default function WorkspacePage() {
         setProcessingId(id);
         try {
             await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', id);
+            await logActivity(`KYC_${aksyon.toUpperCase()}`, 'profile', id, aksyon === 'rejected' ? { reason: rezon, full_name } : { full_name });
             alert(`KYC ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'}!`); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -282,6 +394,7 @@ export default function WorkspacePage() {
                 await supabase.from('profiles').update({ agent_status: 'approved' }).eq('id', userId);
             }
             await supabase.from('agent_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+            await logActivity(`AGENT_${aksyon.toUpperCase()}`, 'agent_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
             alert("Aplikasyon trete!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -319,6 +432,7 @@ export default function WorkspacePage() {
                 await supabase.from('profiles').update(updatePayload).eq('id', userId);
             }
             await supabase.from('enterprise_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+            await logActivity(`ENTERPRISE_${aksyon.toUpperCase()}`, 'enterprise_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
             alert("Aplikasyon Antrepriz trete!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -328,23 +442,39 @@ export default function WorkspacePage() {
 
     const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchQuery.toLowerCase()) || u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    const isSuperAdmin = staffProfile.role === 'super_admin';
+    const canSeeSupport = isSuperAdmin || staffProfile.role === 'support';
+    const canSeeFinance = isSuperAdmin || staffProfile.role === 'finance';
+    const canSeeCompliance = isSuperAdmin || staffProfile.role === 'compliance';
+
+    const roleLabel = staffProfile.role === 'finance' ? 'Finans (Kesye)'
+        : staffProfile.role === 'compliance' ? 'Konfòmite & Sekirite'
+        : staffProfile.role === 'super_admin' ? 'Sipè Admin (Sipèvizyon Total)'
+        : 'Sèvis Kliyan';
+
+    const roleColor = staffProfile.role === 'finance' ? 'bg-emerald-600'
+        : staffProfile.role === 'compliance' ? 'bg-blue-600'
+        : staffProfile.role === 'super_admin' ? 'bg-slate-900'
+        : 'bg-indigo-600';
+
+    const RoleIcon = staffProfile.role === 'finance' ? DollarSign
+        : staffProfile.role === 'compliance' ? ShieldCheck
+        : staffProfile.role === 'super_admin' ? Crown
+        : Users;
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24">
             {/* HEADER ESPAS TRAVAY LA */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm ${
-                            staffProfile.role === 'finance' ? 'bg-emerald-600' :
-                            staffProfile.role === 'compliance' ? 'bg-blue-600' : 'bg-indigo-600'
-                        }`}>
-                            {staffProfile.role === 'finance' ? <DollarSign size={20} /> :
-                             staffProfile.role === 'compliance' ? <ShieldCheck size={20} /> : <Users size={20} />}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm ${roleColor}`}>
+                            <RoleIcon size={20} />
                         </div>
                         <div>
                             <h1 className="text-lg font-bold tracking-tight leading-tight text-slate-900">Workspace</h1>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                Depatman: {staffProfile.role === 'finance' ? 'Finans (Kesye)' : staffProfile.role === 'compliance' ? 'Konfòmite & Sekirite' : 'Sèvis Kliyan'}
+                                Depatman: {roleLabel}
                             </p>
                         </div>
                     </div>
@@ -355,12 +485,42 @@ export default function WorkspacePage() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 mt-4">
-                
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 mt-4 space-y-6">
+
+                {/* ==================================================== */}
+                {/* SWITCHER DEPATMAN — Sipè Admin wè tout, lòt yo wè */}
+                {/* sèlman depatman pa yo + Ekip la ki disponib pou tout moun */}
+                {/* ==================================================== */}
+                <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit flex-wrap">
+                    {canSeeSupport && (
+                        <button onClick={() => { setActiveDept('support'); setActiveTab('tickets'); }} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'support' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                            <Users size={14} /> Sèvis Kliyan
+                        </button>
+                    )}
+                    {canSeeFinance && (
+                        <button onClick={() => { setActiveDept('finance'); setActiveTab('deposits'); }} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'finance' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                            <DollarSign size={14} /> Finans
+                        </button>
+                    )}
+                    {canSeeCompliance && (
+                        <button onClick={() => { setActiveDept('compliance'); setActiveTab('kyc'); }} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'compliance' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                            <ShieldCheck size={14} /> Konfòmite
+                        </button>
+                    )}
+                    <button onClick={() => setActiveDept('team')} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'team' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <MessageCircle size={14} /> Ekip
+                    </button>
+                    {isSuperAdmin && (
+                        <button onClick={() => setActiveDept('activity')} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'activity' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                            <Activity size={14} /> Aktivite
+                        </button>
+                    )}
+                </div>
+
                 {/* ==================================================== */}
                 {/* ESPAS: SÈVIS KLIYAN (SUPPORT)                        */}
                 {/* ==================================================== */}
-                {staffProfile.role === 'support' && (
+                {activeDept === 'support' && canSeeSupport && (
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit mb-4">
                             <button onClick={() => { setActiveTab('tickets'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'tickets' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Mesaj Kliyan ({tickets.filter(t => t.status === 'open').length})</button>
@@ -545,7 +705,7 @@ export default function WorkspacePage() {
                 {/* ==================================================== */}
                 {/* ESPAS: FINANS (KESYE)                                */}
                 {/* ==================================================== */}
-                {staffProfile.role === 'finance' && (
+                {activeDept === 'finance' && canSeeFinance && (
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit">
                             <button onClick={() => setActiveTab('deposits')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'deposits' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Depo ({deposits.length})</button>
@@ -591,7 +751,7 @@ export default function WorkspacePage() {
                 {/* ==================================================== */}
                 {/* ESPAS: KONFÒMITE (KYC & AJAN)                        */}
                 {/* ==================================================== */}
-                {staffProfile.role === 'compliance' && (
+                {activeDept === 'compliance' && canSeeCompliance && (
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit">
                             <button onClick={() => setActiveTab('kyc')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>KYC ({pendingKyc.length})</button>
@@ -677,6 +837,114 @@ export default function WorkspacePage() {
                                 </div>
                             ))}
                             {(activeTab === 'kyc' ? pendingKyc : activeTab === 'ajan' ? pendingAgents : pendingEnterprises).length === 0 && <p className="text-center py-10 text-slate-400 text-sm font-bold uppercase">Pa gen okenn dosye k ap tann.</p>}
+                        </div>
+                    </div>
+                )}
+
+                {/* ==================================================== */}
+                {/* ESPAS: EKIP — Chat entèn ant TOUT anplwaye yo         */}
+                {/* (disponib pou chak depatman, menm jan ak Slack entèn  */}
+                {/* Stripe/PayPal genyen pou ekip sipò/finans/konfòmite)  */}
+                {/* ==================================================== */}
+                {activeDept === 'team' && (
+                    <div className="animate-in fade-in duration-500">
+                        <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden h-[75vh] flex flex-col">
+                            <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+                                    <Radio size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-900 text-sm">Chat Ekip Hatexcard</h3>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tout depatman — Sipò, Finans, Konfòmite &amp; Sipè Admin</p>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50">
+                                {teamMessages.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                        <MessageCircle size={40} className="mb-3 opacity-20" />
+                                        <p className="text-xs font-bold uppercase tracking-widest">Pa gen mesaj ankò. Salye ekip la!</p>
+                                    </div>
+                                ) : (
+                                    teamMessages.map((msg) => {
+                                        const isMe = msg.sender_id === staffProfile.id;
+                                        return (
+                                            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${isMe ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-slate-800 rounded-tl-sm'}`}>
+                                                    <p className={`text-xs font-bold mb-1 flex items-center gap-1.5 ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>
+                                                        {isMe ? 'Mwen' : msg.sender_name}
+                                                        <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded ${isMe ? 'bg-white/20' : 'bg-slate-100'}`}>{msg.sender_role?.replace('_', ' ')}</span>
+                                                    </p>
+                                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                                    <p className={`text-[9px] text-right mt-2 font-medium ${isMe ? 'text-indigo-300' : 'text-slate-400'}`}>{new Date(msg.created_at).toLocaleTimeString('fr-HT', { hour: '2-digit', minute: '2-digit' })}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                <div ref={teamMessagesEndRef} />
+                            </div>
+
+                            <div className="p-3 sm:p-4 border-t border-gray-100 bg-white">
+                                <form onSubmit={handleSendTeamMessage} className="flex gap-2 relative">
+                                    <input
+                                        type="text"
+                                        value={teamMessageInput}
+                                        onChange={(e) => setTeamMessageInput(e.target.value)}
+                                        placeholder="Ekri yon mesaj pou ekip la..."
+                                        className="flex-1 bg-slate-50 border border-gray-200 rounded-full py-3.5 pl-5 pr-14 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all text-slate-900"
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={sendingTeamMessage || !teamMessageInput.trim()}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                    >
+                                        {sendingTeamMessage ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-1" />}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ==================================================== */}
+                {/* ESPAS: AKTIVITE — Jounal Odit (Sipè Admin sèlman)     */}
+                {/* Menm prensip ak "audit log" entèn Stripe/PayPal:      */}
+                {/* chak aksyon kritik yon anplwaye fè kite yon tras.     */}
+                {/* ==================================================== */}
+                {activeDept === 'activity' && isSuperAdmin && (
+                    <div className="animate-in fade-in duration-500 space-y-4">
+                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3">
+                            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-xs font-bold text-amber-800 leading-relaxed">
+                                Jounal sa a montre chak aksyon kritik anplwaye yo fè (depo, retrè, KYC, ajan, antrepriz) — pou responsablite ak sekirite. Sèlman Sipè Admin ka wè l.
+                            </p>
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+                            <div className="max-h-[600px] overflow-y-auto divide-y divide-gray-100">
+                                {loadingActivity ? (
+                                    <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>
+                                ) : activityLog.length === 0 ? (
+                                    <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn aktivite anrejistre ankò.</p>
+                                ) : (
+                                    activityLog.map((log) => (
+                                        <div key={log.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                                                    <Activity size={16} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-slate-900 truncate">{log.action}</p>
+                                                    <p className="text-xs text-slate-500 truncate">{log.staff_name} ({log.staff_role}) • {log.target_type} #{String(log.target_id || '').slice(0, 8)}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 shrink-0">{new Date(log.created_at).toLocaleString('fr-HT')}</p>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
