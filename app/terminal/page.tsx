@@ -8,7 +8,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import QRCode from 'qrcode';
 import { checkSpendingLimit } from '@/lib/security/spending-limits';
-import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
+import { ensureMerchantApiCredentials, canAccessTerminal } from '@/lib/security/merchant-provisioning';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -314,6 +314,12 @@ export default function TerminalPage() {
         }
 
         if (!isMounted) return;
+
+        if (!canAccessTerminal(prof)) {
+          alert('Ou dwe gen KYC apwouve epi kat aktive anvan w itilize Terminal la.');
+          router.push('/dashboard');
+          return;
+        }
 
         setProfile(prof);
         setBusinessName(prof.business_name || '');
@@ -1131,14 +1137,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
         </button>
 
         <button
-          onClick={async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            const { data: fresh } = await supabase.from('profiles').select('kyc_status, is_card_activated, is_merchant, api_key').eq('id', user?.id ?? '').single();
-            // #region agent log
-            fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'pre-fix',hypothesisId:'A-B',location:'terminal/page.tsx:apiDevClick',message:'API/Dev clicked from terminal',data:{userId:user?.id??null,terminalProfileKyc:profile?.kyc_status??null,terminalProfileCard:profile?.is_card_activated??null,freshKyc:fresh?.kyc_status??null,freshCard:fresh?.is_card_activated??null,freshApiKey:!!fresh?.api_key},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
-            router.push('/developer');
-          }}
+          onClick={() => router.push('/developer')}
           className="flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50"
         >
           <Terminal size={14} className="mb-1 md:mb-0 md:mr-2" />

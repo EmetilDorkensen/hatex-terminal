@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
-import { writeDebugLog } from '@/lib/security/debug-log';
 
 export async function GET() {
   try {
@@ -20,7 +19,6 @@ export async function GET() {
 
     const clientProfile = clientRes.data;
     let adminProfile = null;
-    let adminError: string | null = null;
 
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
@@ -31,49 +29,18 @@ export async function GET() {
           .eq('id', user.id)
           .single();
         adminProfile = adminRes.data;
-        adminError = adminRes.error?.message ?? null;
-      } catch (err: unknown) {
-        adminError = err instanceof Error ? err.message : 'admin client failed';
+      } catch {
+        /* itilize pwofil sesyon kliyan an */
       }
-    } else {
-      adminError = 'SUPABASE_SERVICE_ROLE_KEY missing';
     }
 
     const authoritative = adminProfile ?? clientProfile;
 
     if (!authoritative) {
-      writeDebugLog({
-        sessionId: '138d33',
-        runId: 'post-fix',
-        hypothesisId: 'F',
-        location: 'api/developer/eligibility:GET',
-        message: 'no profile found',
-        data: { userId: user.id, clientError: clientRes.error?.message ?? null, adminError },
-      });
       return NextResponse.json({ error: 'Pwofil pa jwenn.' }, { status: 404 });
     }
 
     const eligibility = checkMerchantEligibility(authoritative);
-    const clientEligibility = clientProfile ? checkMerchantEligibility(clientProfile) : null;
-
-    writeDebugLog({
-      sessionId: '138d33',
-      runId: 'post-fix',
-      hypothesisId: 'F',
-      location: 'api/developer/eligibility:GET',
-      message: 'server eligibility check',
-      data: {
-        userId: user.id,
-        source: adminProfile ? 'admin' : 'client-only',
-        clientKyc: clientProfile?.kyc_status ?? null,
-        adminKyc: adminProfile?.kyc_status ?? null,
-        clientCard: clientProfile?.is_card_activated ?? null,
-        adminCard: adminProfile?.is_card_activated ?? null,
-        clientEligible: clientEligibility?.eligible ?? null,
-        adminEligible: eligibility.eligible,
-        adminError,
-      },
-    });
 
     return NextResponse.json({
       eligibility,
@@ -88,15 +55,7 @@ export async function GET() {
       },
       source: adminProfile ? 'admin' : 'client',
     });
-  } catch (err: unknown) {
-    writeDebugLog({
-      sessionId: '138d33',
-      runId: 'post-fix',
-      hypothesisId: 'F',
-      location: 'api/developer/eligibility:GET',
-      message: 'unhandled error',
-      data: { error: err instanceof Error ? err.message : 'unknown' },
-    });
+  } catch {
     return NextResponse.json({ error: 'Erè sèvè.' }, { status: 500 });
   }
 }

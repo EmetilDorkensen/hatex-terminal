@@ -36,18 +36,19 @@ type MerchantProfileLike = {
   webhook_secret?: string | null;
 };
 
+/** Menm kondisyon ak Dashboard/Terminal: KYC apwouve + kat aktive. */
+export function canAccessTerminal(profile: MerchantProfileLike | null | undefined): boolean {
+  return checkMerchantEligibility(profile).eligible;
+}
+
 export function checkMerchantEligibility(profile: MerchantProfileLike | null | undefined): MerchantEligibility {
   const kycOk = profile?.kyc_status === 'approved';
   const cardOk = profile?.is_card_activated === true;
-  const result = {
+  return {
     eligible: kycOk && cardOk,
     missingKyc: !kycOk,
     missingCardActivation: !cardOk,
   };
-  // #region agent log
-  fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'pre-fix',hypothesisId:'A-C',location:'merchant-provisioning.ts:checkMerchantEligibility',message:'eligibility computed',data:{profileId:profile?.id??null,kyc_status:profile?.kyc_status??null,kycOk,is_card_activated:profile?.is_card_activated??null,cardOk,result},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  return result;
 }
 
 // Jenerasyon token izomòfik (mache ni nan navigatè ni sou sèvè Node 19+).

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink } from 'lucide-react';
-import { checkMerchantEligibility, ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
+import { checkMerchantEligibility, ensureMerchantApiCredentials, canAccessTerminal } from '@/lib/security/merchant-provisioning';
 
 const AVAILABLE_EVENTS = ['payment.success'];
 
@@ -56,7 +56,6 @@ export default function DeveloperDashboard() {
 
       let elig: { eligible: boolean; missingKyc: boolean; missingCardActivation: boolean } | null = null;
       let profileData: any = null;
-      let source = 'none';
 
       try {
         const res = await fetch('/api/developer/eligibility');
@@ -64,10 +63,6 @@ export default function DeveloperDashboard() {
           const payload = await res.json();
           elig = payload.eligibility;
           profileData = payload.profile;
-          source = 'server';
-          // #region agent log
-          fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'post-fix',hypothesisId:'F',location:'developer/page.tsx:loadDevData',message:'eligibility from server OK',data:{userId:user.id,elig,source},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         }
       } catch {
         /* eseye fallback kliyan anba */
@@ -76,17 +71,13 @@ export default function DeveloperDashboard() {
       if (!elig || !profileData) {
         const { data } = await supabase
           .from('profiles')
-          .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret')
+          .select('id, kyc_status, is_card_activated')
           .eq('id', user.id)
           .single();
 
         if (data) {
           profileData = data;
           elig = checkMerchantEligibility(data);
-          source = 'client-fallback';
-          // #region agent log
-          fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'post-fix',hypothesisId:'F',location:'developer/page.tsx:loadDevData',message:'eligibility client fallback',data:{userId:user.id,kyc_status:data.kyc_status,is_card_activated:data.is_card_activated,elig,source},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         }
       }
 
@@ -218,9 +209,6 @@ export default function DeveloperDashboard() {
 
   // Kont ki verifye elijib epi ki pa pase: montre kisa ki manke.
   if (eligibility !== null && !eligibility.eligible) {
-    // #region agent log
-    fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'pre-fix',hypothesisId:'E',location:'developer/page.tsx:eligibilityGate',message:'showing blocked API screen',data:{eligibility,merchantKyc:merchant?.kyc_status??null,merchantCard:merchant?.is_card_activated??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-4">
       <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl shadow-sm p-8 text-center">
@@ -229,9 +217,6 @@ export default function DeveloperDashboard() {
         </div>
         <h1 className="text-xl font-bold text-slate-900 mb-2">Aksè API poko disponib</h1>
         <p className="text-sm text-slate-500 mb-6">Pou jwenn kle API w la otomatikman, ou dwe konplete toude etap sa yo:</p>
-        {merchant?.kyc_status && (
-          <p className="text-xs text-slate-400 mb-4 font-mono">Stat KYC nan baz done: {merchant.kyc_status} · Kat aktive: {merchant.is_card_activated ? 'wi' : 'non'}</p>
-        )}
         <div className="space-y-3 text-left mb-6">
           <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingKyc ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
             {eligibility?.missingKyc ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
