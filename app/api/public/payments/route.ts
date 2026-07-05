@@ -44,6 +44,15 @@ function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders
   });
 }
 
+function balanceDiagnostics(balances: { card_balance: number; wallet_balance: number }, amount: number) {
+  return {
+    card_htg: balances.card_balance,
+    wallet_htg: balances.wallet_balance,
+    required_htg: amount,
+    build: API_BUILD_VERSION,
+  };
+}
+
 /** Tcheke si nouvo kòd la sou Vercel (san otantifikasyon). */
 export async function GET() {
   return jsonWithBuild({
@@ -186,9 +195,10 @@ export async function POST(request: Request) {
     if (!clientCanPayAmount(clientBalances, safeAmount)) {
       const errBody: Record<string, unknown> = {
         error: insufficientClientFundsMessage(clientBalances, safeAmount),
+        balances: balanceDiagnostics(clientBalances, safeAmount),
       };
       if (debug) {
-        errBody.debug = { step: 'pre_check_balances', build: API_BUILD_VERSION, ...clientBalances, safeAmount };
+        errBody.debug = { step: 'pre_check_balances', ...clientBalances, safeAmount };
       }
       return jsonWithBuild(errBody, 400);
     }
@@ -250,16 +260,18 @@ export async function POST(request: Request) {
           safeAmount,
         }, 'H4');
       }
-      const errBody: Record<string, unknown> = { error: rpcMessage };
+      const errBody: Record<string, unknown> = {
+        error: rpcMessage,
+        balances: balanceDiagnostics(clientBalances, safeAmount),
+      };
       if (debug) {
         errBody.debug = {
           step: 'rpc_failed',
-          build: API_BUILD_VERSION,
           rpcMessage,
-          card_balance: clientBalances.card_balance,
-          wallet_balance: clientBalances.wallet_balance,
           hint: rpcMessage === 'Fon ensifizan.' ? 'RPC ansyen sou Supabase — kouri migrasyon 20260721' : undefined,
         };
+      } else if (rpcMessage === 'Fon ensifizan.') {
+        errBody.hint = 'Kouri migrasyon 20260721 sou Supabase epi redeploy Vercel (GET /api/public/payments dwe bay build 20260721-balance-v2).';
       }
       return jsonWithBuild(errBody, status);
     }
@@ -272,6 +284,7 @@ export async function POST(request: Request) {
       transaction_id: transactionId,
       customer: freshClient.full_name,
       amount_charged: safeAmount,
+      debited_from: rpcResult.debited_from || 'unknown',
     };
 
     // Anrejistre repons lan pou idempotency (si yon kle te bay).

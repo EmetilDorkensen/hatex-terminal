@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "live": "git add . && git commit -m \"mizajou\" && git push origin main"
+    "live": "git add . && git commit -m \"mizajou\" && git push origin main && node scripts/trigger-vercel-deploy.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
