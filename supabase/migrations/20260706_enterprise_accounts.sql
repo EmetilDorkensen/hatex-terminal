@@ -70,10 +70,38 @@ CREATE POLICY "enterprise_applications_update" ON enterprise_applications
 
 -- ------------------------------------------------------------
 -- 3) BUCKET STORAGE POU DOKIMAN ANTREPRIZ YO
+-- (Si ou wè "Bucket not found", kouri tou 20260708_enterprise_documents_bucket.sql)
 -- ------------------------------------------------------------
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('enterprise_documents', 'enterprise_documents', true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'enterprise_documents',
+  'enterprise_documents',
+  true,
+  10485760,
+  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "enterprise_documents_insert" ON storage.objects;
+CREATE POLICY "enterprise_documents_insert"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'enterprise_documents'
+  AND (
+    name LIKE (auth.uid()::text || '/%')
+    OR name LIKE ('enterprise-' || auth.uid()::text || '-%')
+  )
+);
+
+DROP POLICY IF EXISTS "enterprise_documents_select" ON storage.objects;
+CREATE POLICY "enterprise_documents_select"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'enterprise_documents');
 
 -- ============================================================
 -- NÒT SEKIRITE / LIMIT (aplike nan kòd Next.js la, pa nan SQL):

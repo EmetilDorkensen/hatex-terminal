@@ -140,12 +140,15 @@ export default function EnterprisePortal() {
       }
 
       const uploadFile = async (file: File, type: string) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `enterprise-${profile.id}-${type}-${Date.now()}.${fileExt}`;
-        const { error } = await supabase.storage.from('enterprise_documents').upload(fileName, file);
-        if (error) throw error;
-        const { data } = supabase.storage.from('enterprise_documents').getPublicUrl(fileName);
-        return data.publicUrl;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', type);
+        const res = await fetch('/api/enterprise/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Erè pandan telechajman dokiman an.');
+        }
+        return data.url as string;
       };
 
       const patenteUrl = await uploadFile(patenteDoc!, 'patente');
