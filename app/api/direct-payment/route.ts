@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { findProfileByCardSimple } from '@/lib/security/card-lookup';
+import { checkSpendingLimit } from '@/lib/security/spending-limits';
 
 export async function POST(req: Request) {
   try {
@@ -34,6 +36,16 @@ export async function POST(req: Request) {
     if (insertErr) throw insertErr;
 
     const cleanCardNumber = card_number.replace(/\s/g, '');
+
+    // Limit Depans Jounalye/Mansyèl (kont Antrepriz gen limit pi wo pou kat)
+    const { profile: payerProfile } = await findProfileByCardSimple(supabaseAdmin, cleanCardNumber, String(card_cvv));
+    if (payerProfile) {
+      const limitCheck = await checkSpendingLimit(supabaseAdmin, payerProfile.id, payerProfile.account_type, Number(amount_htg), 'card');
+      if (!limitCheck.allowed) {
+        return NextResponse.json({ error: limitCheck.message || 'Limit depans depase.' }, { status: 400 });
+      }
+    }
+
     const { data: result, error: rpcError } = await supabaseAdmin.rpc('process_merchant_payment_with_card', {
       p_payment_id: paymentRequest.id, p_card_number: cleanCardNumber, p_exp_date: card_expiry, p_cvv: card_cvv
     });

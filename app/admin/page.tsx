@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon } from 'lucide-react';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -25,6 +25,8 @@ export default function AdminSuperPage() {
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
+    const [pendingEnterprises, setPendingEnterprises] = useState<any[]>([]);
+    const [enterpriseRejectionReason, setEnterpriseRejectionReason] = useState<{ [key: string]: string }>({});
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('support');
@@ -34,14 +36,15 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'ekip'>('dashboard'); 
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip'>('dashboard'); 
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
-    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0 });
+    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0, antrepriz: 0 });
     const [agentFeeHistory, setAgentFeeHistory] = useState<any[]>([]);
+    const [enterpriseFeeHistory, setEnterpriseFeeHistory] = useState<any[]>([]);
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -134,6 +137,15 @@ export default function AdminSuperPage() {
                 setPendingAgents(mergedAgents);
             }
 
+            const { data: entData } = await supabase.from('enterprise_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            if (entData && u) {
+                const mergedEnterprises = entData.map(app => ({
+                   ...app,
+                   profiles: u.find(user => user.id === app.user_id) || {}
+                }));
+                setPendingEnterprises(mergedEnterprises);
+            }
+
             const { data: stData } = await supabase.from('staff_users').select('*').order('created_at', { ascending: false });
             setStaffMembers(stData || []);
             
@@ -167,9 +179,19 @@ export default function AdminSuperPage() {
             const totalRetreFee = (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
 
             const { data: traData } = await supabase.from('transfers').select('fee, status');
-            const totalTransfeFee = (traData || [])
+            const totalTransfeFeeOld = (traData || [])
                 .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
                 .reduce((acc, t) => acc + Number(t.fee || 0), 0);
+
+            // Frè transfè P2P yo anrejistre kòm tranzaksyon 'TRANSFER_FEE' (menm sistèm ak frè ajan yo)
+            const { data: transferFeeData } = await supabase
+                .from('transactions')
+                .select('amount, status')
+                .eq('type', 'TRANSFER_FEE')
+                .eq('status', 'success');
+            const totalTransferFeeNew = (transferFeeData || []).reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+
+            const totalTransfeFee = totalTransfeFeeOld + totalTransferFeeNew;
                 
             // Chak frè ajan (aktivasyon oswa ogmantasyon kapasite) antre otomatikman nan Kès Global la
             // paske li anrejistre kòm yon tranzaksyon 'FEE' — nou rale l isit pou n kalkile total la
@@ -190,9 +212,27 @@ export default function AdminSuperPage() {
             }));
             setAgentFeeHistory(enrichedHistory);
 
-            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee });
+            // Frè Pasaj Kont Antrepriz (49,000 HTG) — se pwofi HatexCard, li PA janm
+            // antre sou balans/kont ajan moun ki soumèt aplikasyon an.
+            const { data: entFeeData } = await supabase
+                .from('transactions')
+                .select('id, user_id, amount, description, created_at')
+                .eq('type', 'ENTERPRISE_FEE')
+                .eq('status', 'success')
+                .order('created_at', { ascending: false });
+
+            const totalEnterpriseFee = (entFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
+
+            const enrichedEnterpriseHistory = (entFeeData || []).slice(0, 25).map(f => ({
+                ...f,
+                clientName: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
+                clientEmail: profiles.find(u => u.id === f.user_id)?.email || '',
+            }));
+            setEnterpriseFeeHistory(enrichedEnterpriseHistory);
+
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee, antrepriz: totalEnterpriseFee });
             
-            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee;
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalEnterpriseFee;
             setTotalBiznisProfit(granTotalPwofi);
         } catch (error) {}
     };
@@ -349,6 +389,63 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
     };
 
+    // ====================================================
+    // JERE APLIKASYON KONT ANTREPRIZ (Apwouve/Rejte)
+    // ====================================================
+    const jereAntrepriz = async (applicationId: string, userId: string, fullName: string, userEmail: string, aksyon: 'approved' | 'rejected') => {
+        let rezon = "";
+        if (aksyon === 'rejected') {
+            rezon = enterpriseRejectionReason[applicationId] || "";
+            if (!rezon.trim()) return alert("Tanpri ekri yon rezon pou w ka rejte aplikasyon sa a.");
+        } else {
+            if (!confirm(`Èske w sèten ou vle APWOUVE aplikasyon Antrepriz sa a pou ${fullName}?`)) return;
+        }
+
+        setProcessingId(applicationId);
+        try {
+            if (aksyon === 'rejected') {
+                const { data: userProf } = await supabase.from('profiles').select('wallet_balance, enterprise_fee_paid').eq('id', userId).single();
+                const feePaid = Number(userProf?.enterprise_fee_paid || 0);
+                await supabase.from('profiles').update({
+                    wallet_balance: Number(userProf?.wallet_balance || 0) + feePaid,
+                    enterprise_status: 'rejected',
+                    enterprise_fee_paid: 0,
+                }).eq('id', userId);
+
+                if (feePaid > 0) {
+                    await supabase.from('transactions').insert({ user_id: userId, type: 'REFUND', amount: feePaid, status: 'success', description: 'Ranbousman Frè Kont Antrepriz Rejte' });
+                }
+            } else {
+                // Apwouve: aktive kont Antrepriz la
+                const { data: userProf } = await supabase.from('profiles').select('agent_status').eq('id', userId).single();
+                const updatePayload: any = { account_type: 'business', enterprise_status: 'approved' };
+
+                // Bay Ajan PRO otomatikman si li poko gen youn — se yon kont ajan VID (0 HTG).
+                // Frè 49,000 HTG la se pwofi HatexCard sèlman, li PA janm transfere sou kont ajan an.
+                if (!userProf || userProf.agent_status !== 'approved') {
+                    updatePayload.agent_status = 'approved';
+                    updatePayload.agent_tier = 'pro';
+                    updatePayload.agent_capacity = 40000;
+                    updatePayload.agent_balance = 0;
+                    updatePayload.agent_guarantee_paid = 0;
+                }
+
+                await supabase.from('profiles').update(updatePayload).eq('id', userId);
+            }
+
+            await supabase.from('enterprise_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+
+            const mesajE = aksyon === 'approved'
+                ? `Felisitasyon ${fullName}! Kont Antrepriz ou apwouve. Ou kounye a gen transfè/retrè ilimite, limit kat pi wo, epi yon kont Ajan PRO gratis si w pat genyen l deja.`
+                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon Kont Antrepriz ou epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Frè ou te peye a tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
+
+            await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON ANTREPRIZ ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            alert(`Aplikasyon Antrepriz la ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`);
+            if (aksyon === 'rejected') setEnterpriseRejectionReason(prev => ({...prev, [applicationId]: ''}));
+            raleDone();
+        } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
+    };
+
     const jereAnplwaye = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inviteEmail) return alert("Ou dwe mete yon imèl.");
@@ -499,6 +596,11 @@ export default function AdminSuperPage() {
                         {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
                     </button>
 
+                    <button onClick={() => setView('antrepriz')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'antrepriz' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        Antrepriz
+                        {pendingEnterprises.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingEnterprises.length}</span>}
+                    </button>
+
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
                     <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
                     <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
@@ -544,13 +646,17 @@ export default function AdminSuperPage() {
                                             {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
                                         </h3>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                                    <div className="grid grid-cols-3 gap-2 mt-auto">
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
                                             <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan</p>
                                             <p className="font-bold text-emerald-800">{feesBreakdown.ajan.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt Frè (Dep/Ret)</p>
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Antrepriz</p>
+                                            <p className="font-bold text-emerald-800">{feesBreakdown.antrepriz.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt Frè (Dep/Ret/Tra)</p>
                                             <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe).toLocaleString()}</p>
                                         </div>
                                     </div>
@@ -605,6 +711,42 @@ export default function AdminSuperPage() {
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-bold text-slate-900 truncate">{item.agentName}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ISTORIK FRÈ ANTREPRIZ — Se pwofi HatexCard, li PA ale sou kont ajan
+                                moun ki soumèt aplikasyon an. Kont ajan PRO yo bay otomatikman a se
+                                yon kont vid (0 HTG), pa yon transfè kòb sòti nan frè 49,000 HTG la. */}
+                            <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-900">Istorik Frè Antrepriz (Kès Global)</h3>
+                                        <p className="text-xs text-slate-500 mt-1">Frè pasaj 49,000 HTG kont Antrepriz yo — se pwofi HatexCard, li pa antre sou kont ajan pèsonn.</p>
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg">
+                                        Total: {feesBreakdown.antrepriz.toLocaleString()} HTG
+                                    </span>
+                                </div>
+                                <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
+                                    {enterpriseFeeHistory.length === 0 ? (
+                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè Antrepriz anrejistre pou kounye a.</p>
+                                    ) : (
+                                        enterpriseFeeHistory.map(item => (
+                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                                        <Building2Icon size={18} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.clientName}</p>
                                                         <p className="text-xs text-slate-500 truncate">{item.description}</p>
                                                         <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
                                                     </div>
@@ -898,6 +1040,86 @@ export default function AdminSuperPage() {
                                                 </button>
                                                 <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
                                                     {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    ) : view === 'antrepriz' ? (
+                        pendingEnterprises.length === 0 ? (
+                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
+                                <Building2Icon size={48} className="mx-auto mb-4 text-slate-300" />
+                                Pa gen okenn aplikasyon Antrepriz k ap tann
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {pendingEnterprises.map((app) => (
+                                    <div key={app.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
+
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Building2Icon size={24} /></div>
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900">{app.profiles?.full_name || 'San Non'}</h3>
+                                                    <p className="text-xs text-slate-500 mt-1">{app.profiles?.email}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1 font-mono">ID Kliyan: {app.user_id}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase tracking-wider border border-indigo-100 mb-2">{app.business_name || 'Biznis San Non'}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Frè Peye: {Number(app.metadata?.fee_paid || 0).toLocaleString()} HTG</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid sm:grid-cols-2 gap-4 bg-slate-50 border border-gray-100 rounded-2xl p-4">
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Nimewo Anrejistreman</p>
+                                                <p className="text-sm font-bold text-slate-800">{app.business_reg_number || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Aktivite Biznis</p>
+                                                <p className="text-sm font-bold text-slate-800">{app.business_activity || '—'}</p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman yo soumèt</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                {app.patente_url && <button onClick={() => handleOpenDocument(app.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
+                                                {app.cif_url && <button onClick={() => handleOpenDocument(app.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
+                                                {app.business_registration_url && <button onClick={() => handleOpenDocument(app.business_registration_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Anrejistreman</button>}
+                                                {app.bank_statement_url && <button onClick={() => handleOpenDocument(app.bank_statement_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Relve Bankè</button>}
+                                                {app.lease_doc_url && <button onClick={() => handleOpenDocument(app.lease_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kontra Lokal</button>}
+                                                {app.legal_rep_id_url && <button onClick={() => handleOpenDocument(app.legal_rep_id_url)} className="text-[10px] bg-amber-50 px-4 py-2.5 rounded-lg text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> ID Reprezantan</button>}
+                                            </div>
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                            <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md border ${app.confidentiality_accepted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                                                {app.confidentiality_accepted ? '✓ Angajman Konfidansyalite/Anti-Fwod Siyen' : '✗ Angajman Poko Siyen'}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
+                                            <div className="w-full md:flex-1">
+                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la a (Frè a ap ranbouse):</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Egz: Dokiman patant lan pa klè..."
+                                                    value={enterpriseRejectionReason[app.id] || ''}
+                                                    onChange={(e) => setEnterpriseRejectionReason({...enterpriseRejectionReason, [app.id]: e.target.value})}
+                                                    className="w-full bg-slate-50 border border-gray-200 py-3 px-4 rounded-xl text-sm outline-none focus:border-rose-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div className="flex gap-3 w-full md:w-auto shrink-0">
+                                                <button onClick={() => jereAntrepriz(app.id, app.user_id, app.profiles?.full_name, app.profiles?.email, 'rejected')} disabled={processingId === app.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    <XCircle size={16} /> Rejte (Ranbouse l)
+                                                </button>
+                                                <button onClick={() => jereAntrepriz(app.id, app.user_id, app.profiles?.full_name, app.profiles?.email, 'approved')} disabled={processingId === app.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    {processingId === app.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
                                                 </button>
                                             </div>
                                         </div>

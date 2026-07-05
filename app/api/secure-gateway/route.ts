@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { findProfileByCardSimple } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { checkSpendingLimit } from '@/lib/security/spending-limits';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,6 +51,11 @@ export async function POST(request: Request) {
     if (!profile) return NextResponse.json({ error: cardError || "Kat la pa rekonèt." }, { status: 401, headers: corsHeaders });
     if (profile.account_status === 'suspended') return NextResponse.json({ error: "🚫 Kont sa sispandi." }, { status: 403, headers: corsHeaders });
     if (Number(profile.wallet_balance) < safeAmount) return NextResponse.json({ error: "Balans ensifizan." }, { status: 400, headers: corsHeaders });
+
+    const limitCheck = await checkSpendingLimit(supabase, profile.id, profile.account_type, safeAmount, 'card');
+    if (!limitCheck.allowed) {
+      return NextResponse.json({ error: limitCheck.message || "Limit depans depase." }, { status: 400, headers: corsHeaders });
+    }
 
     // 3. KOUPE KÒB LA
     const nouvoBalans = Number(profile.wallet_balance) - safeAmount;

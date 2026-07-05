@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, AlertTriangle, ShieldCheck, Wallet, ArrowUpRight, Lock, CheckCircle2, Store } from 'lucide-react';
+import { checkSpendingLimit } from '@/lib/security/spending-limits';
 
 export default function WithdrawPage() {
   const router = useRouter();
@@ -73,24 +74,12 @@ export default function WithdrawPage() {
         return alert("Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè.");
       }
 
-      // 3. TCHEKE LIMIT 25,000 HTG PA JOU POU KONT ENDIVIDYÈL YO
-      if (statusCheck.account_type !== 'business') {
-        const bugun = new Date();
-        bugun.setHours(0, 0, 0, 0);
-
-        const { data: todayTxs } = await supabase
-            .from('transactions')
-            .select('amount')
-            .eq('user_id', profile.id)
-            .in('type', ['WITHDRAWAL', 'AGENT_WITHDRAWAL_CLIENT'])
-            .gte('created_at', bugun.toISOString());
-
-        const withdrawnToday = (todayTxs || []).reduce((acc, tx) => acc + Math.abs(Number(tx.amount)), 0);
-
-        if (withdrawnToday + currentAmount > 25000) {
-            setLoading(false);
-            return alert(`Kont endividyèl yo gen limit 25,000 HTG pa jou pou retrè.\nOu gentan retire ${withdrawnToday.toLocaleString()} HTG jodi a deja. Fè rès la demen oswa pase nan kont antrepriz (Business).`);
-        }
+      // 3. TCHEKE LIMIT JOUNALYE/MANSYÈL POU KONT ENDIVIDYÈL YO
+      //    (Kont Antrepriz apwouve gen retrè ILIMITE)
+      const limitCheck = await checkSpendingLimit(supabase, profile.id, statusCheck.account_type, currentAmount, 'withdraw');
+      if (!limitCheck.allowed) {
+          setLoading(false);
+          return alert(`${limitCheck.message}\n\nPase nan Kont Antrepriz pou retrè ilimite (bouton "Vin Kont Antrepriz" nan Tablodbò a).`);
       }
 
       // 4. KONDISYON DEBAZ YO

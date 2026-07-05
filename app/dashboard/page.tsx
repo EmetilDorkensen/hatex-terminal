@@ -7,7 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2, Building2, Receipt
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -646,7 +646,7 @@ export default function Dashboard() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <button onClick={() => router.push('/deposit')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <Plus size={20} />
@@ -665,7 +665,41 @@ export default function Dashboard() {
                 </div>
                 <span className="text-xs font-semibold text-slate-700">Transfè</span>
               </button>
+              <button onClick={() => router.push('/invoice')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <Receipt size={20} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">Invoice</span>
+              </button>
             </div>
+
+            {/* Bouton Kont Antrepriz */}
+            {userData?.account_type === 'business' && userData?.enterprise_status === 'approved' ? (
+              <button onClick={() => router.push('/enterprise')} className="w-full bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between gap-3 hover:shadow-md transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white shrink-0"><Building2 size={16} /></div>
+                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Kont Antrepriz Aktif</span>
+                </div>
+              </button>
+            ) : userData?.enterprise_status === 'pending' ? (
+              <button onClick={() => router.push('/enterprise')} className="w-full bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between gap-3 hover:shadow-md transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-amber-500 flex items-center justify-center text-white shrink-0"><Loader2 size={16} className="animate-spin" /></div>
+                  <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Antrepriz: Nan Revizyon</span>
+                </div>
+              </button>
+            ) : (
+              <button onClick={() => router.push('/enterprise')} className="w-full bg-white border border-gray-200 p-4 rounded-xl flex items-center justify-between gap-3 hover:border-indigo-300 hover:shadow-md transition-all group">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0"><Building2 size={16} /></div>
+                  <div className="text-left">
+                    <span className="text-xs font-bold text-slate-700 block">Vin Kont Antrepriz</span>
+                    <span className="text-[9px] text-slate-400 uppercase tracking-wider">Transfè/Retrè Ilimite + Ajan PRO Gratis</span>
+                  </div>
+                </div>
+                <ArrowUpRight size={16} className="text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0" />
+              </button>
+            )}
           </div>
 
           {/* Col 2: Virtual Card */}

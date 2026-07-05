@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
     ShieldCheck, DollarSign, UserCheck as UserCheckIcon, Users, 
     Search, Loader2, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, 
-    XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send
+    XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2
 } from 'lucide-react';
 
 export default function WorkspacePage() {
@@ -27,6 +27,8 @@ export default function WorkspacePage() {
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
+    const [pendingEnterprises, setPendingEnterprises] = useState<any[]>([]);
+    const [enterpriseRejectionReason, setEnterpriseRejectionReason] = useState<{ [key: string]: string }>({});
     
     // Done pou Support (Tchat)
     const [tickets, setTickets] = useState<any[]>([]);
@@ -92,6 +94,9 @@ export default function WorkspacePage() {
 
             const { data: agData } = await supabase.from('agent_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false });
             setPendingAgents(agData || []);
+
+            const { data: entData } = await supabase.from('enterprise_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false });
+            setPendingEnterprises(entData || []);
         }
 
         setLoading(false);
@@ -266,6 +271,43 @@ export default function WorkspacePage() {
             }
             await supabase.from('agent_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
             alert("Aplikasyon trete!"); checkAuthAndFetchData();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const jereAntrepriz = async (applicationId: string, userId: string, aksyon: 'approved' | 'rejected') => {
+        let rezon = enterpriseRejectionReason[applicationId] || "";
+        if (aksyon === 'rejected' && !rezon.trim()) return alert("Tanpri ekri yon rezon pou rejè a.");
+        if (aksyon === 'approved' && !confirm("Konfime apwobasyon Kont Antrepriz sa a?")) return;
+
+        setProcessingId(applicationId);
+        try {
+            if (aksyon === 'rejected') {
+                const { data: userProf } = await supabase.from('profiles').select('wallet_balance, enterprise_fee_paid').eq('id', userId).single();
+                const feePaid = Number(userProf?.enterprise_fee_paid || 0);
+                await supabase.from('profiles').update({
+                    wallet_balance: Number(userProf?.wallet_balance || 0) + feePaid,
+                    enterprise_status: 'rejected',
+                    enterprise_fee_paid: 0,
+                }).eq('id', userId);
+                if (feePaid > 0) {
+                    await supabase.from('transactions').insert({ user_id: userId, type: 'REFUND', amount: feePaid, status: 'success', description: 'Ranbousman Frè Kont Antrepriz Rejte' });
+                }
+            } else {
+                // Bay Ajan PRO otomatikman si li poko gen youn — se yon kont ajan VID (0 HTG).
+                // Frè 49,000 HTG la se pwofi HatexCard sèlman, li PA janm transfere sou kont ajan an.
+                const { data: userProf } = await supabase.from('profiles').select('agent_status').eq('id', userId).single();
+                const updatePayload: any = { account_type: 'business', enterprise_status: 'approved' };
+                if (!userProf || userProf.agent_status !== 'approved') {
+                    updatePayload.agent_status = 'approved';
+                    updatePayload.agent_tier = 'pro';
+                    updatePayload.agent_capacity = 40000;
+                    updatePayload.agent_balance = 0;
+                    updatePayload.agent_guarantee_paid = 0;
+                }
+                await supabase.from('profiles').update(updatePayload).eq('id', userId);
+            }
+            await supabase.from('enterprise_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+            alert("Aplikasyon Antrepriz trete!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -542,6 +584,7 @@ export default function WorkspacePage() {
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit">
                             <button onClick={() => setActiveTab('kyc')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>KYC ({pendingKyc.length})</button>
                             <button onClick={() => setActiveTab('ajan')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'ajan' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Ajan ({pendingAgents.length})</button>
+                            <button onClick={() => setActiveTab('antrepriz')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'antrepriz' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Antrepriz ({pendingEnterprises.length})</button>
                         </div>
 
                         <div className="space-y-4">
@@ -561,7 +604,7 @@ export default function WorkspacePage() {
                                         <button onClick={() => jereKyc(user.id, user.full_name, 'rejected')} className="flex-1 bg-white border border-rose-200 text-rose-600 px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Rejte</button>
                                     </div>
                                 </div>
-                            )) : pendingAgents.map(agent => (
+                            )) : activeTab === 'ajan' ? pendingAgents.map(agent => (
                                 <div key={agent.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col gap-4">
                                     <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                                         <div>
@@ -592,8 +635,36 @@ export default function WorkspacePage() {
                                         <button onClick={() => jereAjan(agent.id, agent.user_id, 'approved')} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Apwouve</button>
                                     </div>
                                 </div>
+                            )) : pendingEnterprises.map(app => (
+                                <div key={app.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col gap-4">
+                                    <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900">{app.profiles?.full_name}</h3>
+                                            <p className="text-xs text-slate-500">{app.profiles?.email}</p>
+                                            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold uppercase border border-indigo-100 mt-1 inline-block">{app.business_name || 'Biznis San Non'}</span>
+                                        </div>
+                                        <Building2 className="text-indigo-600" size={22} />
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {app.patente_url && <button onClick={() => handleOpenDocument(app.patente_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Patant</button>}
+                                        {app.cif_url && <button onClick={() => handleOpenDocument(app.cif_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> CIF</button>}
+                                        {app.business_registration_url && <button onClick={() => handleOpenDocument(app.business_registration_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Anrejistreman</button>}
+                                        {app.bank_statement_url && <button onClick={() => handleOpenDocument(app.bank_statement_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Relve Bankè</button>}
+                                        {app.lease_doc_url && <button onClick={() => handleOpenDocument(app.lease_doc_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Kontra Lokal</button>}
+                                        {app.legal_rep_id_url && <button onClick={() => handleOpenDocument(app.legal_rep_id_url)} className="text-[10px] bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-amber-100"><EyeOff size={12}/> ID Reprezantan</button>}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-gray-100 rounded-xl p-3 text-xs">
+                                        <p><span className="text-slate-400 font-bold uppercase text-[9px] block">Nimewo Anrejistreman</span>{app.business_reg_number || '—'}</p>
+                                        <p><span className="text-slate-400 font-bold uppercase text-[9px] block">Aktivite</span>{app.business_activity || '—'}</p>
+                                    </div>
+                                    <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-gray-100">
+                                        <input type="text" placeholder="Rezon si w ap rejte l..." value={enterpriseRejectionReason[app.id] || ''} onChange={(e) => setEnterpriseRejectionReason({...enterpriseRejectionReason, [app.id]: e.target.value})} className="flex-1 bg-slate-50 border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500" />
+                                        <button onClick={() => jereAntrepriz(app.id, app.user_id, 'rejected')} className="bg-white border border-rose-200 text-rose-600 px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Rejte</button>
+                                        <button onClick={() => jereAntrepriz(app.id, app.user_id, 'approved')} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Apwouve</button>
+                                    </div>
+                                </div>
                             ))}
-                            {(activeTab === 'kyc' ? pendingKyc : pendingAgents).length === 0 && <p className="text-center py-10 text-slate-400 text-sm font-bold uppercase">Pa gen okenn dosye k ap tann.</p>}
+                            {(activeTab === 'kyc' ? pendingKyc : activeTab === 'ajan' ? pendingAgents : pendingEnterprises).length === 0 && <p className="text-center py-10 text-slate-400 text-sm font-bold uppercase">Pa gen okenn dosye k ap tann.</p>}
                         </div>
                     </div>
                 )}

@@ -5,12 +5,10 @@
   --foreground: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Sit la fèt ak yon tèm klè (fon blan) sou tout paj li yo.
+   Nou pa aktive dark mode otomatik la (prefers-color-scheme) paske
+   sa te fè tèks vin blan sou fon blan (envizib) pou itilizatè ki gen
+   telefòn/navigatè yo an mòd fonse (dark mode). */
 
 /* Nou itilize @theme pou defini varyab Tailwind v4 */
 @theme inline {
@@ -26,6 +24,10 @@
     0%, 100% { top: 0%; }
     50% { top: 100%; }
   }
+}
+
+html {
+  color-scheme: light;
 }
 
 body {

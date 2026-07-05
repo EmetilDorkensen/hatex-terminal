@@ -7,6 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import QRCode from 'qrcode';
+import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -783,18 +784,26 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Ou dwe konekte");
       
-      const { data: freshProfile } = await supabase.from('profiles').select('kyc_status, business_name').eq('id', user.id).single();
+      const { data: freshProfile } = await supabase.from('profiles').select('kyc_status, business_name, account_type').eq('id', user.id).single();
         
       if (freshProfile?.kyc_status !== 'approved') {
         alert(`Echèk: Kont ou dwe 'approved'.`);
         setMode('dashboard');
         return;
       }
+
+      // Limit anti-fwod: kont endividyèl kanpe a 85,000 HTG/jou an fakti; kont Antrepriz ilimite.
+      const limitCheck = await checkSpendingLimit(supabase, user.id, freshProfile?.account_type, parseFloat(amount), 'invoice');
+      if (!limitCheck.allowed) {
+        alert(limitCheck.message || "Ou depase limit jounalye fakti a.");
+        setLoading(false);
+        return;
+      }
       
       const { data: inv, error: invError } = await supabase.from('invoices').insert({ owner_id: user.id, amount: parseFloat(amount), client_email: email.toLowerCase().trim(), status: 'pending', description }).select().single();
       if (invError) throw invError;
       
-      const securePayLink = `${window.location.origin}/pay/${inv.id}`;
+      const securePayLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
       
       await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
         method: 'POST',
