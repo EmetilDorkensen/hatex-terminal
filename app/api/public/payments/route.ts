@@ -5,6 +5,11 @@ import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit } from '@/lib/security/spending-limits';
 import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
+import {
+  clientCanPayAmount,
+  insufficientClientFundsMessage,
+  normalizeClientBalances,
+} from '@/lib/security/client-payment-balance';
 
 // 🔐 KOUCH SEKIRITE 1: PA GEN CORS OUVÈ
 // Sa a se yon API SÈVÈ-A-SÈVÈ ki otantifye ak yon kle sekrè (Bearer api_key).
@@ -107,17 +112,35 @@ export async function POST(request: Request) {
     if (!client) {
       return NextResponse.json({ error: cardError || "Tranzaksyon refize. Enfòmasyon kat yo pa koresponn." }, { status: 401 });
     }
-    if (client.account_status !== 'active') {
+
+    // Reli balans FRESH dirèkteman nan baz done (pa sèlman sa lookup kat la retounen).
+    const { data: freshClient, error: freshClientErr } = await supabase
+      .from('profiles')
+      .select('id, card_balance, wallet_balance, account_status, full_name, account_type')
+      .eq('id', client.id)
+      .single();
+
+    if (freshClientErr || !freshClient) {
+      return NextResponse.json({ error: 'Pa kapab verifye balans kliyan an.' }, { status: 500 });
+    }
+
+    if (freshClient.account_status !== 'active') {
       return NextResponse.json({ error: "Kont ki asosye ak kat sa a pa aktif." }, { status: 403 });
     }
-    if (Number(client.card_balance ?? 0) < safeAmount) {
+
+    const clientBalances = normalizeClientBalances(freshClient);
+    if (!clientCanPayAmount(clientBalances, safeAmount)) {
+      return NextResponse.json({ error: insufficientClientFundsMessage(clientBalances, safeAmount) }, { status: 400 });
+    }
+
+    if (freshClient.id === merchant.id) {
       return NextResponse.json({
-        error: `Ou pa gen ase lajan sou kat ou a. Balans kat ou se ${Number(client.card_balance ?? 0).toFixed(2)} HTG.`,
+        error: 'Ou pa ka itilize menm kont pou machann ak kliyan. Kreye/yon lòt kont kòm kliyan pou teste API a.',
       }, { status: 400 });
     }
 
     // KOUCH SEKIRITE 6B: Limit Depans Jounalye/Mansyèl kliyan an (kont Antrepriz gen limit pi wo)
-    const limitCheck = await checkSpendingLimit(supabase, client.id, client.account_type, safeAmount, 'card');
+    const limitCheck = await checkSpendingLimit(supabase, freshClient.id, freshClient.account_type, safeAmount, 'card');
     if (!limitCheck.allowed) {
       return NextResponse.json({ error: limitCheck.message || "Limit depans depase." }, { status: 400 });
     }
@@ -143,11 +166,11 @@ export async function POST(request: Request) {
     // yon SÈL fonksyon RPC ki fè chèk balans, chèk limit resepsyon, debi,
     // kredi, ak jounal tranzaksyon an TOUT ANSANM, ATOMIKMAN, ak veriwou.
     const { data: rpcResult, error: rpcError } = await supabase.rpc('process_direct_card_payment', {
-      p_client_id: client.id,
+      p_client_id: freshClient.id,
       p_merchant_id: merchant.id,
       p_amount: safeAmount,
       p_order_id: cleanOrderId || 'N/A',
-      p_client_name: client.full_name,
+      p_client_name: freshClient.full_name,
       p_merchant_name: merchant.full_name,
       p_daily_received_so_far: receiveCheck.todayReceived,
     });
@@ -163,7 +186,7 @@ export async function POST(request: Request) {
       success: true,
       message: "Peman an fèt ak siksè!",
       transaction_id: transactionId,
-      customer: client.full_name,
+      customer: freshClient.full_name,
       amount_charged: safeAmount,
     };
 
@@ -187,7 +210,7 @@ export async function POST(request: Request) {
       order_id: cleanOrderId || 'N/A',
       amount: safeAmount,
       currency: currency || 'HTG',
-      customer_name: client.full_name,
+      customer_name: freshClient.full_name,
     });
 
     // REYISI FINAL LA
