@@ -11,6 +11,48 @@ import {
   normalizeClientBalances,
 } from '@/lib/security/client-payment-balance';
 
+const API_BUILD_VERSION = '20260721-balance-v2';
+
+function isDebugSession(request: Request): boolean {
+  return request.headers.get('x-debug-session-id') === '138d33';
+}
+
+function debugLog(location: string, message: string, data: Record<string, unknown>, hypothesisId: string) {
+  // #region agent log
+  fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '138d33' },
+    body: JSON.stringify({
+      sessionId: '138d33',
+      location,
+      message,
+      data,
+      hypothesisId,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
+
+function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders?: Record<string, string>) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      'X-Hatex-Api-Version': API_BUILD_VERSION,
+      ...(extraHeaders || {}),
+    },
+  });
+}
+
+/** Tcheke si nouvo kòd la sou Vercel (san otantifikasyon). */
+export async function GET() {
+  return jsonWithBuild({
+    ok: true,
+    build: API_BUILD_VERSION,
+    hint: 'Si build pa egal 20260721-balance-v2, Vercel poko deploy dènye commit la.',
+  });
+}
+
 // 🔐 KOUCH SEKIRITE 1: PA GEN CORS OUVÈ
 // Sa a se yon API SÈVÈ-A-SÈVÈ ki otantifye ak yon kle sekrè (Bearer api_key).
 // Pa gen okenn rezon pou yon navigatè (browser) rele l dirèkteman ak kle sa a
@@ -20,11 +62,12 @@ import {
 // li). Entegrasyon reyèl yo (backend machann nan) pa bezwen CORS ditou.
 
 export async function POST(request: Request) {
+  const debug = isDebugSession(request);
   try {
     const ip = getClientIp(request);
     const rl = await rateLimit(`public-payments:${ip}`, 40, 60);
     if (!rl.allowed) {
-      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+      return jsonWithBuild({ error: 'Twòp demann. Eseye ankò.' }, 429);
     }
 
     // KOUCH SEKIRITE 2: Otantifikasyon ak verifikasyon Header
@@ -129,14 +172,33 @@ export async function POST(request: Request) {
     }
 
     const clientBalances = normalizeClientBalances(freshClient);
+    if (debug) {
+      debugLog('public/payments:balances', 'Fresh client balances loaded', {
+        build: API_BUILD_VERSION,
+        card_balance: clientBalances.card_balance,
+        wallet_balance: clientBalances.wallet_balance,
+        safeAmount,
+        merchantIdPrefix: String(merchant.id).slice(0, 8),
+        clientIdPrefix: String(freshClient.id).slice(0, 8),
+        sameAccount: freshClient.id === merchant.id,
+      }, 'H2');
+    }
     if (!clientCanPayAmount(clientBalances, safeAmount)) {
-      return NextResponse.json({ error: insufficientClientFundsMessage(clientBalances, safeAmount) }, { status: 400 });
+      const errBody: Record<string, unknown> = {
+        error: insufficientClientFundsMessage(clientBalances, safeAmount),
+      };
+      if (debug) {
+        errBody.debug = { step: 'pre_check_balances', build: API_BUILD_VERSION, ...clientBalances, safeAmount };
+      }
+      return jsonWithBuild(errBody, 400);
     }
 
     if (freshClient.id === merchant.id) {
-      return NextResponse.json({
+      const errBody: Record<string, unknown> = {
         error: 'Ou pa ka itilize menm kont pou machann ak kliyan. Kreye/yon lòt kont kòm kliyan pou teste API a.',
-      }, { status: 400 });
+      };
+      if (debug) errBody.debug = { step: 'self_payment_blocked', build: API_BUILD_VERSION };
+      return jsonWithBuild(errBody, 400);
     }
 
     // KOUCH SEKIRITE 6B: Limit Depans Jounalye/Mansyèl kliyan an (kont Antrepriz gen limit pi wo)
@@ -177,7 +239,29 @@ export async function POST(request: Request) {
 
     if (rpcError || !rpcResult?.success) {
       const status = rpcResult?.duplicate ? 409 : 400;
-      return NextResponse.json({ error: rpcResult?.message || rpcError?.message || "Echèk nan egzekisyon peman an." }, { status });
+      const rpcMessage = rpcResult?.message || rpcError?.message || 'Echèk nan egzekisyon peman an.';
+      if (debug) {
+        debugLog('public/payments:rpc_fail', 'RPC process_direct_card_payment failed', {
+          build: API_BUILD_VERSION,
+          rpcMessage,
+          rpcError: rpcError?.message || null,
+          card_balance: clientBalances.card_balance,
+          wallet_balance: clientBalances.wallet_balance,
+          safeAmount,
+        }, 'H4');
+      }
+      const errBody: Record<string, unknown> = { error: rpcMessage };
+      if (debug) {
+        errBody.debug = {
+          step: 'rpc_failed',
+          build: API_BUILD_VERSION,
+          rpcMessage,
+          card_balance: clientBalances.card_balance,
+          wallet_balance: clientBalances.wallet_balance,
+          hint: rpcMessage === 'Fon ensifizan.' ? 'RPC ansyen sou Supabase — kouri migrasyon 20260721' : undefined,
+        };
+      }
+      return jsonWithBuild(errBody, status);
     }
 
     const transactionId: string = rpcResult.transaction_id;
@@ -214,7 +298,7 @@ export async function POST(request: Request) {
     });
 
     // REYISI FINAL LA
-    return NextResponse.json(successResponse);
+    return jsonWithBuild(successResponse);
 
   } catch (error: any) {
     console.error("[CRITICAL ERROR] HatexCard Payment Gateway:", error);
