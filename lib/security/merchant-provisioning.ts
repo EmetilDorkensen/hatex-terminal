@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // ELIJIBILITE & PWOVIZYON KREDANSYÈL API MACHANN
 // ============================================================================
 // Yon kont ka jwenn aksè API otomatikman SÈLMAN si TOUDE kondisyon sa yo vre:
-//   1. KYC biznis li APWOUVE (kyc_status === 'approved')
+//   1. KYC kont kliyan an APWOUVE nan tab profiles (kyc_status === 'approved')
 //   2. Li peye frè aktivasyon kat la (is_card_activated === true)
 //
 // Lè yon kont elijib men l poko gen kredansyèl (api_key / is_merchant /

@@ -22,7 +22,7 @@ export async function requireEligibleMerchant() {
 
   const eligibility = checkMerchantEligibility(profile);
   if (!eligibility.eligible || !profile.is_merchant) {
-    return { error: 'Kont ou poko elijib pou API devlopè a (KYC apwouve + kat aktive obligatwa).', status: 403 as const, user: null, profile: null, supabaseAdmin: null };
+    return { error: 'Kont ou poko elijib pou API devlopè a (KYC kont kliyan apwouve nan profiles + kat aktive obligatwa).', status: 403 as const, user: null, profile: null, supabaseAdmin: null };
   }
 
   return { error: null, status: 200 as const, user, profile, supabaseAdmin };

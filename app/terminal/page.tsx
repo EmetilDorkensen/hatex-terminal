@@ -158,7 +158,7 @@ export default function TerminalPage() {
 
       if (!result.eligibility.eligible) {
         if (result.eligibility.missingKyc) {
-          alert('KYC ou poko apwouve. Tanpri konplete KYC biznis la anvan.');
+          alert('KYC kont ou poko apwouve. Tanpri konplete verifikasyon ID ou sou paj /kyc anvan.');
         } else if (result.eligibility.missingCardActivation) {
           alert('Ou dwe peye frè aktivasyon Kat Vityèl la anvan w jwenn aksè API a.');
         }

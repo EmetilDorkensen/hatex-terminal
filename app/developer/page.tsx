@@ -177,7 +177,7 @@ export default function DeveloperDashboard() {
         <div className="space-y-3 text-left mb-6">
           <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingKyc ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
             {eligibility?.missingKyc ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
-            <span className="text-sm font-semibold text-slate-700">KYC Biznis apwouve</span>
+            <span className="text-sm font-semibold text-slate-700">Verifikasyon ID (KYC kont ou) apwouve</span>
           </div>
           <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingCardActivation ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
             {eligibility?.missingCardActivation ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
@@ -186,7 +186,7 @@ export default function DeveloperDashboard() {
         </div>
         <div className="flex flex-col gap-3">
           {eligibility?.missingKyc && (
-            <button onClick={() => router.push('/kyc')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Konplete KYC Biznis</button>
+            <button onClick={() => router.push('/kyc')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Konplete Verifikasyon ID (KYC)</button>
           )}
           {eligibility?.missingCardActivation && (
             <button onClick={() => router.push('/kat')} className="w-full bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Aktive Kat Vityèl</button>

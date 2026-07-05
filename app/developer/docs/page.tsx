@@ -26,7 +26,7 @@ export default function HatexcardDocs() {
             Kle API ou a (<code className="bg-gray-800 px-1 py-0.5 rounded text-yellow-400">hx_live_...</code>) jenere otomatikman lè <strong className="text-white">toude</strong> kondisyon sa yo satisfè:
           </p>
           <ul className="list-disc list-inside text-gray-400 space-y-2 ml-2">
-            <li>KYC Biznis ou apwouve (<code className="text-gray-300">kyc_status = approved</code>)</li>
+            <li>Verifikasyon ID kont kliyan ou apwouve nan tab <code className="text-gray-300">profiles</code> (<code className="text-gray-300">kyc_status = approved</code>)</li>
             <li>Ou peye frè aktivasyon Kat Vityèl la (520 HTG, nan paj Kat la)</li>
           </ul>
           <p className="text-gray-400">
