@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const ADMIN_EMAIL = 'hatexcard@gmail.com';
+const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 const STAFF_ROLES = ['support', 'finance', 'compliance'];
 
 export async function middleware(request: NextRequest) {

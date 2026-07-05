@@ -5,7 +5,7 @@ import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { ADMIN_GATE_COOKIE, ADMIN_GATE_MAX_AGE_MS, verifyAdminGateToken } from '@/lib/security/admin-gate';
 
-const ADMIN_EMAIL = 'hatexcard@gmail.com';
+const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 const COOKIE_MAX_AGE = Math.floor(ADMIN_GATE_MAX_AGE_MS / 1000);
 
 function signGateToken(): string {
