@@ -15,13 +15,34 @@ const ALLOWED_MIME = new Set([
   'image/jpg',
   'image/png',
   'image/webp',
+  'image/heic',
+  'image/heif',
   'application/pdf',
 ]);
+
+// Mapping ekstansyon → MIME, itilize kòm rekou lè navigatè telefòn nan
+// (sitou Android/anndan yon app) voye yon 'file.type' vid oswa jenerik
+// tankou 'application/octet-stream' pou foto/PDF ki valab.
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  pdf: 'application/pdf',
+};
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 Mo
 
 export async function POST(req: Request) {
   try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({
+        error: "Sèvè a pa konfigire byen (SUPABASE_SERVICE_ROLE_KEY pa mete nan anviwonman an). Kontakte administratè a.",
+      }, { status: 500 });
+    }
+
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -40,18 +61,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Tip dokiman pa valid.' }, { status: 400 });
     }
 
+    if (file.size === 0) {
+      return NextResponse.json({ error: 'Fichye a vid. Chwazi yon lòt fichye.' }, { status: 400 });
+    }
+
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: 'Fichye a twò gwo. Maksimòm 10 Mo.' }, { status: 400 });
     }
 
-    const mime = file.type || 'application/octet-stream';
-    if (!ALLOWED_MIME.has(mime)) {
-      return NextResponse.json({ error: 'Kalite fichye pa aksepte. Itilize JPG, PNG, WEBP oswa PDF.' }, { status: 400 });
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf'].includes(ext) ? ext : '';
+
+    // Si navigatè a pa bay yon MIME klè (sa rive souvan sou telefòn), n ap
+    // dedwi l apati ekstansyon fichye a olye nou rejte dokiman an tousuit.
+    let mime = file.type;
+    if (!mime || !ALLOWED_MIME.has(mime)) {
+      mime = EXT_TO_MIME[safeExt] || '';
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'pdf'].includes(ext) ? ext : 'pdf';
-    const fileName = `${user.id}/${docType}_${Date.now()}.${safeExt}`;
+    if (!mime || !ALLOWED_MIME.has(mime)) {
+      return NextResponse.json({ error: 'Kalite fichye pa aksepte. Itilize yon foto (JPG/PNG/WEBP/HEIC) oswa yon PDF.' }, { status: 400 });
+    }
+
+    const finalExt = safeExt || (mime === 'application/pdf' ? 'pdf' : 'jpg');
+    const fileName = `${user.id}/${docType}_${Date.now()}.${finalExt}`;
 
     const admin = createSupabaseAdminClient();
     const buffer = Buffer.from(await file.arrayBuffer());

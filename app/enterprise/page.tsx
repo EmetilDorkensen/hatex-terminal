@@ -139,37 +139,45 @@ export default function EnterprisePortal() {
         throw new Error(`Ou pa gen ase kòb. Ou bezwen ${ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG.`);
       }
 
-      const uploadFile = async (file: File, type: string) => {
+      const uploadFile = async (file: File, type: string, label: string) => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('type', type);
-        const res = await fetch('/api/enterprise/upload', { method: 'POST', body: formData });
-        const data = await res.json();
+        let res: Response;
+        try {
+          res = await fetch('/api/enterprise/upload', { method: 'POST', body: formData });
+        } catch {
+          throw new Error(`Pwoblèm koneksyon pandan telechajman "${label}". Tcheke Entènèt ou epi eseye ankò.`);
+        }
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || 'Erè pandan telechajman dokiman an.');
+          console.error('Enterprise upload failed', { type, status: res.status, data });
+          throw new Error(data.error ? `${label}: ${data.error}` : `Erè pandan telechajman "${label}".`);
         }
         return data.url as string;
       };
 
-      const patenteUrl = await uploadFile(patenteDoc!, 'patente');
-      const cifUrl = await uploadFile(cifDoc!, 'cif');
-      const businessRegUrl = await uploadFile(businessRegistrationDoc!, 'business_registration');
-      const bankStatementUrl = await uploadFile(bankStatementDoc!, 'bank_statement');
-      const leaseUrl = await uploadFile(leaseDoc!, 'lease_doc');
-      const legalRepIdUrl = await uploadFile(legalRepIdDoc!, 'legal_rep_id');
+      const patenteUrl = await uploadFile(patenteDoc!, 'patente', 'Patant Biznis');
+      const cifUrl = await uploadFile(cifDoc!, 'cif', 'CIF Biznis');
+      const businessRegUrl = await uploadFile(businessRegistrationDoc!, 'business_registration', 'Sètifika Anrejistreman');
+      const bankStatementUrl = await uploadFile(bankStatementDoc!, 'bank_statement', 'Relve Bankè');
+      const leaseUrl = await uploadFile(leaseDoc!, 'lease_doc', 'Kontra Lokasyon');
+      const legalRepIdUrl = await uploadFile(legalRepIdDoc!, 'legal_rep_id', 'ID Reprezantan Legal');
 
       const newBal = currentBal - ENTERPRISE_APPLICATION_FEE;
-      await supabase.from('profiles').update({
+      const { error: balError } = await supabase.from('profiles').update({
         wallet_balance: newBal,
         enterprise_status: 'pending',
         enterprise_fee_paid: ENTERPRISE_APPLICATION_FEE,
       }).eq('id', profile.id);
+      if (balError) throw new Error(`Erè pandan peman frè a: ${balError.message}`);
 
-      await supabase.from('transactions').insert([
+      const { error: txError } = await supabase.from('transactions').insert([
         { user_id: profile.id, type: 'ENTERPRISE_FEE', amount: -ENTERPRISE_APPLICATION_FEE, status: 'success', description: 'Frè Pasaj Kont Antrepriz' }
       ]);
+      if (txError) console.error('Enterprise fee transaction insert failed', txError);
 
-      await supabase.from('enterprise_applications').insert([{
+      const { error: appError } = await supabase.from('enterprise_applications').insert([{
         user_id: profile.id,
         status: 'pending',
         business_name: businessName.trim(),
@@ -185,6 +193,11 @@ export default function EnterprisePortal() {
         confidentiality_accepted_at: new Date().toISOString(),
         metadata: { fee_paid: ENTERPRISE_APPLICATION_FEE },
       }]);
+      if (appError) {
+        // Aplikasyon an pa t anrejistre — ranbouse fè a imedyatman pou kliyan an pa pèdi kòb.
+        await supabase.from('profiles').update({ wallet_balance: currentBal, enterprise_status: 'none', enterprise_fee_paid: 0 }).eq('id', profile.id);
+        throw new Error(`Erè pandan anrejistreman aplikasyon an (frè ranbouse): ${appError.message}`);
+      }
 
       try {
         await fetch('/api/notifications/telegram', {
@@ -201,7 +214,8 @@ export default function EnterprisePortal() {
       setShowPinPrompt(false);
       setStep('pending');
     } catch (err: any) {
-      setPinError(err.message);
+      console.error('Enterprise application submission failed', err);
+      setPinError(err.message || 'Yon erè fèt. Eseye ankò.');
       setEnteredPin('');
     } finally {
       setActionLoading(false);
