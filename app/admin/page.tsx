@@ -473,12 +473,15 @@ export default function AdminSuperPage() {
                 'support': 'Sèvis Kliyan (Support)'
             };
             
-            const setupLink = `${window.location.origin}/workspace-setup?email=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
-            const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon an envite w vin travay kòm anplwaye Hatexcard nan depatman: "${roleNames[inviteRole]}".\n\nKlike sou lyen anba a pou w kreye Modpas Espas Travay ou a (Workspace Password). Modpas sa a pa gen okenn rapò ak kont kliyan nòmal ou a:\n\n${setupLink}`;
+            // 🔒 SEKIRITE: Pa gen okenn lyen nan imel la ankò. Nou jis anonse
+            // anplwaye a — li dwe konekte sou pwòp kont kliyan li (Dashboard),
+            // epi klike sou bouton "Aksè Espas Travay" pou l kreye modpas fò
+            // espas travay li a pou premye fwa.
+            const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon Hatexcard envite w vin travay kòm anplwaye nan depatman: "${roleNames[inviteRole]}".\n\nPou kòmanse:\n1) Konekte sou kont kliyan ou nòmal (menm imel sa a) sou Dashboard Hatexcard.\n2) Louvri meni an, klike sou bouton "Aksè Espas Travay".\n3) Kreye yon modpas fò espesyal pou espas travay ou (li apa de modpas kont kliyan ou a).\n\nPou rezon sekirite, pa gen okenn lyen nan mesaj sa a — sèvi ak Dashboard ou dirèkteman.`;
             
-            await voyeEmailKliyan(inviteEmail, staffName, msg, "ENVITASYON ESPAS TRAVAY HATEXCARD");
+            await voyeEmailKliyan(inviteEmail, staffName, msg, "OU VIN YON ANPLWAYE HATEXCARD");
 
-            alert(`Envitasyon an ale! ${staffName} ap resevwa lyen an nan imèl li pou l kreye modpas espas travay li.`);
+            alert(`Envitasyon an ale! ${staffName} ap resevwa yon mesaj imèl ki di l konekte sou Dashboard li epi klike sou bouton "Aksè Espas Travay".`);
             setInviteEmail('');
             raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }

@@ -56,19 +56,31 @@ export default function WorkspacePage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // 👇 MEN KÒD OU TE MANDE M METE A 👇
+    // 🔒 SEKIRITE: pa gen okenn sesyon nan localStorage ankò. Aksè a baze
+    // sou (1) vrè sesyon Supabase Auth (menm kont kliyan anplwaye a),
+    // (2) yon liy aktif nan staff_users, ak (3) cookie "gate" serveur
+    // ki pwouve anplwaye a antre modpas espas travay li kòrèkteman —
+    // menm nivo sekirite ak middleware.ts.
     const checkAuthAndFetchData = async () => {
         setLoading(true);
-        
-        // Li done anplwaye a nan kach navigatè a ki te sove nan Workspace Login nan
-        const sessionStr = localStorage.getItem('staff_session');
-        
-        if (!sessionStr) {
-            router.push('/workspace-login');
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) {
+            router.push('/login');
             return;
         }
 
-        const profile = JSON.parse(sessionStr);
+        const [{ data: staff }, gateRes] = await Promise.all([
+            supabase.from('staff_users').select('*').eq('email', user.email.trim().toLowerCase()).maybeSingle(),
+            fetch('/api/workspace/verify-gate'),
+        ]);
+
+        if (!staff || staff.status === 'revoked' || !staff.workspace_password_hash || !gateRes.ok) {
+            router.push('/dashboard');
+            return;
+        }
+
+        const profile = staff;
         setStaffProfile(profile);
 
         // Rale done selon wòl anplwaye a
@@ -102,10 +114,10 @@ export default function WorkspacePage() {
         setLoading(false);
     };
 
-    const handleLogout = () => {
-        // Retiye sesyon anplwaye a
-        localStorage.removeItem('staff_session');
-        router.push('/workspace-login');
+    const handleLogout = async () => {
+        // Efase cookie gate espas travay la imedyatman sou sèvè a.
+        try { await fetch('/api/workspace/verify-gate', { method: 'DELETE' }); } catch {}
+        router.push('/dashboard');
     };
     // 👆 FEN KÒD OU TE MANDE M NAN 👆
 

@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
+import { checkStrongPassword } from '@/lib/security/password-strength';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2, Building2, Receipt
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2, Building2, Receipt, Lock, AlertCircle
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -64,6 +65,16 @@ export default function Dashboard() {
   // ETA POU PÒTAY ADMIN
   const [isLoggingAdmin, setIsLoggingAdmin] = useState(false);
 
+  // ==========================================
+  // ETA POU AKSÈ ESPAS TRAVAY (ANPLWAYE)
+  // ==========================================
+  const [staffRecord, setStaffRecord] = useState<any>(null);
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [workspacePassword, setWorkspacePassword] = useState('');
+  const [workspacePasswordConfirm, setWorkspacePasswordConfirm] = useState('');
+  const [workspaceError, setWorkspaceError] = useState('');
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+
   const generateMissingCard = async (userId: string, currentProfile: any) => {
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
       try {
@@ -107,6 +118,19 @@ export default function Dashboard() {
               
             if (discountData) {
               setDiscountAmount(discountData.discount_amount || 0);
+            }
+          }
+
+          // Tcheke si kliyan sa a se tou yon anplwaye Hatexcard (staff_users).
+          // RLS pèmèt li li SÈLMAN pwòp liy pa li.
+          if (user.email) {
+            const { data: staff } = await supabase
+              .from('staff_users')
+              .select('id, role, status, workspace_password_hash, full_name')
+              .eq('email', user.email.trim().toLowerCase())
+              .maybeSingle();
+            if (staff && staff.status !== 'revoked') {
+              setStaffRecord(staff);
             }
           }
 
@@ -408,6 +432,59 @@ export default function Dashboard() {
     }
   };
 
+  // 👇 BOUTON "AKSÈ ESPAS TRAVAY" — parèt sèlman si imel la nan lis anplwaye 👇
+  const handleOpenWorkspaceModal = () => {
+    setWorkspaceError('');
+    setWorkspacePassword('');
+    setWorkspacePasswordConfirm('');
+    setShowWorkspaceModal(true);
+  };
+
+  const isFirstTimeWorkspaceSetup = staffRecord && !staffRecord.workspace_password_hash;
+
+  const handleWorkspaceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWorkspaceError('');
+
+    if (isFirstTimeWorkspaceSetup) {
+      const strength = checkStrongPassword(workspacePassword);
+      if (!strength.valid) {
+        setWorkspaceError(strength.message || 'Modpas la twò fèb.');
+        return;
+      }
+      if (workspacePassword !== workspacePasswordConfirm) {
+        setWorkspaceError('Modpas yo pa menm. Tanpri konfime menm modpas la de fwa.');
+        return;
+      }
+    }
+
+    setWorkspaceLoading(true);
+    try {
+      const endpoint = isFirstTimeWorkspaceSetup ? '/api/workspace/set-password' : '/api/workspace/verify-gate';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: workspacePassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (data.needsSetup) {
+          setStaffRecord((prev: any) => ({ ...prev, workspace_password_hash: null }));
+        }
+        setWorkspaceError(data.message || "Yon erè pase. Tanpri eseye ankò.");
+        return;
+      }
+
+      setShowWorkspaceModal(false);
+      window.location.href = '/workspace';
+    } catch {
+      setWorkspaceError('Erè rezo. Tanpri eseye ankò.');
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -499,12 +576,23 @@ export default function Dashboard() {
                 <Settings size={20} /> Paramèt
               </button>
 
+              {/* 👇 BOUTON AKSÈ ESPAS TRAVAY — PARÈT SÈLMAN POU ANPLWAYE (staff_users) 👇 */}
+              {staffRecord && (
+                <button
+                  onClick={() => { handleOpenWorkspaceModal(); setIsMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-bold uppercase tracking-wider text-[10px] transition-all border border-indigo-100 mt-4 shadow-sm"
+                >
+                   <Lock size={16} />
+                   Aksè Espas Travay
+                </button>
+              )}
+
               {/* 👇 BOUTON PÒTAY ADMIN NAN ANNDAN MENI AN SÈLMAN POU IMÈL ADMIN NAN 👇 */}
               {isAdmin && (
                 <button 
                   onClick={antreNanAdmin} 
                   disabled={isLoggingAdmin}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-4 shadow-sm"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold uppercase tracking-wider text-[10px] transition-all border border-rose-100 mt-2 shadow-sm"
                 >
                    {isLoggingAdmin ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />} 
                    Kès Biznis (Admin)
@@ -898,6 +986,89 @@ export default function Dashboard() {
           </div>
         </div>
       </footer>
+
+      {/* ========================================== */}
+      {/* MODAL: AKSÈ ESPAS TRAVAY (ANPLWAYE) */}
+      {/* ========================================== */}
+      {showWorkspaceModal && (
+        <div className="fixed inset-0 z-[400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative">
+            <button
+              onClick={() => setShowWorkspaceModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md">
+                <Lock size={22} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  {isFirstTimeWorkspaceSetup ? 'Kreye Modpas Espas Travay' : 'Aksè Espas Travay'}
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  {isFirstTimeWorkspaceSetup
+                    ? 'Premye fwa: kreye yon modpas fò apa pou espas travay ou.'
+                    : 'Antre modpas espas travay ou pou kontinye.'}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleWorkspaceSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  {isFirstTimeWorkspaceSetup ? 'Nouvo Modpas Fò' : 'Modpas Espas Travay'}
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  value={workspacePassword}
+                  onChange={(e) => setWorkspacePassword(e.target.value)}
+                  placeholder="••••••••••"
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-medium text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+                {isFirstTimeWorkspaceSetup && (
+                  <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                    Omwen 10 karaktè, ak yon majiskil, yon miniskil, yon chif, ak yon senbòl. Modpas sa a apa de modpas kont kliyan ou a.
+                  </p>
+                )}
+              </div>
+
+              {isFirstTimeWorkspaceSetup && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Konfime Modpas la</label>
+                  <input
+                    type="password"
+                    required
+                    value={workspacePasswordConfirm}
+                    onChange={(e) => setWorkspacePasswordConfirm(e.target.value)}
+                    placeholder="••••••••••"
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-medium text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+
+              {workspaceError && (
+                <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <p className="text-rose-700 text-xs font-bold leading-relaxed">{workspaceError}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={workspaceLoading}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 shadow-sm"
+              >
+                {workspaceLoading ? <Loader2 size={16} className="animate-spin" /> : (isFirstTimeWorkspaceSetup ? 'Kreye Modpas & Antre' : 'Konekte')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .perspective-1000 { perspective: 1000px; }
