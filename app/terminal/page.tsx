@@ -149,23 +149,55 @@ export default function TerminalPage() {
   // FONKSYON POU JENERE API KEY
   // ============================================================
   const generateApiKey = useCallback(async () => {
-    // 🔐 Egzije KYC apwouve E kat aktive (toude) anvan jenere kredansyèl API.
     if (!profile?.id) return null;
 
     try {
       setGeneratingApiKey(true);
-      const result = await ensureMerchantApiCredentials(supabase, profile);
+
+      let result: Awaited<ReturnType<typeof ensureMerchantApiCredentials>> | null = null;
+      try {
+        const res = await fetch('/api/developer/provision', { method: 'POST' });
+        const payload = await res.json();
+        if (res.ok) {
+          result = {
+            api_key: payload.api_key,
+            is_merchant: payload.is_merchant,
+            webhook_secret: payload.webhook_secret,
+            provisioned: payload.provisioned,
+            eligibility: payload.eligibility,
+          };
+        } else if (payload.eligibility) {
+          result = {
+            api_key: profile.api_key || null,
+            is_merchant: profile.is_merchant === true,
+            webhook_secret: profile.webhook_secret || null,
+            provisioned: false,
+            eligibility: payload.eligibility,
+          };
+        }
+      } catch {
+        /* fallback kliyan */
+      }
+
+      if (!result) {
+        result = await ensureMerchantApiCredentials(supabase, profile);
+      }
 
       if (!result.eligibility.eligible) {
         if (result.eligibility.missingKyc) {
-          alert('KYC kont ou poko apwouve. Tanpri konplete verifikasyon ID ou sou paj /kyc anvan.');
+          alert('KYC kont ou poko apwouve. Tanpri tann apwobasyon admin sou paj /kyc la.');
         } else if (result.eligibility.missingCardActivation) {
-          alert('Ou dwe peye frè aktivasyon Kat Vityèl la anvan w jwenn aksè API a.');
+          alert('Ou dwe peye frè aktivasyon Kat Vityèl la (520 HTG) sou paj /kat anvan w jwenn aksè API a.');
         }
         return null;
       }
 
-      setProfile({ ...profile, api_key: result.api_key, is_merchant: true, webhook_secret: result.webhook_secret });
+      setProfile({
+        ...profile,
+        api_key: result.api_key,
+        is_merchant: true,
+        webhook_secret: result.webhook_secret,
+      });
       return result.api_key;
     } catch (error) {
       console.error('Error generating API key:', error);
@@ -292,9 +324,28 @@ export default function TerminalPage() {
         // regenere api_key ki egziste deja (pou pa kraze entegrasyon k ap mache).
         if (!hasGeneratedKey && (!prof.api_key || !prof.is_merchant || !prof.webhook_secret)) {
           hasGeneratedKey = true;
-          const result = await ensureMerchantApiCredentials(supabase, prof);
-          if (result.provisioned && isMounted) {
-            setProfile({ ...prof, api_key: result.api_key, is_merchant: true, webhook_secret: result.webhook_secret });
+          try {
+            const provRes = await fetch('/api/developer/provision', { method: 'POST' });
+            if (provRes.ok) {
+              const result = await provRes.json();
+              if (isMounted) {
+                setProfile({ ...prof, api_key: result.api_key, is_merchant: true, webhook_secret: result.webhook_secret });
+              }
+            } else {
+              const clientProv = await ensureMerchantApiCredentials(supabase, prof);
+              if (clientProv.provisioned && isMounted) {
+                setProfile({ ...prof, api_key: clientProv.api_key, is_merchant: true, webhook_secret: clientProv.webhook_secret });
+              }
+            }
+          } catch {
+            try {
+              const clientProv = await ensureMerchantApiCredentials(supabase, prof);
+              if (clientProv.provisioned && isMounted) {
+                setProfile({ ...prof, api_key: clientProv.api_key, is_merchant: true, webhook_secret: clientProv.webhook_secret });
+              }
+            } catch {
+              /* pwovizyone ap eseye ankò lè itilizatè a klike API */
+            }
           }
         }
 
@@ -1080,7 +1131,14 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
         </button>
 
         <button
-          onClick={() => router.push('/developer')}
+          onClick={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data: fresh } = await supabase.from('profiles').select('kyc_status, is_card_activated, is_merchant, api_key').eq('id', user?.id ?? '').single();
+            // #region agent log
+            fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'pre-fix',hypothesisId:'A-B',location:'terminal/page.tsx:apiDevClick',message:'API/Dev clicked from terminal',data:{userId:user?.id??null,terminalProfileKyc:profile?.kyc_status??null,terminalProfileCard:profile?.is_card_activated??null,freshKyc:fresh?.kyc_status??null,freshCard:fresh?.is_card_activated??null,freshApiKey:!!fresh?.api_key},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            router.push('/developer');
+          }}
           className="flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50"
         >
           <Terminal size={14} className="mb-1 md:mb-0 md:mr-2" />

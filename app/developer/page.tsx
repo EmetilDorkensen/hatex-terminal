@@ -54,27 +54,78 @@ export default function DeveloperDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return router.push('/login');
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret')
-        .eq('id', user.id)
-        .single();
+      let elig: { eligible: boolean; missingKyc: boolean; missingCardActivation: boolean } | null = null;
+      let profileData: any = null;
+      let source = 'none';
 
-      if (!data) {
+      try {
+        const res = await fetch('/api/developer/eligibility');
+        if (res.ok) {
+          const payload = await res.json();
+          elig = payload.eligibility;
+          profileData = payload.profile;
+          source = 'server';
+          // #region agent log
+          fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'post-fix',hypothesisId:'F',location:'developer/page.tsx:loadDevData',message:'eligibility from server OK',data:{userId:user.id,elig,source},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+        }
+      } catch {
+        /* eseye fallback kliyan anba */
+      }
+
+      if (!elig || !profileData) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret')
+          .eq('id', user.id)
+          .single();
+
+        if (data) {
+          profileData = data;
+          elig = checkMerchantEligibility(data);
+          source = 'client-fallback';
+          // #region agent log
+          fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'post-fix',hypothesisId:'F',location:'developer/page.tsx:loadDevData',message:'eligibility client fallback',data:{userId:user.id,kyc_status:data.kyc_status,is_card_activated:data.is_card_activated,elig,source},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+        }
+      }
+
+      if (!elig || !profileData) {
         setLoading(false);
         return;
       }
 
-      const elig = checkMerchantEligibility(data);
       setEligibility(elig);
 
-      // Oto-pwovizyone kredansyèl si kont lan elijib men poko genyen yo.
       if (elig.eligible) {
-        const result = await ensureMerchantApiCredentials(supabase, data);
-        setMerchant({ ...data, api_key: result.api_key, is_merchant: result.is_merchant, webhook_secret: result.webhook_secret });
+        let apiKey = profileData.api_key;
+        let isMerchant = profileData.is_merchant;
+        let webhookSecret = profileData.webhook_secret;
+
+        try {
+          const provRes = await fetch('/api/developer/provision', { method: 'POST' });
+          if (provRes.ok) {
+            const prov = await provRes.json();
+            apiKey = prov.api_key ?? apiKey;
+            isMerchant = prov.is_merchant ?? isMerchant;
+            webhookSecret = prov.webhook_secret ?? webhookSecret;
+          } else {
+            const clientProv = await ensureMerchantApiCredentials(supabase, profileData);
+            apiKey = clientProv.api_key ?? apiKey;
+            isMerchant = clientProv.is_merchant ?? isMerchant;
+            webhookSecret = clientProv.webhook_secret ?? webhookSecret;
+          }
+        } catch {
+          const clientProv = await ensureMerchantApiCredentials(supabase, profileData);
+          apiKey = clientProv.api_key ?? apiKey;
+          isMerchant = clientProv.is_merchant ?? isMerchant;
+          webhookSecret = clientProv.webhook_secret ?? webhookSecret;
+        }
+
+        setMerchant({ ...profileData, api_key: apiKey, is_merchant: isMerchant, webhook_secret: webhookSecret });
         await loadWebhooks();
       } else {
-        setMerchant(data);
+        setMerchant(profileData);
       }
 
       setLoading(false);
@@ -165,8 +216,12 @@ export default function DeveloperDashboard() {
     </div>
   );
 
-  // Kont ki poko elijib: montre klèman kisa ki manke (KYC / kat aktive).
-  if (!eligibility?.eligible) return (
+  // Kont ki verifye elijib epi ki pa pase: montre kisa ki manke.
+  if (eligibility !== null && !eligibility.eligible) {
+    // #region agent log
+    fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',runId:'pre-fix',hypothesisId:'E',location:'developer/page.tsx:eligibilityGate',message:'showing blocked API screen',data:{eligibility,merchantKyc:merchant?.kyc_status??null,merchantCard:merchant?.is_card_activated??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-4">
       <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl shadow-sm p-8 text-center">
         <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-5">
@@ -174,6 +229,9 @@ export default function DeveloperDashboard() {
         </div>
         <h1 className="text-xl font-bold text-slate-900 mb-2">Aksè API poko disponib</h1>
         <p className="text-sm text-slate-500 mb-6">Pou jwenn kle API w la otomatikman, ou dwe konplete toude etap sa yo:</p>
+        {merchant?.kyc_status && (
+          <p className="text-xs text-slate-400 mb-4 font-mono">Stat KYC nan baz done: {merchant.kyc_status} · Kat aktive: {merchant.is_card_activated ? 'wi' : 'non'}</p>
+        )}
         <div className="space-y-3 text-left mb-6">
           <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingKyc ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
             {eligibility?.missingKyc ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
@@ -194,7 +252,8 @@ export default function DeveloperDashboard() {
         </div>
       </div>
     </div>
-  );
+    );
+  }
 
   const codeSnippets = {
     js: `const response = await fetch('https://hatexcard.com/api/public/payments', {
