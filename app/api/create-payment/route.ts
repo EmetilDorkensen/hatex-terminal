@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 
 export async function POST(req: Request) {
   try {
@@ -19,13 +20,9 @@ export async function POST(req: Request) {
     }
 
     // 2. Nou verifye si machann sa a gen kont HatexCard vre gras ak API Key a
-    const { data: merchant, error: merchantErr } = await supabaseAdmin
-      .from('profiles')
-      .select('id, account_status')
-      .eq('api_key', merchant_api_key) // Verifye ak kòd "hx_live_..." la
-      .single();
+    const merchant = await authenticateMerchantApiKey(supabaseAdmin, merchant_api_key);
 
-    if (merchantErr || !merchant) {
+    if (!merchant) {
       return NextResponse.json({ error: 'Machann sa a pa rekonèt sou HatexCard' }, { status: 404 });
     }
 

@@ -4,6 +4,7 @@ import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit } from '@/lib/security/spending-limits';
 import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
+import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 
 // 🔐 KOUCH SEKIRITE 1: PA GEN CORS OUVÈ
 // Sa a se yon API SÈVÈ-A-SÈVÈ ki otantifye ak yon kle sekrè (Bearer api_key).
@@ -36,14 +37,10 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // KOUCH SEKIRITE 3: Verifikasyon Estati Machann nan
-    const { data: merchant, error: merchantErr } = await supabase
-      .from('profiles')
-      .select('id, full_name, is_merchant, account_status, wallet_balance, account_type')
-      .eq('api_key', apiKey)
-      .single();
+    // KOUCH SEKIRITE 3: Verifikasyon Estati Machann nan (kle API hash nan baz done)
+    const merchant = await authenticateMerchantApiKey(supabase, apiKey);
 
-    if (merchantErr || !merchant || !merchant.is_merchant) {
+    if (!merchant || !merchant.is_merchant) {
       return NextResponse.json({ error: "Kle API sa a pa valab oswa kont lan pa otorize pou resevwa peman." }, { status: 403 });
     }
     if (merchant.account_status !== 'active') {
@@ -113,8 +110,10 @@ export async function POST(request: Request) {
     if (client.account_status !== 'active') {
       return NextResponse.json({ error: "Kont ki asosye ak kat sa a pa aktif." }, { status: 403 });
     }
-    if (Number(client.wallet_balance) < safeAmount) {
-      return NextResponse.json({ error: "Fon ensifizan." }, { status: 400 });
+    if (Number(client.card_balance ?? 0) < safeAmount) {
+      return NextResponse.json({
+        error: `Ou pa gen ase lajan sou kat ou a. Balans kat ou se ${Number(client.card_balance ?? 0).toFixed(2)} HTG.`,
+      }, { status: 400 });
     }
 
     // KOUCH SEKIRITE 6B: Limit Depans Jounalye/Mansyèl kliyan an (kont Antrepriz gen limit pi wo)

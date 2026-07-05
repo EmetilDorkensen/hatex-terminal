@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink } from 'lucide-react';
-import { checkMerchantEligibility, ensureMerchantApiCredentials, canAccessTerminal } from '@/lib/security/merchant-provisioning';
+import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
+import { maskApiKey } from '@/lib/security/api-key';
 
 const AVAILABLE_EVENTS = ['payment.success'];
 
@@ -24,6 +25,9 @@ export default function DeveloperDashboard() {
   const [creatingEndpoint, setCreatingEndpoint] = useState(false);
   const [busyEndpoint, setBusyEndpoint] = useState<string | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<{ url: string; secret: string } | null>(null);
+  const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [rotatingKey, setRotatingKey] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -89,31 +93,38 @@ export default function DeveloperDashboard() {
       setEligibility(elig);
 
       if (elig.eligible) {
-        let apiKey = profileData.api_key;
+        let apiKeyPrefix = profileData.api_key_prefix || null;
+        let apiKeyMasked = profileData.api_key_masked || maskApiKey(apiKeyPrefix);
         let isMerchant = profileData.is_merchant;
         let webhookSecret = profileData.webhook_secret;
+        let plainKeyOnce: string | null = null;
 
         try {
           const provRes = await fetch('/api/developer/provision', { method: 'POST' });
           if (provRes.ok) {
             const prov = await provRes.json();
-            apiKey = prov.api_key ?? apiKey;
+            apiKeyPrefix = prov.api_key_prefix ?? apiKeyPrefix;
+            apiKeyMasked = prov.api_key_masked ?? maskApiKey(apiKeyPrefix);
             isMerchant = prov.is_merchant ?? isMerchant;
             webhookSecret = prov.webhook_secret ?? webhookSecret;
-          } else {
-            const clientProv = await ensureMerchantApiCredentials(supabase, profileData);
-            apiKey = clientProv.api_key ?? apiKey;
-            isMerchant = clientProv.is_merchant ?? isMerchant;
-            webhookSecret = clientProv.webhook_secret ?? webhookSecret;
+            if (prov.api_key) {
+              plainKeyOnce = prov.api_key;
+              setRevealedApiKey(prov.api_key);
+              setShowApiKey(true);
+            }
           }
         } catch {
-          const clientProv = await ensureMerchantApiCredentials(supabase, profileData);
-          apiKey = clientProv.api_key ?? apiKey;
-          isMerchant = clientProv.is_merchant ?? isMerchant;
-          webhookSecret = clientProv.webhook_secret ?? webhookSecret;
+          /* fallback deja nan eligibility */
         }
 
-        setMerchant({ ...profileData, api_key: apiKey, is_merchant: isMerchant, webhook_secret: webhookSecret });
+        setMerchant({
+          ...profileData,
+          api_key_prefix: apiKeyPrefix,
+          api_key_masked: apiKeyMasked,
+          is_merchant: isMerchant,
+          webhook_secret: webhookSecret,
+        });
+        if (plainKeyOnce) setRevealedApiKey(plainKeyOnce);
         await loadWebhooks();
       } else {
         setMerchant(profileData);
@@ -240,11 +251,35 @@ export default function DeveloperDashboard() {
     );
   }
 
+  const handleRotateApiKey = async () => {
+    if (!window.confirm('Ou pral jenere yon NOUVO kle API. Ansyen kle a pa mache ankò. Kontinye?')) return;
+    setRotatingKey(true);
+    try {
+      const res = await fetch('/api/developer/api-key/rotate', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erè');
+      setRevealedApiKey(data.api_key);
+      setShowApiKey(true);
+      setMerchant((prev: any) => ({
+        ...prev,
+        api_key_prefix: data.api_key_prefix,
+        api_key_masked: data.api_key_masked,
+      }));
+      alert(data.message || 'Nouvo kle API jenere.');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setRotatingKey(false);
+    }
+  };
+
+  const snippetKey = revealedApiKey || 'hx_live_KLE_OU_LA';
+
   const codeSnippets = {
     js: `const response = await fetch('https://hatexcard.com/api/public/payments', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer ${merchant?.api_key || 'hx_live_...'}',
+    'Authorization': 'Bearer ${snippetKey}',
     'Content-Type': 'application/json',
     'Idempotency-Key': 'CMD-123-v1' // opsyonèl — evite doub-chaj
   },
@@ -288,7 +323,7 @@ curl_setopt_array($curl, array(
     }
 }',
   CURLOPT_HTTPHEADER => array(
-    'Authorization: Bearer ${merchant?.api_key || 'hx_live_...'}',
+    'Authorization: Bearer ${snippetKey}',
     'Content-Type: application/json',
     'Idempotency-Key: CMD-123-v1'
   ),
@@ -299,7 +334,7 @@ echo $response;
 ?>`,
     curl: `curl --request POST \\
   --url https://hatexcard.com/api/public/payments \\
-  --header 'Authorization: Bearer ${merchant?.api_key || 'hx_live_...'}' \\
+  --header 'Authorization: Bearer ${snippetKey}' \\
   --header 'Content-Type: application/json' \\
   --header 'Idempotency-Key: CMD-123-v1' \\
   --data '{
@@ -339,15 +374,45 @@ echo $response;
 
         {/* Bwat KLE SEKRE A */}
         <div className="bg-white border border-gray-200 p-6 sm:p-8 rounded-2xl shadow-sm">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Kle Prive (Secret Key)</label>
-          <div className="flex items-center justify-between bg-slate-50 border border-gray-200 p-4 rounded-xl">
-            <code className="font-mono text-sm md:text-base text-indigo-600 break-all select-all font-semibold">
-              {merchant?.api_key}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Kle Prive (Secret Key)</label>
+            <button
+              onClick={handleRotateApiKey}
+              disabled={rotatingKey}
+              className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
+            >
+              {rotatingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+              Rotate kle
+            </button>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 p-4 rounded-xl">
+            <code className="flex-1 font-mono text-sm md:text-base text-indigo-600 break-all font-semibold">
+              {showApiKey && revealedApiKey ? revealedApiKey : (merchant?.api_key_masked || maskApiKey(merchant?.api_key_prefix))}
             </code>
-            <button 
-              onClick={() => handleCopy(merchant?.api_key, 'api')} 
-              className="ml-4 p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
-              title="Kopye Kle a"
+            <button
+              type="button"
+              onClick={() => {
+                if (!revealedApiKey) {
+                  alert('Kle konplè a pa estoke sou sèvè a (hash sèlman). Klike "Rotate kle" pou jwenn yon nouvo kle.');
+                  return;
+                }
+                setShowApiKey(!showApiKey);
+              }}
+              className="p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
+              title={showApiKey ? 'Kache kle a' : 'Montre kle a'}
+            >
+              {showApiKey ? <EyeOff className="w-5 h-5 text-slate-500" /> : <Eye className="w-5 h-5 text-slate-400" />}
+            </button>
+            <button
+              onClick={() => {
+                if (!revealedApiKey) {
+                  alert('Rotate kle a pou kopye yon nouvo kle.');
+                  return;
+                }
+                handleCopy(revealedApiKey, 'api');
+              }}
+              className="p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
+              title="Kopye kle a"
             >
               {copiedKey === 'api' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5 text-slate-400 hover:text-indigo-600" />}
             </button>
@@ -357,7 +422,7 @@ echo $response;
             <div>
               <p className="text-xs font-bold uppercase tracking-wider mb-1">ATANSYON</p>
               <p className="text-sm font-medium leading-relaxed">
-                Kle sa a pèmèt trete tranzaksyon reyèl. Kenbe l an sekirite epi pa janm pataje l nan kòd piblik (tankou GitHub oswa nan kòd Frontend lan).
+                Kle API a estoke <strong>hash</strong> nan baz done a. Ou wè kle konplè a sèlman yon sèl fwa apre jenere/rotate. Pa mete l nan kòd frontend oswa GitHub.
               </p>
             </div>
           </div>

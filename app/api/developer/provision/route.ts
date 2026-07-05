@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
+import { maskApiKey } from '@/lib/security/api-key';
 
 export async function POST() {
   try {
@@ -11,46 +12,32 @@ export async function POST() {
       return NextResponse.json({ error: 'Ou dwe konekte.' }, { status: 401 });
     }
 
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { data: profile, error: profileErr } = await supabaseSession
+    const loadProfile = async (client: ReturnType<typeof createSupabaseAdminClient>) =>
+      client
         .from('profiles')
-        .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret')
+        .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, webhook_secret')
         .eq('id', user.id)
         .single();
 
-      if (profileErr || !profile) {
+    let profile;
+    let supabaseWriter = createSupabaseAdminClient();
+
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { data, error } = await loadProfile(supabaseWriter);
+      if (error || !data) {
         return NextResponse.json({ error: 'Pwofil pa jwenn.' }, { status: 404 });
       }
-
-      const result = await ensureMerchantApiCredentials(supabaseSession, profile);
-      if (!result.eligibility.eligible) {
-        return NextResponse.json(
-          { error: 'Kont ou poko elijib.', eligibility: result.eligibility },
-          { status: 403 }
-        );
+      profile = data;
+    } else {
+      const { data, error } = await loadProfile(supabaseSession as unknown as ReturnType<typeof createSupabaseAdminClient>);
+      if (error || !data) {
+        return NextResponse.json({ error: 'Pwofil pa jwenn.' }, { status: 404 });
       }
-
-      return NextResponse.json({
-        api_key: result.api_key,
-        is_merchant: result.is_merchant,
-        webhook_secret: result.webhook_secret,
-        provisioned: result.provisioned,
-        eligibility: result.eligibility,
-      });
+      profile = data;
+      supabaseWriter = supabaseSession as unknown as ReturnType<typeof createSupabaseAdminClient>;
     }
 
-    const supabaseAdmin = createSupabaseAdminClient();
-    const { data: profile, error: profileErr } = await supabaseAdmin
-      .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret')
-      .eq('id', user.id)
-      .single();
-
-    if (profileErr || !profile) {
-      return NextResponse.json({ error: 'Pwofil pa jwenn.' }, { status: 404 });
-    }
-
-    const result = await ensureMerchantApiCredentials(supabaseAdmin, profile);
+    const result = await ensureMerchantApiCredentials(supabaseWriter, profile);
 
     if (!result.eligibility.eligible) {
       return NextResponse.json(
@@ -61,6 +48,9 @@ export async function POST() {
 
     return NextResponse.json({
       api_key: result.api_key,
+      api_key_prefix: result.api_key_prefix,
+      api_key_masked: maskApiKey(result.api_key_prefix),
+      revealed_once: !!result.api_key,
       is_merchant: result.is_merchant,
       webhook_secret: result.webhook_secret,
       provisioned: result.provisioned,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 
 export async function POST(req: Request) {
   try {
@@ -26,13 +27,9 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     );
 
-    const { data: merchant, error: merchantErr } = await supabaseAdmin
-      .from('profiles')
-      .select('id, is_merchant, account_status')
-      .eq('api_key', apiKey)
-      .single();
+    const merchant = await authenticateMerchantApiKey(supabaseAdmin, apiKey);
 
-    if (merchantErr || !merchant || !merchant.is_merchant) {
+    if (!merchant || !merchant.is_merchant) {
       return NextResponse.json({ error: 'Kle API sa a pa valab oswa kont lan pa otorize.' }, { status: 403 });
     }
     if (merchant.account_status === 'suspended') {

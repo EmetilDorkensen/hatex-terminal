@@ -1,4 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  buildStoredApiKeyFields,
+  generateApiKeyToken,
+  generateWebhookSecretToken,
+  profileHasApiKey,
+} from '@/lib/security/api-key';
 
 // ============================================================================
 // ELIJIBILITE & PWOVIZYON KREDANSYÈL API MACHANN
@@ -7,10 +13,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 //   1. KYC kont kliyan an APWOUVE nan tab profiles (kyc_status === 'approved')
 //   2. Li peye frè aktivasyon kat la (is_card_activated === true)
 //
-// Lè yon kont elijib men l poko gen kredansyèl (api_key / is_merchant /
-// webhook_secret), `ensureMerchantApiCredentials` jenere yo otomatikman epi
-// mete yo ajou nan baz done a. Sa a fèmen twou pwovizyone a nèt: pa gen okenn
-// entèvansyon manyèl nesesè.
+// Kle API yo estoke HASH nan baz done (api_key_hash + api_key_prefix).
+// Kle an klè retounen SÈLMAN yon sèl fwa lè li fèk jenere oswa lè li rotate.
 // ============================================================================
 
 export type MerchantEligibility = {
@@ -20,10 +24,13 @@ export type MerchantEligibility = {
 };
 
 export type ProvisionResult = {
+  /** Kle an klè — sèlman lè fèk jenere/rotate. */
   api_key: string | null;
+  api_key_prefix: string | null;
   is_merchant: boolean;
   webhook_secret: string | null;
   provisioned: boolean;
+  rotated: boolean;
   eligibility: MerchantEligibility;
 };
 
@@ -32,6 +39,8 @@ type MerchantProfileLike = {
   kyc_status?: string | null;
   is_card_activated?: boolean | null;
   api_key?: string | null;
+  api_key_hash?: string | null;
+  api_key_prefix?: string | null;
   is_merchant?: boolean | null;
   webhook_secret?: string | null;
 };
@@ -51,13 +60,6 @@ export function checkMerchantEligibility(profile: MerchantProfileLike | null | u
   };
 }
 
-// Jenerasyon token izomòfik (mache ni nan navigatè ni sou sèvè Node 19+).
-function randomToken(prefix: string): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return prefix + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 /**
  * Asire yon kont elijib gen tout kredansyèl API li yo. Si kont lan poko elijib,
  * pa jenere anyen. Si l elijib men manke youn nan kredansyèl yo, konplete sa ki
@@ -66,47 +68,63 @@ function randomToken(prefix: string): string {
  */
 export async function ensureMerchantApiCredentials(
   supabase: SupabaseClient,
-  profile: MerchantProfileLike
+  profile: MerchantProfileLike,
+  options?: { rotateApiKey?: boolean }
 ): Promise<ProvisionResult> {
   const eligibility = checkMerchantEligibility(profile);
 
+  const baseResult = {
+    api_key: null as string | null,
+    api_key_prefix: profile.api_key_prefix || null,
+    is_merchant: profile.is_merchant === true,
+    webhook_secret: profile.webhook_secret || null,
+    provisioned: false,
+    rotated: false,
+    eligibility,
+  };
+
   if (!eligibility.eligible) {
-    return {
-      api_key: profile.api_key || null,
-      is_merchant: profile.is_merchant === true,
-      webhook_secret: profile.webhook_secret || null,
-      provisioned: false,
-      eligibility,
-    };
+    return baseResult;
   }
 
-  const needsProvision = !profile.api_key || !profile.is_merchant || !profile.webhook_secret;
+  const hasApiKey = profileHasApiKey(profile);
+  const rotate = options?.rotateApiKey === true;
+  const needsNewApiKey = rotate || !hasApiKey;
+  const needsWebhook = !profile.webhook_secret;
+  const needsMerchantFlag = !profile.is_merchant;
 
-  const apiKey = profile.api_key || randomToken('hx_live_');
-  const webhookSecret = profile.webhook_secret || randomToken('whsec_');
+  if (!needsNewApiKey && !needsWebhook && !needsMerchantFlag) {
+    return baseResult;
+  }
 
-  if (needsProvision) {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ api_key: apiKey, is_merchant: true, webhook_secret: webhookSecret })
-      .eq('id', profile.id);
+  const plainApiKey = needsNewApiKey ? generateApiKeyToken() : null;
+  const webhookSecret = needsWebhook ? generateWebhookSecretToken() : profile.webhook_secret!;
 
-    if (error) {
-      return {
-        api_key: profile.api_key || null,
-        is_merchant: profile.is_merchant === true,
-        webhook_secret: profile.webhook_secret || null,
-        provisioned: false,
-        eligibility,
-      };
-    }
+  const updatePayload: Record<string, unknown> = {
+    is_merchant: true,
+  };
+
+  if (needsWebhook) {
+    updatePayload.webhook_secret = webhookSecret;
+  }
+
+  if (plainApiKey) {
+    Object.assign(updatePayload, buildStoredApiKeyFields(plainApiKey));
+  }
+
+  const { error } = await supabase.from('profiles').update(updatePayload).eq('id', profile.id);
+
+  if (error) {
+    return baseResult;
   }
 
   return {
-    api_key: apiKey,
+    api_key: plainApiKey,
+    api_key_prefix: plainApiKey ? plainApiKey.slice(0, 12) : profile.api_key_prefix || null,
     is_merchant: true,
     webhook_secret: webhookSecret,
-    provisioned: needsProvision,
+    provisioned: needsNewApiKey || needsWebhook || needsMerchantFlag,
+    rotated: rotate && !!plainApiKey,
     eligibility,
   };
 }

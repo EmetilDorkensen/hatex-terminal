@@ -9,6 +9,7 @@ import { saveAs } from 'file-saver';
 import QRCode from 'qrcode';
 import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { ensureMerchantApiCredentials, canAccessTerminal } from '@/lib/security/merchant-provisioning';
+import { profileHasApiKey, maskApiKey } from '@/lib/security/api-key';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -21,7 +22,7 @@ import {
   DownloadCloud, UploadCloud, Key, Shield, Link,
   Smartphone, Monitor, Server, Cloud, DownloadIcon,
   ShoppingBag, PenTool, Chrome, Wifi, Image, QrCode,
-  Loader2 // 👈 MEN KOTE MWEN KORIJE ERÈ A
+  Loader2, RotateCw
 } from 'lucide-react';
 
 // Konpozan QR (itilize qrcode pou desine canvas)
@@ -68,7 +69,8 @@ export default function TerminalPage() {
   const [description, setDescription] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [copied, setCopied] = useState(false);
-  const [copiedApiKey, setCopiedApiKey] = useState(false);
+  const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
+  const [rotatingApiKey, setRotatingApiKey] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [showVideo, setShowVideo] = useState(false);
   
@@ -161,17 +163,21 @@ export default function TerminalPage() {
         if (res.ok) {
           result = {
             api_key: payload.api_key,
+            api_key_prefix: payload.api_key_prefix ?? null,
             is_merchant: payload.is_merchant,
             webhook_secret: payload.webhook_secret,
             provisioned: payload.provisioned,
+            rotated: false,
             eligibility: payload.eligibility,
           };
         } else if (payload.eligibility) {
           result = {
             api_key: profile.api_key || null,
+            api_key_prefix: profile.api_key_prefix || null,
             is_merchant: profile.is_merchant === true,
             webhook_secret: profile.webhook_secret || null,
             provisioned: false,
+            rotated: false,
             eligibility: payload.eligibility,
           };
         }
@@ -194,10 +200,11 @@ export default function TerminalPage() {
 
       setProfile({
         ...profile,
-        api_key: result.api_key,
+        api_key_prefix: result.api_key_prefix || profile.api_key_prefix,
         is_merchant: true,
         webhook_secret: result.webhook_secret,
       });
+      if (result.api_key) setRevealedApiKey(result.api_key);
       return result.api_key;
     } catch (error) {
       console.error('Error generating API key:', error);
@@ -206,6 +213,49 @@ export default function TerminalPage() {
       setGeneratingApiKey(false);
     }
   }, [profile, supabase]);
+
+  const handleRotateApiKey = useCallback(async () => {
+    if (!window.confirm('Ou pral jenere yon NOUVO kle API. Ansyen kle a pa mache ankò. Kontinye?')) return null;
+    setRotatingApiKey(true);
+    try {
+      const res = await fetch('/api/developer/api-key/rotate', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erè');
+      setRevealedApiKey(data.api_key);
+      setProfile((prev: any) =>
+        prev
+          ? { ...prev, api_key: null, api_key_prefix: data.api_key_prefix, api_key_hash: 'set' }
+          : prev
+      );
+      return data.api_key as string;
+    } catch (err: any) {
+      alert(err.message || 'Pa kapab jenere nouvo kle a.');
+      return null;
+    } finally {
+      setRotatingApiKey(false);
+    }
+  }, []);
+
+  /** Kle an klè pou plugin/snippet — sèlman nan sesyon, oswa apre rotate/provision. */
+  const ensurePlainApiKey = useCallback(async (): Promise<string | null> => {
+    if (revealedApiKey) return revealedApiKey;
+    if (profile?.api_key) {
+      setRevealedApiKey(profile.api_key);
+      return profile.api_key;
+    }
+    if (!profileHasApiKey(profile)) {
+      return generateApiKey();
+    }
+    const ok = window.confirm(
+      'Kle API konplè a pa disponib (estoke hash sou sèvè). Pou telechaje plugin la, ou dwe jenere yon nouvo kle — ansyen kle a ap sispann mache. Kontinye?'
+    );
+    if (!ok) return null;
+    return handleRotateApiKey();
+  }, [revealedApiKey, profile, generateApiKey, handleRotateApiKey]);
+
+  const displayedApiKey =
+    revealedApiKey || maskApiKey(profile?.api_key_prefix) || `${'hx_live_'}${'•'.repeat(24)}`;
+  const snippetApiKey = revealedApiKey || 'hx_live_KLE_OU_LA';
 
   // ============================================================
   // FONKSYON POU TELECHAJE LOGO
@@ -328,26 +378,44 @@ export default function TerminalPage() {
         // 🔐 Oto-pwovizyone kredansyèl API SÈLMAN si kont lan elijib
         // (KYC apwouve E kat aktive). Helper la konplete sa ki manke san
         // regenere api_key ki egziste deja (pou pa kraze entegrasyon k ap mache).
-        if (!hasGeneratedKey && (!prof.api_key || !prof.is_merchant || !prof.webhook_secret)) {
+        if (!hasGeneratedKey && (!profileHasApiKey(prof) || !prof.is_merchant || !prof.webhook_secret)) {
           hasGeneratedKey = true;
           try {
             const provRes = await fetch('/api/developer/provision', { method: 'POST' });
             if (provRes.ok) {
               const result = await provRes.json();
               if (isMounted) {
-                setProfile({ ...prof, api_key: result.api_key, is_merchant: true, webhook_secret: result.webhook_secret });
+                setProfile({
+                  ...prof,
+                  api_key_prefix: result.api_key_prefix ?? prof.api_key_prefix,
+                  is_merchant: true,
+                  webhook_secret: result.webhook_secret,
+                });
+                if (result.api_key) setRevealedApiKey(result.api_key);
               }
             } else {
               const clientProv = await ensureMerchantApiCredentials(supabase, prof);
               if (clientProv.provisioned && isMounted) {
-                setProfile({ ...prof, api_key: clientProv.api_key, is_merchant: true, webhook_secret: clientProv.webhook_secret });
+                setProfile({
+                  ...prof,
+                  api_key_prefix: clientProv.api_key_prefix ?? prof.api_key_prefix,
+                  is_merchant: true,
+                  webhook_secret: clientProv.webhook_secret,
+                });
+                if (clientProv.api_key) setRevealedApiKey(clientProv.api_key);
               }
             }
           } catch {
             try {
               const clientProv = await ensureMerchantApiCredentials(supabase, prof);
               if (clientProv.provisioned && isMounted) {
-                setProfile({ ...prof, api_key: clientProv.api_key, is_merchant: true, webhook_secret: clientProv.webhook_secret });
+                setProfile({
+                  ...prof,
+                  api_key_prefix: clientProv.api_key_prefix ?? prof.api_key_prefix,
+                  is_merchant: true,
+                  webhook_secret: clientProv.webhook_secret,
+                });
+                if (clientProv.api_key) setRevealedApiKey(clientProv.api_key);
               }
             } catch {
               /* pwovizyone ap eseye ankò lè itilizatè a klike API */
@@ -550,7 +618,8 @@ export default function TerminalPage() {
   const generateHostingerPlugin = async () => {
     if (!profile?.id) return;
     if (profile?.kyc_status !== 'approved') return alert('KYC ou poko apwouve. Tanpri tann apwobasyon an.');
-    if (!profile?.api_key) return alert('Kle API poko jenere. Tanpri reyese answit.');
+    const apiKey = await ensurePlainApiKey();
+    if (!apiKey) return;
 
     setDownloadingPlugin('hostinger');
     try {
@@ -582,7 +651,7 @@ if (\$_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 header('Content-Type: application/json');
 
-\$HATEX_API_KEY = '${profile.api_key}';
+\$HATEX_API_KEY = '${apiKey}';
 \$HATEX_API_URL = 'https://hatexcard.com/api/public/payments';
 
 \$amount = isset(\$_POST['amount']) ? floatval(\$_POST['amount']) : 0;
@@ -724,7 +793,8 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
     if (profile?.kyc_status !== 'approved') return alert('Ou dwe pase KYC pou w itilize Plugin sa a.');
-    if (!profile?.api_key) return alert('Kle API w la manke.');
+    const apiKey = await ensurePlainApiKey();
+    if (!apiKey) return;
 
     setDownloadingPlugin('woocommerce');
     
@@ -771,7 +841,7 @@ function hatexcard_init_direct_gateway() {
             \$this->description = \$this->get_option('description');
             \$this->usd_rate = \$this->get_option('usd_rate', '${defaultUsdRate}');
             
-            \$this->merchant_api_key = '${profile.api_key}'; 
+            \$this->merchant_api_key = '${apiKey}'; 
             \$this->api_direct_url = 'https://hatexcard.com/api/public/payments';
 
             add_action('woocommerce_update_options_payment_gateways_' . \$this->id, array(\$this, 'process_admin_options'));
@@ -1528,7 +1598,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vèsyon: 3.0.0</div>
                 <button 
                   onClick={generateWooCommercePlugin} 
-                  disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profile?.api_key} 
+                  disabled={downloadingPlugin === 'woocommerce' || profile?.kyc_status !== 'approved' || !profileHasApiKey(profile)} 
                   className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-indigo-700 disabled:bg-indigo-300 flex items-center justify-center gap-2 shadow-sm transition-colors"
                 >
                   {downloadingPlugin === 'woocommerce' ? <RefreshCw size={16} className="animate-spin" /> : <DownloadIcon size={16} />}
@@ -1552,7 +1622,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vèsyon: 2.0.0</div>
                 <button 
                   onClick={generateHostingerPlugin} 
-                  disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profile?.api_key} 
+                  disabled={downloadingPlugin === 'hostinger' || profile?.kyc_status !== 'approved' || !profileHasApiKey(profile)} 
                   className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-indigo-700 disabled:bg-indigo-300 flex items-center justify-center gap-2 shadow-sm transition-colors"
                 >
                   {downloadingPlugin === 'hostinger' ? <RefreshCw size={16} className="animate-spin" /> : <DownloadIcon size={16} />}
@@ -1568,27 +1638,43 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
             <p className="text-slate-500 text-sm mb-8">Entegre HatexCard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
 
             <div className="bg-slate-50 border border-gray-200 p-6 rounded-2xl mb-8">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Kle Prive (Secret Key)</label>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Kle Prive (Secret Key)</label>
+                <button
+                  type="button"
+                  onClick={handleRotateApiKey}
+                  disabled={rotatingApiKey || !profileHasApiKey(profile)}
+                  className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
+                >
+                  {rotatingApiKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                  Rotate kle
+                </button>
+              </div>
               <div className="flex flex-col sm:flex-row items-center gap-3">
                 <input
                   type="text"
                   readOnly
-                  value={profile?.api_key || "Y ap chaje kle a..."}
+                  value={displayedApiKey}
                   className="flex-1 w-full bg-white border border-gray-300 text-indigo-700 text-sm rounded-xl p-3.5 font-mono outline-none shadow-sm font-semibold"
                 />
                 <button
                   onClick={() => {
-                    if (profile?.api_key) {
-                      navigator.clipboard.writeText(profile.api_key);
-                      setCopiedKey(true);
-                      setTimeout(() => setCopiedKey(false), 2000);
+                    if (!revealedApiKey) {
+                      alert('Kle konplè a pa estoke sou sèvè a. Klike "Rotate kle" pou jwenn yon nouvo kle, oswa ale sou /developer.');
+                      return;
                     }
+                    navigator.clipboard.writeText(revealedApiKey);
+                    setCopiedKey(true);
+                    setTimeout(() => setCopiedKey(false), 2000);
                   }}
                   className="w-full sm:w-auto bg-slate-900 hover:bg-indigo-600 text-white px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2"
                 >
                   {copiedKey ? <><CheckCircle2 size={16}/> Kopye</> : <><Copy size={16}/> Kopye Kle a</>}
                 </button>
               </div>
+              <p className="text-xs text-amber-700 mt-3 font-medium">
+                Kle a estoke hash nan baz done. Ou wè kle konplè a sèlman yon fwa apre provision/rotate nan sesyon sa a.
+              </p>
             </div>
 
             <div>
@@ -1597,7 +1683,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
 <code>{`const response = await fetch('https://hatexcard.com/api/public/payments', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer ${profile?.api_key || 'KLE_W_LA'}',
+    'Authorization': 'Bearer ${snippetApiKey}',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkBalanceCap } from '@/lib/security/spending-limits';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
+import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 
 export async function POST(req: Request) {
   try {
@@ -23,11 +24,7 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const apiKey = authHeader.split(' ')[1].trim();
-      const { data: keyMatch } = await supabaseAdmin
-        .from('profiles')
-        .select('id, is_merchant')
-        .eq('api_key', apiKey)
-        .maybeSingle();
+      const keyMatch = await authenticateMerchantApiKey(supabaseAdmin, apiKey);
       if (keyMatch?.is_merchant) merchant_id = keyMatch.id;
     }
 

@@ -49,10 +49,6 @@ export async function POST(request: Request) {
 
     const pinOk = await verifyWalletPin(profile, String(pin));
 
-    // #region agent log
-    fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',location:'api/auth/pin-login/route.ts:verify',message:'PIN login attempt',data:{emailDomain:cleanEmail.split('@')[1],pinOk,hasHash:!!profile.pin_code_hash,attempts:profile.failed_pin_attempts},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
-
     if (!pinOk) {
       const failure = await buildPinFailureUpdate(profile.failed_pin_attempts || 0);
       await supabase.from('profiles').update(failure.update).eq('id', profile.id);

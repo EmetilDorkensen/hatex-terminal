@@ -89,10 +89,6 @@ export async function POST(request: Request) {
 
       const pinOk = await verifyTransactionPin(profile, String(pin));
 
-      // #region agent log
-      fetch('http://127.0.0.1:7300/ingest/e9f1fe4c-b3fd-4eaf-84be-ae95b4331381',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'138d33'},body:JSON.stringify({sessionId:'138d33',location:'api/auth/pin/route.ts:verify',message:'Transaction PIN verify',data:{userId:user.id.slice(0,8),pinOk,hasHash:!!profile.transaction_pin_hash},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
-
       if (!pinOk) {
         const failure = await buildPinFailureUpdate(profile.failed_pin_attempts || 0);
         await supabase.from('profiles').update(failure.update).eq('id', user.id);

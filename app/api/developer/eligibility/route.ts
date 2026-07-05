@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
+import { maskApiKey, profileHasApiKey } from '@/lib/security/api-key';
 
 export async function GET() {
   try {
@@ -13,7 +14,7 @@ export async function GET() {
 
     const clientRes = await supabaseSession
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret, card_number')
+      .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number')
       .eq('id', user.id)
       .single();
 
@@ -25,7 +26,7 @@ export async function GET() {
         const supabaseAdmin = createSupabaseAdminClient();
         const adminRes = await supabaseAdmin
           .from('profiles')
-          .select('id, kyc_status, is_card_activated, is_merchant, api_key, webhook_secret, card_number')
+          .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number')
           .eq('id', user.id)
           .single();
         adminProfile = adminRes.data;
@@ -49,8 +50,9 @@ export async function GET() {
         kyc_status: authoritative.kyc_status,
         is_card_activated: authoritative.is_card_activated,
         is_merchant: authoritative.is_merchant,
-        api_key: authoritative.api_key,
-        webhook_secret: authoritative.webhook_secret,
+        has_api_key: profileHasApiKey(authoritative),
+        api_key_prefix: authoritative.api_key_prefix || null,
+        api_key_masked: maskApiKey(authoritative.api_key_prefix),
         has_card: !!authoritative.card_number,
       },
       source: adminProfile ? 'admin' : 'client',

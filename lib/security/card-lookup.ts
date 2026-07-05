@@ -9,6 +9,7 @@ import {
 type CardProfile = {
   id: string;
   wallet_balance?: number | null;
+  card_balance?: number | null;
   full_name?: string | null;
   account_status?: string | null;
   account_type?: string | null;
@@ -54,7 +55,7 @@ export async function findProfileByCard(
 
   const { data: hashedProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, full_name, account_status, account_type, exp_date, cvv_hash, card_number_hash, card_last4')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, exp_date, cvv_hash, card_number_hash, card_last4')
     .eq('card_number_hash', cardHash)
     .maybeSingle();
 
@@ -69,7 +70,7 @@ export async function findProfileByCard(
 
   const { data: legacyProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, full_name, account_status, account_type, exp_date, card_number, cvv')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, exp_date, card_number, cvv')
     .eq('card_number', cleanCard)
     .maybeSingle();
 
@@ -96,7 +97,7 @@ export async function findProfileByCardSimple(
 
   const { data: hashedProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, full_name, account_status, account_type, cvv_hash')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, cvv_hash')
     .eq('card_number_hash', cardHash)
     .maybeSingle();
 
@@ -108,7 +109,7 @@ export async function findProfileByCardSimple(
 
   const { data: legacyProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, full_name, account_status, account_type, card_number, cvv')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, card_number, cvv')
     .eq('card_number', cleanCard)
     .eq('cvv', String(cvv))
     .maybeSingle();
