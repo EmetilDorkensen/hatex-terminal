@@ -80,13 +80,19 @@ export default function AdminSuperPage() {
                 body: JSON.stringify({ password: adminPassword }),
             });
 
+            const data = await verifyRes.json().catch(() => ({}));
+
             if (verifyRes.ok) {
                 setAccessGranted(true);
                 raleDone();
             } else if (verifyRes.status === 429) {
-                setUnlockError("Erè 429: Sekirite Vercel bloke w paske w eseye twòp. Tann 1 minit.");
+                setUnlockError("Erè 429: Twòp tantativ. Tann kèk minit anvan w eseye ankò.");
+            } else if (verifyRes.status === 403) {
+                setUnlockError(data.message || "Kont ou konekte a pa gen dwa admin.");
+            } else if (verifyRes.status === 500) {
+                setUnlockError(data.message || "ADMIN_GATE_PASSWORD pa konfigire sou sèvè a. Kontakte devlopè a.");
             } else {
-                setUnlockError("Modpas la pa bon!");
+                setUnlockError(data.message || "Modpas la pa bon!");
             }
         } catch (err) {
             setUnlockError("Erè koneksyon. Tcheke entènèt ou.");

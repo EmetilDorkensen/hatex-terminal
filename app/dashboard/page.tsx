@@ -387,11 +387,19 @@ export default function Dashboard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password: pass }),
         });
-        
-        if (verifyRes.ok) { 
-            window.location.href = "/admin"; 
-        } else { 
-            alert("Modpas la pa bon! Ou pa gen otorizasyon."); 
+
+        const data = await verifyRes.json().catch(() => ({}));
+
+        if (verifyRes.ok) {
+            window.location.href = "/admin";
+        } else if (verifyRes.status === 403) {
+            alert(data.message || "Kont ou konekte a pa gen dwa admin.");
+        } else if (verifyRes.status === 500) {
+            alert(data.message || "ADMIN_GATE_PASSWORD pa konfigire sou sèvè a. Kontakte devlopè a.");
+        } else if (verifyRes.status === 429) {
+            alert("Twòp tantativ. Tann kèk minit anvan w eseye ankò.");
+        } else {
+            alert(data.message || "Modpas la pa bon!");
         }
     } catch (e) {
         alert("Erè nan sistèm nan. Tanpri eseye ankò.");

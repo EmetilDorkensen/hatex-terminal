@@ -32,8 +32,14 @@ export async function POST(request: Request) {
 
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) {
-    return NextResponse.json({ success: false, message: 'Aksè refize.' }, { status: 403 });
+  if (!user) {
+    return NextResponse.json({ success: false, message: 'Ou pa konekte. Konekte sou /login anvan.' }, { status: 403 });
+  }
+  if (user.email !== ADMIN_EMAIL) {
+    return NextResponse.json(
+      { success: false, message: `Kont sa a (${user.email}) pa gen dwa admin. Konekte ak ${ADMIN_EMAIL}.` },
+      { status: 403 }
+    );
   }
 
   const { password } = await request.json();
