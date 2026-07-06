@@ -77,12 +77,15 @@ export async function POST(request: Request) {
 
   const faceResult = await compareIdSelfie(idFront, selfie);
   if (!faceResult.success) {
+    const isConfig = faceResult.error?.includes('FACEPLUSPLUS') || faceResult.error?.includes('konfigire');
     return NextResponse.json(
       {
-        error: faceResult.error || 'Konpare figi echwe.',
+        error: isConfig
+          ? 'Verifikasyon figi pa disponib sou sèvè a. Admin dwe mete FACEPLUSPLUS_API_KEY ak FACEPLUSPLUS_API_SECRET nan Vercel.'
+          : faceResult.error || 'Konpare figi echwe.',
         face_confidence: faceResult.confidence ?? null,
       },
-      { status: 400 }
+      { status: isConfig ? 503 : 400 }
     );
   }
 
@@ -138,8 +141,15 @@ export async function POST(request: Request) {
       backPath = `${user.id}/back_${timestamp}.jpg`;
       await uploadFile(backPath, idBack);
     }
-  } catch {
-    return NextResponse.json({ error: 'Pa t kapab sove dokiman yo. Eseye ankò.' }, { status: 500 });
+  } catch (uploadErr: unknown) {
+    const msg = uploadErr instanceof Error ? uploadErr.message : '';
+    const bucketHint = msg.includes('Bucket not found') || msg.includes('bucket')
+      ? ' Bucket kyc-documents pa kreye — kouri migration 20260725 nan Supabase SQL Editor.'
+      : '';
+    return NextResponse.json(
+      { error: `Pa t kapab sove dokiman yo.${bucketHint} Eseye ankò.` },
+      { status: 500 }
+    );
   }
 
   const { error: updateError } = await admin
@@ -159,7 +169,13 @@ export async function POST(request: Request) {
     .eq('id', user.id);
 
   if (updateError) {
-    return NextResponse.json({ error: 'Pa t kapab mete ajou pwofil la.' }, { status: 500 });
+    const colHint = updateError.message?.includes('kyc_doc_type') || updateError.message?.includes('column')
+      ? ' Kouri migration 20260725_kyc_hardening.sql nan Supabase.'
+      : '';
+    return NextResponse.json(
+      { error: `Pa t kapab mete ajou pwofil la.${colHint}` },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({

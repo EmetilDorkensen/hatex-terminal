@@ -18,7 +18,20 @@ export type FaceCompareResult = {
 };
 
 export async function compareIdSelfie(idFile: File, selfieFile: File): Promise<FaceCompareResult> {
-  const { apiKey, apiSecret } = getFaceCredentials();
+  let apiKey: string;
+  let apiSecret: string;
+  try {
+    ({ apiKey, apiSecret } = getFaceCredentials());
+  } catch (e) {
+    return {
+      success: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : 'FACEPLUSPLUS_API_KEY / FACEPLUSPLUS_API_SECRET pa konfigire sou Vercel.',
+    };
+  }
+
   const body = new FormData();
   body.append('api_key', apiKey);
   body.append('api_secret', apiSecret);
@@ -49,39 +62,43 @@ export type OcrIdResult = {
   rawName?: string;
 };
 
-/** Ekstrè nimewo ID soti nan foto devan dokiman an (Face++ OCR). */
+/** Ekstrè nimewo ID — pa bloke soumisyon si OCR echwe. */
 export async function extractIdNumberFromImage(idFile: File): Promise<OcrIdResult> {
-  const { apiKey, apiSecret } = getFaceCredentials();
-  const body = new FormData();
-  body.append('api_key', apiKey);
-  body.append('api_secret', apiSecret);
-  body.append('image', idFile);
+  try {
+    const { apiKey, apiSecret } = getFaceCredentials();
+    const body = new FormData();
+    body.append('api_key', apiKey);
+    body.append('api_secret', apiSecret);
+    body.append('image', idFile);
 
-  const res = await fetch(OCR_ID_URL, { method: 'POST', body });
-  const result = await res.json().catch(() => ({}));
+    const res = await fetch(OCR_ID_URL, { method: 'POST', body });
+    const result = await res.json().catch(() => ({}));
 
-  if (result.error_message) {
+    if (result.error_message) {
+      return { idNumber: null };
+    }
+
+    const cards = result.cards || result.results || [];
+    const first = Array.isArray(cards) ? cards[0] : result;
+    const fields = first?.fields || first || {};
+
+    const candidates = [
+      fields.id_card_number?.value,
+      fields.card_number?.value,
+      fields.number?.value,
+      fields.passport_number?.value,
+      fields.license_number?.value,
+      result.id_card_number,
+      result.card_number,
+    ];
+
+    const idNumber = candidates.find((v) => typeof v === 'string' && v.trim().length >= 4) || null;
+    const rawName = fields.name?.value || fields.full_name?.value || undefined;
+
+    return { idNumber: idNumber ? String(idNumber).trim() : null, rawName };
+  } catch {
     return { idNumber: null };
   }
-
-  const cards = result.cards || result.results || [];
-  const first = Array.isArray(cards) ? cards[0] : result;
-  const fields = first?.fields || first || {};
-
-  const candidates = [
-    fields.id_card_number?.value,
-    fields.card_number?.value,
-    fields.number?.value,
-    fields.passport_number?.value,
-    fields.license_number?.value,
-    result.id_card_number,
-    result.card_number,
-  ];
-
-  const idNumber = candidates.find((v) => typeof v === 'string' && v.trim().length >= 4) || null;
-  const rawName = fields.name?.value || fields.full_name?.value || undefined;
-
-  return { idNumber: idNumber ? String(idNumber).trim() : null, rawName };
 }
 
 export function isKycStoragePath(value: string | null | undefined): boolean {

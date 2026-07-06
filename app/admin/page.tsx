@@ -43,10 +43,11 @@ export default function AdminSuperPage() {
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
-    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0, antrepriz: 0, kat: 0 });
+    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0, antrepriz: 0, kat: 0, kyc: 0 });
     const [agentFeeHistory, setAgentFeeHistory] = useState<any[]>([]);
     const [enterpriseFeeHistory, setEnterpriseFeeHistory] = useState<any[]>([]);
     const [cardActivationFeeHistory, setCardActivationFeeHistory] = useState<any[]>([]);
+    const [kycFeeHistory, setKycFeeHistory] = useState<any[]>([]);
     const [unifiedFeeHistory, setUnifiedFeeHistory] = useState<any[]>([]);
     const [bizProfitWithdrawn, setBizProfitWithdrawn] = useState(0);
     const [bizProfitAvailable, setBizProfitAvailable] = useState(0);
@@ -308,9 +309,25 @@ export default function AdminSuperPage() {
             }));
             setCardActivationFeeHistory(enrichedCardHistory);
 
-            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee, antrepriz: totalEnterpriseFee, kat: totalCardFee });
+            const { data: kycFeeData } = await supabase
+                .from('transactions')
+                .select('id, user_id, amount, description, created_at')
+                .eq('type', 'KYC_FEE')
+                .eq('status', 'success')
+                .order('created_at', { ascending: false });
+
+            const totalKycFee = (kycFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
+
+            const enrichedKycHistory = (kycFeeData || []).slice(0, 25).map(f => ({
+                ...f,
+                clientName: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
+                clientEmail: profiles.find(u => u.id === f.user_id)?.email || '',
+            }));
+            setKycFeeHistory(enrichedKycHistory);
+
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee, antrepriz: totalEnterpriseFee, kat: totalCardFee, kyc: totalKycFee });
             
-            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalEnterpriseFee + totalCardFee;
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalEnterpriseFee + totalCardFee + totalKycFee;
             setTotalBiznisProfit(granTotalPwofi);
 
             const { data: bizWithdrawData } = await supabase
@@ -354,6 +371,11 @@ export default function AdminSuperPage() {
                 description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
             }));
 
+            const kycEntries = (kycFeeData || []).map((f: any) => ({
+                id: f.id, kalite: 'KYC', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
+                description: f.description || 'Frè KYC (kat enkli)', nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
+            }));
+
             const retreBankEntries = (bizWithdrawData || []).map((w: any) => ({
                 id: w.id,
                 kalite: 'Retrè Bank',
@@ -362,7 +384,7 @@ export default function AdminSuperPage() {
                 description: w.note || 'Retrè pwofi biznis nan bank',
             }));
 
-            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...retreBankEntries]
+            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...kycEntries, ...retreBankEntries]
                 .filter((entry) => entry.created_at)
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .slice(0, 60);
@@ -838,12 +860,12 @@ export default function AdminSuperPage() {
                                             <p className="font-bold text-emerald-800">{feesBreakdown.antrepriz.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Kat</p>
-                                            <p className="font-bold text-emerald-800">{feesBreakdown.kat.toLocaleString()}</p>
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè KYC</p>
+                                            <p className="font-bold text-emerald-800">{feesBreakdown.kyc.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt Frè (Dep/Ret/Tra)</p>
-                                            <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe).toLocaleString()}</p>
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt (Dep/Ret/Tra/Kat)</p>
+                                            <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe + feesBreakdown.kat).toLocaleString()}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -944,7 +966,41 @@ export default function AdminSuperPage() {
                                 </div>
                             </div>
 
-                            {/* ISTORIK FRÈ KAT AKTIVASYON — 520 HTG chak fwa yon kliyan aktive kat vityèl
+                            {/* ISTORIK FRÈ KYC — 1150 HTG (kat + verifikasyon enkli) */}
+                            <div className="bg-white border border-emerald-200 rounded-3xl shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-emerald-100 flex items-center justify-between bg-emerald-50/40">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-emerald-900">Istorik Frè KYC (Kès Global)</h3>
+                                        <p className="text-xs text-emerald-800/70 mt-1">Frè 1150 HTG (verifikasyon ID + kat vityèl enkli) — tout antre nan pwofi biznis la.</p>
+                                    </div>
+                                    <span className="text-[10px] font-bold uppercase bg-emerald-600 text-white px-3 py-1.5 rounded-lg">
+                                        Total: {feesBreakdown.kyc.toLocaleString()} HTG
+                                    </span>
+                                </div>
+                                <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
+                                    {kycFeeHistory.length === 0 ? (
+                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè KYC anrejistre pou kounye a.</p>
+                                    ) : (
+                                        kycFeeHistory.map(item => (
+                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                                        <ShieldCheck size={18} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.clientName}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ISTORIK FRÈ KAT AKTIVASYON — 520 HTG (ansyen modèl, anvan KYC 1150)
                                 li a. Frè sa a te envizib nan Kès Global la anvan, kounye a li konte
                                 epi li gen pwòp istorik li tou (menm modèl ak Ajan/Antrepriz). */}
                             <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
@@ -1005,6 +1061,7 @@ export default function AdminSuperPage() {
                                                         item.kalite === 'Ajan' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
                                                         item.kalite === 'Antrepriz' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
                                                         item.kalite === 'Kat' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
+                                                        item.kalite === 'KYC' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                                                         item.kalite === 'Depo' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
                                                         item.kalite === 'Retrè' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                                                         item.kalite === 'Retrè Bank' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
