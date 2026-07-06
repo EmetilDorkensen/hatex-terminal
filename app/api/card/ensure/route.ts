@@ -43,6 +43,7 @@ export async function POST() {
         card_number: newCardNum,
         cvv: newCvv,
         exp_date: newExp,
+        is_card_activated: true,
         ...securityFields,
       })
       .eq('id', user.id);

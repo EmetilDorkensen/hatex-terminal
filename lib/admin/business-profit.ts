@@ -17,6 +17,7 @@ export async function calculateGrossBusinessProfit(
     { data: feeData },
     { data: entFeeData },
     { data: cardFeeData },
+    { data: kycFeeData },
   ] = await Promise.all([
     supabase.from('deposits').select('fee').eq('status', 'approved'),
     supabase.from('withdrawals').select('fee').eq('status', 'completed'),
@@ -40,6 +41,11 @@ export async function calculateGrossBusinessProfit(
       .from('transactions')
       .select('amount')
       .eq('type', 'CARD_ACTIVATION')
+      .eq('status', 'success'),
+    supabase
+      .from('transactions')
+      .select('amount')
+      .eq('type', 'KYC_FEE')
       .eq('status', 'success'),
   ]);
 
@@ -65,6 +71,10 @@ export async function calculateGrossBusinessProfit(
     (acc, f) => acc + Math.abs(Number(f.amount || 0)),
     0
   );
+  const totalKycFee = (kycFeeData || []).reduce(
+    (acc, f) => acc + Math.abs(Number(f.amount || 0)),
+    0
+  );
 
   return (
     totalDepoFee +
@@ -72,7 +82,8 @@ export async function calculateGrossBusinessProfit(
     totalTransfeFee +
     totalAgentFee +
     totalEnterpriseFee +
-    totalCardFee
+    totalCardFee +
+    totalKycFee
   );
 }
 

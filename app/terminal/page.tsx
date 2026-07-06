@@ -193,7 +193,7 @@ export default function TerminalPage() {
         if (result.eligibility.missingKyc) {
           alert('KYC kont ou poko apwouve. Tanpri tann apwobasyon admin sou paj /kyc la.');
         } else if (result.eligibility.missingCardActivation) {
-          alert('Ou dwe peye frè aktivasyon Kat Vityèl la (520 HTG) sou paj /kat anvan w jwenn aksè API a.');
+          alert('Ou dwe peye frè KYC la (1150 HTG, kat enkli) epi pase verifikasyon anvan w jwenn aksè API a.');
         }
         return null;
       }

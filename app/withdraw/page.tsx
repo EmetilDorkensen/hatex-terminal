@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, AlertTriangle, ShieldCheck, Wallet, ArrowUpRight, Lock, CheckCircle2, Store } from 'lucide-react';
 import { checkSpendingLimit } from '@/lib/security/spending-limits';
+import { isKycApproved } from '@/lib/kyc/status';
 
 export default function WithdrawPage() {
   const router = useRouter();
@@ -37,6 +38,9 @@ export default function WithdrawPage() {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (data) {
            setProfile(data);
+           if (!isKycApproved(data.kyc_status)) {
+               return;
+           }
            if (!data.transaction_pin && !data.transaction_pin_hash) {
                alert("Ou dwe gen yon kòd PIN pou sekirize kont ou anvan ou ka retire lajan.");
                router.push('/setting'); 
@@ -72,6 +76,12 @@ export default function WithdrawPage() {
       if (statusCheck.account_status === 'suspended') {
         setLoading(false);
         return alert("Kont ou a sispandi. Ou pa gen otorizasyon pou w fè retrè.");
+      }
+
+      const { data: kycProf } = await supabase.from('profiles').select('kyc_status').eq('id', profile.id).single();
+      if (!isKycApproved(kycProf?.kyc_status)) {
+        setLoading(false);
+        return alert("Ou dwe pase KYC anvan ou ka fè retrè.");
       }
 
       // 3. TCHEKE LIMIT JOUNALYE/MANSYÈL POU KONT ENDIVIDYÈL YO
@@ -250,6 +260,28 @@ export default function WithdrawPage() {
       setLoading(false);
     }
   };
+
+  if (profile && !isKycApproved(profile.kyc_status)) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 p-6 font-sans flex flex-col items-center justify-center">
+        <div className="max-w-md w-full bg-white border border-amber-200 rounded-3xl p-8 text-center shadow-sm">
+          <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
+            <ShieldCheck size={28} />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">KYC obligatwa pou retrè</h1>
+          <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+            Ou ka fè depo san KYC, men pou retire lajan ou dwe verifye idantite w anvan.
+          </p>
+          <button onClick={() => router.push('/kyc')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-sm mb-3">
+            Pase Verifikasyon ID
+          </button>
+          <button onClick={() => router.push('/dashboard')} className="w-full border border-gray-200 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-50">
+            Tounen Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 font-sans relative flex flex-col items-center">

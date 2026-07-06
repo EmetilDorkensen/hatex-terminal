@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
 import { checkStrongPassword } from '@/lib/security/password-strength';
+import { isKycApproved } from '@/lib/kyc/status';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
@@ -174,53 +175,6 @@ export default function Dashboard() {
     if (!num) return "**** **** **** ****";
     if (showNumbers) return num.match(/.{1,4}/g)?.join(' ') || num;
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
-  };
-
-  const priBase = 520;
-  const uiPriAktivasyon = Math.max(0, priBase - discountAmount);
-
-  const handleActivateCard = async () => {
-    if (!userData) return;
-    setLoading(true);
-
-    try {
-      const { data: realProfile, error: profileErr } = await supabase.from('profiles').select('wallet_balance').eq('id', userData.id).single();
-      if (profileErr || !realProfile) throw new Error("Nou pa ka jwenn enfòmasyon w yo kounye a.");
-
-      let dbDiscountAmount = 0;
-      const { data: realDiscountData } = await supabase.from('user_discounts').select('discount_amount').eq('user_id', userData.id).maybeSingle();
-      if (realDiscountData) dbDiscountAmount = realDiscountData.discount_amount || 0;
-
-      const realActivationPrice = Math.max(0, priBase - dbDiscountAmount);
-      const realWalletBalance = Number(realProfile.wallet_balance || 0);
-
-      if (realWalletBalance < realActivationPrice) {
-        setLoading(false);
-        alert(`Ou pa gen ase kòb sou balans ou!\n\nOu bezwen omwen ${realActivationPrice} HTG pou aktive kat la.\nTanpri fè yon depo anvan.`);
-        router.push('/deposit');
-        return;
-      }
-
-      if (!window.confirm(`Èske w sèten ou vle peye ${realActivationPrice} HTG pou aktive Kat Vityèl la ak Terminal ou a?`)) {
-        setLoading(false);
-        return;
-      }
-
-      const nouvoBalans = realWalletBalance - realActivationPrice;
-      const { error: updateErr } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans, is_card_activated: true }).eq('id', userData.id);
-      if (updateErr) throw updateErr;
-
-      await supabase.from('transactions').insert({
-        user_id: userData.id, amount: -realActivationPrice, type: 'CARD_ACTIVATION',
-        description: dbDiscountAmount > 0 ? `Aktivasyon Kat (Ak Rediksyon -${dbDiscountAmount} HTG)` : 'Frè Aktivasyon Kat Vityèl', status: 'success'
-      });
-
-      alert("✅ Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
-    } catch (err: any) {
-      alert("Erè: " + err.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleOpenRefundModal = async () => {
@@ -494,7 +448,7 @@ export default function Dashboard() {
   }
 
   const kycPending = userData?.kyc_status !== 'approved';
-  const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
+  const kycNotSubmitted = userData?.kyc_status === 'not_submitted' || !userData?.kyc_status;
   const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
   
   // 👇 BOUTON AN PARÈT SÈLMAN POU IMÈL SA A 👇
@@ -553,7 +507,7 @@ export default function Dashboard() {
               <button 
                 onClick={() => {
                   if (cardFullyActive) { router.push('/terminal'); setIsMenuOpen(false); } 
-                  else { alert("⚠️ Ou dwe aktive Kat la ak Terminal la anvan w ka itilize opsyon sa a!"); }
+                  else { alert("⚠️ Ou dwe pase KYC (1150 HTG) epi tann apwobasyon anvan w ka itilize Terminal la."); }
                 }} 
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
               >
@@ -741,13 +695,33 @@ export default function Dashboard() {
                 </div>
                 <span className="text-xs font-semibold text-slate-700">Depo</span>
               </button>
-              <button onClick={() => router.push('/withdraw')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+              <button
+                onClick={() => {
+                  if (!isKycApproved(userData?.kyc_status)) {
+                    alert('Ou dwe pase KYC anvan ou ka fè retrè. Depo a toujou disponib.');
+                    router.push('/kyc');
+                    return;
+                  }
+                  router.push('/withdraw');
+                }}
+                className={`bg-white border p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all group ${isKycApproved(userData?.kyc_status) ? 'border-gray-200 hover:border-indigo-300 hover:shadow-md' : 'border-gray-100 opacity-60'}`}
+              >
                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <ArrowUpRight size={20} />
                 </div>
                 <span className="text-xs font-semibold text-slate-700">Retrè</span>
               </button>
-              <button onClick={() => router.push('/transfert')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+              <button
+                onClick={() => {
+                  if (!isKycApproved(userData?.kyc_status)) {
+                    alert('Ou dwe pase KYC anvan ou ka fè transfè. Depo a toujou disponib.');
+                    router.push('/kyc');
+                    return;
+                  }
+                  router.push('/transfert');
+                }}
+                className={`bg-white border p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all group ${isKycApproved(userData?.kyc_status) ? 'border-gray-200 hover:border-indigo-300 hover:shadow-md' : 'border-gray-100 opacity-60'}`}
+              >
                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <ArrowRightLeft size={20} />
                 </div>
@@ -794,7 +768,7 @@ export default function Dashboard() {
           <div className="lg:col-span-2 flex justify-center lg:justify-end items-center perspective-1000">
             <div className="w-full max-w-[480px]">
               <div className="flex justify-between items-end mb-3 px-1">
-                <p className="text-sm font-semibold text-slate-700">Kat Vityèl {cardNeedsActivation && "(Poko Aktive)"}</p>
+                <p className="text-sm font-semibold text-slate-700">Kat Vityèl {!cardFullyActive && kycPending && ''}{!cardFullyActive && !kycPending && userData?.kyc_status === 'pending' ? '(Nan revizyon)' : ''}</p>
                 {cardFullyActive && <button onClick={() => setIsFlipped(!isFlipped)} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><RefreshCcw size={12}/> Vire Kat la</button>}
               </div>
               
@@ -803,28 +777,18 @@ export default function Dashboard() {
                 {kycPending && (
                   <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-white/90 backdrop-blur-sm p-6 text-center border border-gray-200 shadow-sm">
                     <p className="text-sm font-bold text-slate-900 mb-4">
-                      {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : "Verifikasyon ID Obligatwa"}
+                      {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : kycNotSubmitted ? "Verifikasyon ID Obligatwa" : "KYC pa apwouve ankò"}
                     </p>
                     <button onClick={() => router.push('/kyc')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm shadow-md hover:bg-indigo-700 transition-all">
-                      Pase KYC Gratis
+                      {userData?.kyc_status === 'pending' ? 'Tann Revizyon' : 'Pase KYC (1150 HTG)'}
                     </button>
                   </div>
                 )}
 
-                {cardNeedsActivation && (
-                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-slate-900/80 backdrop-blur-md p-6 text-center shadow-lg border border-slate-700">
-                    <div className="text-4xl mb-3">🔒</div>
-                    <p className="text-sm font-medium text-white mb-4">
-                      Aktive kat ou pou kòmanse resevwa peman.
-                    </p>
-                    {discountAmount > 0 && (
-                       <p className="text-xs text-emerald-400 font-bold mb-3">
-                         🎉 Rediksyon {discountAmount} HTG!
-                       </p>
-                    )}
-                    <button onClick={handleActivateCard} className="bg-white text-slate-900 px-6 py-3 rounded-lg font-bold text-sm shadow-lg hover:bg-gray-100 transition-all">
-                      Aktive pou {uiPriAktivasyon} HTG
-                    </button>
+                {userData?.kyc_status === 'approved' && !cardFullyActive && (
+                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-white/90 backdrop-blur-sm p-6 text-center border border-gray-200 shadow-sm">
+                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
+                    <p className="text-sm font-bold text-slate-900">Ap prepare kat ou...</p>
                   </div>
                 )}
 

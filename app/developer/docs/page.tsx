@@ -25,7 +25,7 @@ export default function HatexcardDocs() {
             <h2 className="text-2xl font-semibold text-white">Kòmanse rapid (4 etap)</h2>
           </div>
           <ol className="list-decimal list-inside text-gray-400 space-y-2 ml-2">
-            <li>Konekte sou HatexCard, fini verifikasyon ID (KYC) epi aktive kat ou (520 HTG).</li>
+            <li>Konekte sou HatexCard, peye frè KYC (1150 HTG, kat enkli), epi verifye idantite w.</li>
             <li>Ale sou <code className="text-indigo-400">/developer</code> — kopye kle API ou a (<code className="text-yellow-400">hx_live_...</code>).</li>
             <li>Sou <strong className="text-white">sèvè ou a</strong>, voye yon <code className="text-gray-300">POST</code> ak kle a, montan an, ak enfòmasyon kat kliyan an.</li>
             <li>(Opsyonèl) Konfigire webhook pou resevwa konfimasyon otomatik lè peman reyisi.</li>
@@ -40,7 +40,7 @@ export default function HatexcardDocs() {
           </div>
           <ul className="list-disc list-inside text-gray-400 space-y-2 ml-2">
             <li>Verifikasyon ID (KYC) apwouve sou kont HatexCard ou a</li>
-            <li>Kat vityèl aktive (frè 520 HTG sou paj Kat la)</li>
+            <li>Verifikasyon ID (KYC) apwouve — frè 1150 HTG (kat vityèl + terminal enkli)</li>
           </ul>
           <p className="text-gray-400 text-sm">
             Apre sa, kle API a parèt otomatikman sou <code className="text-indigo-400">/developer</code>.

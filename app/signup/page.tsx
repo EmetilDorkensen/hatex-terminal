@@ -81,7 +81,7 @@ function SignupForm() {
         await supabase.from('profiles').insert([{
           id: authData.user.id,
           full_name: fullName,
-          kyc_status: 'pending',
+          kyc_status: 'not_submitted',
           used_promo: cleanPromo !== '' ? cleanPromo : null
         }]);
 

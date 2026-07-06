@@ -11,7 +11,7 @@ import {
 // ============================================================================
 // Yon kont ka jwenn aksè API otomatikman SÈLMAN si TOUDE kondisyon sa yo vre:
 //   1. KYC kont kliyan an APWOUVE nan tab profiles (kyc_status === 'approved')
-//   2. Li peye frè aktivasyon kat la (is_card_activated === true)
+//   2. Li peye frè KYC la (1150 HTG, kat enkli) epi KYC apwouve (is_card_activated === true otomatikman)
 //
 // Kle API yo estoke HASH nan baz done (api_key_hash + api_key_prefix).
 // Kle an klè retounen SÈLMAN yon sèl fwa lè li fèk jenere oswa lè li rotate.

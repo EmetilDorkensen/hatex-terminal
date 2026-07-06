@@ -76,74 +76,7 @@ export default function KatPage() {
   };
 
   const kycPending = userData?.kyc_status !== 'approved';
-  const cardNeedsActivation = userData?.kyc_status === 'approved' && !userData?.is_card_activated;
   const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
-
-  const priBase = 520;
-  const uiPriAktivasyon = Math.max(0, priBase - discountAmount);
-
-  const handleActivateCard = async () => {
-    if (!userData) return;
-    setLoading(true);
-
-    try {
-      const { data: realProfile, error: profileErr } = await supabase
-        .from('profiles')
-        .select('wallet_balance')
-        .eq('id', userData.id)
-        .single();
-
-      if (profileErr || !realProfile) throw new Error("Nou pa ka jwenn enfòmasyon w yo kounye a.");
-
-      let dbDiscountAmount = 0;
-      const { data: realDiscountData } = await supabase
-        .from('user_discounts')
-        .select('discount_amount')
-        .eq('user_id', userData.id)
-        .maybeSingle();
-
-      if (realDiscountData) {
-        dbDiscountAmount = realDiscountData.discount_amount || 0;
-      }
-
-      const realActivationPrice = Math.max(0, priBase - dbDiscountAmount);
-      const realWalletBalance = Number(realProfile.wallet_balance || 0);
-
-      if (realWalletBalance < realActivationPrice) {
-        setLoading(false);
-        alert(`Ou pa gen ase kòb sou balans ou!\n\nOu bezwen omwen ${realActivationPrice} HTG pou aktive kat la.\nTanpri fè yon depo anvan.`);
-        router.push('/deposit');
-        return;
-      }
-
-      if (!window.confirm(`Èske w sèten ou vle peye ${realActivationPrice} HTG pou aktive Kat Vityèl la ak Terminal ou a?`)) {
-        setLoading(false);
-        return;
-      }
-
-      const nouvoBalans = realWalletBalance - realActivationPrice;
-      const { error: updateErr } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: nouvoBalans, is_card_activated: true })
-        .eq('id', userData.id);
-
-      if (updateErr) throw updateErr;
-
-      await supabase.from('transactions').insert({
-        user_id: userData.id, 
-        amount: -realActivationPrice, 
-        type: 'CARD_ACTIVATION',
-        description: dbDiscountAmount > 0 ? `Aktivasyon Kat (Ak Rediksyon -${dbDiscountAmount} HTG)` : 'Frè Aktivasyon Kat Vityèl', 
-        status: 'success'
-      });
-
-      alert("Felisitasyon! Kat ou ak Terminal ou aktive nèt.");
-    } catch (err: any) {
-      alert("Erè: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
@@ -192,35 +125,21 @@ export default function KatPage() {
               <IdCard size={28} />
             </div>
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">KYC Obligatwa</h3>
-            <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">Verifye idantite w gratis pou jwenn aksè ak kat la.</p>
+            <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">Peye frè KYC 1150 HTG (kat enkli) epi verifye idantite w.</p>
             <button onClick={() => router.push('/kyc')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold text-xs uppercase shadow-sm transition-colors tracking-wider flex items-center gap-2">
-              Pase KYC Kounye a
+              Pase KYC
             </button>
           </div>
         )}
 
-        {/* OVERLAY POU AKTIVASYON (Si KYC fèt men kat poko peye) */}
-        {cardNeedsActivation && (
-          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-3xl bg-white/95 backdrop-blur-md p-6 text-center border border-amber-200 shadow-sm mx-auto aspect-[1.58/1]">
-            <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 mb-4 border border-amber-100">
-              <Lock size={28} />
-            </div>
-            <p className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
-              Aktive Kat Ou
-            </p>
-            <p className="text-xs text-slate-500 font-medium mb-4 px-4 leading-relaxed">
-              Peye frè a pou w wè nimewo a epi kòmanse itilize l.
-            </p>
-            {discountAmount > 0 && (
-               <p className="text-[10px] text-emerald-600 font-bold mb-4 uppercase tracking-wider flex items-center justify-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-md border border-emerald-100">
-                 <CheckCircle2 size={14} /> Rediksyon {discountAmount} HTG aktif
-               </p>
-            )}
-            <button onClick={handleActivateCard} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold text-xs uppercase shadow-sm transition-colors tracking-wider flex items-center gap-2">
-              <ShieldCheck size={16} /> Aktive pou {uiPriAktivasyon} HTG
-            </button>
+        {userData?.kyc_status === 'approved' && !cardFullyActive && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-3xl bg-white/95 backdrop-blur-md p-6 text-center border border-indigo-200 shadow-sm mx-auto aspect-[1.58/1]">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
+            <p className="text-sm font-bold text-slate-800">Ap prepare kat ou...</p>
           </div>
         )}
+
+        {/* KAT VISUAL — removed separate 520 activation overlay */}
 
         {/* DESIGN KAT LA */}
         <div className={`relative bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-indigo-700/50 w-full aspect-[1.58/1] flex flex-col justify-between overflow-hidden transition-all duration-300`}>

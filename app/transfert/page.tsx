@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Search, User, ShieldCheck, ArrowRightLeft, Lock, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { checkSpendingLimit, checkBalanceCap } from '@/lib/security/spending-limits';
+import { isKycApproved } from '@/lib/kyc/status';
 
 // ==========================================
 // TABLO FRÈ TRANSFÈ (menm estrikti ak MonCash)
@@ -39,6 +40,7 @@ export default function TransferPage() {
   const [senderEmail, setSenderEmail] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
   const [accountType, setAccountType] = useState('individual');
+  const [kycApproved, setKycApproved] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
   const [amount, setAmount] = useState('');
   const [receiverName, setReceiverName] = useState<string | null>(null);
@@ -72,11 +74,12 @@ export default function TransferPage() {
         setSenderEmail(user.email || '');
         const { data: prof } = await supabase
           .from('profiles')
-          .select('wallet_balance, account_type')
+          .select('wallet_balance, account_type, kyc_status')
           .eq('id', user.id)
           .single();
         setWalletBalance(Number(prof?.wallet_balance || 0));
         setAccountType(prof?.account_type || 'individual');
+        setKycApproved(isKycApproved(prof?.kyc_status));
         const statusRes = await fetch('/api/auth/pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -175,6 +178,11 @@ export default function TransferPage() {
 
   // 4. KLIKE SOU BOUTON "KONFIME TRANSFÈ" (Sa ouvri bwat pou l mete PIN nan pito)
   const initiateTransfer = async () => {
+    if (!kycApproved) {
+      setStatus({ type: 'error', msg: 'Ou dwe pase KYC anvan ou ka fè transfè.' });
+      return;
+    }
+
     const amt = Number(amount);
     if (!receiverName || !amount || amt <= 0) return;
 
@@ -293,6 +301,36 @@ export default function TransferPage() {
       setLoading(false);
     }
   };
+
+  if (kycApproved === false) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 p-6 font-sans flex flex-col items-center justify-center">
+        <div className="max-w-md w-full bg-white border border-amber-200 rounded-3xl p-8 text-center shadow-sm">
+          <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
+            <ShieldCheck size={28} />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">KYC obligatwa pou transfè</h1>
+          <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+            Ou ka fè depo san KYC, men pou voye lajan bay lòt moun ou dwe verifye idantite w anvan.
+          </p>
+          <button onClick={() => router.push('/kyc')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-sm mb-3">
+            Pase Verifikasyon ID
+          </button>
+          <button onClick={() => router.push('/dashboard')} className="w-full border border-gray-200 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-50">
+            Tounen Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (kycApproved === null) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 font-sans relative flex flex-col items-center">

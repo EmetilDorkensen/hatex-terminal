@@ -155,7 +155,7 @@ export default function WorkspacePage() {
 
         if (canSeeCompliance) {
             tasks.push(
-                supabase.from('profiles').select('*').eq('kyc_status', 'pending').order('created_at', { ascending: false })
+                supabase.from('profiles').select('*').eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false })
                     .then(({ data }) => setPendingKyc(data || [])),
                 supabase.from('agent_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false })
                     .then(({ data }) => setPendingAgents(data || [])),
@@ -370,16 +370,39 @@ export default function WorkspacePage() {
     // ==========================================
     const handleOpenDocument = (url: string) => window.open(url, '_blank');
 
+    const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
+        if (!legacyValue) return;
+        if (legacyValue.startsWith('http://') || legacyValue.startsWith('https://')) {
+            window.open(legacyValue, '_blank');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
+            const data = await res.json();
+            if (res.ok && data.url) window.open(data.url, '_blank');
+            else alert(data.error || 'Pa t kapab louvri dokiman an.');
+        } catch {
+            alert('Erè nan louvri dokiman an.');
+        }
+    };
+
     const jereKyc = async (id: string, full_name: string, aksyon: 'approved' | 'rejected') => {
         let rezon = "";
         if (aksyon === 'rejected') { rezon = prompt("Rezon ki fè w rejte l la:") || ""; if (!rezon) return; }
-        else { if (!confirm(`Apwouve KYC pou ${full_name}?`)) return; }
+        else { if (!confirm(`Apwouve KYC pou ${full_name}? Kat ap kreye otomatikman.`)) return; }
         
         setProcessingId(id);
         try {
-            await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', id);
+            const res = await fetch('/api/admin/kyc-review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: id, action: aksyon, reason: rezon || undefined }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Erè KYC');
+
             await logActivity(`KYC_${aksyon.toUpperCase()}`, 'profile', id, aksyon === 'rejected' ? { reason: rezon, full_name } : { full_name });
-            alert(`KYC ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'}!`); checkAuthAndFetchData();
+            alert(aksyon === 'approved' ? 'KYC apwouve — kat kreye otomatikman!' : 'KYC rejte!'); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -774,9 +797,9 @@ export default function WorkspacePage() {
                                         <h3 className="text-lg font-bold text-slate-900">{user.full_name}</h3>
                                         <p className="text-xs text-slate-500 mb-4">{user.email}</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {user.kyc_front && <button onClick={() => handleOpenDocument(user.kyc_front)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Devan</button>}
-                                            {user.kyc_back && <button onClick={() => handleOpenDocument(user.kyc_back)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Dèyè</button>}
-                                            {user.kyc_selfie && <button onClick={() => handleOpenDocument(user.kyc_selfie)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Selfie</button>}
+                                            {user.kyc_front && <button onClick={() => handleOpenKycDocument(user.id, 'front', user.kyc_front)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Devan</button>}
+                                            {user.kyc_back && <button onClick={() => handleOpenKycDocument(user.id, 'back', user.kyc_back)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Dèyè</button>}
+                                            {user.kyc_selfie && <button onClick={() => handleOpenKycDocument(user.id, 'selfie', user.kyc_selfie)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Selfie</button>}
                                         </div>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">

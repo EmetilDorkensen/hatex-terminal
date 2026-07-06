@@ -134,7 +134,7 @@ export default function AdminSuperPage() {
             const { data: s } = await supabase.from('profiles').select('*').eq('account_status', 'suspended').order('created_at', { ascending: false });
             setSuspendedAccounts(s || []);
 
-            const { data: k } = await supabase.from('profiles').select('*').eq('kyc_status', 'pending').order('created_at', { ascending: false });
+            const { data: k } = await supabase.from('profiles').select('*').eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false });
             setPendingKyc(k || []);
 
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
@@ -376,6 +376,22 @@ export default function AdminSuperPage() {
         window.open(url, '_blank');
     };
 
+    const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
+        if (!legacyValue) { alert("Pa gen dokiman sa a!"); return; }
+        if (legacyValue.startsWith('http://') || legacyValue.startsWith('https://')) {
+            window.open(legacyValue, '_blank');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
+            const data = await res.json();
+            if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
+            window.open(data.url, '_blank');
+        } catch (e: any) {
+            alert(e.message || 'Pa t kapab louvri dokiman an.');
+        }
+    };
+
     const voyeEmailKliyan = async (email: string, non: string, mesaj: string, subject: string) => {
         if (!email) return;
         try { await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: email.trim(), subject, non, mesaj }), }); } catch (error) {}
@@ -471,13 +487,22 @@ export default function AdminSuperPage() {
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
         if (aksyon === 'rejected') { const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:"); if (!rep) return; rezonReje = rep; } 
-        else { if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}?`)) return; }
+        else { if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}? Kat ak terminal ap kreye otomatikman.`)) return; }
         setProcessingId(id);
         try {
-            await supabase.from('profiles').update({ kyc_status: aksyon, kyc_rejection_reason: aksyon === 'rejected' ? rezonReje : null }).eq('id', id);
-            const mesajE = aksyon === 'approved' ? `Felisitasyon ${full_name}! Dokiman w yo apwouve.` : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
+            const res = await fetch('/api/admin/kyc-review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: id, action: aksyon, reason: rezonReje || undefined }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Erè pandan revizyon KYC.');
+
+            const mesajE = aksyon === 'approved'
+                ? `Felisitasyon ${full_name}! Dokiman w yo apwouve. Kat vityèl ou ak terminal ou aktive otomatikman.`
+                : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
             await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            alert(`KYC a ${aksyon === 'approved' ? 'Apwouve' : 'Rejte'} avèk siksè!`); raleDone();
+            alert(aksyon === 'approved' ? 'KYC apwouve — kat kreye otomatikman!' : 'KYC rejte avèk siksè!'); raleDone();
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
@@ -1180,9 +1205,11 @@ export default function AdminSuperPage() {
                                             <h3 className="text-lg font-bold text-slate-900">{user.full_name || 'San Non'}</h3>
                                             <p className="text-xs text-slate-500 mt-1 mb-4">{user.email}</p>
                                             <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                                {user.kyc_front && <button onClick={() => handleOpenDocument(user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
-                                                {user.kyc_back && <button onClick={() => handleOpenDocument(user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
-                                                {user.kyc_selfie && <button onClick={() => handleOpenDocument(user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
+                                                {user.kyc_doc_type && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 font-bold uppercase">{user.kyc_doc_type}</span>}
+                                                {user.kyc_face_match_score != null && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 font-bold">Figi: {Number(user.kyc_face_match_score).toFixed(1)}%</span>}
+                                                {user.kyc_front && <button onClick={() => handleOpenKycDocument(user.id, 'front', user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
+                                                {user.kyc_back && <button onClick={() => handleOpenKycDocument(user.id, 'back', user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
+                                                {user.kyc_selfie && <button onClick={() => handleOpenKycDocument(user.id, 'selfie', user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
                                                 {!user.kyc_front && !user.kyc_selfie && <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 font-bold uppercase tracking-wider">Okenn imaj sou sistèm nan</span>}
                                             </div>
                                         </div>

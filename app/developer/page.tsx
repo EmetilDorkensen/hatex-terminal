@@ -235,7 +235,7 @@ export default function DeveloperDashboard() {
           </div>
           <div className={`flex items-center gap-3 p-3 rounded-xl border ${eligibility?.missingCardActivation ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
             {eligibility?.missingCardActivation ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
-            <span className="text-sm font-semibold text-slate-700">Frè aktivasyon Kat Vityèl peye</span>
+            <span className="text-sm font-semibold text-slate-700">Frè aktivasyon Kat Vityèl peye (nan frè KYC 1150 HTG)</span>
           </div>
         </div>
         <div className="flex flex-col gap-3">
