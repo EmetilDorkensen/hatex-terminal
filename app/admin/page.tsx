@@ -1203,7 +1203,7 @@ export default function AdminSuperPage() {
                         pendingEnterprises.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
                                 <Building2Icon size={48} className="mx-auto mb-4 text-slate-300" />
-                                Pa gen okenn aplikasyon Antrepriz k ap tann
+                                Pa gen okenn aplikasyon Antrepriz kap tann
                             </div>
                         ) : (
                             <div className="space-y-6">
