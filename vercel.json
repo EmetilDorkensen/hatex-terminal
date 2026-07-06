@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/developer/webhooks/process-retries",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
