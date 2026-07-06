@@ -382,7 +382,7 @@ export default function AdminSuperPage() {
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'active', failed_otp_attempts: 0 }).eq('id', id); alert(`Kont ${email} lan aktive!`); raleDone(); } 
+        try { await supabase.from('profiles').update({ account_status: 'active', is_activated: true, failed_otp_attempts: 0 }).eq('id', id); alert(`Kont ${email} lan aktive!`); raleDone(); } 
         catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 

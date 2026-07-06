@@ -121,10 +121,16 @@ export default function SubscribePage() {
         id: verifyData.clientId,
         card_balance: verifyData.card_balance,
         is_activated: verifyData.is_activated,
+        account_status: verifyData.account_status,
         full_name: verifyData.full_name,
         email: verifyData.email,
       };
-      if (clientProfile.is_activated === false) throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
+      if (clientProfile.account_status === 'suspended') {
+        throw new Error("Kont ou sispann. Tanpri kontakte sipò H-Pay.");
+      }
+      if (clientProfile.account_status && clientProfile.account_status !== 'active') {
+        throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
+      }
       if (clientProfile.card_balance < product.price) throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
 
       const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, product.price);

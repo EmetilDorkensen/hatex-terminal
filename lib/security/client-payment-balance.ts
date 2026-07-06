@@ -75,16 +75,20 @@ export type ClientPaymentValidation =
   | { ok: true; balances: ClientPaymentBalances; debitFrom: 'card' | 'wallet' }
   | { ok: false; status: number; error: string; balances?: ClientPaymentBalances };
 
-/** Valide kliyan an anvan RPC — menm lòjik ak subscribe + verify-card. */
+/** Valide kliyan an anvan RPC — menm lòjik ak checkout RPC (account_status sèlman). */
 export function validateClientForCardPayment(
   profile: ClientPaymentProfile,
   amount: number
 ): ClientPaymentValidation {
   if (profile.account_status !== 'active') {
-    return { ok: false, status: 403, error: 'Kont ki asosye ak kat sa a pa aktif.' };
-  }
-  if (profile.is_activated === false) {
-    return { ok: false, status: 403, error: 'Kont ou bloke alèkile. Tanpri kontakte sipò HatexCard.' };
+    return {
+      ok: false,
+      status: 403,
+      error:
+        profile.account_status === 'suspended'
+          ? 'Kont ou sispann. Kontakte sipò HatexCard pou debloke l.'
+          : 'Kont ki asosye ak kat sa a pa aktif.',
+    };
   }
 
   const balances = normalizeClientBalances(profile);
