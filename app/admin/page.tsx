@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle } from 'lucide-react';
 import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export default function AdminSuperPage() {
@@ -48,6 +48,15 @@ export default function AdminSuperPage() {
     const [enterpriseFeeHistory, setEnterpriseFeeHistory] = useState<any[]>([]);
     const [cardActivationFeeHistory, setCardActivationFeeHistory] = useState<any[]>([]);
     const [unifiedFeeHistory, setUnifiedFeeHistory] = useState<any[]>([]);
+    const [bizProfitWithdrawn, setBizProfitWithdrawn] = useState(0);
+    const [bizProfitAvailable, setBizProfitAvailable] = useState(0);
+    const [bizWithdrawHistory, setBizWithdrawHistory] = useState<any[]>([]);
+    const [showBizWithdrawModal, setShowBizWithdrawModal] = useState(false);
+    const [bizWithdrawAmount, setBizWithdrawAmount] = useState('');
+    const [bizWithdrawNote, setBizWithdrawNote] = useState('');
+    const [bizWithdrawPassword, setBizWithdrawPassword] = useState('');
+    const [bizWithdrawLoading, setBizWithdrawLoading] = useState(false);
+    const [bizWithdrawError, setBizWithdrawError] = useState('');
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -167,6 +176,53 @@ export default function AdminSuperPage() {
         }
     };
 
+    const handleBizProfitWithdraw = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setBizWithdrawLoading(true);
+        setBizWithdrawError('');
+
+        const montan = Number(bizWithdrawAmount);
+        if (!Number.isFinite(montan) || montan <= 0) {
+            setBizWithdrawError('Antre yon montan valab.');
+            setBizWithdrawLoading(false);
+            return;
+        }
+        if (!bizWithdrawPassword) {
+            setBizWithdrawError('Modpas admin obligatwa pou konfime.');
+            setBizWithdrawLoading(false);
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/admin/business-withdrawal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: montan,
+                    note: bizWithdrawNote.trim() || undefined,
+                    password: bizWithdrawPassword,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                setBizWithdrawError(data.error || 'Retrè a echwe.');
+                return;
+            }
+
+            setShowBizWithdrawModal(false);
+            setBizWithdrawAmount('');
+            setBizWithdrawNote('');
+            setBizWithdrawPassword('');
+            await raleDone();
+            alert(`Retrè ${montan.toLocaleString()} HTG anrejistre. Pwofi disponib: ${Number(data.available_htg || 0).toLocaleString()} HTG`);
+        } catch {
+            setBizWithdrawError('Erè koneksyon. Eseye ankò.');
+        } finally {
+            setBizWithdrawLoading(false);
+        }
+    };
+
     const kalkileTotalBiznis = async (profiles: any[]) => {
         try {
             const totalKliyan = profiles.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
@@ -257,6 +313,17 @@ export default function AdminSuperPage() {
             const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalEnterpriseFee + totalCardFee;
             setTotalBiznisProfit(granTotalPwofi);
 
+            const { data: bizWithdrawData } = await supabase
+                .from('business_profit_withdrawals')
+                .select('id, amount, note, created_at')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            const totalRetirePwofi = (bizWithdrawData || []).reduce((acc, w) => acc + Number(w.amount || 0), 0);
+            setBizProfitWithdrawn(totalRetirePwofi);
+            setBizProfitAvailable(Math.max(0, granTotalPwofi - totalRetirePwofi));
+            setBizWithdrawHistory(bizWithdrawData || []);
+
             // 🔗 ISTORIK KONPLÈ KÈS GLOBAL — fusyone TOUT sous frè yo (depo,
             // retrè, transfè, ajan, antrepriz, kat) nan YON SÈL lis kwonolojik
             // pou Sipè Admin ka wè tout mouvman kòb biznis la fè nan yon sèl kote.
@@ -287,7 +354,15 @@ export default function AdminSuperPage() {
                 description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
             }));
 
-            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries]
+            const retreBankEntries = (bizWithdrawData || []).map((w: any) => ({
+                id: w.id,
+                kalite: 'Retrè Bank',
+                amount: -Number(w.amount || 0),
+                created_at: w.created_at,
+                description: w.note || 'Retrè pwofi biznis nan bank',
+            }));
+
+            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...retreBankEntries]
                 .filter((entry) => entry.created_at)
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .slice(0, 60);
@@ -710,11 +785,24 @@ export default function AdminSuperPage() {
                                 <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
                                     <div className="relative z-10 mb-6">
-                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis La (Frè Kolèkte)</p>
+                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis Disponib</p>
                                         <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
-                                            {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
+                                            {Number(bizProfitAvailable).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
                                         </h3>
+                                        <p className="text-[11px] text-emerald-700/80 mt-2 font-medium">
+                                            Frè kolèkte: {Number(totalBiznisProfit).toLocaleString()} HTG
+                                            {bizProfitWithdrawn > 0 && (
+                                                <> · Retire: <span className="text-rose-600">-{Number(bizProfitWithdrawn).toLocaleString()} HTG</span></>
+                                            )}
+                                        </p>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setBizWithdrawError(''); setShowBizWithdrawModal(true); }}
+                                        className="mb-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm"
+                                    >
+                                        <MinusCircle size={16} /> Retrè Pwofi Biznis
+                                    </button>
                                     <div className="grid grid-cols-2 gap-2 mt-auto">
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
                                             <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan</p>
@@ -753,10 +841,10 @@ export default function AdminSuperPage() {
                             <div className="bg-indigo-600 p-8 rounded-3xl shadow-sm mt-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                 <div>
                                     <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-2">GRAN TOTAL KI SIPOZE NAN BANK LA (Kliyan + Biznis)</p>
-                                    <p className="text-sm text-white font-medium">Sa se sòm Kòb Wallet yo ak Pwofi konpayi an sèlman.</p>
+                                    <p className="text-sm text-white font-medium">Sa se sòm Kòb Wallet yo ak Pwofi disponib konpayi an.</p>
                                 </div>
                                 <p className="text-3xl font-bold text-white tracking-tight">
-                                    {Number(totalClientBal + totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
+                                    {Number(totalClientBal + bizProfitAvailable).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
                                 </p>
                             </div>
 
@@ -878,7 +966,7 @@ export default function AdminSuperPage() {
                                         <p className="text-xs text-indigo-700/70 mt-1">TOUT sous frè yo fusyone (Depo, Retrè, Transfè, Ajan, Antrepriz, Kat) — triye pa dat, pi resan an anlè.</p>
                                     </div>
                                     <span className="text-[10px] font-bold uppercase bg-indigo-600 text-white px-3 py-1.5 rounded-lg">
-                                        Gran Total: {Number(totalBiznisProfit).toLocaleString()} HTG
+                                        Disponib: {Number(bizProfitAvailable).toLocaleString()} HTG
                                     </span>
                                 </div>
                                 <div className="max-h-[560px] overflow-y-auto divide-y divide-gray-100">
@@ -894,6 +982,7 @@ export default function AdminSuperPage() {
                                                         item.kalite === 'Kat' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
                                                         item.kalite === 'Depo' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
                                                         item.kalite === 'Retrè' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                        item.kalite === 'Retrè Bank' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
                                                         'bg-rose-50 text-rose-700 border border-rose-100'
                                                     }`}>{item.kalite}</span>
                                                     <div className="min-w-0">
@@ -902,7 +991,9 @@ export default function AdminSuperPage() {
                                                         <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
                                                     </div>
                                                 </div>
-                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Number(item.amount).toLocaleString()} HTG</p>
+                                                <p className={`text-sm font-bold shrink-0 ${Number(item.amount) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                    {Number(item.amount) < 0 ? '' : '+'}{Number(item.amount).toLocaleString()} HTG
+                                                </p>
                                             </div>
                                         ))
                                     )}
@@ -1403,6 +1494,87 @@ export default function AdminSuperPage() {
                     )}
                 </div>
             </div>
+
+            {showBizWithdrawModal && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !bizWithdrawLoading && setShowBizWithdrawModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><MinusCircle size={22} /></div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900">Retrè Pwofi Biznis</h3>
+                                <p className="text-xs text-slate-500">Lè ou retire lajan nan bank la, soustrè li isit pou kontwòl rete kòrèk.</p>
+                            </div>
+                        </div>
+
+                        <p className="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-4">
+                            Disponib: {Number(bizProfitAvailable).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
+                        </p>
+
+                        <form onSubmit={handleBizProfitWithdraw} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Montan (HTG)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="0.01"
+                                    max={bizProfitAvailable}
+                                    value={bizWithdrawAmount}
+                                    onChange={(e) => setBizWithdrawAmount(e.target.value)}
+                                    placeholder="eg. 5000"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Nòt (opsyonèl)</label>
+                                <input
+                                    type="text"
+                                    value={bizWithdrawNote}
+                                    onChange={(e) => setBizWithdrawNote(e.target.value)}
+                                    placeholder="eg. Retrè bank Moncash 06/07/2026"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block flex items-center gap-1.5">
+                                    <KeyRound size={14} /> Modpas Admin (konfimasyon)
+                                </label>
+                                <input
+                                    type="password"
+                                    value={bizWithdrawPassword}
+                                    onChange={(e) => setBizWithdrawPassword(e.target.value)}
+                                    placeholder="Menm modpas Pòtay Admin lan"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                    required
+                                />
+                            </div>
+
+                            {bizWithdrawError && (
+                                <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">{bizWithdrawError}</p>
+                            )}
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    disabled={bizWithdrawLoading}
+                                    onClick={() => setShowBizWithdrawModal(false)}
+                                    className="flex-1 border border-gray-200 text-slate-600 py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                    Anile
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={bizWithdrawLoading || bizProfitAvailable <= 0}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {bizWithdrawLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                    Konfime Retrè
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -273,22 +273,23 @@ export default function DeveloperDashboard() {
     }
   };
 
-  const snippetKey = revealedApiKey || 'hx_live_KLE_OU_LA';
+  const snippetKey = 'hx_live_KLE_OU_LA'; // Ranplase ak kle ou a (kopye nan /developer)
 
   const codeSnippets = {
-    js: `const response = await fetch('https://hatexcard.com/api/public/payments', {
+    js: `// ⚠️ Sèlman sou SÈVÈ ou a — pa nan navigatè kliyan an
+const response = await fetch('https://hatexcard.com/api/public/payments', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer ${snippetKey}',
     'Content-Type': 'application/json',
-    'Idempotency-Key': 'CMD-123-v1' // opsyonèl — evite doub-chaj
+    'Idempotency-Key': 'CMD-123-v1' // inik pou chak kòmand
   },
   body: JSON.stringify({
-    amount: 1500, // HTG (max 50,000 endividyèl / 2,000,000 antrepriz pa tranzaksyon)
+    amount: 1500,
     currency: 'HTG',
     order_id: 'CMD-123',
     card_info: {
-      number: '0000 0000 0000 0000',
+      number: '0000111122223333', // 16 chif, kat KLIYAN (pa menm kont ak machann)
       exp: '12/28',
       cvv: '123'
     }
@@ -297,42 +298,40 @@ export default function DeveloperDashboard() {
 const data = await response.json();
 
 if (data.success) {
-  console.log("Peman Reyisi! Ref:", data.transaction_id);
+  console.log('Reyisi:', data.transaction_id, 'debite:', data.debited_from);
 } else {
-  alert("Erè: " + data.error);
+  console.error('Erè:', data.error);
+  // Si fon ensifizan: data.balances.card_htg, data.balances.wallet_htg
 }`,
     php: `<?php
+// ⚠️ Sèlman sou sèvè PHP ou a
 $curl = curl_init();
-curl_setopt_array($curl, array(
+curl_setopt_array($curl, [
   CURLOPT_URL => 'https://hatexcard.com/api/public/payments',
   CURLOPT_RETURNTRANSFER => true,
-  CURLOPT_ENCODING => '',
-  CURLOPT_MAXREDIRS => 10,
-  CURLOPT_TIMEOUT => 0,
-  CURLOPT_FOLLOWLOCATION => true,
-  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
   CURLOPT_CUSTOMREQUEST => 'POST',
-  CURLOPT_POSTFIELDS =>'{
-    "amount": 1500,
-    "currency": "HTG",
-    "order_id": "CMD-123",
-    "card_info": {
-        "number": "0000 0000 0000 0000",
-        "exp": "12/28",
-        "cvv": "123"
-    }
-}',
-  CURLOPT_HTTPHEADER => array(
+  CURLOPT_POSTFIELDS => json_encode([
+    'amount' => 1500,
+    'currency' => 'HTG',
+    'order_id' => 'CMD-123',
+    'card_info' => [
+      'number' => '0000111122223333',
+      'exp' => '12/28',
+      'cvv' => '123'
+    ]
+  ]),
+  CURLOPT_HTTPHEADER => [
     'Authorization: Bearer ${snippetKey}',
     'Content-Type: application/json',
     'Idempotency-Key: CMD-123-v1'
-  ),
-));
+  ],
+]);
 $response = curl_exec($curl);
 curl_close($curl);
 echo $response;
 ?>`,
-    curl: `curl --request POST \\
+    curl: `# ⚠️ Sèlman depi sèvè ou a (pa navigatè)
+curl --request POST \\
   --url https://hatexcard.com/api/public/payments \\
   --header 'Authorization: Bearer ${snippetKey}' \\
   --header 'Content-Type: application/json' \\
@@ -342,7 +341,7 @@ echo $response;
     "currency": "HTG",
     "order_id": "CMD-123",
     "card_info": {
-      "number": "0000 0000 0000 0000",
+      "number": "0000111122223333",
       "exp": "12/28",
       "cvv": "123"
     }
@@ -360,7 +359,9 @@ echo $response;
               <Terminal className="text-indigo-600 w-8 h-8" />
               API Piblik & Kle Sekrè
             </h1>
-            <p className="text-slate-500 mt-2 text-sm md:text-base font-medium">Entegre Hatexcard sou lòt aplikasyon ak sit ki pa sèvi ak WordPress.</p>
+            <p className="text-slate-500 mt-2 text-sm md:text-base font-medium">
+              Entegre HatexCard sou sèvè ou a (PHP, Node, Python). Pa mete kle API nan frontend.
+            </p>
           </div>
           
           <button 
@@ -370,6 +371,18 @@ echo $response;
             <BookOpen className="w-5 h-5" />
             <span className="uppercase tracking-wider text-[11px]">Gade Dokimantasyon an</span>
           </button>
+        </div>
+
+        {/* Gid entegrasyon rapid */}
+        <div className="bg-indigo-50 border border-indigo-200 p-6 rounded-2xl">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-800 mb-3">Gid entegrasyon</h2>
+          <ol className="text-sm text-indigo-900 space-y-2 list-decimal list-inside font-medium">
+            <li>Kopye kle API ou anba a (oswa rotate pou yon nouvo kle).</li>
+            <li>Sou <strong>sèvè ou a</strong>, voye <code className="bg-white px-1 rounded">POST https://hatexcard.com/api/public/payments</code> ak Bearer token.</li>
+            <li>Itilize <code className="bg-white px-1 rounded">Idempotency-Key</code> inik pou chak kòmand.</li>
+            <li>Pou teste: machann (kle API) ak kliyan (kat) dwe <strong>2 kont diferan</strong>.</li>
+            <li>Gade <button type="button" onClick={() => router.push('/developer/docs')} className="underline text-indigo-700 font-bold">dokimantasyon konplè</button> pou repons erè, webhook, ak limit yo.</li>
+          </ol>
         </div>
 
         {/* Bwat KLE SEKRE A */}
@@ -422,7 +435,7 @@ echo $response;
             <div>
               <p className="text-xs font-bold uppercase tracking-wider mb-1">ATANSYON</p>
               <p className="text-sm font-medium leading-relaxed">
-                Kle API a estoke <strong>hash</strong> nan baz done a. Ou wè kle konplè a sèlman yon sèl fwa apre jenere/rotate. Pa mete l nan kòd frontend oswa GitHub.
+                Kle API a pa dwe parèt nan GitHub, frontend, oswa screenshot piblik. Sèvi ak placeholder <code className="bg-amber-100 px-1 rounded">hx_live_KLE_OU_LA</code> nan egzanp kòd — kole kle reyèl la sèlman sou sèvè ou a.
               </p>
             </div>
           </div>
@@ -558,7 +571,7 @@ echo $response;
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="bg-slate-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-              <Code2 className="text-indigo-600 w-5 h-5" /> Egzanp Kòd Peman & Sekirite
+              <Code2 className="text-indigo-600 w-5 h-5" /> Egzanp Kòd (ranplase hx_live_KLE_OU_LA)
             </h2>
             <div className="flex gap-2">
               {(['js', 'php', 'curl'] as const).map(tab => (
