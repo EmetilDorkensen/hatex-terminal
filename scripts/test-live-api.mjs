@@ -16,7 +16,7 @@ const getRes = await fetch(`${LIVE_URL}/api/public/payments`);
 const getBody = getRes.ok ? await getRes.json() : null;
 console.log(`GET /api/public/payments → ${getRes.status}`, getBody?.build || '(no build)');
 
-if (getRes.status === 405 || getBody?.build !== '20260721-balance-v2') {
+if (getRes.status === 405 || getBody?.build !== '20260722-card-balance-v3') {
   console.error('\n[STOP] Prod pa gen nouvo kòd. Redeploy Vercel epi kouri: npm run verify:live');
   process.exit(1);
 }

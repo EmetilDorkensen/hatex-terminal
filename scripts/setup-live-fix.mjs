@@ -3,7 +3,7 @@ import { loadEnvLocal } from './load-env-local.mjs';
 loadEnvLocal();
 
 const LIVE_URL = process.env.HATEX_LIVE_URL || 'https://hatexcard.com';
-const EXPECTED_BUILD = '20260721-balance-v2';
+const EXPECTED_BUILD = '20260722-card-balance-v3';
 const MAX_ATTEMPTS = 24;
 const INTERVAL_MS = 10_000;
 

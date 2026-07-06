@@ -6,12 +6,12 @@ import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit } from '@/lib
 import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 import {
-  clientCanPayAmount,
-  insufficientClientFundsMessage,
-  normalizeClientBalances,
+  CLIENT_PAYMENT_PROFILE_SELECT,
+  balanceDiagnosticsFromBalances,
+  validateClientForCardPayment,
 } from '@/lib/security/client-payment-balance';
 
-const API_BUILD_VERSION = '20260721-balance-v2';
+const API_BUILD_VERSION = '20260722-card-balance-v3';
 
 function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders?: Record<string, string>) {
   return NextResponse.json(body, {
@@ -23,11 +23,14 @@ function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders
   });
 }
 
-function balanceDiagnostics(balances: { card_balance: number; wallet_balance: number }, amount: number) {
+function balanceDiagnostics(
+  balances: { card_balance: number; wallet_balance: number },
+  amount: number,
+  debitFrom?: 'card' | 'wallet'
+) {
   return {
-    card_htg: balances.card_balance,
-    wallet_htg: balances.wallet_balance,
-    required_htg: amount,
+    ...balanceDiagnosticsFromBalances(balances, amount),
+    debit_from: debitFrom,
     build: API_BUILD_VERSION,
   };
 }
@@ -37,7 +40,7 @@ export async function GET() {
   return jsonWithBuild({
     ok: true,
     build: API_BUILD_VERSION,
-    hint: 'Si build pa egal 20260721-balance-v2, Vercel poko deploy dènye commit la.',
+    hint: 'Si build pa egal 20260722-card-balance-v3, Vercel poko deploy dènye commit la.',
   });
 }
 
@@ -126,25 +129,28 @@ export async function POST(request: Request) {
 
     const { data: freshClient, error: freshClientErr } = await supabase
       .from('profiles')
-      .select('id, card_balance, wallet_balance, account_status, full_name, account_type')
+      .select(CLIENT_PAYMENT_PROFILE_SELECT)
       .eq('id', client.id)
       .single();
 
     if (freshClientErr || !freshClient) {
-      return jsonWithBuild({ error: 'Pa kapab verifye balans kliyan an.' }, 500);
+      return jsonWithBuild({ error: 'Pa kapab verifye balans kliyan an (profiles.card_balance).' }, 500);
     }
 
-    if (freshClient.account_status !== 'active') {
-      return jsonWithBuild({ error: 'Kont ki asosye ak kat sa a pa aktif.' }, 403);
+    const paymentCheck = validateClientForCardPayment(freshClient, safeAmount);
+    if (!paymentCheck.ok) {
+      return jsonWithBuild(
+        {
+          error: paymentCheck.error,
+          ...(paymentCheck.balances
+            ? { balances: balanceDiagnostics(paymentCheck.balances, safeAmount) }
+            : {}),
+        },
+        paymentCheck.status
+      );
     }
 
-    const clientBalances = normalizeClientBalances(freshClient);
-    if (!clientCanPayAmount(clientBalances, safeAmount)) {
-      return jsonWithBuild({
-        error: insufficientClientFundsMessage(clientBalances, safeAmount),
-        balances: balanceDiagnostics(clientBalances, safeAmount),
-      }, 400);
-    }
+    const clientBalances = paymentCheck.balances;
 
     if (freshClient.id === merchant.id) {
       return jsonWithBuild({
@@ -182,10 +188,12 @@ export async function POST(request: Request) {
       const rpcMessage = rpcResult?.message || rpcError?.message || 'Echèk nan egzekisyon peman an.';
       const errBody: Record<string, unknown> = {
         error: rpcMessage,
-        balances: balanceDiagnostics(clientBalances, safeAmount),
+        balances: balanceDiagnostics(clientBalances, safeAmount, paymentCheck.debitFrom),
       };
       if (rpcMessage === 'Fon ensifizan.') {
-        errBody.hint = 'Kouri migrasyon 20260721 sou Supabase epi redeploy Vercel (npm run verify:live).';
+        errBody.hint =
+          'Ansyen RPC Supabase toujou sou live (li tcheke wallet_balance, pa card_balance). ' +
+          'Kouri migrasyon 20260721 sou Supabase epi redeploy Vercel (npm run verify:live).';
       }
       return jsonWithBuild(errBody, status);
     }
@@ -198,7 +206,8 @@ export async function POST(request: Request) {
       transaction_id: transactionId,
       customer: freshClient.full_name,
       amount_charged: safeAmount,
-      debited_from: rpcResult.debited_from || 'unknown',
+      debited_from: rpcResult.debited_from || paymentCheck.debitFrom,
+      balances: balanceDiagnostics(clientBalances, safeAmount, rpcResult.debited_from || paymentCheck.debitFrom),
     };
 
     if (idempotencyKey) {
