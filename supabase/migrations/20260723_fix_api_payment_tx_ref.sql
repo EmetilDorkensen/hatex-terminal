@@ -1,11 +1,5 @@
--- ============================================================================
--- PEMAN API: debite card_balance an premye, sinon wallet_balance
--- ============================================================================
--- Anpil itilizatè gen lajan sou wallet (Dashboard) men card_balance = 0 paske
--- yo pa fè rechaj kat. RPC anba a aliye ak sa UI a montre epi bay mesaj klè.
--- ============================================================================
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Fix: gen_random_bytes pa disponib ak search_path=public sou Supabase.
+-- Kouri TOUT fichye sa a nan SQL Editor, apre sa retest peman API a.
 
 CREATE OR REPLACE FUNCTION public.process_direct_card_payment(
   p_client_id UUID,
@@ -132,40 +126,5 @@ BEGIN
     'transaction_id', v_transaction_ref,
     'debited_from', v_debit_source
   );
-END;
-$$;
-
--- Rechaj kat: wallet -> card (manke nan repo anvan)
-CREATE OR REPLACE FUNCTION public.process_card_recharge(
-  p_user_id UUID,
-  p_amount NUMERIC
-)
-RETURNS JSON
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_wallet NUMERIC;
-BEGIN
-  IF p_amount IS NULL OR p_amount <= 0 THEN
-    RETURN json_build_object('success', false, 'message', 'Montan pa valab.');
-  END IF;
-
-  SELECT wallet_balance INTO v_wallet FROM public.profiles WHERE id = p_user_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RETURN json_build_object('success', false, 'message', 'Kont pa jwenn.');
-  END IF;
-
-  IF COALESCE(v_wallet, 0) < p_amount THEN
-    RETURN json_build_object('success', false, 'message', 'Balans wallet pa ase.');
-  END IF;
-
-  UPDATE public.profiles
-  SET wallet_balance = wallet_balance - p_amount,
-      card_balance = COALESCE(card_balance, 0) + p_amount
-  WHERE id = p_user_id;
-
-  RETURN json_build_object('success', true, 'message', 'Kat ou rechaje ak siksè!');
 END;
 $$;
