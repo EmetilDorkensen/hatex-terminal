@@ -5,6 +5,8 @@
 -- yo pa fè rechaj kat. RPC anba a aliye ak sa UI a montre epi bay mesaj klè.
 -- ============================================================================
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE OR REPLACE FUNCTION public.process_direct_card_payment(
   p_client_id UUID,
   p_merchant_id UUID,
