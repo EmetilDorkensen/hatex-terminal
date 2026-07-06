@@ -1,5 +1,5 @@
 const LIVE_URL = process.env.HATEX_LIVE_URL || 'https://hatexcard.com';
-const EXPECTED_BUILD = '20260722-card-balance-v3';
+const EXPECTED_BUILD = '20260723-api-secure-v4';
 
 const res = await fetch(`${LIVE_URL}/api/public/payments`);
 const versionHeader = res.headers.get('x-hatex-api-version');

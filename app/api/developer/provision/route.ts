@@ -2,9 +2,15 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
 import { maskApiKey } from '@/lib/security/api-key';
+import { rateLimitMerchantIp } from '@/lib/security/merchant-api';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const ipRl = await rateLimitMerchantIp(request, 'developer-provision', 10, 300);
+    if (!ipRl.allowed) {
+      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
+    }
+
     const supabaseSession = await createSupabaseServerClient();
     const { data: { user }, error: authErr } = await supabaseSession.auth.getUser();
 

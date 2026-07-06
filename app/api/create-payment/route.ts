@@ -1,33 +1,53 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
+import {
+  isUntrustedBrowserRequest,
+  merchantApiJson,
+  parseBearerApiKey,
+  rateLimitMerchantApiKey,
+  rateLimitMerchantIp,
+} from '@/lib/security/merchant-api';
 
 export async function POST(req: Request) {
   try {
-    // 🚨 KONEKSYON AN DWE ANNDAN FONKSYON AN POU NEXT.JS PA BAY ERÈ 🚨
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    );
-
-    // 1. Nou resevwa done WordPress/WooCommerce la voye yo
-    const body = await req.json();
-    const { merchant_api_key, amount_htg, order_id, redirect_url, webhook_url, customer_info } = body;
-
-    // Tcheke si l voye tout enfòmasyon yo
-    if (!merchant_api_key || !amount_htg || !order_id || !redirect_url) {
-      return NextResponse.json({ error: 'Manke enfòmasyon nan demann lan' }, { status: 400 });
+    if (isUntrustedBrowserRequest(req)) {
+      return merchantApiJson({ error: 'API sa a se sèlman pou sèvè machann.' }, 403);
     }
 
-    // 2. Nou verifye si machann sa a gen kont HatexCard vre gras ak API Key a
-    const merchant = await authenticateMerchantApiKey(supabaseAdmin, merchant_api_key);
+    const ipRl = await rateLimitMerchantIp(req, 'create-payment', 40, 60);
+    if (!ipRl.allowed) {
+      return merchantApiJson({ error: 'Twòp demann. Eseye ankò.' }, 429);
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const body = await req.json();
+    const { merchant_api_key, amount_htg, order_id, redirect_url, webhook_url } = body;
+
+    const apiKey =
+      parseBearerApiKey(req) || (typeof merchant_api_key === 'string' ? merchant_api_key.trim() : null);
+
+    if (!apiKey || !amount_htg || !order_id || !redirect_url) {
+      return merchantApiJson({ error: 'Manke enfòmasyon nan demann lan' }, 400);
+    }
+
+    const keyRl = await rateLimitMerchantApiKey(apiKey, 60, 60);
+    if (!keyRl.allowed) {
+      return merchantApiJson({ error: 'Twòp demann pou kle API sa a.' }, 429);
+    }
+
+    const merchant = await authenticateMerchantApiKey(supabaseAdmin, apiKey);
 
     if (!merchant) {
-      return NextResponse.json({ error: 'Machann sa a pa rekonèt sou HatexCard' }, { status: 404 });
+      return merchantApiJson({ error: 'Machann sa a pa rekonèt sou HatexCard' }, 404);
     }
 
     if (merchant.account_status === 'suspended') {
-      return NextResponse.json({ error: 'Kont machann sa a bloke. Peman enposib.' }, { status: 403 });
+      return merchantApiJson({ error: 'Kont machann sa a bloke. Peman enposib.' }, 403);
     }
 
     // 3. Nou kreye "Tikè Peman an" (Fakti a) nan baz done nou an
@@ -49,14 +69,13 @@ export async function POST(req: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const checkoutUrl = `${baseUrl}/pay/${paymentRequest.id}`;
 
-    return NextResponse.json({ 
-      success: true, 
+    return merchantApiJson({
+      success: true,
       payment_id: paymentRequest.id,
-      checkout_url: checkoutUrl 
+      checkout_url: checkoutUrl,
     });
-
-  } catch (error: any) {
-    console.error("API Payment Error:", error);
-    return NextResponse.json({ error: 'Erè nan sèvè HatexCard la' }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('API Payment Error:', error);
+    return merchantApiJson({ error: 'Erè nan sèvè HatexCard la' }, 500);
   }
 }

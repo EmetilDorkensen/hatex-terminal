@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { findProfileByCard } from '@/lib/security/card-lookup';
-import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit } from '@/lib/security/spending-limits';
 import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
@@ -10,17 +9,32 @@ import {
   balanceDiagnosticsFromBalances,
   validateClientForCardPayment,
 } from '@/lib/security/client-payment-balance';
+import {
+  claimIdempotencyKey,
+  finalizeIdempotencyKey,
+  isUntrustedBrowserRequest,
+  merchantApiJson,
+  MERCHANT_API_SECURITY_HEADERS,
+  parseBearerApiKey,
+  rateLimitCardPaymentAttempts,
+  rateLimitInvalidApiKey,
+  rateLimitMerchantApiKey,
+  rateLimitMerchantIp,
+  releaseIdempotencyKey,
+} from '@/lib/security/merchant-api';
+import { getClientIp } from '@/lib/security/rate-limit';
 
-const API_BUILD_VERSION = '20260722-card-balance-v3';
+const API_BUILD_VERSION = '20260723-api-secure-v4';
 
 function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders?: Record<string, string>) {
-  return NextResponse.json(body, {
+  return merchantApiJson(
+    body,
     status,
-    headers: {
+    {
       'X-Hatex-Api-Version': API_BUILD_VERSION,
       ...(extraHeaders || {}),
-    },
-  });
+    }
+  );
 }
 
 function balanceDiagnostics(
@@ -40,50 +54,70 @@ export async function GET() {
   return jsonWithBuild({
     ok: true,
     build: API_BUILD_VERSION,
-    hint: 'Si build pa egal 20260722-card-balance-v3, Vercel poko deploy dènye commit la.',
+    hint: 'Si build pa egal 20260723-api-secure-v4, Vercel poko deploy dènye commit la.',
   });
 }
 
 export async function POST(request: Request) {
+  let idempotencyKey = '';
+  let merchantId: string | null = null;
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
-    const ip = getClientIp(request);
-    const rl = await rateLimit(`public-payments:${ip}`, 40, 60);
-    if (!rl.allowed) {
+    if (isUntrustedBrowserRequest(request)) {
+      return jsonWithBuild(
+        {
+          error:
+            'API sa a se sèlman pou sèvè machann (PHP/Node/Python). Pa rele l depi navigatè kliyan an.',
+        },
+        403
+      );
+    }
+
+    const ipRl = await rateLimitMerchantIp(request, 'public-payments', 30, 60);
+    if (!ipRl.allowed) {
       return jsonWithBuild({ error: 'Twòp demann. Eseye ankò.' }, 429);
     }
 
-    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const apiKey = parseBearerApiKey(request);
+    if (!apiKey) {
       return jsonWithBuild({ error: 'Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen.' }, 401);
     }
 
-    const apiKey = authHeader.split(' ')[1].trim();
-    const idempotencyKey = (request.headers.get('idempotency-key') || request.headers.get('Idempotency-Key') || '').trim().slice(0, 200);
+    idempotencyKey = (request.headers.get('idempotency-key') || request.headers.get('Idempotency-Key') || '')
+      .trim()
+      .slice(0, 200);
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const keyRl = await rateLimitMerchantApiKey(apiKey, 120, 60);
+    if (!keyRl.allowed) {
+      return jsonWithBuild({ error: 'Twòp demann pou kle API sa a. Eseye ankò.' }, 429);
+    }
 
     const merchant = await authenticateMerchantApiKey(supabase, apiKey);
 
     if (!merchant || !merchant.is_merchant) {
+      const badKeyRl = await rateLimitInvalidApiKey(getClientIp(request));
+      if (!badKeyRl.allowed) {
+        return jsonWithBuild({ error: 'Twòp tantativ ak kle envalid. Eseye ankò.' }, 429);
+      }
       return jsonWithBuild({ error: 'Kle API sa a pa valab oswa kont lan pa otorize pou resevwa peman.' }, 403);
     }
     if (merchant.account_status !== 'active') {
       return jsonWithBuild({ error: 'Kont machann sa a pa aktif. Tranzaksyon an anile.' }, 403);
     }
 
-    if (idempotencyKey) {
-      const { data: existingIdem } = await supabase
-        .from('api_idempotency_keys')
-        .select('response_body')
-        .eq('merchant_id', merchant.id)
-        .eq('idempotency_key', idempotencyKey)
-        .maybeSingle();
+    merchantId = merchant.id;
 
-      if (existingIdem?.response_body) {
-        return jsonWithBuild(existingIdem.response_body as Record<string, unknown>, 200, { 'Idempotent-Replayed': 'true' });
+    if (idempotencyKey) {
+      const claim = await claimIdempotencyKey(supabase, merchant.id, idempotencyKey);
+      if (claim.status === 'replay') {
+        return jsonWithBuild(claim.body, 200, { 'Idempotent-Replayed': 'true' });
+      }
+      if (claim.status === 'in_progress') {
+        return jsonWithBuild({ error: 'Peman ak menm Idempotency-Key deja an kou.' }, 409);
       }
     }
 
@@ -97,7 +131,17 @@ export async function POST(request: Request) {
     const cleanOrderId = String(order_id || '').trim().substring(0, 50);
 
     if (cleanCard.length < 15 || cleanCvv.length < 3 || rawExp.length !== 4 || isNaN(safeAmount) || safeAmount <= 0) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: 'Fòma done yo pa bon. Tcheke kat la, CVV a, Dat la (MMYY), oswa kantite kòb la.' }, 400);
+    }
+
+    const cardRl = await rateLimitCardPaymentAttempts(cleanCard);
+    if (!cardRl.allowed) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+      return jsonWithBuild(
+        { error: `Twòp tantativ sou kat sa a. Eseye ankò nan ${Math.ceil((cardRl.retryAfterSec || 900) / 60)} minit.` },
+        429
+      );
     }
 
     const slashedExp = `${rawExp.slice(0, 2)}/${rawExp.slice(2)}`;
@@ -111,6 +155,7 @@ export async function POST(request: Request) {
         .single();
 
       if (existingTx) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
         return jsonWithBuild({ error: 'Peman sa a fèt deja pou kòmand sa a (Pwoteksyon Anti-Doublon).' }, 409);
       }
     }
@@ -124,6 +169,7 @@ export async function POST(request: Request) {
     );
 
     if (!client) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: cardError || 'Tranzaksyon refize. Enfòmasyon kat yo pa koresponn.' }, 401);
     }
 
@@ -134,11 +180,13 @@ export async function POST(request: Request) {
       .single();
 
     if (freshClientErr || !freshClient) {
-      return jsonWithBuild({ error: 'Pa kapab verifye balans kliyan an (profiles.card_balance).' }, 500);
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+      return jsonWithBuild({ error: 'Pa kapab verifye balans kliyan an.' }, 500);
     }
 
     const paymentCheck = validateClientForCardPayment(freshClient, safeAmount);
     if (!paymentCheck.ok) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild(
         {
           error: paymentCheck.error,
@@ -153,6 +201,7 @@ export async function POST(request: Request) {
     const clientBalances = paymentCheck.balances;
 
     if (freshClient.id === merchant.id) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({
         error: 'Ou pa ka itilize menm kont pou machann ak kliyan. Itilize yon lòt kont kòm kliyan pou teste API a.',
       }, 400);
@@ -160,16 +209,19 @@ export async function POST(request: Request) {
 
     const limitCheck = await checkSpendingLimit(supabase, freshClient.id, freshClient.account_type, safeAmount, 'card');
     if (!limitCheck.allowed) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: limitCheck.message || 'Limit depans depase.' }, 400);
     }
 
     const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, safeAmount);
     if (!capCheck.allowed) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: capCheck.message || 'Balans machann nan ta depase limit maksimòm otorize a.' }, 400);
     }
 
     const receiveCheck = await checkApiReceiveLimit(supabase, merchant.id, merchant.account_type, safeAmount);
     if (!receiveCheck.allowed) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: receiveCheck.message || 'Limit resepsyon API depase.' }, 400);
     }
 
@@ -184,18 +236,16 @@ export async function POST(request: Request) {
     });
 
     if (rpcError || !rpcResult?.success) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       const status = rpcResult?.duplicate ? 409 : 400;
       const rpcMessage = rpcResult?.message || rpcError?.message || 'Echèk nan egzekisyon peman an.';
-      const errBody: Record<string, unknown> = {
-        error: rpcMessage,
-        balances: balanceDiagnostics(clientBalances, safeAmount, paymentCheck.debitFrom),
-      };
-      if (rpcMessage === 'Fon ensifizan.') {
-        errBody.hint =
-          'Ansyen RPC Supabase toujou sou live (li tcheke wallet_balance, pa card_balance). ' +
-          'Kouri migrasyon 20260721 sou Supabase epi redeploy Vercel (npm run verify:live).';
-      }
-      return jsonWithBuild(errBody, status);
+      return jsonWithBuild(
+        {
+          error: rpcMessage,
+          balances: balanceDiagnostics(clientBalances, safeAmount, paymentCheck.debitFrom),
+        },
+        status
+      );
     }
 
     const transactionId: string = rpcResult.transaction_id;
@@ -207,15 +257,10 @@ export async function POST(request: Request) {
       customer: freshClient.full_name,
       amount_charged: safeAmount,
       debited_from: rpcResult.debited_from || paymentCheck.debitFrom,
-      balances: balanceDiagnostics(clientBalances, safeAmount, rpcResult.debited_from || paymentCheck.debitFrom),
     };
 
     if (idempotencyKey) {
-      await supabase.from('api_idempotency_keys').insert({
-        merchant_id: merchant.id,
-        idempotency_key: idempotencyKey,
-        response_body: successResponse,
-      });
+      await finalizeIdempotencyKey(supabase, merchant.id, idempotencyKey, successResponse);
     }
 
     await deliverWebhookEvent(supabase, merchant.id, 'payment.success', {
@@ -229,6 +274,16 @@ export async function POST(request: Request) {
     return jsonWithBuild(successResponse);
   } catch (error: unknown) {
     console.error('[CRITICAL ERROR] HatexCard Payment Gateway:', error);
-    return jsonWithBuild({ error: 'Sèvè a rankontre yon erè kritik. Tanpri kontakte sipò HatexCard.' }, 500);
+    if (idempotencyKey && merchantId) {
+      try {
+        await releaseIdempotencyKey(supabase, merchantId, idempotencyKey);
+      } catch {
+        /* ignore cleanup failure */
+      }
+    }
+    return NextResponse.json(
+      { error: 'Sèvè a rankontre yon erè kritik. Tanpri kontakte sipò HatexCard.' },
+      { status: 500, headers: MERCHANT_API_SECURITY_HEADERS }
+    );
   }
 }

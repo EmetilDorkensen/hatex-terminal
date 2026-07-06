@@ -3,9 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
+import { isUntrustedBrowserRequest, merchantApiJson, parseBearerApiKey } from '@/lib/security/merchant-api';
 
 export async function POST(req: Request) {
   try {
+    if (isUntrustedBrowserRequest(req)) {
+      return merchantApiJson({ error: 'API sa a se sèlman pou sèvè machann.' }, 403);
+    }
+
     const ip = getClientIp(req);
     const rl = await rateLimit(`refunds:${ip}`, 20, 60);
     if (!rl.allowed) {
@@ -15,11 +20,10 @@ export async function POST(req: Request) {
     // 🔐 OTANTIFIKASYON OBLIGATWA: se sèlman machann ki gen kle API valab la
     // (Bearer token) ki ka mande yon ranbousman — `merchant_id` PA JANM dwe
     // soti nan kò rekèt la, sinon nenpòt moun ka fòse yon ranbousman.
-    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen.' }, { status: 401 });
+    const apiKey = parseBearerApiKey(req);
+    if (!apiKey) {
+      return merchantApiJson({ error: 'Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen.' }, 401);
     }
-    const apiKey = authHeader.split(' ')[1].trim();
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const supabaseAdmin = createClient(
