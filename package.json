@@ -11,7 +11,8 @@
     "verify:live": "node scripts/verify-live-deploy.mjs",
     "test:live": "node scripts/test-live-api.mjs",
     "db:migrate:balance": "node scripts/print-migration-20260721.mjs",
-    "db:apply:balance": "node scripts/apply-migration-20260721.mjs"
+    "db:apply:balance": "node scripts/apply-migration-20260721.mjs",
+    "setup:live": "node scripts/setup-live-fix.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
