@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "live": "git add . && git commit -m \"mizajou\" && git push origin main && node scripts/trigger-vercel-deploy.mjs"
+    "live": "git add . && git commit -m \"mizajou\" && git push origin main && node scripts/trigger-vercel-deploy.mjs",
+    "verify:live": "node scripts/verify-live-deploy.mjs",
+    "test:live": "node scripts/test-live-api.mjs",
+    "db:migrate:balance": "node scripts/print-migration-20260721.mjs",
+    "db:apply:balance": "node scripts/apply-migration-20260721.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
