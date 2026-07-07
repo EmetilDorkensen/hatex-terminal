@@ -59,9 +59,19 @@ export async function middleware(request: NextRequest) {
     if (!session || session.user.email !== ADMIN_EMAIL) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
+  }
 
-    // Si kont admin la anrejistre yon aparèy MFA (TOTP), sesyon an DWE fin
-    // pase pa etap MFA (aal2) — yon cookie sesyon aal1 vòlè pa ka sifi.
+  // Kont ki gen MFA aktive (TOTP verifye) dwe fin pase etap MFA (aal2) anvan
+  // yo antre nan paj pwoteje yo — yon cookie sesyon aal1 sèl pa sifi.
+  if (
+    session &&
+    !url.pathname.startsWith('/login') &&
+    !url.pathname.startsWith('/api') &&
+    (url.pathname.startsWith('/admin') ||
+      url.pathname.startsWith('/dashboard') ||
+      url.pathname.startsWith('/setting') ||
+      url.pathname.startsWith('/workspace'))
+  ) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
       return NextResponse.redirect(new URL('/login', request.url));

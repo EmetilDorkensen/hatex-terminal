@@ -5,8 +5,9 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Bell, Globe, LogOut, ChevronRight, 
-  Loader2, Key, Edit2, X, Lock, ShieldCheck, Mail, User
+  Loader2, Key, Edit2, X, Lock, ShieldCheck
 } from 'lucide-react';
+import MfaSettings from '@/app/components/MfaSettings';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -258,7 +259,7 @@ export default function SettingsPage() {
               </>
             )}
 
-            <div onClick={handleResetPassword} className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors cursor-pointer">
+            <div onClick={handleResetPassword} className="flex items-center justify-between p-6 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
               <div className="flex items-center gap-4">
                 <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Key className="w-5 h-5" /></div>
                 <div>
@@ -267,6 +268,15 @@ export default function SettingsPage() {
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
+            </div>
+
+            <div className="p-6">
+              <MfaSettings
+                supabase={supabase}
+                title="Otantifikasyon 2 Etap (MFA)"
+                subtitle="Google Authenticator, Authy, elatriye"
+                emptyMessage="Aktive MFA pou plis sekirite. Chak fwa ou konekte, ou ap bezwen yon kòd 6 chif soti nan app otantifikatè w la."
+              />
             </div>
           </div>
         </div>

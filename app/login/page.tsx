@@ -154,17 +154,13 @@ export default function Login() {
     setErrorMsg('');
 
     try {
-      const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
-      if (challengeErr || !challenge) throw new Error('Pa t kapab kòmanse verifikasyon MFA.');
-
-      const { error: verifyErr } = await supabase.auth.mfa.verify({
+      const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
         factorId: mfaFactorId,
-        challengeId: challenge.id,
-        code: mfaCode,
+        code: mfaCode.trim(),
       });
 
       if (verifyErr) {
-        setErrorMsg("Kòd MFA a pa bon oswa li ekspire.");
+        setErrorMsg(verifyErr.message || "Kòd MFA a pa bon oswa li ekspire. Verifye lè aparèy ou a kòrèk.");
         setMfaCode('');
         setLoading(false);
         return;
