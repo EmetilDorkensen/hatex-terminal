@@ -154,17 +154,21 @@ export default function Login() {
     setErrorMsg('');
 
     try {
-      const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
-        factorId: mfaFactorId,
-        code: mfaCode.trim(),
+      const res = await fetch('/api/auth/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factorId: mfaFactorId, code: mfaCode.trim() }),
       });
+      const data = await res.json();
 
-      if (verifyErr) {
-        setErrorMsg(verifyErr.message || "Kòd MFA a pa bon oswa li ekspire. Verifye lè aparèy ou a kòrèk.");
+      if (!res.ok || !data.success) {
+        setErrorMsg(data.message || "Kòd MFA a pa bon oswa li ekspire. Verifye lè aparèy ou a kòrèk.");
         setMfaCode('');
         setLoading(false);
         return;
       }
+
+      await supabase.auth.refreshSession();
 
       await trackDeviceAndIP(email);
       window.location.href = '/dashboard';

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { QRCodeSVG } from 'qrcode.react';
 import { ShieldCheck, Loader2, AlertTriangle, Smartphone, Trash2, CheckCircle2, Clock } from 'lucide-react';
 
 interface Props {
@@ -19,6 +18,21 @@ interface TotpFactor {
   created_at: string;
 }
 
+function formatServerTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleString('ht-HT', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export default function MfaSettings({
   supabase,
   title = 'Otantifikasyon 2 Etap (MFA)',
@@ -29,71 +43,58 @@ export default function MfaSettings({
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [otpUri, setOtpUri] = useState('');
+  const [qrCodeSvg, setQrCodeSvg] = useState('');
   const [secret, setSecret] = useState('');
   const [pendingFactorId, setPendingFactorId] = useState('');
+  const [serverTime, setServerTime] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const loadFactors = async () => {
     setLoading(true);
-    const { data } = await supabase.auth.mfa.listFactors();
-    const verified = ((data?.totp as TotpFactor[]) || []).filter((f) => f.status === 'verified');
-    setFactors(verified);
+    const res = await fetch('/api/auth/mfa/factors');
+    const data = await res.json();
+    setFactors((data.factors as TotpFactor[]) || []);
     setLoading(false);
   };
 
   useEffect(() => {
     loadFactors();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const cleanupUnverifiedFactors = async () => {
-    const { data: existing } = await supabase.auth.mfa.listFactors();
-    const staleFactors = (existing?.all || []).filter((f: { status: string }) => f.status === 'unverified');
-    for (const stale of staleFactors) {
-      await supabase.auth.mfa.unenroll({ factorId: stale.id });
-    }
-  };
 
   const startEnroll = async () => {
     setError('');
     setSuccess('');
     setEnrolling(true);
+    setQrCodeSvg('');
+    setSecret('');
+    setPendingFactorId('');
+    setServerTime('');
 
-    await supabase.auth.refreshSession().catch(() => {});
+    const res = await fetch('/api/auth/mfa/enroll', { method: 'POST' });
+    const data = await res.json();
 
-    await cleanupUnverifiedFactors();
-
-    const friendlyName = `HatexCard-${Date.now()}`;
-    const { data, error: enrollErr } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName,
-      issuer: 'HatexCard',
-    });
-
-    if (enrollErr || !data) {
-      setError(enrollErr?.message || 'Pa t kapab kòmanse enskripsyon MFA.');
+    if (!res.ok || !data.success) {
+      setError(data.message || 'Pa t kapab kòmanse enskripsyon MFA.');
       setEnrolling(false);
       return;
     }
 
-    const uri = data.totp.uri || '';
-    if (!uri) {
-      await supabase.auth.mfa.unenroll({ factorId: data.id }).catch(() => {});
+    if (!data.qrCode || !data.factorId) {
       setError('Sistèm nan pa t ka jenere kòd QR la. Eseye ankò.');
       setEnrolling(false);
       return;
     }
 
-    setOtpUri(uri);
-    setSecret(data.totp.secret);
-    setPendingFactorId(data.id);
+    setQrCodeSvg(data.qrCode);
+    setSecret(data.secret || '');
+    setPendingFactorId(data.factorId);
+    setServerTime(data.serverTime || '');
   };
 
   const confirmEnroll = async () => {
-    const code = verifyCode.trim();
+    const code = verifyCode.replace(/\D/g, '').trim();
     if (code.length !== 6) {
       setError('Kòd la dwe gen 6 chif.');
       return;
@@ -103,21 +104,27 @@ export default function MfaSettings({
     setVerifying(true);
 
     try {
-      const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
-        factorId: pendingFactorId,
-        code,
+      const res = await fetch('/api/auth/mfa/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factorId: pendingFactorId, code, secret }),
       });
+      const data = await res.json();
 
-      if (verifyErr) {
-        throw new Error(verifyErr.message || 'Kòd la pa bon. Asire lè aparèy ou a kòrèk epi eseye yon nouvo kòd.');
+      if (!res.ok || !data.success) {
+        const timeHint = data.serverTime ? ` Lè sèvè a: ${formatServerTime(data.serverTime)}.` : '';
+        throw new Error((data.message || 'Kòd la pa bon.') + timeHint);
       }
+
+      await supabase.auth.refreshSession();
 
       setSuccess('MFA aktive avèk siksè! Ou ap bezwen kòd sa a chak fwa ou konekte.');
       setEnrolling(false);
-      setOtpUri('');
+      setQrCodeSvg('');
       setSecret('');
       setVerifyCode('');
       setPendingFactorId('');
+      setServerTime('');
       await loadFactors();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erè nan verifikasyon.';
@@ -130,24 +137,37 @@ export default function MfaSettings({
   const removeFactor = async (factorId: string) => {
     if (!confirm('Retire aparèy MFA sa a? Ou p ap gen 2-etap ankò pou pwochen koneksyon w.')) return;
     setError('');
-    const { error: unenrollErr } = await supabase.auth.mfa.unenroll({ factorId });
-    if (unenrollErr) {
-      setError(unenrollErr.message || 'Pa t kapab retire aparèy la.');
+
+    const res = await fetch('/api/auth/mfa/factors', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ factorId }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      setError(data.message || 'Pa t kapab retire aparèy la.');
       return;
     }
+
     setSuccess('MFA retire avèk siksè.');
     loadFactors();
   };
 
   const cancelEnroll = async () => {
     if (pendingFactorId) {
-      await supabase.auth.mfa.unenroll({ factorId: pendingFactorId }).catch(() => {});
+      await fetch('/api/auth/mfa/factors', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factorId: pendingFactorId }),
+      }).catch(() => {});
     }
     setEnrolling(false);
-    setOtpUri('');
+    setQrCodeSvg('');
     setSecret('');
     setVerifyCode('');
     setPendingFactorId('');
+    setServerTime('');
     setError('');
   };
 
@@ -216,24 +236,36 @@ export default function MfaSettings({
             </button>
           )}
 
-          {enrolling && otpUri && (
+          {enrolling && qrCodeSvg && (
             <div className="text-center space-y-4 pt-2 border-t border-gray-100">
-              <p className="text-xs font-bold text-slate-800">1. Eskane kòd QR sa a ak app otantifikatè w la</p>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-left max-w-md mx-auto">
+                <p className="text-[10px] text-blue-800 font-bold mb-1">⚠️ Enpòtan anvan ou eskane:</p>
+                <p className="text-[10px] text-blue-700">
+                  Efase tout ansyen antre &quot;HatexCard&quot; oswa &quot;Supabase&quot; ki deja nan app otantifikatè w la (Google Authenticator / Authy), epi eskane sèlman QR sa a.
+                </p>
+              </div>
+
+              <p className="text-xs font-bold text-slate-800">1. Eskane kòd QR sa a</p>
               <div className="flex justify-center">
-                <div className="bg-white p-4 rounded-2xl border border-gray-200 inline-block">
-                  <QRCodeSVG value={otpUri} size={180} level="M" includeMargin />
-                </div>
+                <div
+                  className="bg-white p-4 rounded-2xl border border-gray-200 inline-block [&>svg]:block"
+                  dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+                />
               </div>
               <p className="text-[11px] text-slate-500">
-                Pa ka eskane l? Antre kòd sa a manyèlman:{' '}
-                <span className="font-mono font-bold text-slate-700 break-all">{secret}</span>
+                Pa ka eskane l? Antre kòd sa a manyèlman (san espas):{' '}
+                <span className="font-mono font-bold text-slate-700 break-all select-all">{secret}</span>
               </p>
 
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 text-left max-w-sm mx-auto">
                 <Clock size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-amber-800 font-medium">
-                  Si kòd yo toujou rejte, verifye lè aparèy ou a ak telefòn ou a kòrèk (paramèt &rarr; Dat ak Lè &rarr; otomatik).
-                </p>
+                <div className="text-[10px] text-amber-800 font-medium">
+                  <p>Lè telefòn ou a dwe matche ak lè sèvè a.</p>
+                  {serverTime && (
+                    <p className="mt-1 font-bold">Lè sèvè HatexCard: {formatServerTime(serverTime)}</p>
+                  )}
+                  <p className="mt-1">Ale nan Paramèt → Dat ak Lè → aktive &quot;Lè otomatik&quot;.</p>
+                </div>
               </div>
 
               <p className="text-xs font-bold text-slate-800 pt-1">2. Antre kòd 6 chif ki parèt nan app la</p>
