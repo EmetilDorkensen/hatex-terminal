@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
-import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import {
   buildLoginFailureUpdate,
   CAPTCHA_AFTER_ATTEMPTS,
@@ -67,6 +67,15 @@ export async function POST(request: Request) {
   }
 
   if (action === 'success') {
+    // 🔒 Reset kontè echèk yo SÈLMAN si gen yon sesyon valab ki fèk kreye pou
+    // menm imèl la. San sa, nenpòt moun ta ka rele `action=success` pou efase
+    // kontè brute-force la epi kontinye eseye modpas san limit (kontounen
+    // pwoteksyon lockout la).
+    const sessionClient = await createSupabaseServerClient();
+    const { data: { user: sessionUser } } = await sessionClient.auth.getUser();
+    if (!sessionUser || (sessionUser.email || '').trim().toLowerCase() !== email) {
+      return NextResponse.json({ allowed: false, message: 'Sesyon pa valid.' }, { status: 401 });
+    }
     await db.from('profiles').update(loginSuccessUpdate).eq('id', profile.id);
     return NextResponse.json({ allowed: true });
   }

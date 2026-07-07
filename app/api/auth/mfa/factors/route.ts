@@ -34,6 +34,21 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: false, message: 'Faktè manke.' }, { status: 400 });
   }
 
+  // 🔒 Step-up: pou retire yon faktè MFA VERIFYE, sesyon an dwe deja pase etap
+  // 2 faktè a (aal2) nan sesyon aktyèl la. Sa anpeche yon sesyon vòlè ki gen
+  // sèlman modpas (aal1) dezaktive MFA epi febli kont lan.
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: factorsList } = await supabase.auth.mfa.listFactors();
+  const targetFactor = (factorsList?.all || []).find((f) => f.id === factorId);
+  const isVerifiedFactor = targetFactor?.status === 'verified';
+
+  if (isVerifiedFactor && aal?.currentLevel !== 'aal2') {
+    return NextResponse.json(
+      { success: false, message: 'Ou dwe konfime kòd MFA a (etap 2) anvan ou ka retire aparèy la.' },
+      { status: 403 }
+    );
+  }
+
   const { error } = await supabase.auth.mfa.unenroll({ factorId });
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });

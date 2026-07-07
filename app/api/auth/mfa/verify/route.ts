@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
@@ -7,6 +8,12 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ success: false, message: 'Sesyon ekspire.' }, { status: 401 });
+  }
+
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`mfa-verify:${user.id}:${ip}`, 10, 300);
+  if (!rl.allowed) {
+    return NextResponse.json({ success: false, message: 'Twòp tantativ. Tanpri tann kèk minit.' }, { status: 429 });
   }
 
   const body = await request.json().catch(() => ({}));

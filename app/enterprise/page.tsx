@@ -164,19 +164,8 @@ export default function EnterprisePortal() {
       const leaseUrl = await uploadFile(leaseDoc!, 'lease_doc', 'Kontra Lokasyon');
       const legalRepIdUrl = await uploadFile(legalRepIdDoc!, 'legal_rep_id', 'ID Reprezantan Legal');
 
-      const newBal = currentBal - ENTERPRISE_APPLICATION_FEE;
-      const { error: balError } = await supabase.from('profiles').update({
-        wallet_balance: newBal,
-        enterprise_status: 'pending',
-        enterprise_fee_paid: ENTERPRISE_APPLICATION_FEE,
-      }).eq('id', profile.id);
-      if (balError) throw new Error(`Erè pandan peman frè a: ${balError.message}`);
-
-      const { error: txError } = await supabase.from('transactions').insert([
-        { user_id: profile.id, type: 'ENTERPRISE_FEE', amount: -ENTERPRISE_APPLICATION_FEE, status: 'success', description: 'Frè Pasaj Kont Antrepriz' }
-      ]);
-      if (txError) console.error('Enterprise fee transaction insert failed', txError);
-
+      // 1) Anrejistre aplikasyon an AN PREMYE (okenn kòb pa deplase la a). Konsa
+      // si sa echwe, pa gen frè ki chaje pou n bezwen ranbouse.
       const { error: appError } = await supabase.from('enterprise_applications').insert([{
         user_id: profile.id,
         status: 'pending',
@@ -194,9 +183,18 @@ export default function EnterprisePortal() {
         metadata: { fee_paid: ENTERPRISE_APPLICATION_FEE },
       }]);
       if (appError) {
-        // Aplikasyon an pa t anrejistre — ranbouse fè a imedyatman pou kliyan an pa pèdi kòb.
-        await supabase.from('profiles').update({ wallet_balance: currentBal, enterprise_status: 'none', enterprise_fee_paid: 0 }).eq('id', profile.id);
-        throw new Error(`Erè pandan anrejistreman aplikasyon an (frè ranbouse): ${appError.message}`);
+        throw new Error(`Erè pandan anrejistreman aplikasyon an: ${appError.message}`);
+      }
+
+      // 2) Kounye a chaje frè a ATOMIKMAN sou sèvè (debi wallet + estati +
+      // tranzaksyon). Montan frè a fiks sou sèvè — navigatè a pa modifye balans.
+      const { data: feeResult, error: feeErr } = await supabase.rpc('process_enterprise_fee', {
+        p_user_id: profile.id,
+      });
+      if (feeErr || !feeResult?.success) {
+        // Frè a pa t chaje — retire aplikasyon ki fèk kreye a pou pa kite l pandye.
+        await supabase.from('enterprise_applications').delete().eq('user_id', profile.id).eq('status', 'pending');
+        throw new Error((feeErr?.message || feeResult?.message) || 'Peman frè a pa reyisi.');
       }
 
       try {

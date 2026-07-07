@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     const { data: fullProfile } = await supabase
       .from('profiles')
-      .select('id, card_balance, is_activated, full_name, email, account_status')
+      .select('id, is_activated, account_status')
       .eq('id', profile.id)
       .single();
 
@@ -53,13 +53,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false, error: 'Kat pa rekonèt.' }, { status: 401 });
     }
 
+    // ⚠️ Pa janm retounen PII (non, imèl, balans, UUID) bay yon moun ki jis gen
+    // nimewo kat + CVV. Sa te yon "orak" ki te pèmèt enumerasyon/fwod. Peman
+    // abònman an pase pa /api/subscribe/pay kounye a ki fè tout bagay sou sèvè.
     return NextResponse.json({
       valid: true,
-      clientId: fullProfile.id,
-      card_balance: fullProfile.card_balance,
       is_activated: fullProfile.is_activated,
-      full_name: fullProfile.full_name,
-      email: fullProfile.email,
       account_status: fullProfile.account_status,
     });
   } catch {

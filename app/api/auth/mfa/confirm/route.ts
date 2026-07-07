@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifySync } from 'otplib';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 function isCodeValidForSecret(code: string, secret: string) {
   if (!secret) return false;
@@ -18,6 +19,13 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ success: false, message: 'Ou dwe konekte pou verifye MFA.' }, { status: 401 });
+  }
+
+  // Bloke brute-force sou kòd 6 chif la: pa IP epi pa itilizatè.
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`mfa-confirm:${user.id}:${ip}`, 10, 300);
+  if (!rl.allowed) {
+    return NextResponse.json({ success: false, message: 'Twòp tantativ. Tanpri tann kèk minit.' }, { status: 429 });
   }
 
   const body = await request.json().catch(() => ({}));

@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ success: false, message: 'Ou dwe konekte pou aktive MFA.' }, { status: 401 });
+  }
+
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`mfa-enroll:${user.id}:${ip}`, 15, 300);
+  if (!rl.allowed) {
+    return NextResponse.json({ success: false, message: 'Twòp tantativ enskripsyon. Tann kèk minit.' }, { status: 429 });
   }
 
   const { data: existing } = await supabase.auth.mfa.listFactors();

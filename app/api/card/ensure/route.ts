@@ -19,7 +19,7 @@ export async function POST() {
       return NextResponse.json({ card: null });
     }
 
-    if (profile.card_number && profile.card_number_hash) {
+    if (profile.card_number_hash) {
       return NextResponse.json({
         card: {
           card_number: profile.card_number,

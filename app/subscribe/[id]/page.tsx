@@ -8,7 +8,6 @@ import {
   Receipt, Phone, CalendarIcon, Hash, MessageCircle
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export default function SubscribePage() {
   const params = useParams();
@@ -103,128 +102,28 @@ export default function SubscribePage() {
     setProcessing(true);
 
     try {
-      const cleanCard = cardNumber.replace(/\s/g, '');
-
-      // 1. Chache pwofil kliyan an
-      const verifyRes = await fetch('/api/payments/verify-card', {
+      // TOUT peman an fèt sou sèvè a (verifikasyon kat, tcheke balans, mouvman
+      // kòb, istorik) ATOMIKMAN. Navigatè a pa modifye okenn balans ankò epi li
+      // pa resevwa balans/PII kliyan an — sa fèmen twou double-spend/tampering.
+      const payRes = await fetch('/api/subscribe/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardNumber: cleanCard, cvv, expiry }),
+        body: JSON.stringify({
+          productId: product.id,
+          cardNumber: cardNumber.replace(/\s/g, ''),
+          cvv,
+          expiry,
+        }),
       });
-      const verifyData = await verifyRes.json();
+      const payData = await payRes.json();
 
-      if (!verifyRes.ok || !verifyData.valid) {
-        throw new Error(verifyData.error || "Kat sa a pa anrejistre nan sistèm H-Pay oswa enfòmasyon yo pa bon.");
+      if (!payRes.ok || !payData.success) {
+        throw new Error(payData.error || "Peman an pa t reyisi. Tanpri verifye enfòmasyon kat ou.");
       }
 
-      const clientProfile = {
-        id: verifyData.clientId,
-        card_balance: verifyData.card_balance,
-        is_activated: verifyData.is_activated,
-        account_status: verifyData.account_status,
-        full_name: verifyData.full_name,
-        email: verifyData.email,
-      };
-      if (clientProfile.account_status === 'suspended') {
-        throw new Error("Kont ou sispann. Tanpri kontakte sipò H-Pay.");
-      }
-      if (clientProfile.account_status && clientProfile.account_status !== 'active') {
-        throw new Error("Kont ou bloke alèkile. Tanpri kontakte sipò H-Pay.");
-      }
-      if (clientProfile.card_balance < product.price) throw new Error(`Ou pa gen ase fon sou kat ou a. Balans aktyèl ou se: ${clientProfile.card_balance} HTG.`);
-
-      const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, product.price);
-      if (!capCheck.allowed) throw new Error(capCheck.message || "Balans machann nan ta depase limit maksimòm otorize a.");
-
-      // ==========================================
-      // 2. TRANZAKSYON KÒB LA
-      // ==========================================
-
-      // A) Rache non kliyan an (EME... DOR...) pou pwoteje idantite l
-      const nameParts = (clientProfile.full_name || '').trim().split(/\s+/);
-      const firstName = nameParts[0] ? nameParts[0].substring(0, 3).toUpperCase() : 'KLI';
-      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].substring(0, 3).toUpperCase() : 'YAN';
-      const maskedName = `${firstName}... ${lastName}...`;
-
-      // Kalkile nouvo balans yo pou nou ka mete yo nan istorik la
-      const clientNewBalance = clientProfile.card_balance - product.price;
-      const newMerchantBalance = (merchant.wallet_balance || 0) + product.price;
-
-      // B) Mete baz done a ajou pou kliyan an (retire kòb) ak machann nan (ajoute kòb)
-      const { error: deductErr } = await supabase.from('profiles').update({ card_balance: clientNewBalance }).eq('id', clientProfile.id);
-      if (deductErr) throw new Error("Te gen yon pwoblèm nan retire kòb la sou kat ou.");
-
-      const { error: addErr } = await supabase.from('profiles').update({ wallet_balance: newMerchantBalance }).eq('id', merchant.id);
-      if (addErr) throw new Error("Te gen yon pwoblèm nan transfere kòb la bay machann nan.");
-
-// ============================================================
-// C) ANREJISTRE ISTORIK LA AK BÈL MESAJ POU TOU 2 MOUN YO
-// ============================================================
-const fakeTxId = 'HPY-' + Math.random().toString(36).substring(2, 11).toUpperCase();
-
-const { error: txErr } = await supabase
-        .from('transactions')
-        .insert([
-          // 1. MESAJ POU MACHANN NAN
-          {
-            user_id: merchant.id,
-            amount: product.price, 
-            type: 'SALE',             
-            status: 'success',        
-            description: `Vant Abònman: ${product.title} (Kliyan: ${maskedName})`,
-            reference_id: `${fakeTxId}-M`,  // <--- KORIJE LA A
-            metadata: {
-              customer_name: maskedName,
-              customer_email: clientProfile.email || '',
-              plan_name: product.title,
-              payment_method: 'card'
-            }
-          },
-          // 2. MESAJ POU KLIYAN AN
-          {
-            user_id: clientProfile.id,
-            amount: -product.price,   
-            type: 'PAYMENT',          
-            status: 'success',
-            description: `Peman Abònman: ${product.title} nan ${merchant.business_name || 'H-Pay Store'}`,
-            reference_id: `${fakeTxId}-C`,  // <--- KORIJE LA A
-            metadata: {
-              merchant_name: merchant.business_name || 'Biznis San Non',
-              plan_name: product.title
-            }
-          }
-        ]);
-
-if (txErr) {
-  console.error("❌ Erè nan anrejistreman istorik tranzaksyon:", txErr); 
-} 
-
-// ============================================================
-// 3. ANREJISTRE TRAS ABÒNMAN AN (PÈMÈT WEBHOOK VOYE IMÈL)
-// ============================================================
-const { error: subErr } = await supabase
-  .from('subscriptions_history')
-  .insert({
-    merchant_id: merchant.id,
-    client_id: clientProfile.id,
-    client_email: clientProfile.email || 'Pa gen imèl',
-    client_name: clientProfile.full_name || 'Kliyan Hatex',
-    shop_name: merchant.business_name || 'Biznis San Non',
-    plan_name: product.title,
-    amount: product.price,
-    status: 'success'
-  });
-
-if (subErr) {
-  console.error("❌ Erè nan subscriptions_history:", subErr);
-} else {
-  // Sa a ap kouri sèlman si Sub la byen anrejistre
-  console.log("✅ Istorik ak Abònman anrejistre pafètman!");
-}
-      // Jenere ID Tranzaksyon an ak afiche ekran siksè a
-      setTxId(fakeTxId);
+      setTxId(payData.reference || 'HPY-OK');
       setSuccess(true);
-      
+
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -248,7 +248,7 @@ app.post('/webhook-hatexcard', express.raw({ type: 'application/json' }), (req, 
         <div className="flex items-start space-x-3 bg-blue-900/20 border border-blue-900/50 p-4 rounded-lg">
           <CheckCircle2 className="w-6 h-6 text-blue-400 shrink-0 mt-0.5" />
           <p className="text-sm text-blue-200">
-            Wout litij, livrezon, ak eskwo sou dashboard la se zouti entèn — pa API devlopè a.
+            Wout litij sou dashboard la se zouti entèn — pa API devlopè a.
             Pou sipò entegrasyon: kontakte ekip HatexCard atravè paj Sipò a.
           </p>
         </div>

@@ -2,7 +2,6 @@
 
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { CreditCard, Calendar, Lock, AlertCircle, Loader2, Store, CheckSquare, Square, History } from 'lucide-react';
 
 function CheckoutContent() {
@@ -20,11 +19,6 @@ function CheckoutContent() {
   const [saveCard, setSaveCard] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [savedCards, setSavedCards] = useState<any[]>([]);
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   // Load saved cards from localStorage on mount
   useEffect(() => {
@@ -48,39 +42,16 @@ function CheckoutContent() {
       }
   
       try {
-        console.log('Verifikasyon token an:', token);
-        
-        const { data: tokenData, error: tokenError } = await supabase
-          .from('payment_tokens')
-          .select('merchant_id, expires_at')
-          .eq('id', token)
-          .single();
-  
-        if (tokenError || !tokenData) {
-          setError('Token pa valid. Tanpri jenere yon nouvo QR kòd.');
+        const res = await fetch(`/api/checkout/session?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+
+        if (!res.ok || !data.valid) {
+          setError(data.message || 'Token pa valid. Tanpri jenere yon nouvo QR kòd.');
           setLoading(false);
           return;
         }
-  
-        if (new Date(tokenData.expires_at) < new Date()) {
-          setError('Token ekspire. Tanpri jenere yon nouvo QR kòd.');
-          setLoading(false);
-          return;
-        }
-  
-        const { data: merchantData, error: merchantError } = await supabase
-          .from('profiles')
-          .select('id, api_key, business_name, full_name, avatar_url')
-          .eq('id', tokenData.merchant_id)
-          .single();
-  
-        if (merchantError || !merchantData) {
-          setError('Machann pa jwenn. Kontakte sipò.');
-          setLoading(false);
-          return;
-        }
-  
-        setMerchant(merchantData);
+
+        setMerchant(data.merchant);
       } catch (err) {
         console.error('Erè inatandi:', err);
         setError('Erè pandan verifikasyon. Tanpri eseye ankò.');
@@ -90,7 +61,7 @@ function CheckoutContent() {
     }
   
     validateToken();
-  }, [token, supabase]);
+  }, [token]);
 
   const formatCardNumber = (value: string) => {
     const v = value.replace(/\D/g, '');
@@ -138,48 +109,23 @@ function CheckoutContent() {
     setProcessing(true);
     setError('');
 
-    const payload = {
-      merchant_id: merchant.api_key,
-      amount: parseFloat(amount),
-      currency: 'HTG',
-      card_number: cleanCard,
-      card_expiry: cardExpiry,
-      card_cvv: cardCvv,
-      metadata: {
-        platform: 'qr',
-        token: token,
-        merchant_name: merchant.business_name || merchant.full_name,
-        merchant_logo: merchant.avatar_url,
-        save_card: saveCard,
-        card_last4: cleanCard.slice(-4), // Store only last 4 for reference
-      },
-    };
-
     try {
-      const res = await fetch('https://psdnklsqttyqhqhkhmgq.supabase.co/functions/v1/validate-payment', {
+      const res = await fetch('/api/checkout/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          token,
+          amount: parseFloat(amount),
+          card_number: cleanCard,
+          card_expiry: cardExpiry,
+          card_cvv: cardCvv,
+        }),
       });
 
-      const responseText = await res.text();
+      const data = await res.json();
 
       if (!res.ok) {
-        let errorMsg = 'Erè kominikasyon ak sèvè peman.';
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMsg = errorData.message || errorMsg;
-        } catch {}
-        setError(errorMsg);
-        setProcessing(false);
-        return;
-      }
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        setError('Repons envalid soti nan sèvè peman.');
+        setError(data.message || 'Erè kominikasyon ak sèvè peman.');
         setProcessing(false);
         return;
       }

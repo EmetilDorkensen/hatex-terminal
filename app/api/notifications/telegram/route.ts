@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
+import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 type TelegramChannel = 'admin' | 'finance';
+
+const MAX_MESSAGE_LEN = 2000;
 
 function getTelegramConfig(channel: TelegramChannel) {
   if (channel === 'finance') {
@@ -25,6 +28,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Aksè refize.' }, { status: 401 });
     }
 
+    // Anpeche yon itilizatè voye kantite mesaj san limit sou chanèl ops yo
+    // (spam / enjenyeri sosyal). Chak itilizatè gen yon kota rezonab.
+    const ip = getClientIp(request);
+    const rl = await rateLimit(`telegram-notify:${user.id}:${ip}`, 12, 300);
+    if (!rl.allowed) {
+      return NextResponse.json({ success: false, message: 'Twòp notifikasyon. Eseye pita.' }, { status: 429 });
+    }
+
     const body = await request.json();
     const { message, channel = 'admin', photoUrl, parseMode = 'HTML' } = body;
 
@@ -32,7 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Mesaj vid.' }, { status: 400 });
     }
 
-    const { token, chatId } = getTelegramConfig(channel as TelegramChannel);
+    // Sèlman 2 chanèl valab; nenpòt lòt valè tonbe sou 'admin'.
+    const safeChannel: TelegramChannel = channel === 'finance' ? 'finance' : 'admin';
+    const safeMessage = typeof message === 'string' ? message.slice(0, MAX_MESSAGE_LEN) : '';
+    const safeParseMode = parseMode === 'MarkdownV2' || parseMode === 'Markdown' ? parseMode : 'HTML';
+
+    const { token, chatId } = getTelegramConfig(safeChannel);
     if (!token || !chatId) {
       return NextResponse.json({ success: false, message: 'Telegram pa konfigire sou sèvè a.' }, { status: 500 });
     }
@@ -42,8 +58,8 @@ export async function POST(request: Request) {
       : `https://api.telegram.org/bot${token}/sendMessage`;
 
     const payload = photoUrl
-      ? { chat_id: chatId, photo: photoUrl, caption: message, parse_mode: parseMode }
-      : { chat_id: chatId, text: message, parse_mode: parseMode };
+      ? { chat_id: chatId, photo: photoUrl, caption: safeMessage, parse_mode: safeParseMode }
+      : { chat_id: chatId, text: safeMessage, parse_mode: safeParseMode };
 
     const res = await fetch(endpoint, {
       method: 'POST',

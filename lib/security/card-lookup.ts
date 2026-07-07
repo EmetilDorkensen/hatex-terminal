@@ -36,10 +36,7 @@ async function upgradeLegacyCard(
   const fields = await buildCardSecurityFields(cleanCard, cvv);
   await supabase
     .from('profiles')
-    .update({
-      ...fields,
-      card_number: cleanCard,
-    })
+    .update(fields)
     .eq('id', profile.id);
 }
 

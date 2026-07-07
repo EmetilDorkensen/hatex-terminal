@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Search, User, ShieldCheck, ArrowRightLeft, Lock, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
-import { checkSpendingLimit, checkBalanceCap } from '@/lib/security/spending-limits';
+import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { isKycApproved } from '@/lib/kyc/status';
 
 // ==========================================
@@ -134,15 +134,18 @@ export default function TransferPage() {
     const findUser = async () => {
       if (email.includes('@') && email.length > 5) {
         setSearching(true);
-        const { data, error } = await supabase.rpc('get_user_name_by_email', {
-          p_email: email.toLowerCase().trim()
+        const { data, error } = await supabase.rpc('hatex_lookup_transfer_recipient', {
+          p_email: email.toLowerCase().trim(),
         });
-        
-        if (data) {
-          setReceiverName(data);
+
+        if (!error && data?.found) {
+          setReceiverName(data.full_name || null);
           setStatus({ type: '', msg: '' });
         } else {
           setReceiverName(null);
+          if (data?.message && email.includes('@')) {
+            setStatus({ type: 'error', msg: data.message });
+          }
         }
         setSearching(false);
       } else {
@@ -239,29 +242,8 @@ export default function TransferPage() {
          throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
 
-      // Plafon Balans Maksimòm: nou chèche pwofil destinatè a AVAN nou rele
-      // RPC transfè a, pou n ka bloke operasyon an si l ta fè balans li
-      // depase limit otorize a (105,000 HTG endividyèl / 2,000,000 HTG antrepriz).
-      // ⚠️ Verifikasyon sa a fèt nan kòd la (pa nan RPC a) — si de transfè rive
-      // resevwa pa menm moun nan menm segonn nan, se RPC a k ap dwe pwoteje
-      // balans final la; n ap ranfòse sa dirèkteman nan baz done a lè n gen kòd
-      // SQL fonksyon 'process_transfer_by_email' la.
-      const { data: receiverProfile } = await supabase
-        .from('profiles')
-        .select('id, wallet_balance, account_type')
-        .eq('email', email.toLowerCase().trim())
-        .maybeSingle();
-
-      if (receiverProfile) {
-        const capCheck = checkBalanceCap(Number(receiverProfile.wallet_balance || 0), receiverProfile.account_type, amt);
-        if (!capCheck.allowed) {
-          throw new Error(capCheck.message || "Balans destinatè a ta depase limit maksimòm otorize a.");
-        }
-      }
-
-      // Montan an AK frè a debite ATOMIKMAN anndan RPC a — nou pa fè yon
-      // dezyèm `.update()` apa pou frè a ankò (etap sa a te ka manipile
-      // oswa sote depi navigatè a).
+      // Plafon balans destinatè a verifye ATOMIKMAN anndan RPC
+      // `process_transfer_by_email` — pa bezwen li balans li depi navigatè a.
       const { error: rpcError } = await supabase.rpc('process_transfer_by_email', {
         p_sender_id: userId,
         p_receiver_email: email.toLowerCase().trim(),

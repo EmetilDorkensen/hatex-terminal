@@ -9,7 +9,6 @@ import {
   ArrowLeft, Building2, Briefcase, UploadCloud, CheckSquare, ChevronRight,
   RefreshCw, ArrowUpCircle, Filter, Calendar, Clock
 } from 'lucide-react';
-import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 type AppStep = 'loading' | 'kyc_denied' | 'rejected' | 'tier_select' | 'upload_docs' | 'payment_plan' | 'pending' | 'dashboard';
 
@@ -195,21 +194,15 @@ export default function AgentPortal() {
       const bankStatementUrl = selectedTier === 'premium' && bankStatementDoc ? await uploadFile(bankStatementDoc, 'bank_statement') : null;
       const leaseUrl = selectedTier === 'premium' && leaseDoc ? await uploadFile(leaseDoc, 'lease_doc') : null;
 
-      const newWalletBal = Number(profile.wallet_balance) - totalDeduction;
-      
-      await supabase.from('profiles').update({ 
-        wallet_balance: newWalletBal,
-        agent_balance: amount,
-        agent_capacity: amount,
-        agent_guarantee_paid: amount,
-        agent_status: 'pending', 
-        agent_tier: selectedTier 
-      }).eq('id', profile.id);
-
-      await supabase.from('transactions').insert([
-          { user_id: profile.id, type: 'AGENT_GUARANTEE', amount: -amount, status: 'success', description: `Aktivasyon Ajan ${selectedTier?.toUpperCase() || ''}` },
-          { user_id: profile.id, type: 'FEE', amount: -fee, status: 'success', description: `Frè aktivasyon Ajan (7 HTG / 1000 HTG)` }
-      ]);
+      // 🔒 Mouvman kòb + estati ajan fèt ATOMIKMAN sou sèvè (RPC). Navigatè a pa
+      // modifye balans ankò — frè a kalkile sou sèvè tou.
+      const { data: actResult, error: actErr } = await supabase.rpc('process_agent_activation', {
+        p_user_id: profile.id,
+        p_amount: amount,
+        p_tier: selectedTier,
+      });
+      if (actErr) throw new Error(actErr.message || "Erè pandan aktivasyon an.");
+      if (!actResult?.success) throw new Error(actResult?.message || "Aktivasyon an pa reyisi.");
 
       await supabase.from('agent_applications').insert([{
         user_id: profile.id,
@@ -249,7 +242,7 @@ export default function AgentPortal() {
 
   const restartApplication = async () => {
     setActionLoading(true);
-    await supabase.from('profiles').update({ agent_status: 'none', upgrade_status: 'none' }).eq('id', profile.id);
+    await supabase.rpc('agent_restart_application', { p_user_id: profile.id });
     setAppStep('tier_select');
     setActionLoading(false);
   };
@@ -267,18 +260,12 @@ export default function AgentPortal() {
 
     setActionLoading(true);
     try {
-      const newWalletBal = Number(profile.wallet_balance) - amount;
-      const newAgentBal = Number(profile.agent_balance) + amount;
-
-      await supabase.from('profiles').update({ 
-        wallet_balance: newWalletBal,
-        agent_balance: newAgentBal
-      }).eq('id', profile.id);
-
-      await supabase.from('transactions').insert([
-          { user_id: profile.id, type: 'AGENT_RECHARGE', amount: amount, status: 'success', description: `Rechaj balans ajan san frè` },
-          { user_id: profile.id, type: 'WITHDRAWAL', amount: -amount, status: 'success', description: `Retrè pou rechaje kont ajan` }
-      ]);
+      const { data: result, error: rpcErr } = await supabase.rpc('process_agent_recharge', {
+        p_user_id: profile.id,
+        p_amount: amount,
+      });
+      if (rpcErr) throw new Error(rpcErr.message || "Erè pandan rechaj la.");
+      if (!result?.success) throw new Error(result?.message || "Rechaj la pa reyisi.");
 
       alert(`Ou rechaje kont ajan w lan ak ${amount.toLocaleString()} HTG ak siksè!`);
       setRechargeAmount('');
@@ -305,22 +292,12 @@ export default function AgentPortal() {
 
     setActionLoading(true);
     try {
-      const newWalletBal = profile.wallet_balance - totalDeduction;
-      const newGuaranteePaid = (profile.agent_guarantee_paid || 0) + amount;
-      const newCapacity = (profile.agent_capacity || 0) + amount;
-      const newAgentBalance = (profile.agent_balance || 0) + amount;
-
-      await supabase.from('profiles').update({ 
-        wallet_balance: newWalletBal,
-        agent_guarantee_paid: newGuaranteePaid,
-        agent_capacity: newCapacity,
-        agent_balance: newAgentBalance
-      }).eq('id', profile.id);
-
-      await supabase.from('transactions').insert([
-          { user_id: profile.id, type: 'AGENT_GUARANTEE', amount: -amount, status: 'success', description: `Ogmante kapasite ajan` },
-          { user_id: profile.id, type: 'FEE', amount: -fee, status: 'success', description: `Frè ogmantasyon kapasite ajan (7/1000 HTG)` }
-      ]);
+      const { data: result, error: rpcErr } = await supabase.rpc('process_agent_capacity_increase', {
+        p_user_id: profile.id,
+        p_amount: amount,
+      });
+      if (rpcErr) throw new Error(rpcErr.message || "Erè pandan ogmantasyon an.");
+      if (!result?.success) throw new Error(result?.message || "Ogmantasyon an pa reyisi.");
 
       // Notifye Admin nan: frè sa a fèk antre otomatikman nan Kès Global antrepriz la
       await notifyAdminOfAgentFee({
@@ -416,35 +393,17 @@ export default function AgentPortal() {
 
     setActionLoading(true);
     try {
-      const { data: currentAgent, error: agentErr } = await supabase.from('profiles').select('account_status, agent_status, agent_balance').eq('id', profile.id).single();
-      if (agentErr || !currentAgent) throw new Error("Erè verifikasyon ajan.");
-      if (currentAgent.account_status === 'suspended') throw new Error("Kont ou a sispandi.");
-      if (currentAgent.agent_balance < amountNum) throw new Error("Ou pa gen ase kòb sou balans Ajan w lan pou fè depo sa.");
+      // 🔒 Tout verifikasyon + mouvman kòb (balans ajan → balans kliyan) fèt
+      // ATOMIKMAN sou sèvè, ak plafon balans, nan yon sèl tranzaksyon SQL.
+      const { data: result, error: rpcErr } = await supabase.rpc('process_agent_client_deposit', {
+        p_agent_id: profile.id,
+        p_client_email: depositEmail.toLowerCase().trim(),
+        p_amount: amountNum,
+      });
+      if (rpcErr) throw new Error(rpcErr.message || "Erè pandan depo a.");
+      if (!result?.success) throw new Error(result?.message || "Depo a pa reyisi.");
 
-      const { data: client, error: clientErr } = await supabase.from('profiles').select('id, wallet_balance, account_status, full_name, account_type').eq('email', depositEmail.toLowerCase().trim()).single();
-      if (clientErr || !client) throw new Error("Pa jwenn okenn kliyan ak imèl sa a.");
-      if (client.account_status === 'suspended') throw new Error("Kont kliyan an sispandi.");
-
-      const capCheck = checkBalanceCap(Number(client.wallet_balance || 0), client.account_type, amountNum);
-      if (!capCheck.allowed) throw new Error(capCheck.message || "Balans kliyan an ta depase limit maksimòm otorize a.");
-
-      const newAgentBalance = Number(currentAgent.agent_balance) - amountNum;
-      const newClientBalance = Number(client.wallet_balance) + amountNum;
-
-      await supabase.from('profiles').update({ agent_balance: newAgentBalance }).eq('id', profile.id);
-      const { error: err2 } = await supabase.from('profiles').update({ wallet_balance: newClientBalance }).eq('id', client.id);
-      
-      if (err2) {
-         await supabase.from('profiles').update({ agent_balance: currentAgent.agent_balance }).eq('id', profile.id);
-         throw new Error("Echèk tranzaksyon. Kòb la retounen sou kont ou.");
-      }
-
-      await supabase.from('transactions').insert([
-        { user_id: profile.id, type: 'AGENT_DEPOSIT', amount: -amountNum, status: 'success', description: `Depo pou ${client.full_name}`, metadata: { client_email: depositEmail } },
-        { user_id: client.id, type: 'DEPOSIT', amount: amountNum, status: 'success', description: `Depo nan men Ajan: ${profile.agent_code}`, metadata: { agent_code: profile.agent_code } }
-      ]);
-
-      setStatusMsg({ type: 'success', text: `Depo ${amountNum} HTG reyisi pou ${client.full_name}!` });
+      setStatusMsg({ type: 'success', text: `Depo ${amountNum} HTG reyisi pou ${result.client_name || 'kliyan an'}!` });
       setDepositAmount(''); setDepositEmail('');
       fetchAgentData();
     } catch (err: any) { setStatusMsg({ type: 'error', text: err.message }); } finally { setActionLoading(false); }

@@ -55,14 +55,6 @@ export default function Dashboard() {
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [isClosingDispute, setIsClosingDispute] = useState(false);
 
-  // ==========================================
-  // ETA POU KONFIME LIVREZON (OTP)
-  // ==========================================
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpTxId, setOtpTxId] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-
   // ETA POU PÒTAY ADMIN
   const [isLoggingAdmin, setIsLoggingAdmin] = useState(false);
 
@@ -87,14 +79,10 @@ export default function Dashboard() {
            }
          }
       } catch (e) {
-          // fallback san api
-          const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
-          const newCardNum = `4550${random4()}${random4()}${random4()}`;
-          const newCvv = Math.floor(100 + Math.random() * 900).toString();
-          const now = new Date();
-          const newExp = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
-          await supabase.from('profiles').update({ card_number: newCardNum, cvv: newCvv, exp_date: newExp }).eq('id', userId);
-          return { ...currentProfile, card_number: newCardNum, cvv: newCvv, exp_date: newExp };
+          // Pa gen fallback bò kliyan ankò: pwovizyon kat la fèt SÈLMAN sou sèvè
+          // (/api/card/ensure ak service role) pou nimewo/CVV pa janm jenere ni
+          // ekri an klè depi navigatè a. Si sèvè a pa reponn, n ap reeseye pita.
+          console.error('Card ensure failed, will retry later:', e);
       }
     }
     return currentProfile;
@@ -325,31 +313,6 @@ export default function Dashboard() {
         alert("Erè lè w t ap fèmen dosye a."); 
     } finally { 
         setIsClosingDispute(false); 
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!otpTxId || !otpCode) return alert("Tanpri ranpli tout bwat yo!");
-    setIsVerifying(true);
-    try {
-      const res = await fetch('/api/verify-delivery', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: otpTxId.trim(), merchant_id: userData.id, otp_code: otpCode.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Echèk nan verifikasyon kòd la.");
-      
-      alert(`✅ ${data.message}`);
-      setShowOtpModal(false);
-      setOtpTxId('');
-      setOtpCode('');
-    } catch (err: any) {
-      alert(`❌ Erè: ${err.message}`);
-      if (err.message.includes("sispann") || err.message.includes("bloke")) {
-          window.location.reload();
-      }
-    } finally {
-      setIsVerifying(false);
     }
   };
 
