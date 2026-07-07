@@ -42,6 +42,16 @@ export default function AdminMfaSettings({ supabase }: Props) {
     setError('');
     setSuccess('');
     setEnrolling(true);
+
+    // Netwaye ansyen tantativ ki pa t fini (aparèy "unverified" ki rete sou
+    // kont lan lè yon enskripsyon anile/echwe san l pa t verifye) — Supabase
+    // refize kreye yon nouvo faktè si youn ki gen menm non ("") deja la.
+    const { data: existing } = await supabase.auth.mfa.listFactors();
+    const staleFactors = (existing?.all || []).filter((f: any) => f.status === 'unverified');
+    for (const stale of staleFactors) {
+      await supabase.auth.mfa.unenroll({ factorId: stale.id });
+    }
+
     const { data, error: enrollErr } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
     if (enrollErr || !data) {
       setError(enrollErr?.message || 'Pa t kapab kòmanse enskripsyon MFA.');
@@ -93,7 +103,12 @@ export default function AdminMfaSettings({ supabase }: Props) {
     loadFactors();
   };
 
-  const cancelEnroll = () => {
+  const cancelEnroll = async () => {
+    // Efase faktè "unverified" la sou Supabase — otreman li rete la epi
+    // bloke pwochen tantativ ak yon erè "friendly name already exists".
+    if (pendingFactorId) {
+      await supabase.auth.mfa.unenroll({ factorId: pendingFactorId }).catch(() => {});
+    }
     setEnrolling(false);
     setQrCode('');
     setSecret('');
