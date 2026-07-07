@@ -1,9 +1,19 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 
 export async function GET(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rl = await rateLimit(`oauth-token:${ip}`, 30, 300);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Twòp tantativ. Eseye ankò nan ${rl.retryAfterSec}s.` },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
     
@@ -49,6 +59,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ user_id: tokenData.user_id });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erè oauth/token:', error?.message);
+    return NextResponse.json({ error: 'Sèvè a rankontre yon erè.' }, { status: 500 });
   }
 }

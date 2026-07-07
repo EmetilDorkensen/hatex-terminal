@@ -6,6 +6,7 @@ import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioni
 import { KYC_STATUS } from '@/lib/kyc/status';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { canViewKycDocuments, getAuthenticatedUser } from '@/lib/kyc/access';
+import { logAdminAction } from '@/lib/admin/audit-log';
 
 async function isWorkspaceReviewer(email: string): Promise<boolean> {
   return canViewKycDocuments(email);
@@ -85,6 +86,10 @@ export async function POST(request: Request) {
       await ensureMerchantApiCredentials(admin, freshProfile);
     }
 
+    if (isAdmin) {
+      await logAdminAction(admin, { adminEmail: user.email, action: 'KYC_APPROVED', targetType: 'profile', targetId: userId, ip });
+    }
+
     return NextResponse.json({
       success: true,
       action: 'approved',
@@ -102,6 +107,10 @@ export async function POST(request: Request) {
 
   if (rejectErr) {
     return NextResponse.json({ error: 'Pa t kapab rejte KYC.' }, { status: 500 });
+  }
+
+  if (isAdmin) {
+    await logAdminAction(admin, { adminEmail: user.email, action: 'KYC_REJECTED', targetType: 'profile', targetId: userId, details: { reason }, ip });
   }
 
   return NextResponse.json({ success: true, action: 'rejected' });

@@ -10,6 +10,7 @@ import {
   requireAdminUser,
   verifyAdminPassword,
 } from '@/lib/admin/auth';
+import { logAdminAction } from '@/lib/admin/audit-log';
 
 async function sendFinanceTelegram(message: string) {
   const token = process.env.TELEGRAM_FINANCE_BOT_TOKEN;
@@ -114,6 +115,15 @@ export async function POST(request: Request) {
 
   const newSummary = await getBusinessProfitSummary(db);
   const totalWithdrawn = await getTotalBusinessWithdrawn(db);
+
+  await logAdminAction(db, {
+    adminEmail: admin.user.email!,
+    action: 'BUSINESS_PROFIT_WITHDRAWN',
+    targetType: 'business_profit_withdrawal',
+    targetId: inserted.id,
+    details: { amount: inserted.amount, note },
+    ip,
+  });
 
   await sendFinanceTelegram(
     `<b>RETRÈ PWOFI BIZNIS</b>\n` +

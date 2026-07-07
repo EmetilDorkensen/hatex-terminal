@@ -147,95 +147,31 @@ export default function WithdrawPage() {
         throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
 
-      const { data: checkData, error: checkErr } = await supabase
-        .from('profiles')
-        .select('wallet_balance, account_status')
-        .eq('id', profile.id)
-        .single();
-      
-      if (checkErr || !checkData) throw new Error("Nou pa jwenn kont ou.");
-      
-      if (checkData.account_status === 'suspended') {
-        throw new Error("Kont ou a sispandi. Tranzaksyon an anile otomatikman.");
+      // Fonksyon SQL 'process_wallet_withdrawal' la fè TOUT verifikasyon yo
+      // (estati kont, KYC, balans) AK debi/kredi a ATOMIKMAN nan baz done a —
+      // nou pa voye okenn "nouvo balans" kalkile bò kote navigatè a ankò.
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('process_wallet_withdrawal', {
+        p_user_id: profile.id,
+        p_amount: currentAmount,
+        p_method: method,
+        p_phone: phone || null,
+        p_agent_code: method === 'Ajan' ? agentCode : null,
+        p_user_email: profile.email,
+      });
+
+      if (rpcError) throw new Error(rpcError.message || "Sistèm nan jwenn yon pwoblèm.");
+      if (!rpcResult?.success) throw new Error(rpcResult?.message || "Retrè a echwe. Tanpri re-eseye.");
+
+      if (rpcResult.is_agent) {
+        setShowPinPrompt(false);
+        alert(`Tranzaksyon an reyisi!\n\nAjan ${rpcResult.agent_name} resevwa lajan an sou sistèm nan.\nTanpri mande ajan an ${Number(rpcResult.net_amount).toLocaleString()} HTG kach ou a kounye a.`);
+        router.push('/dashboard');
+        return;
       }
 
-      if (currentAmount > Number(checkData.wallet_balance)) {
-         throw new Error("Ou pa gen ase kòb pou tranzaksyon sa a.");
-      }
-
-      // ==============================================
-      // CHEMEN 1: RETRÈ NAN MEN YON AJAN (KÒD 8 CHIF)
-      // ==============================================
-      if (method === 'Ajan') {
-         // Chèche ajan an
-         const { data: agent, error: agentErr } = await supabase
-            .from('profiles')
-            .select('id, agent_balance, agent_status, full_name')
-            .eq('agent_code', agentCode)
-            .single();
-
-         if (agentErr || !agent) throw new Error("Sistèm nan pa jwenn okenn ajan ak kòd sa a.");
-         if (agent.agent_status !== 'approved') throw new Error("Ajan sa a pa aktif kounye a.");
-         if (agent.id === profile.id) throw new Error("Ou pa ka fè retrè sou pwòp kòd ajan pa w la.");
-
-         // Tranzaksyon An: Koupe sou kliyan, Mete sou Ajan
-         const newClientBal = Number(checkData.wallet_balance) - currentAmount;
-         const newAgentBal = Number(agent.agent_balance) + currentAmount; // Ajan an jwenn tout kòb la (Net la + Frè a kòm pwofi l)
-
-         // 1. Retire lajan sou Kliyan an
-         const { error: err1 } = await supabase.from('profiles').update({ wallet_balance: newClientBal }).eq('id', profile.id);
-         if (err1) throw new Error("Erè nan debite kòb la sou kont ou.");
-
-         // 2. Mete lajan an sou Balans Ajan an
-         const { error: err2 } = await supabase.from('profiles').update({ agent_balance: newAgentBal }).eq('id', agent.id);
-         if (err2) {
-             // Rollback si l pa pase
-             await supabase.from('profiles').update({ wallet_balance: checkData.wallet_balance }).eq('id', profile.id);
-             throw new Error("Erè nan voye kòb la bay ajan an. Lajan w lan ranbouse.");
-         }
-
-         // 3. Ekri Jounal Tranzaksyon an
-         await supabase.from('transactions').insert([
-            { user_id: profile.id, type: 'AGENT_WITHDRAWAL_CLIENT', amount: -currentAmount, status: 'success', description: `Retrè kach kay ajan: ${agentCode}` },
-            { user_id: agent.id, type: 'AGENT_WITHDRAWAL', amount: currentAmount, status: 'success', description: `Retrè Kliyan: ${profile.email}`, metadata: { client_email: profile.email } }
-         ]);
-
-         setShowPinPrompt(false);
-         alert(`Tranzaksyon an reyisi!\n\nAjan ${agent.full_name} resevwa lajan an sou sistèm nan.\nTanpri mande ajan an ${netAmount.toLocaleString()} HTG kach ou a kounye a.`);
-         router.push('/dashboard');
-         return; // NOU FINI AK CHEMEN AJAN AN LA A
-      }
-
-      // ==============================================
-      // CHEMEN 2: RETRÈ NÒMAL SOU MONCASH / NATCASH
-      // ==============================================
-      const nouvoBalans = Number(checkData.wallet_balance) - currentAmount;
-      const { error: balanceError } = await supabase.from('profiles').update({ wallet_balance: nouvoBalans }).eq('id', profile.id);
-
-      if (balanceError) throw new Error("Erè nan mizajou balans ou an. Tanpri re-eseye.");
-
-      const withdrawalMethod = isLargeWithdrawal ? 'VIP_LARGE_TRANSFER' : method;
-      const withdrawalPhone = isLargeWithdrawal ? 'Pral bay li bay Sèvis Kliyan' : phone;
-
-      const { error: withdrawError } = await supabase.from('withdrawals').insert([{
-        user_id: profile.id,
-        amount: currentAmount,
-        fee: withdrawFee,
-        net_amount: netAmount,
-        method: withdrawalMethod,
-        phone: withdrawalPhone,
-        user_email: profile.email, 
-        status: 'pending'
-      }]);
-
-      if (withdrawError) {
-        await supabase.from('profiles').update({ wallet_balance: checkData.wallet_balance }).eq('id', profile.id);
-        throw new Error("Sistèm nan jwenn yon pwoblèm. Nou remèt kòb la sou balans ou.");
-      }
-
-      const msg = isLargeWithdrawal 
+      const msg = rpcResult.is_large
         ? `🚨 *GWO DEMANN RETRÈ VIP*\n\n👤: ${profile.full_name}\n💰 Montan: ${currentAmount} HTG\n⚠️ _Montan an plis pase 15,000 HTG._`
-        : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (5%): ${withdrawFee} HTG\n✅ Nèt pou voye: ${netAmount} HTG\n📲: ${method} (${phone})`;
+        : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (5%): ${rpcResult.fee} HTG\n✅ Nèt pou voye: ${rpcResult.net_amount} HTG\n📲: ${method} (${phone})`;
 
       await fetch('/api/notifications/telegram', {
         method: 'POST',
@@ -245,7 +181,7 @@ export default function WithdrawPage() {
 
       setShowPinPrompt(false);
       
-      if (isLargeWithdrawal) {
+      if (rpcResult.is_large) {
           alert("Demann ou a pase! Tanpri kontakte Sèvis Kliyan pou n bay kote nou dwe voye kòb la pou ou.");
       } else {
           alert("Retrè voye! Kòb la retire sou balans ou. N ap voye l nan 15-45 minit.");

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle } from 'lucide-react';
 import { checkBalanceCap } from '@/lib/security/spending-limits';
+import AdminMfaSettings from './AdminMfaSettings';
+import AdminAuditLog from './AdminAuditLog';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -37,7 +39,7 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip'>('dashboard'); 
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite'>('dashboard'); 
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
@@ -423,10 +425,16 @@ export default function AdminSuperPage() {
         try { await fetch('/api/notifications/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel: 'admin', message: msg, parseMode: 'HTML' }) }); } catch (e) {}
     };
 
+    // Jounal odit sèvè-a-sèvè pou chak aksyon sansib Sipè Admin fè (gade
+    // AdminAuditLog.tsx pou konsilte l nan tab "Sekirite").
+    const logAdminAudit = async (action: string, targetType?: string, targetId?: string, details?: Record<string, unknown>) => {
+        try { await fetch('/api/admin/audit-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, targetType, targetId, details }) }); } catch (e) {}
+    };
+
     const deleteTranzaksyon = async (id: string, table: string) => {
         if (!confirm("Èske ou vle efase istwa sa a nèt?")) return;
         setProcessingId(id);
-        try { await supabase.from(table).delete().eq('id', id); alert("Efase nèt!"); raleDone(); } finally { setProcessingId(null); }
+        try { await supabase.from(table).delete().eq('id', id); await logAdminAudit('TRANSACTION_DELETED', table, id); alert("Efase nèt!"); raleDone(); } finally { setProcessingId(null); }
     };
 
     const apwouveDepo = async (d: any) => {
@@ -453,6 +461,7 @@ export default function AdminSuperPage() {
 
             await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
             await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p?.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
+            await logAdminAudit('DEPOSIT_APPROVED', 'deposit', d.id, { amount: montanFinal, fee: frePouBiznisLa, user_id: d.user_id });
             
             alert("SIKSÈ! Depo a apwouve."); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
@@ -468,6 +477,7 @@ export default function AdminSuperPage() {
             
             await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
             await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p?.full_name}\nMontan: ${w.amount} HTG`);
+            await logAdminAudit('WITHDRAWAL_APPROVED', 'withdrawal', w.id, { amount: w.amount, user_id: w.user_id });
             alert("RETRÈ FINI!"); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -488,6 +498,7 @@ export default function AdminSuperPage() {
             await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
             await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
             await voyeTelegram(`<b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
+            await logAdminAudit(`${table.toUpperCase()}_CANCELLED`, table, item.id, { reason: rezon, amount: item.amount, user_id: item.user_id });
             alert("Anile!"); raleDone();
         } finally { setProcessingId(null); }
     };
@@ -495,14 +506,14 @@ export default function AdminSuperPage() {
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'active', is_activated: true, failed_otp_attempts: 0 }).eq('id', id); alert(`Kont ${email} lan aktive!`); raleDone(); } 
+        try { await supabase.from('profiles').update({ account_status: 'active', is_activated: true, failed_otp_attempts: 0 }).eq('id', id); await logAdminAudit('ACCOUNT_UNSUSPENDED', 'profile', id, { email }); alert(`Kont ${email} lan aktive!`); raleDone(); } 
         catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
     const sispannKont = async (id: string, email: string) => {
         if (!confirm(`Èske w sèten ou vle SISPANN kont sa a? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); alert(`Kont ${email} lan sispandi!`); raleDone(); } 
+        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); await logAdminAudit('ACCOUNT_SUSPENDED', 'profile', id, { email }); alert(`Kont ${email} lan sispandi!`); raleDone(); } 
         catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
@@ -571,6 +582,7 @@ export default function AdminSuperPage() {
                 : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Tout garanti ou te depoze yo tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
             
             await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            await logAdminAudit(`AGENT_${aksyon.toUpperCase()}`, 'agent_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
             alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`); 
             if (aksyon === 'rejected') setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
             raleDone();
@@ -628,6 +640,7 @@ export default function AdminSuperPage() {
                 : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon Kont Antrepriz ou epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Frè ou te peye a tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
 
             await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON ANTREPRIZ ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            await logAdminAudit(`ENTERPRISE_${aksyon.toUpperCase()}`, 'enterprise_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
             alert(`Aplikasyon Antrepriz la ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`);
             if (aksyon === 'rejected') setEnterpriseRejectionReason(prev => ({...prev, [applicationId]: ''}));
             raleDone();
@@ -668,6 +681,7 @@ export default function AdminSuperPage() {
             const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon Hatexcard envite w vin travay kòm anplwaye nan depatman: "${roleNames[inviteRole]}".\n\nPou kòmanse:\n1) Konekte sou kont kliyan ou nòmal (menm imel sa a) sou Dashboard Hatexcard.\n2) Louvri meni an, klike sou bouton "Aksè Espas Travay".\n3) Kreye yon modpas fò espesyal pou espas travay ou (li apa de modpas kont kliyan ou a).\n\nPou rezon sekirite, pa gen okenn lyen nan mesaj sa a — sèvi ak Dashboard ou dirèkteman.`;
             
             await voyeEmailKliyan(inviteEmail, staffName, msg, "OU VIN YON ANPLWAYE HATEXCARD");
+            await logAdminAudit('STAFF_INVITED', 'staff_users', inviteEmail, { role: inviteRole });
 
             alert(`Envitasyon an ale! ${staffName} ap resevwa yon mesaj imèl ki di l konekte sou Dashboard li epi klike sou bouton "Aksè Espas Travay".`);
             setInviteEmail('');
@@ -680,6 +694,7 @@ export default function AdminSuperPage() {
         setProcessingId(`revoke_${id}`);
         try {
             await supabase.from('staff_users').delete().eq('id', id);
+            await logAdminAudit('STAFF_REVOKED', 'staff_users', id, { email });
             alert(`Aksè a revoke nèt pou ${email}.`); raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -795,6 +810,9 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
                     <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
                     <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
+                    <button onClick={() => setView('sekirite')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'sekirite' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Lock size={14}/> Sekirite
+                    </button>
                 </div>
 
                 <div className="space-y-6">
@@ -1514,6 +1532,11 @@ export default function AdminSuperPage() {
                                     </div>
                                 ))
                             )}
+                        </div>
+                    ) : view === 'sekirite' ? (
+                        <div className="space-y-6">
+                            <AdminMfaSettings supabase={supabase} />
+                            <AdminAuditLog />
                         </div>
                     ) : (
                         <div className="space-y-4">

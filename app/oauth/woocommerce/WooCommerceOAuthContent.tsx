@@ -5,13 +5,26 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { ArrowLeft, Mail, Lock, AlertCircle } from 'lucide-react';
 
+function getSafeReturnUrl(raw: string | null): URL | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 export default function WooCommerceOAuthContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const searchParams = useSearchParams();
-  const returnUrl = searchParams.get('return_url');
+  const rawReturnUrl = searchParams.get('return_url');
+  const state = searchParams.get('state');
+  const safeReturnUrl = getSafeReturnUrl(rawReturnUrl);
   const router = useRouter();
 
   const supabase = createBrowserClient(
@@ -23,6 +36,12 @@ export default function WooCommerceOAuthContent() {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    if (rawReturnUrl && !safeReturnUrl) {
+      setError('Lyen retou WooCommerce la pa valab. Rekòmanse pwosesis konneksyon an depi boutik ou a.');
+      setLoading(false);
+      return;
+    }
 
     try {
       // 1. Verifye machann nan nan baz done HATEX
@@ -76,11 +95,12 @@ export default function WooCommerceOAuthContent() {
         return;
       }
 
-      // 6. Redireksyon tounen nan WooCommerce la ak token an
-      if (returnUrl) {
-        const redirectUrl = new URL(returnUrl);
-        redirectUrl.searchParams.set('hatex_token', token);
-        window.location.href = redirectUrl.toString();
+      // 6. Redireksyon tounen nan WooCommerce la ak token an (+ state pou machann
+      // nan ka verifye li se menm demann CSRF li te lanse a)
+      if (safeReturnUrl) {
+        safeReturnUrl.searchParams.set('hatex_token', token);
+        if (state) safeReturnUrl.searchParams.set('state', state);
+        window.location.href = safeReturnUrl.toString();
       } else {
         // Si pa gen returnUrl, voye yo nan dashboard la
         router.push('/dashboard');
@@ -108,6 +128,13 @@ export default function WooCommerceOAuthContent() {
         </div>
         
         <p className="text-zinc-400 mb-8">Konekte ak kont ou pou otorize WooCommerce</p>
+
+        {safeReturnUrl && (
+          <p className="text-[11px] text-zinc-500 mb-6 -mt-4">
+            Apre koneksyon, ou ap retounen nan{' '}
+            <span className="text-zinc-300 font-semibold">{safeReturnUrl.hostname}</span>.
+          </p>
+        )}
 
         {error && (
           <div className="bg-red-600/20 border border-red-600/30 p-4 rounded-xl mb-6 flex items-center gap-3">

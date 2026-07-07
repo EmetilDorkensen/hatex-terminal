@@ -14,7 +14,7 @@ export default function AutoLogout() {
 
   useEffect(() => {
     // Nou chwazi ki paj ki bezwen gadyen sa a (paj kote lajan ye yo)
-    const protectedRoutes = ['/dashboard', '/transfert', '/withdraw', '/kat', '/setting'];
+    const protectedRoutes = ['/dashboard', '/transfert', '/withdraw', '/kat', '/setting', '/admin', '/workspace', '/kyc', '/agent', '/enterprise'];
     
     // Si l pa sou paj sa yo (tankou login oswa signup), pa fè anyen
     if (!protectedRoutes.includes(pathname)) return;

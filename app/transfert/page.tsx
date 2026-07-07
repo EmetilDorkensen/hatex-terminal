@@ -259,30 +259,23 @@ export default function TransferPage() {
         }
       }
 
+      // Montan an AK frè a debite ATOMIKMAN anndan RPC a — nou pa fè yon
+      // dezyèm `.update()` apa pou frè a ankò (etap sa a te ka manipile
+      // oswa sote depi navigatè a).
       const { error: rpcError } = await supabase.rpc('process_transfer_by_email', {
         p_sender_id: userId,
         p_receiver_email: email.toLowerCase().trim(),
-        p_amount: amt
+        p_amount: amt,
+        p_fee: fee,
       });
   
       if (rpcError) throw rpcError;
 
-      // Frè a se yon operasyon apa: nou retire l sou Wallet ekspeditè a epi nou
-      // anrejistre l kòm yon tranzaksyon 'TRANSFER_FEE' pou l antre otomatikman
-      // nan Kès Global antrepriz la (li parèt nan Kès Global admin la).
-      if (fee > 0 && userId) {
-        const { data: freshProf } = await supabase
-          .from('profiles')
-          .select('wallet_balance')
-          .eq('id', userId)
-          .single();
-        const balAfterTransfer = Number(freshProf?.wallet_balance || 0);
-        await supabase.from('profiles').update({ wallet_balance: balAfterTransfer - fee }).eq('id', userId);
-        await supabase.from('transactions').insert([
-          { user_id: userId, type: 'TRANSFER_FEE', amount: -fee, status: 'success', description: `Frè Transfè P2P bay ${email.toLowerCase().trim()}` }
-        ]);
-        setWalletBalance(balAfterTransfer - fee);
+      if (fee > 0) {
+        setWalletBalance(walletBalance - amt - fee);
         notifyAdminOfTransferFee({ senderEmail, receiverEmail: email.toLowerCase().trim(), amount: amt, fee });
+      } else {
+        setWalletBalance(walletBalance - amt);
       }
 
       setStatus({ type: 'success', msg: 'Transfè a reyisi!' });

@@ -38,6 +38,13 @@ export async function middleware(request: NextRequest) {
     if (!session || session.user.email !== ADMIN_EMAIL) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
+
+    // Si kont admin la anrejistre yon aparèy MFA (TOTP), sesyon an DWE fin
+    // pase pa etap MFA (aal2) — yon cookie sesyon aal1 vòlè pa ka sifi.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
   }
 
   // /workspace-login ak /workspace-setup se ansyen paj ki depreke — yo
