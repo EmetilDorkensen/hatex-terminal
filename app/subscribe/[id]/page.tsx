@@ -408,6 +408,8 @@ if (subErr) {
                   <input 
                     required 
                     type="text" 
+                    name="cc-name"
+                    autoComplete="cc-name"
                     placeholder="Jean Dupont"
                     className="w-full bg-black/40 border border-white/10 rounded-[2rem] p-5 md:p-6 text-sm font-bold uppercase outline-none focus:border-red-600 transition-all placeholder:text-zinc-700"
                     value={cardName}
@@ -422,6 +424,9 @@ if (subErr) {
                     <input 
                       required 
                       type="text" 
+                      inputMode="numeric"
+                      name="cc-number"
+                      autoComplete="cc-number"
                       placeholder="0000 0000 0000 0000"
                       className="w-full bg-black/40 border border-white/10 rounded-[2rem] pl-14 md:pl-16 pr-6 py-5 md:py-6 text-base md:text-lg font-black tracking-[0.2em] outline-none focus:border-red-600 transition-all text-white placeholder:text-zinc-800"
                       value={cardNumber}
@@ -438,6 +443,9 @@ if (subErr) {
                       <input 
                         required 
                         type="text" 
+                        inputMode="numeric"
+                        name="cc-exp"
+                        autoComplete="cc-exp"
                         placeholder="MM/YY"
                         className="w-full bg-black/40 border border-white/10 rounded-[2rem] pl-12 md:pl-14 pr-4 py-5 md:py-6 text-sm md:text-base font-black tracking-widest outline-none focus:border-red-600 transition-all placeholder:text-zinc-800"
                         value={expiry}
@@ -452,6 +460,9 @@ if (subErr) {
                       <input 
                         required 
                         type="password" 
+                        inputMode="numeric"
+                        name="cc-csc"
+                        autoComplete="cc-csc"
                         maxLength={4}
                         placeholder="123"
                         className="w-full bg-black/40 border border-white/10 rounded-[2rem] pl-12 md:pl-14 pr-4 py-5 md:py-6 text-sm md:text-base font-black tracking-widest outline-none focus:border-red-600 transition-all placeholder:text-zinc-800"

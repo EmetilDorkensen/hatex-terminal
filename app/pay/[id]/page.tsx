@@ -201,6 +201,9 @@ export default function CheckoutPage() {
                   <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
                   <input
                     type="text"
+                    inputMode="numeric"
+                    name="cc-number"
+                    autoComplete="cc-number"
                     placeholder="0000 0000 0000 0000"
                     value={cardNumber}
                     onChange={handleCardNumberChange}
@@ -217,6 +220,9 @@ export default function CheckoutPage() {
                     <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
                     <input
                       type="text"
+                      inputMode="numeric"
+                      name="cc-exp"
+                      autoComplete="cc-exp"
                       placeholder="MM/YY"
                       value={expiry}
                       onChange={handleExpiryChange}
@@ -232,6 +238,9 @@ export default function CheckoutPage() {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
                     <input
                       type="password"
+                      inputMode="numeric"
+                      name="cc-csc"
+                      autoComplete="cc-csc"
                       placeholder="•••"
                       maxLength={4}
                       value={cvv}

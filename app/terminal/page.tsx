@@ -706,16 +706,16 @@ echo \$response;
 <form id="hatex-payment-form" style="max-width:380px;margin:0 auto;font-family:sans-serif;">
   <div style="margin-bottom:10px;">
     <label>Nimewo Kat HatexCard</label>
-    <input type="tel" id="hatex-card-number" maxlength="19" placeholder="0000 0000 0000 0000" required style="width:100%;padding:10px;box-sizing:border-box;">
+    <input type="tel" id="hatex-card-number" name="cc-number" autocomplete="cc-number" maxlength="19" placeholder="0000 0000 0000 0000" required style="width:100%;padding:10px;box-sizing:border-box;">
   </div>
   <div style="display:flex;gap:10px;margin-bottom:10px;">
     <div style="flex:1;">
       <label>Dat (MM/YY)</label>
-      <input type="tel" id="hatex-card-exp" maxlength="5" placeholder="MM/YY" required style="width:100%;padding:10px;box-sizing:border-box;">
+      <input type="tel" id="hatex-card-exp" name="cc-exp" autocomplete="cc-exp" maxlength="5" placeholder="MM/YY" required style="width:100%;padding:10px;box-sizing:border-box;">
     </div>
     <div style="flex:1;">
       <label>CVV</label>
-      <input type="password" id="hatex-card-cvv" maxlength="4" placeholder="123" required style="width:100%;padding:10px;box-sizing:border-box;">
+      <input type="password" id="hatex-card-cvv" name="cc-csc" autocomplete="cc-csc" maxlength="4" placeholder="123" required style="width:100%;padding:10px;box-sizing:border-box;">
     </div>
   </div>
   <button type="submit" style="width:100%;padding:12px;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Peye Kounye a</button>
@@ -898,16 +898,16 @@ function hatexcard_init_direct_gateway() {
                 </style>
                 <div class="hatex-field">
                     <label>Nimewo Kat HatexCard <span class="required">*</span></label>
-                    <input type="tel" name="hatex_card_number" class="hatex-input" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric">
+                    <input type="tel" name="hatex_card_number" autocomplete="cc-number" class="hatex-input" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric">
                 </div>
                 <div style="display: flex; gap: 15px;">
                     <div class="hatex-field" style="flex: 1;">
                         <label>Dat (MM/YY) <span class="required">*</span></label>
-                        <input type="tel" name="hatex_expiry" class="hatex-input" placeholder="MM/YY" maxlength="5" inputmode="numeric">
+                        <input type="tel" name="hatex_expiry" autocomplete="cc-exp" class="hatex-input" placeholder="MM/YY" maxlength="5" inputmode="numeric">
                     </div>
                     <div class="hatex-field" style="flex: 1;">
                         <label>CVV <span class="required">*</span></label>
-                        <input type="password" name="hatex_cvv" class="hatex-input" placeholder="***" maxlength="4" inputmode="numeric">
+                        <input type="password" name="hatex_cvv" autocomplete="cc-csc" class="hatex-input" placeholder="***" maxlength="4" inputmode="numeric">
                     </div>
                 </div>
             </fieldset>

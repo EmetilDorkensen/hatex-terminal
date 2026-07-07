@@ -211,6 +211,9 @@ export default function InvoiceCheckout() {
                 </label>
                 <input 
                   type="text" 
+                  inputMode="numeric"
+                  name="cc-number"
+                  autoComplete="cc-number"
                   required
                   className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="0000 0000 0000 0000"
@@ -226,6 +229,9 @@ export default function InvoiceCheckout() {
                   </label>
                   <input 
                     type="text" 
+                    inputMode="numeric"
+                    name="cc-exp"
+                    autoComplete="cc-exp"
                     required
                     placeholder="MM/YY" 
                     className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-center shadow-sm placeholder:text-gray-400" 
@@ -239,6 +245,9 @@ export default function InvoiceCheckout() {
                   </label>
                   <input 
                     type="password" 
+                    inputMode="numeric"
+                    name="cc-csc"
+                    autoComplete="cc-csc"
                     required
                     maxLength={4}
                     placeholder="•••" 

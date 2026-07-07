@@ -317,6 +317,9 @@ function CheckoutContent() {
             </label>
             <input
               type="text"
+              inputMode="numeric"
+              name="cc-number"
+              autoComplete="cc-number"
               value={cardNumber}
               onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
               placeholder="0000 0000 0000 0000"
@@ -333,6 +336,9 @@ function CheckoutContent() {
               </label>
               <input
                 type="text"
+                inputMode="numeric"
+                name="cc-exp"
+                autoComplete="cc-exp"
                 value={cardExpiry}
                 onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                 placeholder="MM/AA"
@@ -347,6 +353,9 @@ function CheckoutContent() {
               </label>
               <input
                 type="password"
+                inputMode="numeric"
+                name="cc-csc"
+                autoComplete="cc-csc"
                 value={cardCvv}
                 onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="***"
