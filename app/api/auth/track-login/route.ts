@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import crypto from 'crypto';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp } from '@/lib/security/rate-limit';
+import { SESSION_TAG_COOKIE, SESSION_TAG_MAX_AGE_SEC } from '@/lib/security/session-tag';
 
 // Sèvi ak sesyon otantifye a (pa yon email nan kò rekèt la) pou evite yon
 // itilizatè fè sistèm nan kwè se yon LÒT moun ki konekte.
@@ -24,7 +27,20 @@ export async function POST(request: Request) {
 
   const isNewDevice = Boolean(profile?.last_ip) && (profile?.last_ip !== ip || profile?.last_device !== device);
 
-  await db.from('profiles').update({ last_ip: ip, last_device: device }).eq('id', user.id);
+  // Chak koneksyon jenere yon nouvo "tag" — sa a fè kont lan SÈLMAN ka rete
+  // konekte sou yon sèl aparèy alafwa (gade middleware.ts pou aplikasyon an).
+  const sessionTag = crypto.randomUUID();
+
+  await db.from('profiles').update({ last_ip: ip, last_device: device, current_session_token: sessionTag }).eq('id', user.id);
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_TAG_COOKIE, sessionTag, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: SESSION_TAG_MAX_AGE_SEC,
+    path: '/',
+  });
 
   if (isNewDevice) {
     await sendNewDeviceAlert({ email: user.email || '', fullName: profile?.full_name, ip, device });

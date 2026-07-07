@@ -42,6 +42,15 @@ export default function Login() {
   const captchaWidgetId = useRef<string | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
+  // Si sistèm nan dekonekte nou paske yon LÒT aparèy konekte sou menm kont
+  // lan (gade middleware.ts), montre yon mesaj klè olye yon paj vid.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reason') === 'session_replaced') {
+      setErrorMsg("Ou te dekonekte paske kont ou konekte sou yon lòt aparèy. Yon kont Hatexcard ka sèlman konekte sou YON SÈL aparèy alafwa.");
+    }
+  }, []);
+
   useEffect(() => {
     if (!requireCaptcha || !turnstileSiteKey || !captchaRef.current || captchaWidgetId.current) return;
 

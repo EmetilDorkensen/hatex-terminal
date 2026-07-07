@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { WORKSPACE_GATE_COOKIE, verifyWorkspaceGateToken } from '@/lib/security/workspace-gate';
+import { SESSION_TAG_COOKIE } from '@/lib/security/session-tag';
 
 const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 
@@ -31,6 +32,26 @@ export async function middleware(request: NextRequest) {
     if (!url.pathname.startsWith('/admin')) {
       url.pathname = `/admin${url.pathname}`;
       return NextResponse.rewrite(url);
+    }
+  }
+
+  // 🔒 YON SÈL APARÈY KONEKTE ALAFWA: chak koneksyon jenere yon nouvo "tag"
+  // (gade app/api/auth/track-login/route.ts). Si tag aparèy sa a pa matche
+  // dènye tag ki anrejistre sou pwofil la, se paske yon LÒT aparèy konekte
+  // sou menm kont lan depi lè sa a — nou dekonekte aparèy sa a otomatikman.
+  if (session && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/login')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_session_token')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    const deviceTag = request.cookies.get(SESSION_TAG_COOKIE)?.value;
+    if (profile?.current_session_token && profile.current_session_token !== deviceTag) {
+      await supabase.auth.signOut();
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('reason', 'session_replaced');
+      return NextResponse.redirect(loginUrl);
     }
   }
 
