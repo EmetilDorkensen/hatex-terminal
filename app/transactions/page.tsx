@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { RefreshCcw, Copy, CheckCircle2, ArrowLeft, Download, Upload, CreditCard, ShoppingBag, ArrowRightLeft, Repeat, History } from 'lucide-react';
@@ -57,10 +57,50 @@ export default function TransactionsPage() {
       const businessName = t.metadata?.merchant_name || 'BIZNIS';
       return `ACHA NAN ${businessName.toUpperCase()}`;
     }
+    if (t.type === 'P2P' && Number(t.amount) < 0) {
+      const base = (t.description || 'TRANSFÈ BAY').replace(/\s*@\S+/g, '').trim();
+      const fee = Number(t._pairedFee || t.metadata?.transfer_fee || 0);
+      if (fee > 0) {
+        return `${base} (+ ${fee.toLocaleString()} HTG frè)`;
+      }
+      return base;
+    }
     return t.description || t.type;
   };
 
-  const filteredTransactions = transactions.filter(t => {
+  const displayTransactions = useMemo(() => {
+    const feeWindowMs = 3000;
+    const fees: Array<{ userId: string; at: number; amount: number }> = [];
+
+    for (const t of transactions) {
+      if (t.type === 'TRANSFER_FEE') {
+        fees.push({
+          userId: t.user_id,
+          at: new Date(t.created_at).getTime(),
+          amount: Math.abs(Number(t.amount || 0)),
+        });
+      }
+    }
+
+    const findPairedFee = (t: any) => {
+      const at = new Date(t.created_at).getTime();
+      const match = fees.find(
+        (f) => f.userId === t.user_id && Math.abs(f.at - at) <= feeWindowMs && Number(t.amount) < 0
+      );
+      return match?.amount || 0;
+    };
+
+    return transactions
+      .filter((t) => t.type !== 'TRANSFER_FEE')
+      .map((t) => {
+        if (t.type === 'P2P' && Number(t.amount) < 0) {
+          return { ...t, _pairedFee: findPairedFee(t) };
+        }
+        return t;
+      });
+  }, [transactions]);
+
+  const filteredTransactions = displayTransactions.filter((t) => {
     const isManualOldRecord = t.description?.includes("Voye bay") || t.description?.includes("Resevwa nan men yon zanmi");
     if (isManualOldRecord && t.type === 'TRANSFER') return false;
 

@@ -86,12 +86,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Foto dèyè CIN obligatwa.' }, { status: 400 });
   }
 
-  // A) Fas vs dèyè + selfie gen figi
+  // A) Verifye dokiman + non OCR
   const sides = await validateKycDocumentSides({
     idFront,
     idBack: idBack instanceof File ? idBack : null,
     selfie,
     requireBack: isCin,
+    enteredFullName: `${firstName} ${lastName}`,
   });
   if (!sides.ok) {
     const isConfig = sides.error?.includes('FACEPLUSPLUS') || sides.error?.includes('konfigire');
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // C) Konpare figi ID ↔ selfie
+  // B) Konpare figi ID ↔ selfie (face_token + fallback imaj)
   const faceResult = await compareIdSelfie(idFront, selfie);
   if (!faceResult.success) {
     const isConfig = faceResult.error?.includes('FACEPLUSPLUS') || faceResult.error?.includes('konfigire');
@@ -217,8 +218,11 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    message: 'Dokiman yo soumèt. Ekip nou an ap revize yo.',
+    message: faceResult.needsReview
+      ? 'Dokiman yo soumèt. Figi w ap verifye pa ekip nou an (revizyon rapid).'
+      : 'Dokiman yo soumèt. Ekip nou an ap revize yo.',
     face_confidence: faceResult.confidence,
     id_detected: Boolean(ocrResult.idNumber),
+    needs_review: Boolean(faceResult.needsReview),
   });
 }

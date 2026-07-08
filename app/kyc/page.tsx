@@ -126,10 +126,10 @@ export default function KYCPage() {
     // yo souvan bay "manque de mémoire". Konprese youn apre lòt ak limi pi ba.
     try {
       return await imageCompression(file, {
-        maxSizeMB: 0.45,
-        maxWidthOrHeight: 1024,
+        maxSizeMB: label.includes('selfie') ? 0.85 : 0.65,
+        maxWidthOrHeight: label.includes('selfie') ? 1280 : 1400,
         useWebWorker: false,
-        initialQuality: 0.72,
+        initialQuality: label.includes('selfie') ? 0.88 : 0.8,
         fileType: 'image/jpeg',
       });
     } catch {
