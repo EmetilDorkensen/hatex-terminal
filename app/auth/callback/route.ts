@@ -2,11 +2,24 @@ import { NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+/** Sèlman chemen relatif sou menm sit — pa open redirect. */
+function safeNextPath(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) {
+    return '/dashboard';
+  }
+  // Bloke protocol-relative ak URL absoli (http:, javascript:, elt.)
+  if (raw.includes('://') || /^\/[a-z]+:/i.test(raw)) {
+    return '/dashboard';
+  }
+  return raw;
+}
+
 /** Echanj kòd konfimasyon imèl → sesyon, epi redireksyon. */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const next = safeNextPath(searchParams.get('next'));
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=missing_code`);

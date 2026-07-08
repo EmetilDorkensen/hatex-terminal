@@ -11,6 +11,29 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    // Sekirite: pa aksepte apèl soti nan navigatè anon san sekrè sèvè
+    // (Supabase Database Webhook / service role sèlman).
+    const authHeader = req.headers.get('authorization') || ''
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const hasServiceBearer = !!serviceKey && authHeader === `Bearer ${serviceKey}`
+    const hasWebhookSecret =
+      !!Deno.env.get('RESEND_WEBHOOK_SECRET') &&
+      req.headers.get('x-hatex-webhook-secret') === Deno.env.get('RESEND_WEBHOOK_SECRET')
+
+    if (!hasServiceBearer && !hasWebhookSecret) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!RESEND_API_KEY) {
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY manke' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const payload = await req.json()
     const record = payload.record || payload 
     const table = payload.table 

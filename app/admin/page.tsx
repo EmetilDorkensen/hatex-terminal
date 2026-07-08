@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle } from 'lucide-react';
-import { checkBalanceCap } from '@/lib/security/spending-limits';
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 
@@ -447,17 +446,20 @@ export default function AdminSuperPage() {
         
         setProcessingId(d.id);
         try {
-            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, email, account_type').eq('id', d.user_id).single();
+            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', d.user_id).single();
 
-            const capCheck = checkBalanceCap(Number(p?.wallet_balance || 0), p?.account_type, montanFinal);
-            if (!capCheck.allowed) {
-                alert(capCheck.message || "Balans kliyan an ta depase limit maksimòm otorize a.");
-                return;
-            }
-
-            await supabase.from('profiles').update({ wallet_balance: Number(p?.wallet_balance || 0) + montanFinal }).eq('id', d.user_id);
-            await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
-            await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
+            const res = await fetch('/api/admin/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'approve_deposit',
+                deposit_id: d.id,
+                final_amount: montanFinal,
+                fee: frePouBiznisLa,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Apwobasyon echwe.');
 
             await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
             await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p?.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
@@ -472,8 +474,13 @@ export default function AdminSuperPage() {
         setProcessingId(w.id);
         try {
             const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', w.user_id).single();
-            await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
-            await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
+            const res = await fetch('/api/admin/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'complete_withdrawal', withdrawal_id: w.id }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Retrè echwe.');
             
             await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
             await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p?.full_name}\nMontan: ${w.amount} HTG`);
@@ -487,20 +494,20 @@ export default function AdminSuperPage() {
         if (!rezon) return;
         setProcessingId(item.id);
         try {
-            await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
-            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, email').eq('id', item.user_id).single();
-            
-            if (table === 'withdrawals') {
-                const balansR = Number(p?.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); 
-                await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
-            }
-            
-            await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
+            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', item.user_id).single();
+            const res = await fetch('/api/admin/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'reject', table, item_id: item.id, reason: rezon }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Anilasyon echwe.');
+
             await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
             await voyeTelegram(`<b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
             await logAdminAudit(`${table.toUpperCase()}_CANCELLED`, table, item.id, { reason: rezon, amount: item.amount, user_id: item.user_id });
             alert("Anile!"); raleDone();
-        } finally { setProcessingId(null); }
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
     const deblokeKont = async (id: string, email: string) => {

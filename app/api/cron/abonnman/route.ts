@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { verifyCronSecret } from '@/lib/security/cron-auth';
 
 export async function GET(req: Request) {
   try {
-    // 🚨 SEKIRITE: Asire w se sèlman Vercel (robo a) ki ka deklanche paj sa a
-    const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    // Fail-closed: si CRON_SECRET pa mete, pa janm otorize
+    if (!verifyCronSecret(req)) {
       return new Response('Ou pa gen otorizasyon pou deklanche robo sa a.', { status: 401 });
     }
 

@@ -118,22 +118,10 @@ export default function InvoicePage() {
       const payLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
 
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
+        await fetch('/api/invoices/notify', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            table: 'invoices',
-            record: {
-              id: inv.id,
-              amount: inv.amount,
-              client_email: inv.client_email,
-              business_name: freshProfile.business_name || freshProfile.full_name || 'HatexCard',
-              pay_url: payLink,
-            },
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoice_id: inv.id }),
         });
       } catch {
         // Si notifikasyon imel echwe, sa pa dwe bloke kreyasyon fakti a — lyen an toujou valid.

@@ -32,7 +32,6 @@ export default function CheckoutPage() {
           amount: data.payment.amount,
           order_id: data.payment.order_id,
           redirect_url: data.payment.redirect_url,
-          webhook_url: data.payment.webhook_url,
         });
         setMerchantName(data.merchant_name);
       } catch (err: unknown) {
@@ -91,23 +90,6 @@ export default function CheckoutPage() {
 
       if (!res.ok || !result.success) {
         throw new Error(result.message || 'Gen yon pwoblèm nan sistèm peman an.');
-      }
-
-      if (paymentData?.webhook_url) {
-        try {
-          await fetch(paymentData.webhook_url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              order_id: paymentData.order_id,
-              status: 'paid',
-              transaction_id: paymentId,
-              amount_htg: paymentData.amount,
-            }),
-          });
-        } catch {
-          /* webhook echwe — peman deja fèt sou sèvè */
-        }
       }
 
       setMsg({ type: 'success', text: '✅ Peman an pase avèk siksè! N ap voye w tounen...' });

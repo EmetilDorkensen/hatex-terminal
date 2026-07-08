@@ -49,6 +49,24 @@ async function checkSupabase(key: string, limit: number, windowSec: number): Pro
   const now = Date.now();
   const resetAt = new Date(now + windowSec * 1000).toISOString();
 
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('hatex_rate_limit_hit', {
+    p_key: key,
+    p_limit: limit,
+    p_window_sec: windowSec,
+  });
+
+  if (!rpcErr && rpcData) {
+    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    if (row && typeof (row as { allowed?: boolean }).allowed === 'boolean') {
+      const r = row as { allowed: boolean; remaining?: number; retry_after_sec?: number };
+      return {
+        allowed: r.allowed,
+        remaining: Number(r.remaining ?? 0),
+        retryAfterSec: r.retry_after_sec != null ? Number(r.retry_after_sec) : undefined,
+      };
+    }
+  }
+
   const { data: existing } = await supabase
     .from('rate_limits')
     .select('count, reset_at')

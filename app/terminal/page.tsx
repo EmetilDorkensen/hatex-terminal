@@ -1075,11 +1075,15 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
       
       const securePayLink = `${window.location.origin}/checkout-invoice/${inv.id}`;
       
-      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ table: 'invoices', record: { id: inv.id, amount: inv.amount, client_email: inv.client_email, business_name: freshProfile.business_name || "Merchant Hatex", pay_url: securePayLink }})
-      });
+      try {
+        await fetch('/api/invoices/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoice_id: inv.id }),
+        });
+      } catch {
+        /* imèl opsyonèl */
+      }
       
       await navigator.clipboard.writeText(securePayLink);
       alert(`Siksè! Lyen kopye.`);

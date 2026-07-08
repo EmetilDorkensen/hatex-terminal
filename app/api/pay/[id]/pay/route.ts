@@ -42,7 +42,7 @@ export async function POST(
 
     const { data: paymentReq } = await supabase
       .from('payment_requests')
-      .select('id, status')
+      .select('id, status, order_id, amount, webhook_url, redirect_url')
       .eq('id', paymentId)
       .maybeSingle();
 
@@ -69,10 +69,28 @@ export async function POST(
       return NextResponse.json({ success: false, message: res?.message || 'Peman an echwe.' }, { status: 400 });
     }
 
+    // Webhook machann — sou sèvè sèlman (pa ekspoze URL nan navigatè)
+    if (paymentReq.webhook_url) {
+      try {
+        await fetch(paymentReq.webhook_url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: paymentReq.order_id,
+            status: 'paid',
+            transaction_id: paymentId,
+            amount_htg: paymentReq.amount,
+          }),
+        });
+      } catch {
+        /* webhook echwe — peman deja konfime */
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: res.message || 'Peman an reyisi!',
-      redirect_url: res.redirect_url || null,
+      redirect_url: res.redirect_url || paymentReq.redirect_url || null,
     });
   } catch {
     return NextResponse.json({ success: false, message: 'Erè sèvè.' }, { status: 500 });

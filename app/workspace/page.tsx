@@ -9,8 +9,6 @@ import {
     XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
     Crown, MessageCircle, Activity, Radio
 } from 'lucide-react';
-import { checkBalanceCap } from '@/lib/security/spending-limits';
-
 export default function WorkspacePage() {
     const router = useRouter();
     const supabase = createBrowserClient(
@@ -315,23 +313,23 @@ export default function WorkspacePage() {
         const isModified = montanModifye[d.id] !== undefined;
         const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
         const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
-        const totalPeye = montanFinal + frePouBiznisLa;
 
         if (!confirm(`Konfime Depo: \nKliyan resevwa: ${montanFinal} HTG\nFrè (Biznis): ${frePouBiznisLa} HTG`)) return;
         
         setProcessingId(d.id);
         try {
-            const { data: p } = await supabase.from('profiles').select('wallet_balance, full_name, account_type').eq('id', d.user_id).single();
-
-            const capCheck = checkBalanceCap(Number(p?.wallet_balance || 0), p?.account_type, montanFinal);
-            if (!capCheck.allowed) {
-                alert(capCheck.message || "Balans kliyan an ta depase limit maksimòm otorize a.");
-                return;
-            }
-
-            await supabase.from('profiles').update({ wallet_balance: Number(p?.wallet_balance || 0) + montanFinal }).eq('id', d.user_id);
-            await supabase.from('deposits').update({ status: 'approved', amount: montanFinal, fee: frePouBiznisLa, total_to_pay: totalPeye }).eq('id', d.id);
-            await supabase.from('transactions').insert({ user_id: d.user_id, amount: montanFinal, type: 'DEPOSIT', description: `Depo konfime: +${montanFinal} HTG`, status: 'success' });
+            const res = await fetch('/api/admin/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'approve_deposit',
+                deposit_id: d.id,
+                final_amount: montanFinal,
+                fee: frePouBiznisLa,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Apwobasyon echwe.');
             await logActivity('DEPOSIT_APPROVED', 'deposit', d.id, { amount: montanFinal, fee: frePouBiznisLa, user_id: d.user_id });
             alert("Depo apwouve!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
@@ -342,26 +340,31 @@ export default function WorkspacePage() {
         if (!rezon) return;
         setProcessingId(item.id);
         try {
-            await supabase.from(table).update({ status: 'rejected' }).eq('id', item.id);
-            if (table === 'withdrawals') {
-                const { data: p } = await supabase.from('profiles').select('wallet_balance').eq('id', item.user_id).single();
-                const balansR = Number(p?.wallet_balance || 0) + Number(item.amount) + Number(item.fee || 0); 
-                await supabase.from('profiles').update({ wallet_balance: balansR }).eq('id', item.user_id);
-            }
-            await supabase.from('transactions').insert({ user_id: item.user_id, amount: 0, type: 'REJECTED', description: `Anile: ${rezon}`, status: 'failed' });
+            const res = await fetch('/api/admin/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'reject', table, item_id: item.id, reason: rezon }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Anilasyon echwe.');
             await logActivity(`${table.toUpperCase()}_CANCELLED`, table, item.id, { reason: rezon, amount: item.amount, user_id: item.user_id });
             alert("Anile avèk siksè."); checkAuthAndFetchData();
-        } finally { setProcessingId(null); }
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
     const apwouveRetre = async (w: any) => {
         if (!confirm(`Konfime retrè ${w.amount} HTG sa a?`)) return;
         setProcessingId(w.id);
         try {
-            await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', w.id);
-            await supabase.from('transactions').insert({ user_id: w.user_id, amount: -Number(w.amount), type: 'WITHDRAWAL', description: `Retrè konfime: -${w.amount} HTG`, status: 'success' });
+            const res = await fetch('/api/admin/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'complete_withdrawal', withdrawal_id: w.id }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Retrè echwe.');
             await logActivity('WITHDRAWAL_APPROVED', 'withdrawal', w.id, { amount: w.amount, user_id: w.user_id });
-            alert("Retrè Fini!"); checkAuthAndFetchData();
+            alert("Retrè konfime!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
