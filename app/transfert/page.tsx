@@ -86,9 +86,11 @@ export default function TransferPage() {
           body: JSON.stringify({ action: 'status' }),
         });
         const statusData = await statusRes.json();
-        if (!statusData.hasTransactionPin) {
+        if (!statusData.hasPin && !statusData.hasTransactionPin && !statusData.hasWalletPin) {
           setHasPin(false);
-          setShowCreatePin(true); // Fòse l kreye youn
+          setShowCreatePin(true);
+        } else {
+          setHasPin(true);
         }
       } else {
          router.push('/login');

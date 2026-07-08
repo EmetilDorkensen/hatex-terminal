@@ -41,7 +41,12 @@ export default function WithdrawPage() {
            if (!isKycApproved(data.kyc_status)) {
                return;
            }
-           if (!data.transaction_pin && !data.transaction_pin_hash) {
+           if (
+             !data.transaction_pin &&
+             !data.transaction_pin_hash &&
+             !data.pin_code &&
+             !data.pin_code_hash
+           ) {
                alert("Ou dwe gen yon kòd PIN pou sekirize kont ou anvan ou ka retire lajan.");
                router.push('/setting'); 
            }

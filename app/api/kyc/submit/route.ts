@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getAuthenticatedUser } from '@/lib/kyc/access';
-import { compareIdSelfie, extractIdNumberFromImage } from '@/lib/kyc/faceplusplus';
+import {
+  compareIdSelfie,
+  extractIdNumberFromImage,
+  validateKycDocumentSides,
+} from '@/lib/kyc/faceplusplus';
 import { hashKycIdNumber } from '@/lib/kyc/id-hash';
 import { KYC_STATUS } from '@/lib/kyc/status';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
@@ -59,12 +63,19 @@ export async function POST(request: Request) {
   const docType = String(formData.get('docType') || '').trim();
   const firstName = String(formData.get('firstName') || '').trim().toUpperCase();
   const lastName = String(formData.get('lastName') || '').trim().toUpperCase();
+  const manualIdNumber = String(formData.get('idNumber') || '').trim().toUpperCase().replace(/[\s\-]/g, '');
   const idFront = formData.get('idFront');
   const idBack = formData.get('idBack');
   const selfie = formData.get('selfie');
 
   if (!docType || !firstName || !lastName) {
     return NextResponse.json({ error: 'Non, siyati, ak tip dokiman obligatwa.' }, { status: 400 });
+  }
+  if (!manualIdNumber || manualIdNumber.length < 5) {
+    return NextResponse.json(
+      { error: 'Nimewo dokiman obligatwa (omwen 5 karaktè jan li ekri sou ID a).' },
+      { status: 400 }
+    );
   }
   if (!(idFront instanceof File) || !(selfie instanceof File)) {
     return NextResponse.json({ error: 'Foto devan ID ak selfie obligatwa.' }, { status: 400 });
@@ -75,6 +86,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Foto dèyè CIN obligatwa.' }, { status: 400 });
   }
 
+  // A) Fas vs dèyè + selfie gen figi
+  const sides = await validateKycDocumentSides({
+    idFront,
+    idBack: idBack instanceof File ? idBack : null,
+    selfie,
+    requireBack: isCin,
+  });
+  if (!sides.ok) {
+    const isConfig = sides.error?.includes('FACEPLUSPLUS') || sides.error?.includes('konfigire');
+    return NextResponse.json(
+      { error: sides.error || 'Dokiman yo pa valide.' },
+      { status: isConfig ? 503 : 400 }
+    );
+  }
+
+  // C) Konpare figi ID ↔ selfie
   const faceResult = await compareIdSelfie(idFront, selfie);
   if (!faceResult.success) {
     const isConfig = faceResult.error?.includes('FACEPLUSPLUS') || faceResult.error?.includes('konfigire');
@@ -89,35 +116,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const ocrResult = await extractIdNumberFromImage(idFront);
-  let idHash: string | null = null;
-
-  if (ocrResult.idNumber) {
-    try {
-      idHash = hashKycIdNumber(ocrResult.idNumber);
-    } catch {
-      /* kontinye san hash si env manke — pa ta dwe rive an prod */
-    }
+  // B) OCR opsyonèl — nimewo manyèl se sous ofisyèl (OCR Face++ pa toujou li CIN Ayiti byen)
+  let ocrResult = await extractIdNumberFromImage(idFront);
+  if (!ocrResult.idNumber && idBack instanceof File) {
+    const backOcr = await extractIdNumberFromImage(idBack);
+    if (backOcr.idNumber) ocrResult = backOcr;
   }
 
-  if (idHash) {
-    const { data: duplicate } = await admin
-      .from('profiles')
-      .select('id, email, kyc_status')
-      .eq('kyc_id_number_hash', idHash)
-      .neq('id', user.id)
-      .in('kyc_status', [KYC_STATUS.PENDING, KYC_STATUS.APPROVED])
-      .maybeSingle();
+  // Hash toujou sou nimewo itilizatè a antre (obligatwa) pou doublon nan DB
+  const resolvedIdNumber = manualIdNumber;
 
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          error:
-            'Nimewo dokiman sa a deja anrejistre sou yon lòt kont. Si se ou, kontakte sipò HatexCard.',
-        },
-        { status: 409 }
-      );
-    }
+  let idHash: string;
+  try {
+    idHash = hashKycIdNumber(resolvedIdNumber);
+  } catch {
+    return NextResponse.json(
+      { error: 'Konfigirasyon sekirite KYC manke sou sèvè a (KYC_HASH_SECRET).' },
+      { status: 503 }
+    );
+  }
+
+  // D) Dokiman deja nan baz done?
+  const { data: duplicate } = await admin
+    .from('profiles')
+    .select('id, email, kyc_status')
+    .eq('kyc_id_number_hash', idHash)
+    .neq('id', user.id)
+    .in('kyc_status', [KYC_STATUS.PENDING, KYC_STATUS.APPROVED])
+    .maybeSingle();
+
+  if (duplicate) {
+    return NextResponse.json(
+      {
+        error:
+          'Nimewo dokiman sa a deja anrejistre sou yon lòt kont. Si se ou, kontakte sipò HatexCard.',
+      },
+      { status: 409 }
+    );
   }
 
   const timestamp = Date.now();
@@ -143,9 +178,10 @@ export async function POST(request: Request) {
     }
   } catch (uploadErr: unknown) {
     const msg = uploadErr instanceof Error ? uploadErr.message : '';
-    const bucketHint = msg.includes('Bucket not found') || msg.includes('bucket')
-      ? ' Bucket kyc-documents pa kreye — kouri migration 20260725 nan Supabase SQL Editor.'
-      : '';
+    const bucketHint =
+      msg.includes('Bucket not found') || msg.includes('bucket')
+        ? ' Bucket kyc-documents pa kreye — kouri migration 20260725 nan Supabase SQL Editor.'
+        : '';
     return NextResponse.json(
       { error: `Pa t kapab sove dokiman yo.${bucketHint} Eseye ankò.` },
       { status: 500 }
@@ -169,9 +205,10 @@ export async function POST(request: Request) {
     .eq('id', user.id);
 
   if (updateError) {
-    const colHint = updateError.message?.includes('kyc_doc_type') || updateError.message?.includes('column')
-      ? ' Kouri migration 20260725_kyc_hardening.sql nan Supabase.'
-      : '';
+    const colHint =
+      updateError.message?.includes('kyc_doc_type') || updateError.message?.includes('column')
+        ? ' Kouri migration 20260725_kyc_hardening.sql nan Supabase.'
+        : '';
     return NextResponse.json(
       { error: `Pa t kapab mete ajou pwofil la.${colHint}` },
       { status: 500 }

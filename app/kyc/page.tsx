@@ -28,7 +28,7 @@ export default function KYCPage() {
     kyc_fee_paid: boolean;
   } | null>(null);
 
-  const [extractedData, setExtractedData] = useState({ firstName: '', lastName: '' });
+  const [extractedData, setExtractedData] = useState({ firstName: '', lastName: '', idNumber: '' });
   const [files, setFiles] = useState({
     idFront: null as File | null,
     idBack: null as File | null,
@@ -144,6 +144,10 @@ export default function KYCPage() {
       setErrorMsg('TANPRI ANTRE NON AK SIYATI OU AVAN.');
       return;
     }
+    if (!extractedData.idNumber || extractedData.idNumber.replace(/[\s\-]/g, '').length < 5) {
+      setErrorMsg('Tanpri antre nimewo dokiman an jan li ekri sou ID a (omwen 5 karaktè).');
+      return;
+    }
 
     const isCIN = docType === 'CIN / KAT ELEKTORAL';
     if (!files.idFront || !files.selfie || (isCIN && !files.idBack)) {
@@ -167,6 +171,7 @@ export default function KYCPage() {
       body.append('docType', docType);
       body.append('firstName', extractedData.firstName);
       body.append('lastName', extractedData.lastName);
+      body.append('idNumber', extractedData.idNumber.trim());
       body.append('idFront', compressedFront, 'front.jpg');
       body.append('selfie', compressedSelfie, 'selfie.jpg');
       if (compressedBack) body.append('idBack', compressedBack, 'back.jpg');
@@ -343,7 +348,7 @@ export default function KYCPage() {
               <p className="text-xs text-slate-500 font-medium">Antre non w jan l ekri sou dokiman an.</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wider mb-2">Non</label>
                 <input
@@ -366,13 +371,40 @@ export default function KYCPage() {
               </div>
             </div>
 
+            <div className="mb-6">
+              <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wider mb-2">
+                Nimewo dokiman (obligatwa)
+              </label>
+              <input
+                type="text"
+                placeholder="EG: 001-234-567-8 oswa nimewo sou ID a"
+                className="w-full bg-white p-4 rounded-xl border border-gray-300 text-sm font-bold uppercase text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
+                value={extractedData.idNumber}
+                onChange={(e) =>
+                  setExtractedData((prev) => ({
+                    ...prev,
+                    idNumber: e.target.value.toUpperCase(),
+                  }))
+                }
+              />
+              <p className="mt-1.5 text-[10px] text-slate-400 font-medium">
+                Nou verifye nimewo sa a pa deja sou yon lòt kont.
+              </p>
+            </div>
+
             <div className="space-y-4">
               <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 border-b border-gray-200 pb-2">Foto Dokiman yo</p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left mb-2">
+                <p className="text-[11px] text-amber-900 font-medium leading-relaxed">
+                  <strong>DEVAN</strong> = fas kat (kote foto ou ye). <strong>DÈYÈ</strong> = lòt bò a (pa menm foto fas). Selfie = figi ou sèlman, limyè klè.
+                </p>
+              </div>
 
               <label className={`block bg-slate-50 p-6 rounded-2xl border-2 border-dashed text-center transition-all cursor-pointer ${files.idFront ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300 hover:border-indigo-400'}`}>
                 <Camera size={32} className={`mx-auto mb-3 ${files.idFront ? 'text-emerald-500' : 'text-slate-400'}`} />
                 <p className={`text-xs font-bold uppercase tracking-wider ${files.idFront ? 'text-emerald-700' : 'text-slate-600'}`}>
-                  {files.idFront ? `✅ ${files.idFront.name}` : 'Foto DEVAN Dokiman an'}
+                  {files.idFront ? `✅ ${files.idFront.name}` : 'Foto DEVAN Dokiman an (fas + foto figi)'}
                 </p>
                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileChange(e, 'idFront')} />
               </label>
@@ -381,7 +413,7 @@ export default function KYCPage() {
                 <label className={`block bg-slate-50 p-6 rounded-2xl border-2 border-dashed text-center transition-all cursor-pointer ${files.idBack ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300 hover:border-indigo-400'}`}>
                   <Camera size={32} className={`mx-auto mb-3 ${files.idBack ? 'text-emerald-500' : 'text-slate-400'}`} />
                   <p className={`text-xs font-bold uppercase tracking-wider ${files.idBack ? 'text-emerald-700' : 'text-slate-600'}`}>
-                    {files.idBack ? `✅ ${files.idBack.name}` : 'Foto DÈYÈ Dokiman an'}
+                    {files.idBack ? `✅ ${files.idBack.name}` : 'Foto DÈYÈ Dokiman an (lòt bò, pa fas)'}
                   </p>
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileChange(e, 'idBack')} />
                 </label>

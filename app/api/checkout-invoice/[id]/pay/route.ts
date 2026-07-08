@@ -69,7 +69,11 @@ export async function POST(
     });
 
     if (error) {
-      return NextResponse.json({ success: false, message: 'Peman an pa t reyisi.' }, { status: 400 });
+      console.error('invoice pay rpc:', error.message);
+      return NextResponse.json(
+        { success: false, message: error.message || 'Peman an pa t reyisi.' },
+        { status: 400 }
+      );
     }
 
     const res = result as { success?: boolean; message?: string } | null;

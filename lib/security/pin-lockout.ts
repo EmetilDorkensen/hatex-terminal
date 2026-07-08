@@ -53,6 +53,29 @@ export async function verifyTransactionPin(profile: PinProfile, pin: string): Pr
   return false;
 }
 
+/** Aksepte PIN wallet OSWA PIN tranzaksyon (yon sèl PIN pou koneksyon + retrè/transfert). */
+export async function verifyAnyPin(profile: PinProfile, pin: string): Promise<{
+  ok: boolean;
+  field: 'wallet' | 'transaction' | null;
+}> {
+  if (await verifyWalletPin(profile, pin)) {
+    return { ok: true, field: 'wallet' };
+  }
+  if (await verifyTransactionPin(profile, pin)) {
+    return { ok: true, field: 'transaction' };
+  }
+  return { ok: false, field: null };
+}
+
+export function hasAnyPin(profile: Pick<PinProfile, 'pin_code' | 'pin_code_hash' | 'transaction_pin' | 'transaction_pin_hash'>): boolean {
+  return !!(
+    profile.pin_code_hash ||
+    profile.pin_code ||
+    profile.transaction_pin_hash ||
+    profile.transaction_pin
+  );
+}
+
 export async function buildPinFailureUpdate(currentAttempts: number) {
   const next = (currentAttempts || 0) + 1;
   if (next >= MAX_PIN_ATTEMPTS) {
@@ -73,22 +96,20 @@ export async function buildPinFailureUpdate(currentAttempts: number) {
   };
 }
 
-export async function buildPinSuccessUpdate(pin: string, field: 'wallet' | 'transaction') {
-  const hashed = await hashPin(pin);
-  if (field === 'wallet') {
-    return {
-      pin_code_hash: hashed,
-      pin_code: null,
-      pin_enabled: true,
-      failed_pin_attempts: 0,
-      pin_locked_until: null,
-    };
-  }
+export async function buildPinSuccessUpdate(
+  _pin: string,
+  _field: 'wallet' | 'transaction' | 'both' = 'both'
+) {
+  const hashed = await hashPin(_pin);
+  // Toujou sync wallet + tranzaksyon pou yon sèl PIN (login + retrè/transfert)
   return {
+    pin_code_hash: hashed,
+    pin_code: null,
+    pin_enabled: true,
     transaction_pin_hash: hashed,
     transaction_pin: null,
     failed_pin_attempts: 0,
-    pin_locked_until: null,
+    pin_locked_until: null as string | null,
   };
 }
 

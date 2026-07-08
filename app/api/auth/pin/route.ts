@@ -3,11 +3,10 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/sec
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import {
   isPinLocked,
-  verifyTransactionPin,
-  verifyWalletPin,
+  verifyAnyPin,
+  hasAnyPin,
   buildPinFailureUpdate,
   buildPinSuccessUpdate,
-  buildPinMigrationUpdate,
 } from '@/lib/security/pin-lockout';
 
 export async function POST(request: Request) {
@@ -22,10 +21,12 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { action, pin, oldPin, type = 'transaction' } = body;
+    const { action, pin, oldPin } = body;
 
     const supabaseAuth = await createSupabaseServerClient();
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'Ou dwe konekte.' }, { status: 401 });
@@ -34,7 +35,9 @@ export async function POST(request: Request) {
     const supabase = createSupabaseAdminClient();
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('id, pin_code, pin_code_hash, transaction_pin, transaction_pin_hash, failed_pin_attempts, pin_locked_until, account_status')
+      .select(
+        'id, pin_code, pin_code_hash, transaction_pin, transaction_pin_hash, failed_pin_attempts, pin_locked_until, account_status, pin_enabled'
+      )
       .eq('id', user.id)
       .single();
 
@@ -48,9 +51,13 @@ export async function POST(request: Request) {
     }
 
     if (action === 'status') {
-      const hasTransactionPin = !!(profile.transaction_pin_hash || profile.transaction_pin);
-      const hasWalletPin = !!(profile.pin_code_hash || profile.pin_code);
-      return NextResponse.json({ success: true, hasTransactionPin, hasWalletPin });
+      const hasPin = hasAnyPin(profile);
+      return NextResponse.json({
+        success: true,
+        hasTransactionPin: hasPin,
+        hasWalletPin: hasPin,
+        hasPin,
+      });
     }
 
     if (action === 'set') {
@@ -58,8 +65,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: 'PIN dwe gen 4 chif.' }, { status: 400 });
       }
 
-      const field = type === 'wallet' ? 'wallet' : 'transaction';
-      const updates = await buildPinSuccessUpdate(String(pin), field);
+      const updates = await buildPinSuccessUpdate(String(pin));
       await supabase.from('profiles').update(updates).eq('id', user.id);
 
       return NextResponse.json({ success: true, message: 'PIN anrejistre avèk siksè.' });
@@ -70,14 +76,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: 'PIN dwe gen 4 chif.' }, { status: 400 });
       }
 
-      const oldOk = await verifyWalletPin(profile, String(oldPin));
+      const { ok: oldOk } = await verifyAnyPin(profile, String(oldPin));
       if (!oldOk) {
         const failure = await buildPinFailureUpdate(profile.failed_pin_attempts || 0);
         await supabase.from('profiles').update(failure.update).eq('id', user.id);
         return NextResponse.json({ success: false, message: failure.message }, { status: 401 });
       }
 
-      const updates = await buildPinSuccessUpdate(String(pin), 'wallet');
+      const updates = await buildPinSuccessUpdate(String(pin));
       await supabase.from('profiles').update(updates).eq('id', user.id);
       return NextResponse.json({ success: true, message: 'PIN chanje avèk siksè.' });
     }
@@ -87,7 +93,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: 'PIN dwe gen 4 chif.' }, { status: 400 });
       }
 
-      const pinOk = await verifyTransactionPin(profile, String(pin));
+      const { ok: pinOk } = await verifyAnyPin(profile, String(pin));
 
       if (!pinOk) {
         const failure = await buildPinFailureUpdate(profile.failed_pin_attempts || 0);
@@ -95,15 +101,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: failure.message }, { status: 401 });
       }
 
-      if (profile.transaction_pin && !profile.transaction_pin_hash) {
-        const migration = await buildPinMigrationUpdate(profile, String(pin), 'transaction');
-        await supabase.from('profiles').update(migration).eq('id', user.id);
+      // Sync de PIN yo apre verifikasyon siksè
+      if (
+        !profile.pin_code_hash ||
+        !profile.transaction_pin_hash ||
+        profile.pin_code ||
+        profile.transaction_pin ||
+        !profile.pin_enabled
+      ) {
+        await supabase.from('profiles').update(await buildPinSuccessUpdate(String(pin))).eq('id', user.id);
+      } else {
+        await supabase
+          .from('profiles')
+          .update({ failed_pin_attempts: 0, pin_locked_until: null })
+          .eq('id', user.id);
       }
-
-      await supabase
-        .from('profiles')
-        .update({ failed_pin_attempts: 0, pin_locked_until: null })
-        .eq('id', user.id);
 
       return NextResponse.json({ success: true, message: 'PIN verifye.' });
     }

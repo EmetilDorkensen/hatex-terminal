@@ -145,7 +145,11 @@ function CheckoutContent() {
         }
 
         // REDIREKSYON AN – SA A ENPÒTAN!
-        router.push(`/checkout/success?id=${data.transaction_id}`);
+        router.push(
+          `/checkout/success?id=${encodeURIComponent(data.transaction_id)}&amount=${encodeURIComponent(amount)}${
+            data.reference ? `&ref=${encodeURIComponent(data.reference)}` : ''
+          }`
+        );
       } else {
         setError(data.message || 'Peman an echwe.');
         setProcessing(false);
