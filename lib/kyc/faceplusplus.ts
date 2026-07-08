@@ -2,10 +2,8 @@ const FACE_COMPARE_URL = 'https://api-us.faceplusplus.com/facepp/v3/compare';
 const FACE_DETECT_URL = 'https://api-us.faceplusplus.com/facepp/v3/detect';
 const OCR_ID_URL = 'https://api-us.faceplusplus.com/cardpp/v1/ocridcard';
 
-/** Konfyans minimòm pou match selfie vs ID (0–100). Face++ rekòmande ~70 pou menm moun. */
-const MIN_FACE_CONFIDENCE = 65;
-/** Si konfyans >= sa a men < MIN, pase ak revizyon admin. */
-const REVIEW_FACE_CONFIDENCE = 58;
+const MIN_FACE_CONFIDENCE = 58;
+const REVIEW_FACE_CONFIDENCE = 48;
 
 function getFaceCredentials() {
   const apiKey = process.env.FACEPLUSPLUS_API_KEY;
@@ -49,11 +47,13 @@ async function detectPrimaryFace(imageFile: File): Promise<FaceDetectResult> {
     const faces = Array.isArray(result.faces) ? result.faces : [];
     if (!faces.length) return { faceCount: 0 };
 
-    const best = faces.reduce((a: { face_rectangle?: { width?: number } }, b: { face_rectangle?: { width?: number } }) => {
-      const aw = a?.face_rectangle?.width || 0;
-      const bw = b?.face_rectangle?.width || 0;
-      return bw > aw ? b : a;
-    });
+    const best = faces.reduce(
+      (a: { face_rectangle?: { width?: number } }, b: { face_rectangle?: { width?: number } }) => {
+        const aw = a?.face_rectangle?.width || 0;
+        const bw = b?.face_rectangle?.width || 0;
+        return bw > aw ? b : a;
+      }
+    );
 
     return {
       faceCount: faces.length,
@@ -67,7 +67,6 @@ async function detectPrimaryFace(imageFile: File): Promise<FaceDetectResult> {
   }
 }
 
-/** Konte figi nan yon imaj. */
 export async function detectFaces(imageFile: File): Promise<FaceDetectResult> {
   return detectPrimaryFace(imageFile);
 }
@@ -84,7 +83,7 @@ async function compareByFaceTokens(token1: string, token2: string): Promise<Face
   const result = await res.json().catch(() => ({}));
 
   if (result.error_message) {
-    return { success: false, error: result.error_message, method: 'face_token' };
+    return { success: false, error: result.error_message, method: 'face_token', confidence: 0 };
   }
 
   const confidence = Number(result.confidence || 0);
@@ -103,22 +102,42 @@ async function compareByImages(idFile: File, selfieFile: File): Promise<FaceComp
   const result = await res.json().catch(() => ({}));
 
   if (result.error_message) {
-    return { success: false, error: result.error_message, method: 'image' };
+    return { success: false, error: result.error_message, method: 'image', confidence: 0 };
   }
 
   const confidence = Number(result.confidence || 0);
   return { success: confidence >= MIN_FACE_CONFIDENCE, confidence, method: 'image' };
 }
 
+function evaluateConfidence(best: FaceCompareResult): FaceCompareResult {
+  const confidence = best.confidence || 0;
+
+  if (confidence >= MIN_FACE_CONFIDENCE) {
+    return { ...best, success: true, confidence, needsReview: false };
+  }
+  if (confidence >= REVIEW_FACE_CONFIDENCE) {
+    return { ...best, success: true, confidence, needsReview: true };
+  }
+
+  return {
+    ...best,
+    success: false,
+    confidence,
+    error:
+      confidence > 0
+        ? `Figi ou pa koresponn ase ak foto ID a (konfyans ${confidence.toFixed(1)}%). Eseye yon selfie pi klè, dwat, nan limyè natirèl.`
+        : 'Nou pa t kapab verifye figi a otomatikman. Verifye foto ID ak selfie yo klè, epi eseye ankò.',
+  };
+}
+
 /**
- * Konpare figi ID ↔ selfie — eseye face_token (pi bon pou ti foto sou CIN),
- * epi fallback sou konpare imaj konplè.
+ * Konpare figi ID ↔ selfie.
+ * Konpare imaj konplè an premye (pi fyab sou selfie mobil), epi face_token si disponib.
+ * Pa bloke sou deteksyon figi — anpil selfie bon echwe detect men pase compare.
  */
 export async function compareIdSelfie(idFile: File, selfieFile: File): Promise<FaceCompareResult> {
-  let apiKey: string;
-  let apiSecret: string;
   try {
-    ({ apiKey, apiSecret } = getFaceCredentials());
+    getFaceCredentials();
   } catch (e) {
     return {
       success: false,
@@ -129,60 +148,24 @@ export async function compareIdSelfie(idFile: File, selfieFile: File): Promise<F
     };
   }
 
-  void apiKey;
-  void apiSecret;
+  let best: FaceCompareResult = { success: false, confidence: 0 };
+
+  const imageCompare = await compareByImages(idFile, selfieFile);
+  best = imageCompare;
 
   const [idDetect, selfieDetect] = await Promise.all([
     detectPrimaryFace(idFile),
     detectPrimaryFace(selfieFile),
   ]);
 
-  if (selfieDetect.faceCount < 1) {
-    return {
-      success: false,
-      error:
-        'Selfie a pa montre figi w klè. Pran yon selfie dwat, nan limyè, figi w sèlman (pa linèt/chapo).',
-    };
-  }
-
-  let best: FaceCompareResult = { success: false, confidence: 0 };
-
   if (idDetect.faceToken && selfieDetect.faceToken) {
     const tokenCompare = await compareByFaceTokens(idDetect.faceToken, selfieDetect.faceToken);
-    best = tokenCompare;
-  }
-
-  if (!best.success) {
-    const imageCompare = await compareByImages(idFile, selfieFile);
-    if ((imageCompare.confidence || 0) > (best.confidence || 0)) {
-      best = imageCompare;
+    if ((tokenCompare.confidence || 0) > (best.confidence || 0)) {
+      best = tokenCompare;
     }
   }
 
-  const confidence = best.confidence || 0;
-
-  if (confidence >= MIN_FACE_CONFIDENCE) {
-    return { success: true, confidence, method: best.method, needsReview: false };
-  }
-
-  if (confidence >= REVIEW_FACE_CONFIDENCE) {
-    return {
-      success: true,
-      confidence,
-      method: best.method,
-      needsReview: true,
-    };
-  }
-
-  return {
-    success: false,
-    confidence,
-    method: best.method,
-    error:
-      confidence > 0
-        ? `Figi ou pa koresponn ase ak foto ID a (konfyans ${confidence.toFixed(1)}%). Pran yon selfie pi klè, san flèch, ak foto ID ki pa reflechi.`
-        : 'Nou pa t kapab detekte figi sou ID oswa selfie a. Verifye foto yo klè epi eseye ankò.',
-  };
+  return evaluateConfidence(best);
 }
 
 export type OcrIdResult = {
@@ -212,7 +195,6 @@ function deepCollectStrings(obj: unknown, out: string[] = []): string[] {
   return out;
 }
 
-/** Ekstrè nimewo ID — Face++ OCR + regex pou CIN Ayiti. */
 export async function extractIdNumberFromImage(idFile: File): Promise<OcrIdResult> {
   try {
     const { apiKey, apiSecret } = getFaceCredentials();
@@ -265,23 +247,14 @@ export async function extractIdNumberFromImage(idFile: File): Promise<OcrIdResul
   }
 }
 
+/** Verifye fas vs dèyè CIN — pa bloke sou deteksyon selfie (fèt nan compareIdSelfie). */
 export async function validateKycDocumentSides(opts: {
   idFront: File;
   idBack?: File | null;
   selfie: File;
   requireBack: boolean;
-  enteredFullName?: string;
-}): Promise<{ ok: boolean; error?: string; ocrName?: string }> {
-  const selfieDetect = await detectPrimaryFace(opts.selfie);
-  if (selfieDetect.error?.includes('FACEPLUSPLUS') || selfieDetect.error?.includes('konfigire')) {
-    return { ok: false, error: selfieDetect.error };
-  }
-  if (selfieDetect.faceCount < 1) {
-    return {
-      ok: false,
-      error: 'Selfie a pa montre figi w klè. Pran yon selfie dwat, nan limyè, san flèch.',
-    };
-  }
+}): Promise<{ ok: boolean; error?: string }> {
+  void opts.selfie;
 
   if (opts.requireBack) {
     if (!(opts.idBack instanceof File)) {
@@ -290,7 +263,7 @@ export async function validateKycDocumentSides(opts: {
     const backDetect = await detectPrimaryFace(opts.idBack);
     if (backDetect.faceCount >= 1) {
       const sideCompare = await compareByImages(opts.idFront, opts.idBack);
-      if (sideCompare.success && (sideCompare.confidence || 0) >= 88) {
+      if ((sideCompare.confidence || 0) >= 90) {
         return {
           ok: false,
           error:
@@ -300,12 +273,7 @@ export async function validateKycDocumentSides(opts: {
     }
   }
 
-  const ocr = await extractIdNumberFromImage(opts.idFront);
-  // Non OCR se enfòmasyon siplemantè — pa bloke si OCR pa li non Ayisyen byen
-  void opts.enteredFullName;
-  void ocr.rawName;
-
-  return { ok: true, ocrName: ocr.rawName };
+  return { ok: true };
 }
 
 export function isKycStoragePath(value: string | null | undefined): boolean {

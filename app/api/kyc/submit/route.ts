@@ -92,7 +92,6 @@ export async function POST(request: Request) {
     idBack: idBack instanceof File ? idBack : null,
     selfie,
     requireBack: isCin,
-    enteredFullName: `${firstName} ${lastName}`,
   });
   if (!sides.ok) {
     const isConfig = sides.error?.includes('FACEPLUSPLUS') || sides.error?.includes('konfigire');

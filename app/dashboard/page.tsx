@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { createBrowserClient } from '@supabase/ssr';
 import { checkStrongPassword } from '@/lib/security/password-strength';
 import { isKycApproved } from '@/lib/kyc/status';
+import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
@@ -123,8 +124,8 @@ export default function Dashboard() {
             }
           }
 
-          const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(5);
-          if (transactions) setRecentTransactions(transactions);
+          const { data: transactions } = await supabase.from('transactions').select('*').eq('user_id', user.id).not('description', 'ilike', '%Voye bay%').order('created_at', { ascending: false }).limit(12);
+          if (transactions) setRecentTransactions(prepareUserTransactions(transactions).slice(0, 5));
 
           const { data: settings } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
           if (settings) {
@@ -836,10 +837,9 @@ export default function Dashboard() {
                         {t.amount > 0 ? <ArrowDownToLine size={18} /> : <ArrowUpFromLine size={18} />}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{t.description}</p>
+                        <p className="text-sm font-semibold text-slate-900 truncate">{getTransactionDescription(t)}</p>
                         <p className="text-xs text-slate-500 truncate mt-0.5">
                           {new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                          {t.user_email && ` • ${t.user_email.split('@')[0]}...`}
                         </p>
                       </div>
                     </div>

@@ -122,14 +122,17 @@ export default function KYCPage() {
 
   const compressKycImage = async (file: File, label: string) => {
     setVerifyStep(`Konprese ${label}...`);
-    // useWebWorker:false — sou Chrome Android / Safari, worker sou gwo foto
-    // yo souvan bay "manque de mémoire". Konprese youn apre lòt ak limi pi ba.
+    const isSelfie = label.toLowerCase().includes('selfie');
+    // Selfie: pa konprese twòp — deteksyon figi echwe sou foto twòp konprese
+    if (isSelfie && file.size <= 2.5 * 1024 * 1024) {
+      return file;
+    }
     try {
       return await imageCompression(file, {
-        maxSizeMB: label.includes('selfie') ? 0.85 : 0.65,
-        maxWidthOrHeight: label.includes('selfie') ? 1280 : 1400,
+        maxSizeMB: isSelfie ? 1.2 : 0.75,
+        maxWidthOrHeight: isSelfie ? 1600 : 1400,
         useWebWorker: false,
-        initialQuality: label.includes('selfie') ? 0.88 : 0.8,
+        initialQuality: isSelfie ? 0.92 : 0.82,
         fileType: 'image/jpeg',
       });
     } catch {
