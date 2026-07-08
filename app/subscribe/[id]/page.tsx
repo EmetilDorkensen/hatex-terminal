@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { 
   Loader2, CreditCard, ShieldCheck, AlertCircle, 
-  ArrowLeft, CheckCircle2, Lock, ShieldAlert, 
+  ArrowLeft, CheckCircle2, Lock, 
   Receipt, Phone, CalendarIcon, Hash, MessageCircle
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -281,13 +281,6 @@ export default function SubscribePage() {
                </div>
             </div>
 
-            <div className="bg-red-600/5 border border-red-600/20 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex gap-4 items-start shadow-inner">
-               <ShieldAlert className="w-5 h-5 md:w-6 md:h-6 text-red-600 shrink-0" />
-               <p className="text-[10px] md:text-[11px] text-zinc-400 leading-relaxed font-bold italic">
-                 <span className="text-white block mb-1 uppercase font-black">Garanti H-Pay Escrow</span>
-                 Lajan ou an sekirite nèt. Li p ap ale sou kont vandè a toutotan ou pa konfime ou resevwa sèvis la kòrèkteman nan espas 24 èdtan.
-               </p>
-            </div>
           </div>
 
           <div className="lg:col-span-6 order-1 lg:order-2">

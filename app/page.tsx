@@ -50,7 +50,6 @@ export default function LandingPage() {
     {
       label: "Sekirite", href: "#sekirite",
       sub: [
-        { label: "Escrow 24h", desc: "Pwoteksyon achè & machann" },
         { label: "KYC & Verifikasyon", desc: "Platfòm san fwòd" },
         { label: "Ankripsyon 256-bit", desc: "Done ou an sekirite" },
         { label: "Kontwòl Tranzaksyon", desc: "Istwa konplè an tan reyèl" },
@@ -83,7 +82,7 @@ export default function LandingPage() {
     { val: "0 HTG", label: "Frè pou tranzaksyon P2P" },
     { val: "< 10s", label: "Vitès mwayèn peman" },
     { val: "256-bit", label: "Nivo ankripsyon done" },
-    { val: "24h", label: "Garanti Escrow machann" },
+    { val: "24/7", label: "Siveyans tranzaksyon" },
   ];
 
   const features = [
@@ -551,7 +550,6 @@ export default function LandingPage() {
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                 {[
-                  { t: "Garanti Escrow 24 Èdtan", d: "Peman sot nan kliyan bloke nan sistèm nou pou 24h anvan li lage bay machann. Si gen yon pwoblèm, achè a gen yon fenèt pou ouvri yon diferan." },
                   { t: "Verifikasyon KYC Obligatwa", d: "Chak itilizatè dwe verifye idantite yo anvan yo ka resevwa peman. Sa elimine risk koken ak fwòd sou platfòm nan." },
                   { t: "Ankripsyon SSL 256-bit", d: "Tout done bankè ak pèsonèl ou yo pase nan yon tiyo ankripte nivo bankè. Okenn enfòmasyon sansib pa janm transmèt an klè." },
                   { t: "Siveyans Tranzaksyon 24/7", d: "Sistèm nou an monitoré chak mouvman lajan an tan reyèl. Aktivite etranj deklanche yon alèt imedyat epi blokaj otomatik." },

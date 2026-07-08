@@ -6,7 +6,7 @@ import {
   Users, LayoutGrid, Plus, 
   ExternalLink, Trash2, Loader2, 
   TrendingUp, Search, ShieldCheck,
-  ShieldAlert, Lock
+  Lock
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -166,13 +166,6 @@ export default function SubscriptionsDashboard() {
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full lg:w-auto">
-            <button 
-              onClick={() => router.push('/dashboard/escrow')}
-              className="w-full sm:w-auto bg-orange-500/10 border border-orange-500/20 text-orange-500 px-6 md:px-8 py-4 md:py-5 rounded-full md:rounded-[2rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 hover:bg-orange-500 hover:text-white transition-all shadow-xl"
-            >
-              <ShieldAlert className="w-4 h-4 md:w-5 md:h-5" /> Kòb nan Escrow
-            </button>
-
             <button 
               onClick={() => router.push('/dashboard/subscriptions/new')}
               className="w-full sm:w-auto bg-white text-black px-8 py-4 md:py-5 rounded-full md:rounded-[2rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 hover:bg-red-600 hover:text-white transition-all shadow-xl"

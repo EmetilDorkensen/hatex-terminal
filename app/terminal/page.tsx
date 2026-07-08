@@ -1098,8 +1098,13 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
     if (earnings.total <= 0) return alert("Pa gen okenn revni pou senkronize.");
     setSyncing(true);
     try {
-      const { error } = await supabase.rpc('increment_merchant_balance', { merchant_id: profile?.id, amount_to_add: earnings.total });
-      if (error) throw error;
+      const res = await fetch('/api/terminal/sync-earnings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_to_add: earnings.total }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Senkronizasyon an pa t reyisi.');
       alert("Balans Wallet ou moute avèk siksè!");
       window.location.reload();
     } catch (err: any) {

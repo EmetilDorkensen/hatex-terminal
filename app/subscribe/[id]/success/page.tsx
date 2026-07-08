@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { CheckCircle2, AlertTriangle, MessageCircle, Copy, Key, Loader2, ExternalLink } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Copy, Key, Loader2, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SuccessPage({ params }: { params: { id: string } }) {
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Nimewo WhatsApp Sipò Hatex la (Ou ka chanje l)
-  const HATEX_SUPPORT_WHATSAPP = "50900000000"; 
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -126,27 +123,6 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
               <p>Machann nan ap kontakte w talè konsa ak detay abònman ou an, oubyen ou ka sèvi ak lyen pwodwi a dirèk.</p>
             </div>
           )}
-
-          {/* SÈKSYON ESCROW / AVÈTISMAN 1H15 */}
-          <div className="bg-red-600/5 border border-red-600/20 rounded-3xl p-6 flex flex-col items-center text-center">
-            <AlertTriangle className="text-red-500 mb-3" size={28} />
-            <h3 className="text-red-500 font-black uppercase text-sm mb-2">Sistèm Pwoteksyon Kliyan</h3>
-            <p className="text-xs text-zinc-400 font-bold leading-relaxed mb-6">
-              Èske enfòmasyon anlè a mache? Si kont lan pa bon oswa ou pa jwenn abònman w lan, ou gen <span className="text-white font-black underline">Egzakteman 1 èdtan</span> apati kounye a pou w kontakte sèvis sipò nou an. 
-              <br/><br/>
-              Si w kite 1h15 minit pase, sistèm nan ap voye kòb ou a bay machann nan otomatikman epi <span className="text-red-400">ou p ap ka fè okenn reklamasyon ankò.</span>
-            </p>
-
-            <a 
-              href={`https://wa.me/${HATEX_SUPPORT_WHATSAPP}?text=Bonjou%20Sipò%20Hatex,%20mwen%20fèk%20peye%20abònman%20${subscription.id}%20men%20mwen%20gen%20yon%20pwoblèm.`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-green-600 hover:bg-green-500 text-white w-full py-4 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/20"
-            >
-              <MessageCircle size={18} />
-              Kontakte Sipò a sou WhatsApp
-            </a>
-          </div>
 
           {/* BOUTON RETOUNEN */}
           <Link href="/dashboard" className="block text-center text-[10px] text-zinc-500 font-black uppercase tracking-widest hover:text-white transition-colors">

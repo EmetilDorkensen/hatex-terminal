@@ -1,9 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
 import { CreditCard, Lock, Calendar, ShieldCheck } from 'lucide-react';
-import { checkBalanceCap } from '@/lib/security/spending-limits';
 
 export default function CheckoutPage() {
   const params = useParams();
@@ -13,57 +11,40 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [paymentData, setPaymentData] = useState<any>(null);
   const [merchantName, setMerchantName] = useState('');
-  const [merchantProfile, setMerchantProfile] = useState<any>(null);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
-  // Enfòmasyon Kat la
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   useEffect(() => {
     const fetchPaymentDetails = async () => {
       try {
-        // Pa gen anyen pou verifye si moun nan konekte (NO LOGIN REQUIRED)
+        const res = await fetch(`/api/pay/${paymentId}/session`);
+        const data = await res.json();
 
-        // 1. Chèche detay fakti a (Tikè Peman an)
-        const { data: request, error: reqErr } = await supabase
-          .from('payment_requests')
-          .select('*')
-          .eq('id', paymentId)
-          .single();
-
-        if (reqErr || !request) throw new Error("Fakti sa a pa valab oswa li pa egziste ankò.");
-        if (request.status === 'completed') throw new Error("Fakti sa a te deja peye.");
-        
-        setPaymentData(request);
-
-        // 2. Chèche non Machann nan pou n ka afiche l (+ balans/tip kont pou plafon balans)
-        const { data: merchant } = await supabase
-          .from('profiles')
-          .select('business_name, full_name, wallet_balance, account_type')
-          .eq('id', request.merchant_id)
-          .single();
-          
-        if (merchant) {
-            setMerchantName(merchant.business_name || merchant.full_name);
-            setMerchantProfile(merchant);
+        if (!res.ok || !data.valid) {
+          throw new Error(data.message || 'Fakti sa a pa valab oswa li pa egziste ankò.');
         }
 
-      } catch (err: any) {
-        setMsg({ type: 'error', text: err.message });
+        setPaymentData({
+          id: data.payment.id,
+          amount: data.payment.amount,
+          order_id: data.payment.order_id,
+          redirect_url: data.payment.redirect_url,
+          webhook_url: data.payment.webhook_url,
+        });
+        setMerchantName(data.merchant_name);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Erè pandan chajman.';
+        setMsg({ type: 'error', text: message });
       } finally {
         setLoading(false);
       }
     };
 
     if (paymentId) fetchPaymentDetails();
-  }, [paymentId, supabase]);
+  }, [paymentId]);
 
   // Fonksyon pou fòmate nimewo kat la bèl ak espas (XXXX XXXX XXXX XXXX)
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,63 +78,47 @@ export default function CheckoutPage() {
     setMsg({ type: '', text: '' });
 
     try {
-      // Plafon Balans Maksimòm pou machann k ap resevwa kòb la — pre-check
-      // fèt anvan RPC la, an atandan yo ranfòse limit la dirèkteman nan RPC a.
-      if (merchantProfile) {
-        const capCheck = checkBalanceCap(Number(merchantProfile.wallet_balance || 0), merchantProfile.account_type, Number(paymentData?.amount || 0));
-        if (!capCheck.allowed) {
-          throw new Error(capCheck.message || 'Balans machann nan ta depase limit maksimòm otorize a.');
-        }
-      }
-
-      // 1. Voye enfòmasyon kat la nan nouvo RPC baz done a
-      // (non paramèt yo dwe matche EGZAKTMAN ak fonksyon SQL la: p_exp_date / p_cvv,
-      // pa p_card_expiry / p_card_cvv — sinon PostgREST pa jwenn fonksyon an.)
-      const { data: result, error } = await supabase.rpc('process_merchant_payment_with_card', {
-        p_payment_id: paymentId,
-        p_card_number: cleanCardNumber,
-        p_exp_date: cleanExpiry,
-        p_cvv: cleanCvv
+      const res = await fetch(`/api/pay/${paymentId}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_number: cleanCardNumber,
+          expiry: cleanExpiry,
+          cvv: cleanCvv,
+        }),
       });
+      const result = await res.json();
 
-      if (error) throw new Error("Gen yon pwoblèm nan sistèm peman an. Tanpri re-eseye.");
-
-      if (result.success) {
-        
-        // ==========================================
-        // 🚨 MAJI WEBHOOK LA FÈT LA A 🚨
-        // ==========================================
-        if (paymentData.webhook_url) {
-            try {
-                // Siyal nan fènwa pou di plugin WooCommerce la kòb la nan men Hatex
-                await fetch(paymentData.webhook_url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        order_id: paymentData.order_id,
-                        status: 'paid',
-                        transaction_id: paymentId,
-                        amount_htg: paymentData.amount
-                    })
-                });
-            } catch (webhookErr) {
-                console.error("Webhook error ignored");
-            }
-        }
-        // ==========================================
-
-        setMsg({ type: 'success', text: '✅ Peman an pase avèk siksè! N ap voye w tounen...' });
-        
-        // Voye kliyan an tounen sou sit la apre 2 segonn
-        setTimeout(() => {
-          window.location.href = result.redirect_url;
-        }, 2000);
-
-      } else {
-        setMsg({ type: 'error', text: result.message });
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || 'Gen yon pwoblèm nan sistèm peman an.');
       }
-    } catch (err: any) {
-      setMsg({ type: 'error', text: err.message });
+
+      if (paymentData?.webhook_url) {
+        try {
+          await fetch(paymentData.webhook_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              order_id: paymentData.order_id,
+              status: 'paid',
+              transaction_id: paymentId,
+              amount_htg: paymentData.amount,
+            }),
+          });
+        } catch {
+          /* webhook echwe — peman deja fèt sou sèvè */
+        }
+      }
+
+      setMsg({ type: 'success', text: '✅ Peman an pase avèk siksè! N ap voye w tounen...' });
+
+      const redirect = result.redirect_url || paymentData?.redirect_url;
+      setTimeout(() => {
+        if (redirect) window.location.href = redirect;
+      }, 2000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erè pandan peman an.';
+      setMsg({ type: 'error', text: message });
     } finally {
       setProcessing(false);
       setCvv(''); // Efase CVV a imedyatman pou sekirite
