@@ -17,7 +17,7 @@ import {
   Filter, Download, TrendingUp, Package, BarChart3,
   ArrowUpRight, DollarSign, Zap, Play, Youtube,
   Code, CreditCard, Settings, Bell, HelpCircle,
-  Clock, CheckSquare, XCircle, Eye, Edit, Trash2,
+  Clock, XCircle, Eye, Edit, Trash2,
   PlusCircle, List, Grid, Search, Calendar,
   DownloadCloud, UploadCloud, Key, Shield, Link,
   Smartphone, Monitor, Server, Cloud, DownloadIcon,
@@ -1098,17 +1098,17 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
     if (earnings.total <= 0) return alert("Pa gen okenn revni pou senkronize.");
     setSyncing(true);
     try {
-      const res = await fetch('/api/terminal/sync-earnings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_to_add: earnings.total }),
-      });
+      const res = await fetch('/api/terminal/sync-earnings', { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Senkronizasyon an pa t reyisi.');
+      if ((data.amount ?? 0) <= 0) {
+        alert("Revni ou deja sou balans wallet ou. Pa gen anyen nouvo pou senkronize.");
+        return;
+      }
       alert("Balans Wallet ou moute avèk siksè!");
       window.location.reload();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Erè');
     } finally {
       setSyncing(false);
     }
@@ -1128,15 +1128,6 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
     }
   };
 
-  const handleMarkInvoiceAsPaid = async (invoiceId: string) => {
-    try {
-      const { error } = await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
-      if (error) throw error;
-      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'paid' } : inv));
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
 
   const handleDeleteInvoice = async (invoiceId: string) => {
     if (!confirm('Èske w sèten ou vle efase fakti sa?')) return;
@@ -1498,10 +1489,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
                       </div>
                       <div className="flex gap-2 shrink-0">
                         {inv.status === 'pending' && (
-                          <>
-                            <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 border border-emerald-100 transition-colors"><CheckSquare size={16} /></button>
-                            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors"><Copy size={16} /></button>
-                          </>
+                          <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors"><Copy size={16} /></button>
                         )}
                         <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors"><Trash2 size={16} /></button>
                       </div>
@@ -1804,10 +1792,7 @@ if (data.success) {
                   </div>
                   <div className="flex gap-2 shrink-0">
                     {inv.status === 'pending' && (
-                      <>
-                        <button onClick={() => handleMarkInvoiceAsPaid(inv.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Marke kòm peye"><CheckSquare size={16} /></button>
-                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors" title="Kopye lyen an"><Copy size={16} /></button>
-                      </>
+                      <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors" title="Kopye lyen an"><Copy size={16} /></button>
                     )}
                     <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors" title="Efase"><Trash2 size={16} /></button>
                   </div>

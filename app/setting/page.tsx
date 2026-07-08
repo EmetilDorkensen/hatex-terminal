@@ -132,7 +132,7 @@ export default function SettingsPage() {
     if (!isConfirmed) return;
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `https://hatexcard.com/update-password`,
+      redirectTo: `https://hatexcard.com/reset-password`,
     });
 
     if (error) {

@@ -356,14 +356,15 @@ export default function Login() {
           return;
         }
 
+        // generateLink(magiclink) retounen hashed_token — verifyOtp bezwen token_hash, pa token+email
         const { error: otpErr } = await supabase.auth.verifyOtp({
-          email: rpcData.email,
-          token: rpcData.token_hash,
-          type: 'email',
+          token_hash: rpcData.token_hash,
+          type: 'magiclink',
         });
 
         if (otpErr) {
-          setErrorMsg("Pa kapab kreye sesyon. Eseye ak modpas.");
+          console.error('PIN session error:', otpErr.message);
+          setErrorMsg("Pa kapab kreye sesyon. Eseye ak modpas oswa re-aktive PIN nan Paramèt.");
           setLoading(false);
           return;
         }

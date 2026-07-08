@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
-/** Senkronize revni terminal → wallet machann (sèlman sou sèvè). */
+/** Senkronize revni terminal → wallet machann (montan kalkile sou sèvè). */
 export async function POST(request: Request) {
   const ip = getClientIp(request);
   const rl = await rateLimit(`terminal-sync:${ip}`, 10, 300);
@@ -15,12 +15,6 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabaseSession.auth.getUser();
     if (!user) {
       return NextResponse.json({ success: false, message: 'Ou dwe konekte.' }, { status: 401 });
-    }
-
-    const body = await request.json().catch(() => ({}));
-    const amount = Math.floor(Number(body.amount_to_add));
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ success: false, message: 'Montan pa valab.' }, { status: 400 });
     }
 
     const supabase = createSupabaseAdminClient();
@@ -37,16 +31,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Kont ou a sispandi.' }, { status: 403 });
     }
 
-    const { error } = await supabase.rpc('increment_merchant_balance', {
-      merchant_id: user.id,
-      amount_to_add: amount,
+    const { data: result, error } = await supabase.rpc('sync_merchant_terminal_earnings', {
+      p_merchant_id: user.id,
     });
 
     if (error) {
       return NextResponse.json({ success: false, message: 'Senkronizasyon an pa t reyisi.' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, message: 'Balans Wallet ou moute avèk siksè!' });
+    const res = result as { success?: boolean; message?: string; amount?: number } | null;
+    if (!res?.success) {
+      return NextResponse.json({ success: false, message: res?.message || 'Senkronizasyon echwe.' }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: res.message || 'Balans Wallet ou moute avèk siksè!',
+      amount: res.amount ?? 0,
+    });
   } catch {
     return NextResponse.json({ success: false, message: 'Erè sèvè.' }, { status: 500 });
   }

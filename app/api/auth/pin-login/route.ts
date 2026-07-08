@@ -71,7 +71,15 @@ export async function POST(request: Request) {
     });
 
     if (linkErr || !linkData?.properties?.hashed_token) {
-      return NextResponse.json({ success: false, message: 'Pa kapab kreye sesyon. Eseye ak modpas.' }, { status: 500 });
+      console.error('PIN generateLink failed:', linkErr?.message);
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'Pa kapab kreye sesyon PIN. Verifye SUPABASE_SERVICE_ROLE_KEY sou Vercel, oswa konekte ak modpas.',
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

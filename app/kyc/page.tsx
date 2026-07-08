@@ -108,8 +108,34 @@ export default function KYCPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: keyof typeof files) => {
-    if (e.target.files?.[0]) {
-      setFiles((prev) => ({ ...prev, [type]: e.target.files![0] }));
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Telefòn ka pran foto 8–12 MB — rejte oswa kontinyè; konpresyon ap fèt sou soumisyon
+    if (file.size > 25 * 1024 * 1024) {
+      setErrorMsg('Foto a twò gwo (plis pase 25 MB). Pran yon lòt foto pi piti.');
+      e.target.value = '';
+      return;
+    }
+    setErrorMsg('');
+    setFiles((prev) => ({ ...prev, [type]: file }));
+  };
+
+  const compressKycImage = async (file: File, label: string) => {
+    setVerifyStep(`Konprese ${label}...`);
+    // useWebWorker:false — sou Chrome Android / Safari, worker sou gwo foto
+    // yo souvan bay "manque de mémoire". Konprese youn apre lòt ak limi pi ba.
+    try {
+      return await imageCompression(file, {
+        maxSizeMB: 0.45,
+        maxWidthOrHeight: 1024,
+        useWebWorker: false,
+        initialQuality: 0.72,
+        fileType: 'image/jpeg',
+      });
+    } catch {
+      // Fall back si konpresyon echwe — limenm gen chans pase si foto a deja pi piti
+      if (file.size <= 1.5 * 1024 * 1024) return file;
+      throw new Error(`Pa t kapab konprese ${label}. Fèmen lòt aplikasyon epi pran yon foto pi piti.`);
     }
   };
 
@@ -127,14 +153,14 @@ export default function KYCPage() {
 
     setLoading(true);
     setErrorMsg('');
-    setVerifyStep('Konprese foto yo...');
+    setVerifyStep('Prepare dokiman yo...');
 
     try {
-      const compressionOptions = { maxSizeMB: 1, maxWidthOrHeight: 1280, useWebWorker: true };
-      const compressedFront = await imageCompression(files.idFront, compressionOptions);
-      const compressedSelfie = await imageCompression(files.selfie, compressionOptions);
+      // Konprese youn apre lòt pou pa choke memwa telefòn nan
+      const compressedFront = await compressKycImage(files.idFront, 'devan ID');
+      const compressedSelfie = await compressKycImage(files.selfie, 'selfie');
       const compressedBack = files.idBack
-        ? await imageCompression(files.idBack, compressionOptions)
+        ? await compressKycImage(files.idBack, 'dèyè ID')
         : null;
 
       const body = new FormData();
@@ -158,8 +184,13 @@ export default function KYCPage() {
       }
 
       setStep(3);
-    } catch (err: any) {
-      setErrorMsg('Erè nan voye dokiman yo: ' + (err.message || 'Eseye ankò.'));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (/mémoire|memory|out of memory|allocation/i.test(msg) || msg.includes('konprese')) {
+        setErrorMsg(msg || 'Telefòn ou pa gen ase memwa. Fèmen lòt aplikasyon, pran foto pi piti (pa 4K), epi eseye ankò.');
+      } else {
+        setErrorMsg('Erè nan voye dokiman yo: ' + (msg || 'Eseye ankò.'));
+      }
     } finally {
       setLoading(false);
       setVerifyStep('');
