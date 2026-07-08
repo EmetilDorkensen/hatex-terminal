@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 ALTER TABLE invoices ALTER COLUMN owner_id SET NOT NULL;
 ALTER TABLE invoices ALTER COLUMN amount SET NOT NULL;
 ALTER TABLE invoices ALTER COLUMN status SET DEFAULT 'pending';
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 
 -- 3. Endèks pou pèfòmans (istorik ak kalkil limit jounalye a pi rapid).
 CREATE INDEX IF NOT EXISTS idx_invoices_owner_id ON invoices(owner_id);

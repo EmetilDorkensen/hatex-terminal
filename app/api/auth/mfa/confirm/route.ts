@@ -53,17 +53,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId });
-  if (challengeErr || !challenge) {
-    return NextResponse.json(
-      { success: false, message: challengeErr?.message || 'Pa t kapab kòmanse verifikasyon MFA. Eseye rekòmanse enskripsyon an.' },
-      { status: 400 }
-    );
-  }
-
-  const { error: verifyErr } = await supabase.auth.mfa.verify({
+  const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
     factorId,
-    challengeId: challenge.id,
     code,
   });
 

@@ -127,8 +127,8 @@ BEGIN
     IF v_row.status IS DISTINCT FROM 'pending' THEN
       RETURN json_build_object('success', false, 'message', 'Deja trete.');
     END IF;
-    -- Retrè te deja koupe kòb (RPC) — ranbouse amount + fee
-    v_refund := COALESCE(v_row.amount, 0) + COALESCE(v_row.fee, 0);
+    -- process_wallet_withdrawal debite SEULEMENT amount (montan brit) — pa amount + fee
+    v_refund := COALESCE(v_row.amount, 0);
     UPDATE public.profiles
     SET wallet_balance = COALESCE(wallet_balance, 0) + v_refund
     WHERE id = v_row.user_id
@@ -139,13 +139,14 @@ BEGIN
     END IF;
 
     UPDATE public.withdrawals SET status = 'rejected' WHERE id = p_item_id;
-    INSERT INTO public.transactions (user_id, amount, type, description, status)
+    INSERT INTO public.transactions (user_id, amount, type, description, status, metadata)
     VALUES (
       v_row.user_id,
       v_refund,
       'REFUND',
       'Ranbousman retrè anile (+' || v_refund || ' HTG): ' || COALESCE(p_reason, ''),
-      'success'
+      'success',
+      jsonb_build_object('withdrawal_id', p_item_id, 'gross_amount', v_row.amount, 'fee_was', COALESCE(v_row.fee, 0))
     );
     RETURN json_build_object('success', true, 'refunded', v_refund, 'wallet_balance', v_new_bal);
 

@@ -130,13 +130,26 @@ export default function Login() {
   // Retounen `true` si nou kanpe pwosesis la pou mande kòd MFA la.
   // ==========================================
   const requiresMfaStepUp = async (): Promise<boolean> => {
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aalErr) {
+      console.error('MFA AAL:', aalErr.message);
+      return false;
+    }
     if (!aal || aal.nextLevel !== 'aal2' || aal.currentLevel === aal.nextLevel) {
       return false;
     }
 
-    const { data: factorsData } = await supabase.auth.mfa.listFactors();
-    const totpFactor = factorsData?.totp?.find((f) => f.status === 'verified');
+    const { data: factorsData, error: factorsErr } = await supabase.auth.mfa.listFactors();
+    if (factorsErr) {
+      console.error('MFA factors:', factorsErr.message);
+      return false;
+    }
+
+    const verified = (factorsData?.totp || []).filter((f) => f.status === 'verified');
+    const totpFactor = verified.sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    )[0];
+
     if (!totpFactor) return false;
 
     setMfaFactorId(totpFactor.id);
@@ -146,34 +159,47 @@ export default function Login() {
 
   const handleMfaVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mfaCode.length !== 6) {
+    const code = mfaCode.replace(/\D/g, '').trim();
+    if (code.length !== 6) {
       setErrorMsg("Kòd MFA a dwe gen 6 chif.");
       return;
     }
+    if (!mfaFactorId) {
+      setErrorMsg("Faktè MFA pa jwenn. Dekonekte epi rekonekte.");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/auth/mfa/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ factorId: mfaFactorId, code: mfaCode.trim() }),
+      // Verifye MFA dirèkteman nan navigatè a — sesyon aal2 mete ajou nan cookies
+      const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: mfaFactorId,
+        code,
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        setErrorMsg(data.message || "Kòd MFA a pa bon oswa li ekspire. Verifye lè aparèy ou a kòrèk.");
+      if (verifyErr) {
+        const serverTime = new Date().toLocaleString('ht-HT');
+        setErrorMsg(
+          verifyErr.message?.includes('Invalid')
+            ? `Kòd MFA a pa bon oswa li ekspire. Verifye lè telefòn ou a (lè sèvè: ${serverTime}) epi eseye kòd ki sot parèt la.`
+            : verifyErr.message || "Kòd MFA a pa bon. Eseye ankò."
+        );
         setMfaCode('');
         setLoading(false);
         return;
       }
 
-      await supabase.auth.refreshSession();
+      const { data: aalAfter } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aalAfter?.currentLevel !== 'aal2') {
+        await supabase.auth.refreshSession();
+      }
 
       await trackDeviceAndIP(email);
       window.location.href = '/dashboard';
-    } catch (err: any) {
-      setErrorMsg(err.message || "Erè nan verifikasyon MFA.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Erè nan verifikasyon MFA.");
       setLoading(false);
     }
   };
