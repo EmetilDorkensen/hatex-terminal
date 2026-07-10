@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import {
@@ -11,7 +11,7 @@ import { ENTERPRISE_APPLICATION_FEE, ENTERPRISE_CARD_DAILY_LIMIT, ENTERPRISE_CAR
 
 type Step = 'loading' | 'kyc_denied' | 'intro' | 'upload_docs' | 'confirm_fee' | 'pending' | 'rejected' | 'approved';
 
-export default function EnterprisePortal() {
+function EnterprisePortalContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromDeveloper = searchParams.get('from') === 'developer';
@@ -519,4 +519,19 @@ export default function EnterprisePortal() {
   }
 
   return null;
+}
+
+export default function EnterprisePortal() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+          <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
+        </div>
+      </div>
+    }>
+      <EnterprisePortalContent />
+    </Suspense>
+  );
 }
