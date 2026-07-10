@@ -396,9 +396,20 @@ export default function AdminSuperPage() {
         } catch (error) {}
     };
 
-    const handleOpenDocument = (url: string) => {
-        if (!url) { alert("Pa gen lyen pou dokiman sa a!"); return; }
-        window.open(url, '_blank');
+    const handleOpenDocument = async (ref: string) => {
+        if (!ref) { alert("Pa gen lyen pou dokiman sa a!"); return; }
+        if (ref.startsWith('http://') || ref.startsWith('https://')) {
+            window.open(ref, '_blank');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/admin/deposit-proof?ref=${encodeURIComponent(ref)}`);
+            const data = await res.json();
+            if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
+            window.open(data.url, '_blank');
+        } catch (e: any) {
+            alert(e.message || 'Pa t kapab louvri prèv la.');
+        }
     };
 
     const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {

@@ -241,8 +241,7 @@ export default function Login() {
       }
 
       await trackDeviceAndIP(email);
-      const dest = email.trim().toLowerCase() === 'adminhatexcard@gmail.com' ? '/admin' : '/dashboard';
-      window.location.href = dest;
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Erè nan verifikasyon MFA.");
       setLoading(false);

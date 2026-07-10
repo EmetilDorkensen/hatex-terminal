@@ -51,12 +51,18 @@ export default function DepositPage() {
     const total = amount + fee;
 
     const handleFileUpload = async (file: File) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
-        const { data, error } = await supabase.storage.from('proofs').upload(fileName, file, { upsert: true });
-        if (error) throw error;
-        const { data: { publicUrl } } = supabase.storage.from('proofs').getPublicUrl(data.path);
-        return publicUrl;
+        const body = new FormData();
+        body.append('file', file);
+        const res = await fetch('/api/deposit/upload-proof', {
+            method: 'POST',
+            credentials: 'include',
+            body,
+        });
+        const data = await res.json();
+        if (!res.ok || !data.storagePath) {
+            throw new Error(data.error || 'Pa t kapab telechaje prèv la.');
+        }
+        return data.storagePath as string;
     };
 
     const handleSubmitManual = async () => {
