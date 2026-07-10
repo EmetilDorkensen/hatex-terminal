@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle } from 'lucide-react';
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
+import AdminClientDossier from './AdminClientDossier';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -38,7 +39,8 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite'>('dashboard'); 
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite'>('dashboard');
+    const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
@@ -800,6 +802,9 @@ export default function AdminSuperPage() {
                     </button>
 
                     <button onClick={() => setView('kliyan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kliyan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kliyan ({allUsers.length})</button>
+                    <button onClick={() => { setDossierUserId(null); setView('dosye'); }} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'dosye' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <FileText size={14} /> Dosye
+                    </button>
                     <button onClick={() => setView('depo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'depo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Depo ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
@@ -1238,7 +1243,14 @@ export default function AdminSuperPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setDossierUserId(user.id); setView('dosye'); }}
+                                                    className="w-full md:w-auto bg-indigo-50 border border-indigo-200 text-indigo-700 px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-indigo-100 transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                                >
+                                                    <FileText size={14} /> Dosye
+                                                </button>
                                                 {user.account_status === 'suspended' ? (
                                                     <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-emerald-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-emerald-700 transition-all shadow-sm">AKTIVE KONT</button>
                                                 ) : (
@@ -1250,6 +1262,8 @@ export default function AdminSuperPage() {
                                 )}
                             </div>
                         </div>
+                    ) : view === 'dosye' ? (
+                        <AdminClientDossier initialUserId={dossierUserId} />
                     ) : view === 'anons' ? (
                         <div className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
