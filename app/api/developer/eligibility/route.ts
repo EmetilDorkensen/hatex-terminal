@@ -14,7 +14,7 @@ export async function GET() {
 
     const clientRes = await supabaseSession
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number')
+      .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number, account_type, enterprise_status')
       .eq('id', user.id)
       .single();
 
@@ -26,7 +26,7 @@ export async function GET() {
         const supabaseAdmin = createSupabaseAdminClient();
         const adminRes = await supabaseAdmin
           .from('profiles')
-          .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number')
+          .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number, account_type, enterprise_status')
           .eq('id', user.id)
           .single();
         adminProfile = adminRes.data;
@@ -54,6 +54,8 @@ export async function GET() {
         api_key_prefix: authoritative.api_key_prefix || null,
         api_key_masked: maskApiKey(authoritative.api_key_prefix),
         has_card: !!authoritative.card_number,
+        account_type: authoritative.account_type || 'individual',
+        enterprise_status: authoritative.enterprise_status || 'none',
       },
       source: adminProfile ? 'admin' : 'client',
     });

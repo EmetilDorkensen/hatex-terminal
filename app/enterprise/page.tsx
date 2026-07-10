@@ -1,18 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import {
   Building2, ShieldCheck, Loader2, CheckCircle2, AlertTriangle,
   ArrowLeft, ChevronRight, Lock, XCircle, Wallet, CreditCard, ArrowRightLeft, ArrowUpFromLine
 } from 'lucide-react';
-import { ENTERPRISE_APPLICATION_FEE, ENTERPRISE_CARD_DAILY_LIMIT, ENTERPRISE_CARD_MONTHLY_LIMIT, INDIVIDUAL_DAILY_LIMIT, INDIVIDUAL_MONTHLY_LIMIT } from '@/lib/security/spending-limits';
+import { ENTERPRISE_APPLICATION_FEE, ENTERPRISE_CARD_DAILY_LIMIT, ENTERPRISE_CARD_MONTHLY_LIMIT, INDIVIDUAL_DAILY_LIMIT, INDIVIDUAL_MONTHLY_LIMIT, API_RECEIVE_INDIVIDUAL_LIMIT, API_RECEIVE_ENTERPRISE_LIMIT } from '@/lib/security/spending-limits';
 
 type Step = 'loading' | 'kyc_denied' | 'intro' | 'upload_docs' | 'confirm_fee' | 'pending' | 'rejected' | 'approved';
 
 export default function EnterprisePortal() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromDeveloper = searchParams.get('from') === 'developer';
+  const backHref = fromDeveloper ? '/developer' : '/dashboard';
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -312,14 +315,18 @@ export default function EnterprisePortal() {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-2xl mx-auto">
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 text-slate-500 mb-6 font-bold text-xs">
+          <button onClick={() => router.push(backHref)} className="flex items-center gap-2 text-slate-500 mb-6 font-bold text-xs">
             <ArrowLeft size={16} /> Tounen
           </button>
 
           <div className="bg-slate-900 p-8 rounded-3xl shadow-xl text-white mb-6">
             <Building2 className="mb-4" size={32} />
             <h1 className="text-2xl font-bold mb-2">Vin Kont Antrepriz</h1>
-            <p className="text-sm text-slate-300">Debloke plis posiblite pou biznis ou: transfè ak retrè ilimite, limit kat pi wo, epi yon kont Ajan PRO gratis.</p>
+            <p className="text-sm text-slate-300">
+              {fromDeveloper
+                ? `Ogmante kapasite API ou a: resevwa jiska ${API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG pa peman (kont endividyèl limite a ${API_RECEIVE_INDIVIDUAL_LIMIT.toLocaleString()} HTG).`
+                : 'Debloke plis posiblite pou biznis ou: transfè ak retrè ilimite, limit kat pi wo, epi yon kont Ajan PRO gratis.'}
+            </p>
           </div>
 
           <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm mb-6">
@@ -332,6 +339,10 @@ export default function EnterprisePortal() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
                 <p className="text-sm text-slate-600">Kat ka depanse jiska <strong>{ENTERPRISE_CARD_DAILY_LIMIT.toLocaleString()} HTG/jou</strong> ak <strong>{ENTERPRISE_CARD_MONTHLY_LIMIT.toLocaleString()} HTG/mwa</strong></p>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
+                <p className="text-sm text-slate-600">API piblik: resevwa jiska <strong>{API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG</strong> pa peman (endividyèl: {API_RECEIVE_INDIVIDUAL_LIMIT.toLocaleString()} HTG)</p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />

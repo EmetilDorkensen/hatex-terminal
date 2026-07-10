@@ -3,6 +3,8 @@
 import React from 'react';
 import { ShieldCheck, CreditCard, Webhook, CheckCircle2, Key, Gauge, Server, AlertTriangle } from 'lucide-react';
 
+import { API_RECEIVE_FEE_PERCENT } from '@/lib/security/spending-limits';
+
 const API_URL = 'https://hatexcard.com/api/public/payments';
 
 export default function HatexcardDocs() {
@@ -109,8 +111,25 @@ export default function HatexcardDocs() {
             </table>
           </div>
           <p className="text-gray-500 text-sm">
-            Lajan antre sou balans machann ou a apre peman reyisi. Plafon balans jeneral (105k endividyèl / 2M antrepriz) toujou aplike.
+            Lajan antre sou balans machann ou a apre peman reyisi (<strong>net</strong>, apre frè API {API_RECEIVE_FEE_PERCENT}%).
+            Plafon balans jeneral (105k endividyèl / 2M antrepriz) toujou aplike.
           </p>
+        </section>
+
+        {/* Frè API */}
+        <section className="space-y-4">
+          <div className="flex items-center space-x-3">
+            <Gauge className="w-8 h-8 text-yellow-500" />
+            <h2 className="text-2xl font-semibold text-white">Frè API ({API_RECEIVE_FEE_PERCENT}%)</h2>
+          </div>
+          <p className="text-gray-400 text-sm leading-relaxed">
+            Sou chak peman resevwa via API a, HatexCard retire <strong className="text-white">{API_RECEIVE_FEE_PERCENT}%</strong> kòm frè platfòm.
+            Kliyan an peye montan total la (<code className="text-green-400">amount</code>); machann lan resevwa <strong className="text-white">net</strong> sou wallet li.
+            Egzanp: peman 10,000 HTG → machann resevwa 9,700 HTG, frè 300 HTG.
+          </p>
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800 text-sm text-gray-300 font-mono">
+            {`"amount_charged": 10000,\n"amount_received": 9700,\n"api_fee": 300,\n"api_fee_percent": 3`}
+          </div>
         </section>
 
         {/* Peman */}
@@ -155,7 +174,7 @@ export default function HatexcardDocs() {
 
 const data = await response.json();
 if (data.success) {
-  // data.transaction_id, data.amount_charged, data.debited_from ("card" oswa "wallet")
+  // data.transaction_id, data.amount_charged, data.amount_received, data.api_fee, data.debited_from
 } else {
   // data.error — si fon ensifizan, data.balances montre balans kat ak wallet
 }`}</pre>
@@ -172,6 +191,9 @@ if (data.success) {
   "transaction_id": "HTX-ABC12345",
   "customer": "Non Kliyan",
   "amount_charged": 1500,
+  "amount_received": 1455,
+  "api_fee": 45,
+  "api_fee_percent": 3,
   "debited_from": "card"
 }`}</pre>
           <p className="text-gray-400 text-sm mt-4 mb-2">Erè fon ensifizan (HTTP 400):</p>

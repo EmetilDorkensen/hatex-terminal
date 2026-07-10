@@ -14,7 +14,7 @@ export type UserTransaction = {
 };
 
 function isHiddenTransferFee(t: UserTransaction): boolean {
-  if (t.type === 'TRANSFER_FEE') return true;
+  if (t.type === 'TRANSFER_FEE' || t.type === 'API_FEE') return true;
   const desc = String(t.description || '').toLowerCase();
   if (desc.includes('frè transfè') || desc.includes('frè transfe')) return true;
   if (t.metadata?.hidden_from_user === true) return true;

@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink, Eye, EyeOff, Building2, TrendingUp, FileText, ChevronRight } from 'lucide-react';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
 import { maskApiKey } from '@/lib/security/api-key';
+import { API_RECEIVE_ENTERPRISE_LIMIT, API_RECEIVE_INDIVIDUAL_LIMIT, ENTERPRISE_APPLICATION_FEE, ENTERPRISE_MAX_WALLET_BALANCE, INDIVIDUAL_MAX_WALLET_BALANCE, API_RECEIVE_FEE_PERCENT } from '@/lib/security/spending-limits';
 
 const AVAILABLE_EVENTS = ['payment.success'];
 
@@ -28,6 +29,8 @@ export default function DeveloperDashboard() {
   const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [rotatingKey, setRotatingKey] = useState(false);
+  const [accountType, setAccountType] = useState<string>('individual');
+  const [enterpriseStatus, setEnterpriseStatus] = useState<string>('none');
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -91,6 +94,9 @@ export default function DeveloperDashboard() {
       }
 
       setEligibility(elig);
+
+      if (profileData.account_type) setAccountType(profileData.account_type);
+      if (profileData.enterprise_status) setEnterpriseStatus(profileData.enterprise_status);
 
       if (elig.eligible) {
         let apiKeyPrefix = profileData.api_key_prefix || null;
@@ -371,6 +377,84 @@ curl --request POST \\
             <BookOpen className="w-5 h-5" />
             <span className="uppercase tracking-wider text-[11px]">Gade Dokimantasyon an</span>
           </button>
+        </div>
+
+        {/* KAPASITE API — ogmante limit resepsyon pou gwo tranzaksyon biznis */}
+        <div className="bg-white border border-gray-200 p-6 sm:p-8 rounded-2xl shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Kapasite API & Gwo Peman</h2>
+                  <p className="text-xs text-slate-500 font-medium">Limit resepsyon pa tranzaksyon via API piblik la</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                <div className={`p-4 rounded-xl border ${accountType === 'business' && enterpriseStatus === 'approved' ? 'bg-slate-50 border-gray-200 opacity-60' : 'bg-indigo-50 border-indigo-100'}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Kont Endividyèl (aktyèl)</p>
+                  <p className="text-xl font-black text-slate-900">{API_RECEIVE_INDIVIDUAL_LIMIT.toLocaleString()} HTG</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Max balans wallet: {INDIVIDUAL_MAX_WALLET_BALANCE.toLocaleString()} HTG · Frè API: {API_RECEIVE_FEE_PERCENT}%</p>
+                </div>
+                <div className={`p-4 rounded-xl border ${accountType === 'business' && enterpriseStatus === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-1">Kont Antrepriz (Biznis)</p>
+                  <p className="text-xl font-black text-emerald-800">{API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG</p>
+                  <p className="text-[11px] text-emerald-700 mt-1">Max balans wallet: {ENTERPRISE_MAX_WALLET_BALANCE.toLocaleString()} HTG · Frè API: {API_RECEIVE_FEE_PERCENT}%</p>
+                </div>
+              </div>
+
+              {accountType === 'business' && enterpriseStatus === 'approved' ? (
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold">
+                  <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  Kont Antrepriz ou aktif — kapasite API biznis deja aplike.
+                </div>
+              ) : enterpriseStatus === 'pending' ? (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-sm font-semibold">
+                  <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
+                  Aplikasyon biznis ou an ap egzamine. Kapasite API ap monte apre apwobasyon.
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 font-medium mb-4">
+                    Pou resevwa <strong>gwo som lajan</strong> sou API ou a (jiska {API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG pa peman),
+                    ou dwe pase an <strong>Kont Antrepriz</strong> epi soumèt dokiman legal biznis ou yo.
+                    Sou chak peman API, <strong>{API_RECEIVE_FEE_PERCENT}% frè</strong> retire otomatikman — ou resevwa <strong>net</strong> sou wallet ou a; frè a ale nan Kès Global HatexCard.
+                  </p>
+
+                  <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 mb-5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-indigo-600" />
+                      Dokiman legal obligatwa
+                    </p>
+                    <ul className="text-sm text-slate-600 space-y-1.5 list-disc list-inside">
+                      <li>Patant biznis (DGI)</li>
+                      <li>CIF / NIF biznis</li>
+                      <li>Sètifika anrejistreman biznis (RCCM)</li>
+                      <li>Relve bankè biznis (3 dènye mwa)</li>
+                      <li>Kontra lokasyon oswa tit pwopriyete lokal la</li>
+                      <li>Pyès idantite reprezantan legal la</li>
+                    </ul>
+                    <p className="text-[11px] text-slate-500 mt-3">
+                      Frè pasaj: <strong>{ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG</strong> (ranbouse si aplikasyon an rejte).
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => router.push('/enterprise?from=developer')}
+                    className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-bold text-sm transition-all shadow-sm w-full sm:w-auto"
+                  >
+                    <Building2 className="w-5 h-5" />
+                    Ogmante Kapasite API — Vin Kont Antrepriz
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Gid entegrasyon rapid */}

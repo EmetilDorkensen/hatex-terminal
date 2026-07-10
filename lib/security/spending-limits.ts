@@ -35,6 +35,17 @@ export const ENTERPRISE_MAX_WALLET_BALANCE = 2000000;
 export const API_RECEIVE_INDIVIDUAL_LIMIT = 50000;
 export const API_RECEIVE_ENTERPRISE_LIMIT = 2000000;
 
+/** Frè platfòm sou chak peman resevwa via API piblik la (ale nan Kès Global). */
+export const API_RECEIVE_FEE_PERCENT = 3;
+export const API_RECEIVE_FEE_RATE = API_RECEIVE_FEE_PERCENT / 100;
+
+export function calcApiReceiveFee(grossAmount: number): { fee: number; net: number } {
+  const gross = Number(grossAmount || 0);
+  const fee = Math.round(gross * API_RECEIVE_FEE_RATE * 100) / 100;
+  const net = Math.round((gross - fee) * 100) / 100;
+  return { fee, net };
+}
+
 export type SpendingChannel = 'transfer' | 'withdraw' | 'card' | 'invoice';
 
 const TRANSFER_TYPES = ['TRANSFER', 'P2P'];
@@ -225,13 +236,17 @@ async function sumApiReceivedToday(
 ): Promise<number> {
   const { data } = await supabase
     .from('transactions')
-    .select('amount')
+    .select('amount, metadata')
     .eq('user_id', merchantId)
     .eq('metadata->>source', 'public_api')
     .gt('amount', 0)
     .gte('created_at', sinceIso);
 
-  return (data || []).reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+  return (data || []).reduce((acc, tx) => {
+    const meta = tx.metadata as { gross_amount?: number | string } | null;
+    const gross = meta?.gross_amount != null ? Number(meta.gross_amount) : Number(tx.amount || 0);
+    return acc + gross;
+  }, 0);
 }
 
 /**

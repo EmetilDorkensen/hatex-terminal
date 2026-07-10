@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { findProfileByCard } from '@/lib/security/card-lookup';
-import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit } from '@/lib/security/spending-limits';
+import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit, calcApiReceiveFee } from '@/lib/security/spending-limits';
 import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 import {
@@ -24,7 +24,7 @@ import {
 } from '@/lib/security/merchant-api';
 import { getClientIp } from '@/lib/security/rate-limit';
 
-const API_BUILD_VERSION = '20260723-api-secure-v4';
+const API_BUILD_VERSION = '20260744-api-fee-v5';
 
 function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders?: Record<string, string>) {
   return merchantApiJson(
@@ -54,7 +54,7 @@ export async function GET() {
   return jsonWithBuild({
     ok: true,
     build: API_BUILD_VERSION,
-    hint: 'Si build pa egal 20260723-api-secure-v4, Vercel poko deploy dènye commit la.',
+    hint: 'Si build pa egal 20260744-api-fee-v5, Vercel poko deploy dènye commit la.',
   });
 }
 
@@ -213,7 +213,9 @@ export async function POST(request: Request) {
       return jsonWithBuild({ error: limitCheck.message || 'Limit depans depase.' }, 400);
     }
 
-    const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, safeAmount);
+    const { fee: apiFee, net: merchantNet } = calcApiReceiveFee(safeAmount);
+
+    const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, merchantNet);
     if (!capCheck.allowed) {
       if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: capCheck.message || 'Balans machann nan ta depase limit maksimòm otorize a.' }, 400);
@@ -256,6 +258,9 @@ export async function POST(request: Request) {
       transaction_id: transactionId,
       customer: freshClient.full_name,
       amount_charged: safeAmount,
+      amount_received: rpcResult.net_amount ?? merchantNet,
+      api_fee: rpcResult.api_fee ?? apiFee,
+      api_fee_percent: 3,
       debited_from: rpcResult.debited_from || paymentCheck.debitFrom,
     };
 
@@ -267,6 +272,8 @@ export async function POST(request: Request) {
       transaction_id: transactionId,
       order_id: cleanOrderId || 'N/A',
       amount: safeAmount,
+      amount_received: rpcResult.net_amount ?? merchantNet,
+      api_fee: rpcResult.api_fee ?? apiFee,
       currency: currency || 'HTG',
       customer_name: freshClient.full_name,
     });
