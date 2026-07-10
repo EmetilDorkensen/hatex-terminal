@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { verifyMfaTotpCode } from '@/lib/auth/mfa-totp';
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ success: false, message: 'Sesyon ekspire.' }, { status: 401 });
+    return NextResponse.json({ success: false, message: 'Sesyon ekspire. Rekonekte.' }, { status: 401 });
   }
 
   const ip = getClientIp(request);
@@ -20,27 +21,27 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const factorId = typeof body.factorId === 'string' ? body.factorId : '';
-  const code = typeof body.code === 'string' ? body.code.replace(/\D/g, '').trim() : '';
+  const code = typeof body.code === 'string' ? body.code : '';
+  const challengeId = typeof body.challengeId === 'string' ? body.challengeId : null;
 
-  if (!factorId || code.length !== 6) {
-    return NextResponse.json({ success: false, message: 'Kòd MFA envalid.' }, { status: 400 });
+  if (!factorId) {
+    return NextResponse.json({ success: false, message: 'Faktè MFA manke.' }, { status: 400 });
   }
 
-  const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
-    factorId,
-    code,
-  });
+  const result = await verifyMfaTotpCode(supabase, factorId, code, challengeId);
 
-  if (verifyErr) {
+  if (!result.ok) {
     return NextResponse.json(
       {
         success: false,
-        message: verifyErr.message || 'Kòd MFA a pa bon.',
+        message: result.message || 'Kòd MFA a pa bon.',
         serverTime: new Date().toISOString(),
       },
       { status: 400 }
     );
   }
 
-  return NextResponse.json({ success: true });
+  await supabase.auth.refreshSession();
+
+  return NextResponse.json({ success: true, serverTime: new Date().toISOString() });
 }

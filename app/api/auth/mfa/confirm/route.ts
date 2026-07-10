@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifySync } from 'otplib';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
+import { verifyMfaTotpCode } from '@/lib/auth/mfa-totp';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 function isCodeValidForSecret(code: string, secret: string) {
@@ -53,16 +54,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
-    factorId,
-    code,
-  });
+  const verifyResult = await verifyMfaTotpCode(supabase, factorId, code);
 
-  if (verifyErr) {
+  if (!verifyResult.ok) {
     const serverTime = new Date().toISOString();
     const message = secret && isCodeValidForSecret(code, secret)
       ? `Kòd la kòrèk sou aparèy ou a men sèvè a rejte l. Verifye dat/lè telefòn ou a (lè sèvè: ${serverTime}).`
-      : verifyErr.message || 'Kòd la pa bon.';
+      : verifyResult.message || 'Kòd la pa bon.';
 
     return NextResponse.json({ success: false, message, serverTime }, { status: 400 });
   }

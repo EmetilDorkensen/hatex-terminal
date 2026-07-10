@@ -32,6 +32,7 @@ export default function Login() {
   // (egzanp: admin) ap wè etap sa a apre modpas/PIN yo bon.
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState('');
+  const [mfaChallengeId, setMfaChallengeId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
 
   // CAPTCHA (Cloudflare Turnstile) — parèt sèlman apre plizyè tantativ echwe
@@ -107,6 +108,7 @@ export default function Login() {
 
       await fetch('/api/auth/track-login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ device: navigator.userAgent }),
       });
@@ -152,9 +154,39 @@ export default function Login() {
 
     if (!totpFactor) return false;
 
+    const { error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr) {
+      setErrorMsg('Sesyon ekspire. Rekonekte ak modpas ou.');
+      return false;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      setErrorMsg('Sesyon pa konplè. Rekonekte ak modpas ou, epi eseye ankò.');
+      return false;
+    }
+
+    const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({
+      factorId: totpFactor.id,
+    });
+    if (challengeErr || !challenge?.id) {
+      setErrorMsg(challengeErr?.message || 'Pa t kapab kòmanse etap MFA. Eseye rekonekte.');
+      return false;
+    }
+
     setMfaFactorId(totpFactor.id);
+    setMfaChallengeId(challenge.id);
     setMfaRequired(true);
     return true;
+  };
+
+  const resetMfaStep = async () => {
+    setMfaRequired(false);
+    setMfaFactorId('');
+    setMfaChallengeId('');
+    setMfaCode('');
+    setErrorMsg('');
+    await supabase.auth.signOut();
   };
 
   const handleMfaVerify = async (e: React.FormEvent) => {
@@ -173,23 +205,35 @@ export default function Login() {
     setErrorMsg('');
 
     try {
-      // Verifye MFA dirèkteman nan navigatè a — sesyon aal2 mete ajou nan cookies
-      const { error: verifyErr } = await supabase.auth.mfa.challengeAndVerify({
-        factorId: mfaFactorId,
-        code,
+      const res = await fetch('/api/auth/mfa/verify', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          factorId: mfaFactorId,
+          challengeId: mfaChallengeId || undefined,
+          code,
+        }),
       });
+      const data = await res.json().catch(() => ({}));
 
-      if (verifyErr) {
-        const serverTime = new Date().toLocaleString('ht-HT');
+      if (!res.ok || !data.success) {
+        const serverTime = data.serverTime
+          ? new Date(data.serverTime).toLocaleString('ht-HT')
+          : new Date().toLocaleString('ht-HT');
         setErrorMsg(
-          verifyErr.message?.includes('Invalid')
-            ? `Kòd MFA a pa bon oswa li ekspire. Verifye lè telefòn ou a (lè sèvè: ${serverTime}) epi eseye kòd ki sot parèt la.`
-            : verifyErr.message || "Kòd MFA a pa bon. Eseye ankò."
+          data.message?.toLowerCase().includes('sub')
+            ? 'Sesyon MFA ekspire. Klike "Rekonekte" anba a epi antre modpas ou ankò.'
+            : data.message?.includes('Invalid') || data.message?.includes('invalid')
+              ? `Kòd MFA a pa bon oswa li ekspire. Verifye lè telefòn ou a (lè sèvè: ${serverTime}).`
+              : data.message || 'Kòd MFA a pa bon. Eseye ankò.'
         );
         setMfaCode('');
         setLoading(false);
         return;
       }
+
+      await supabase.auth.refreshSession();
 
       const { data: aalAfter } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (aalAfter?.currentLevel !== 'aal2') {
@@ -197,7 +241,8 @@ export default function Login() {
       }
 
       await trackDeviceAndIP(email);
-      window.location.href = '/dashboard';
+      const dest = email.trim().toLowerCase() === 'adminhatexcard@gmail.com' ? '/admin' : '/dashboard';
+      window.location.href = dest;
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Erè nan verifikasyon MFA.");
       setLoading(false);
@@ -486,6 +531,13 @@ export default function Login() {
               className="w-full bg-indigo-600 hover:bg-indigo-700 py-4 rounded-xl font-bold uppercase tracking-wider shadow-sm shadow-indigo-200 active:scale-[0.98] transition-all text-xs mt-6 text-white disabled:opacity-70 flex justify-center items-center gap-2"
             >
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Ap Verifye...</> : "Konfime Kòd la"}
+            </button>
+            <button
+              type="button"
+              onClick={resetMfaStep}
+              className="w-full text-slate-500 hover:text-indigo-600 py-2 text-[10px] font-bold uppercase tracking-wider"
+            >
+              Rekonekte
             </button>
           </form>
         ) : (
