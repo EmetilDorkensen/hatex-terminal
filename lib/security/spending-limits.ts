@@ -63,15 +63,16 @@ export function calcAgentWithdrawFee(cashAmount: number): AgentWithdrawFeeBreakd
 export const API_RECEIVE_INDIVIDUAL_LIMIT = 50000;
 export const API_RECEIVE_ENTERPRISE_LIMIT = 2000000;
 
-/** Frè platfòm sou chak peman resevwa via API piblik la (ale nan Kès Global). */
-export const API_RECEIVE_FEE_PERCENT = 3;
-export const API_RECEIVE_FEE_RATE = API_RECEIVE_FEE_PERCENT / 100;
+/** Frè platfòm sou peman API: 3 HTG pou chak 1 000 HTG resevwa. */
+export const API_RECEIVE_FEE_PER_1000 = 3;
+/** @deprecated Itilize API_RECEIVE_FEE_PER_1000 — pa yon pousantaj. */
+export const API_RECEIVE_FEE_PERCENT = API_RECEIVE_FEE_PER_1000;
 
 export function calcApiReceiveFee(grossAmount: number): { fee: number; net: number } {
   const gross = Number(grossAmount || 0);
-  const fee = Math.round(gross * API_RECEIVE_FEE_RATE * 100) / 100;
+  const fee = Math.round((gross / 1000) * API_RECEIVE_FEE_PER_1000 * 100) / 100;
   const net = Math.round((gross - fee) * 100) / 100;
-  return { fee, net };
+  return { fee: Math.max(0, fee), net: Math.max(0, net) };
 }
 
 export type SpendingChannel = 'transfer' | 'withdraw' | 'card' | 'invoice';

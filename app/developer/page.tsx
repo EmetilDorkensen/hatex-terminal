@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Terminal, Copy, CheckCircle2, ShieldAlert, Code2, Webhook, Loader2, Save, BookOpen, AlertCircle, Plus, Send, RotateCw, Trash2, ExternalLink, Eye, EyeOff, Building2, TrendingUp, FileText, ChevronRight } from 'lucide-react';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
 import { maskApiKey } from '@/lib/security/api-key';
-import { API_RECEIVE_ENTERPRISE_LIMIT, API_RECEIVE_INDIVIDUAL_LIMIT, ENTERPRISE_APPLICATION_FEE, ENTERPRISE_MAX_WALLET_BALANCE, INDIVIDUAL_MAX_WALLET_BALANCE, API_RECEIVE_FEE_PERCENT } from '@/lib/security/spending-limits';
+import { API_RECEIVE_ENTERPRISE_LIMIT, API_RECEIVE_INDIVIDUAL_LIMIT, ENTERPRISE_APPLICATION_FEE, ENTERPRISE_MAX_WALLET_BALANCE, INDIVIDUAL_MAX_WALLET_BALANCE, API_RECEIVE_FEE_PER_1000 } from '@/lib/security/spending-limits';
 
 const AVAILABLE_EVENTS = ['payment.success'];
 
@@ -397,12 +397,12 @@ curl --request POST \\
                 <div className={`p-4 rounded-xl border ${accountType === 'business' && enterpriseStatus === 'approved' ? 'bg-slate-50 border-gray-200 opacity-60' : 'bg-indigo-50 border-indigo-100'}`}>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Kont Endividyèl (aktyèl)</p>
                   <p className="text-xl font-black text-slate-900">{API_RECEIVE_INDIVIDUAL_LIMIT.toLocaleString()} HTG</p>
-                  <p className="text-[11px] text-slate-500 mt-1">Max balans wallet: {INDIVIDUAL_MAX_WALLET_BALANCE.toLocaleString()} HTG · Frè API: {API_RECEIVE_FEE_PERCENT}%</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Max balans wallet: {INDIVIDUAL_MAX_WALLET_BALANCE.toLocaleString()} HTG · Frè API: {API_RECEIVE_FEE_PER_1000} HTG / 1 000</p>
                 </div>
                 <div className={`p-4 rounded-xl border ${accountType === 'business' && enterpriseStatus === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-1">Kont Antrepriz (Biznis)</p>
                   <p className="text-xl font-black text-emerald-800">{API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG</p>
-                  <p className="text-[11px] text-emerald-700 mt-1">Max balans wallet: {ENTERPRISE_MAX_WALLET_BALANCE.toLocaleString()} HTG · Frè API: {API_RECEIVE_FEE_PERCENT}%</p>
+                  <p className="text-[11px] text-emerald-700 mt-1">Max balans wallet: {ENTERPRISE_MAX_WALLET_BALANCE.toLocaleString()} HTG · Frè API: {API_RECEIVE_FEE_PER_1000} HTG / 1 000</p>
                 </div>
               </div>
 
@@ -421,7 +421,7 @@ curl --request POST \\
                   <p className="text-sm text-slate-600 font-medium mb-4">
                     Pou resevwa <strong>gwo som lajan</strong> sou API ou a (jiska {API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG pa peman),
                     ou dwe pase an <strong>Kont Antrepriz</strong> epi soumèt dokiman legal biznis ou yo.
-                    Sou chak peman API, <strong>{API_RECEIVE_FEE_PERCENT}% frè</strong> retire otomatikman — ou resevwa <strong>net</strong> sou wallet ou a; frè a ale nan Kès Global HatexCard.
+                    Sou chak peman API, <strong>{API_RECEIVE_FEE_PER_1000} HTG / 1 000</strong> frè retire otomatikman — ou resevwa <strong>net</strong> sou wallet ou a; frè a ale nan pwofi biznis HatexCard.
                   </p>
 
                   <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 mb-5">

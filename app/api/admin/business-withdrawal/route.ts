@@ -49,6 +49,7 @@ export async function GET() {
   return NextResponse.json({
     ...summary,
     withdrawals: withdrawals || [],
+    breakdown: summary.breakdown,
   });
 }
 

@@ -47,7 +47,9 @@ export default function AdminSuperPage() {
     const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
     const [totalClientBal, setTotalClientBal] = useState(0);
     const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
-    const [feesBreakdown, setFeesBreakdown] = useState({ depo: 0, retre: 0, transfe: 0, ajan: 0, antrepriz: 0, kat: 0, kyc: 0 });
+    const [feesBreakdown, setFeesBreakdown] = useState({
+        depo: 0, retre: 0, transfe: 0, ajan: 0, antrepriz: 0, kat: 0, kyc: 0, api: 0,
+    });
     const [agentFeeHistory, setAgentFeeHistory] = useState<any[]>([]);
     const [enterpriseFeeHistory, setEnterpriseFeeHistory] = useState<any[]>([]);
     const [cardActivationFeeHistory, setCardActivationFeeHistory] = useState<any[]>([]);
@@ -341,9 +343,29 @@ export default function AdminSuperPage() {
             }));
             setKycFeeHistory(enrichedKycHistory);
 
-            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee + totalAgentWithdrawHatexFee, antrepriz: totalEnterpriseFee, kat: totalCardFee, kyc: totalKycFee });
+            // Frè API: 3 HTG / 1 000 resevwa (pa enkli 20% komisyon ajan)
+            const { data: apiFeeData } = await supabase
+                .from('transactions')
+                .select('id, user_id, amount, description, created_at')
+                .eq('type', 'API_FEE')
+                .eq('status', 'success')
+                .order('created_at', { ascending: false });
+            const totalApiFee = (apiFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
+
+            setFeesBreakdown({
+                depo: totalDepoFee,
+                retre: totalRetreFee,
+                transfe: totalTransfeFee,
+                ajan: totalAgentFee + totalAgentWithdrawHatexFee,
+                antrepriz: totalEnterpriseFee,
+                kat: totalCardFee,
+                kyc: totalKycFee,
+                api: totalApiFee,
+            });
             
-            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalAgentWithdrawHatexFee + totalEnterpriseFee + totalCardFee + totalKycFee;
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee
+                + totalAgentFee + totalAgentWithdrawHatexFee
+                + totalEnterpriseFee + totalCardFee + totalKycFee + totalApiFee;
             setTotalBiznisProfit(granTotalPwofi);
 
             const { data: bizWithdrawData } = await supabase
@@ -399,6 +421,11 @@ export default function AdminSuperPage() {
                 description: f.description || 'Frè KYC (kat enkli)', nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
             }));
 
+            const apiEntries = (apiFeeData || []).map((f: any) => ({
+                id: f.id, kalite: 'API', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
+                description: f.description || 'Frè API (3 HTG / 1 000)', nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Machann',
+            }));
+
             const retreBankEntries = (bizWithdrawData || []).map((w: any) => ({
                 id: w.id,
                 kalite: 'Retrè Bank',
@@ -407,7 +434,7 @@ export default function AdminSuperPage() {
                 description: w.note || 'Retrè pwofi biznis nan bank',
             }));
 
-            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...kycEntries, ...retreBankEntries]
+            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...kycEntries, ...apiEntries, ...retreBankEntries]
                 .filter((entry) => entry.created_at)
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .slice(0, 60);
@@ -866,16 +893,18 @@ export default function AdminSuperPage() {
                                 <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
                                     <div className="relative z-10 mb-6">
-                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Pwofi Biznis Disponib</p>
+                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Total Frè HatexCard Kolèkte</p>
                                         <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
-                                            {Number(bizProfitAvailable).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
+                                            {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
                                         </h3>
-                                        <p className="text-[11px] text-emerald-700/80 mt-2 font-medium">
-                                            Frè kolèkte: {Number(totalBiznisProfit).toLocaleString()} HTG
+                                        <p className="text-[11px] text-emerald-800/90 mt-2 font-medium">
+                                            Disponib pou retrè:{' '}
+                                            <span className="font-bold">{Number(bizProfitAvailable).toLocaleString()} HTG</span>
                                             {bizProfitWithdrawn > 0 && (
-                                                <> · Retire: <span className="text-rose-600">-{Number(bizProfitWithdrawn).toLocaleString()} HTG</span></>
+                                                <> · Deja retire: <span className="text-rose-600">-{Number(bizProfitWithdrawn).toLocaleString()} HTG</span></>
                                             )}
                                         </p>
+                                        <p className="text-[10px] text-emerald-700/70 mt-1">Tout frè sistèm (sof 20% komisyon ajan)</p>
                                     </div>
                                     <button
                                         type="button"
@@ -886,8 +915,12 @@ export default function AdminSuperPage() {
                                     </button>
                                     <div className="grid grid-cols-2 gap-2 mt-auto">
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan</p>
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan*</p>
                                             <p className="font-bold text-emerald-800">{feesBreakdown.ajan.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè API</p>
+                                            <p className="font-bold text-emerald-800">{feesBreakdown.api.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
                                             <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Antrepriz</p>
@@ -897,11 +930,12 @@ export default function AdminSuperPage() {
                                             <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè KYC</p>
                                             <p className="font-bold text-emerald-800">{feesBreakdown.kyc.toLocaleString()}</p>
                                         </div>
-                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt (Dep/Ret/Tra/Kat)</p>
+                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50 col-span-2">
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt (Depo / Retrè / P2P / Kat)</p>
                                             <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe + feesBreakdown.kat).toLocaleString()}</p>
                                         </div>
                                     </div>
+                                    <p className="text-[9px] text-emerald-700/60 mt-2">* Aktivasyon ajan + 80% frè retrè ajan (pa 20% komisyon ajan)</p>
                                 </div>
 
                                 <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">

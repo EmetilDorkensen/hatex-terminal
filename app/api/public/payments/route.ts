@@ -24,7 +24,7 @@ import {
 } from '@/lib/security/merchant-api';
 import { getClientIp } from '@/lib/security/rate-limit';
 
-const API_BUILD_VERSION = '20260744-api-fee-v5';
+const API_BUILD_VERSION = '20260749-api-fee-3-per-1000';
 
 function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders?: Record<string, string>) {
   return merchantApiJson(
@@ -54,7 +54,7 @@ export async function GET() {
   return jsonWithBuild({
     ok: true,
     build: API_BUILD_VERSION,
-    hint: 'Si build pa egal 20260744-api-fee-v5, Vercel poko deploy dènye commit la.',
+    hint: 'Si build pa egal 20260749-api-fee-3-per-1000, Vercel poko deploy dènye commit la.',
   });
 }
 
@@ -260,7 +260,7 @@ export async function POST(request: Request) {
       amount_charged: safeAmount,
       amount_received: rpcResult.net_amount ?? merchantNet,
       api_fee: rpcResult.api_fee ?? apiFee,
-      api_fee_percent: 3,
+      api_fee_rule: '3_htg_per_1000',
       debited_from: rpcResult.debited_from || paymentCheck.debitFrom,
     };
 
