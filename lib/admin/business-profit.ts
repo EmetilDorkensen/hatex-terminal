@@ -4,6 +4,7 @@ export type BusinessProfitSummary = {
   gross_htg: number;
   withdrawn_htg: number;
   available_htg: number;
+  kes_global_htg: number;
 };
 
 export async function calculateGrossBusinessProfit(
@@ -122,9 +123,16 @@ export async function getBusinessProfitSummary(
   const withdrawn = await getTotalBusinessWithdrawn(supabase);
   const available = Math.max(0, Number((gross - withdrawn).toFixed(2)));
 
+  const { data: treasury } = await supabase
+    .from('platform_treasury')
+    .select('balance')
+    .eq('id', 'kes_global')
+    .maybeSingle();
+
   return {
     gross_htg: Number(gross.toFixed(2)),
     withdrawn_htg: Number(withdrawn.toFixed(2)),
     available_htg: available,
+    kes_global_htg: Number(treasury?.balance || 0),
   };
 }

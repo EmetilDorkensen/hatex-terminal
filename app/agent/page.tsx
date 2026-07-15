@@ -58,6 +58,10 @@ export default function AgentPortal() {
   const [activationAmount, setActivationAmount] = useState('');
   const [installmentAmount, setInstallmentAmount] = useState('');
   const [rechargeAmount, setRechargeAmount] = useState('');
+  const [hatexRechargeAmount, setHatexRechargeAmount] = useState('');
+  const [hatexPaymentAccount, setHatexPaymentAccount] = useState('');
+  const [hatexProofFile, setHatexProofFile] = useState<File | null>(null);
+  const [hatexRequests, setHatexRequests] = useState<any[]>([]);
   
   // Dashboard Ajan
   const [depositEmail, setDepositEmail] = useState('');
@@ -71,6 +75,16 @@ export default function AgentPortal() {
   useEffect(() => {
     fetchAgentData();
   }, [supabase, router]);
+
+  const loadHatexRequests = async () => {
+    try {
+      const res = await fetch('/api/agent/recharge-request');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.requests) setHatexRequests(data.requests);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const fetchAgentData = async () => {
     setAppStep('loading');
@@ -96,9 +110,10 @@ export default function AgentPortal() {
           .from('transactions')
           .select('*')
           .eq('user_id', user.id)
-          .in('type', ['AGENT_DEPOSIT', 'AGENT_WITHDRAWAL', 'AGENT_GUARANTEE', 'AGENT_RECHARGE', 'AGENT_COMMISSION'])
+          .in('type', ['AGENT_DEPOSIT', 'AGENT_WITHDRAWAL', 'AGENT_GUARANTEE', 'AGENT_RECHARGE', 'AGENT_COMMISSION', 'AGENT_RECHARGE_HATEX'])
           .order('created_at', { ascending: false });
         if (txs) setAgentTransactions(txs);
+        loadHatexRequests();
       }
     }
   };
@@ -271,6 +286,34 @@ export default function AgentPortal() {
       setRechargeAmount('');
       fetchAgentData();
     } catch (err: any) { alert(err.message); } finally { setActionLoading(false); }
+  };
+
+  /** Rechaj gratis dirèkteman nan men HatexCard (voye prèv — admin/kesye apwouve san frè). */
+  const handleHatexRechargeRequest = async () => {
+    const amount = Number(hatexRechargeAmount);
+    if (amount <= 0) return alert('Montan pa valab.');
+    if (!hatexPaymentAccount.trim()) return alert('Mete nimewo kont / referans peman ou.');
+    if (!hatexProofFile) return alert('Telechaje yon prèv peman (foto oswa PDF).');
+
+    setActionLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('amount', String(amount));
+      fd.append('payment_account', hatexPaymentAccount.trim());
+      fd.append('proof', hatexProofFile);
+      const res = await fetch('/api/agent/recharge-request', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'Demann lan echwe.');
+      alert(data.message || 'Demann voye! Tann verifye admin/kesye (san frè).');
+      setHatexRechargeAmount('');
+      setHatexPaymentAccount('');
+      setHatexProofFile(null);
+      loadHatexRequests();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // ==========================================
@@ -799,12 +842,50 @@ export default function AgentPortal() {
 
                 {/* RECHAJE BALANS SAN FRÈ */}
                 <div className="bg-white p-6 rounded-3xl border shadow-sm">
-                   <div className="flex items-center gap-3 mb-4"><div className="bg-blue-50 text-blue-600 p-2 rounded-lg"><RefreshCw size={20} /></div><h3 className="font-bold text-slate-900">Rechaje Kont Ajan (San Frè)</h3></div>
+                   <div className="flex items-center gap-3 mb-4"><div className="bg-blue-50 text-blue-600 p-2 rounded-lg"><RefreshCw size={20} /></div><h3 className="font-bold text-slate-900">Rechaje depi Wallet (San Frè)</h3></div>
                    <p className="text-xs text-slate-500 mb-4">Pran kòb sou Wallet ou pou w ranpli balans Ajan w lan (Jiska limit kapasite w).</p>
                    <div className="flex gap-2">
                       <input type="number" value={rechargeAmount} onChange={(e) => setRechargeAmount(e.target.value)} placeholder="Montan HTG" className="w-full bg-slate-50 border p-3 rounded-xl text-sm font-bold" />
                       <button onClick={handleRechargeBalance} disabled={actionLoading || !rechargeAmount} className="bg-slate-900 text-white px-5 rounded-xl font-bold text-xs uppercase whitespace-nowrap">{actionLoading ? <Loader2 size={16} className="animate-spin" /> : 'Rechaje'}</button>
                    </div>
+                </div>
+
+                {/* RECHAJE GRATIS NAN MEN HATEXCARD */}
+                <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
+                   <div className="flex items-center gap-3 mb-4">
+                     <div className="bg-emerald-50 text-emerald-600 p-2 rounded-lg"><UploadCloud size={20} /></div>
+                     <h3 className="font-bold text-slate-900">Rechaje gratis nan men HatexCard</h3>
+                   </div>
+                   <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                     Voye lajan bay kont HatexCard, telechaje prèv peman + nimewo kont/referans.
+                     Admin oswa kesye verifye epi apwouve san okenn frè — kòb la monte sou balans ajan ou.
+                   </p>
+                   <div className="space-y-3">
+                     <input type="number" value={hatexRechargeAmount} onChange={(e) => setHatexRechargeAmount(e.target.value)} placeholder="Montan HTG" className="w-full bg-slate-50 border p-3 rounded-xl text-sm font-bold" />
+                     <input type="text" value={hatexPaymentAccount} onChange={(e) => setHatexPaymentAccount(e.target.value)} placeholder="Nimewo kont / referans MonCash" className="w-full bg-slate-50 border p-3 rounded-xl text-sm font-medium" />
+                     <input type="file" accept="image/*,.pdf" onChange={(e) => setHatexProofFile(e.target.files?.[0] || null)} className="w-full bg-slate-50 p-3 rounded-xl text-sm border" />
+                     <button onClick={handleHatexRechargeRequest} disabled={actionLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-xs uppercase">
+                       {actionLoading ? <Loader2 size={14} className="animate-spin inline" /> : 'Voye Demann (0 frè)'}
+                     </button>
+                   </div>
+                   {hatexRequests.length > 0 && (
+                     <div className="mt-4 space-y-2 border-t pt-4">
+                       <p className="text-[10px] font-bold uppercase text-slate-400">Demann mwen yo</p>
+                       {hatexRequests.slice(0, 5).map((r) => (
+                         <div key={r.id} className="flex flex-col gap-0.5 text-xs bg-slate-50 p-2 rounded-lg">
+                           <div className="flex justify-between">
+                             <span>{Number(r.amount).toLocaleString()} HTG</span>
+                             <span className={r.status === 'approved' ? 'text-emerald-600 font-bold' : r.status === 'rejected' ? 'text-rose-600 font-bold' : 'text-amber-600 font-bold'}>
+                               {r.status === 'approved' ? 'Apwouve' : r.status === 'rejected' ? 'Rejte' : 'Ap tann'}
+                             </span>
+                           </div>
+                           {r.status === 'rejected' && r.rejection_reason && (
+                             <p className="text-[10px] text-rose-500">{r.rejection_reason}</p>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   )}
                 </div>
 
                 {/* FÒM DEPO */}

@@ -6,6 +6,7 @@ import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
+import AdminAgentRechargePanel from './AdminAgentRechargePanel';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -844,6 +845,8 @@ export default function AdminSuperPage() {
                                     <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Aksè Rezève (Sipè Admin)</p>
                                 </div>
                             </div>
+
+                            <AdminAgentRechargePanel />
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between">

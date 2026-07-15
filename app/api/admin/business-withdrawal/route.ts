@@ -113,6 +113,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Pa t kapab anrejistre retrè a.' }, { status: 500 });
   }
 
+  // Debite Kès Global si gen balans (frè ajan 80% ak lòt kòb trezò)
+  try {
+    const { data: treasury } = await db
+      .from('platform_treasury')
+      .select('balance')
+      .eq('id', 'kes_global')
+      .maybeSingle();
+    const kesBal = Number(treasury?.balance || 0);
+    const debitAmt = Math.min(Number(amount.toFixed(2)), kesBal);
+    if (debitAmt > 0) {
+      await db.rpc('hatex_debit_kes_global', { p_amount: debitAmt });
+    }
+  } catch {
+    /* pa revoke retrè anrejistre a si debit treasury echwe — log sèlman */
+  }
+
   const newSummary = await getBusinessProfitSummary(db);
   const totalWithdrawn = await getTotalBusinessWithdrawn(db);
 

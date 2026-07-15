@@ -9,6 +9,8 @@ import {
     XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
     Crown, MessageCircle, Activity, Radio
 } from 'lucide-react';
+import AdminAgentRechargePanel from '@/app/admin/AdminAgentRechargePanel';
+
 export default function WorkspacePage() {
     const router = useRouter();
     const supabase = createBrowserClient(
@@ -729,6 +731,8 @@ export default function WorkspacePage() {
                 {/* ==================================================== */}
                 {activeDept === 'finance' && canSeeFinance && (
                     <div className="space-y-6 animate-in fade-in duration-500">
+                        <AdminAgentRechargePanel />
+
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit">
                             <button onClick={() => setActiveTab('deposits')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'deposits' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Depo ({deposits.length})</button>
                             <button onClick={() => setActiveTab('withdrawals')} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'withdrawals' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Retrè ({withdrawals.length})</button>

@@ -58,3 +58,32 @@ export async function assertFinanceOperatorWithGate(
   if (!verifyWorkspaceGateToken(wsToken, normalized)) return { ok: false };
   return { ok: true, role: 'staff' };
 }
+
+/** Admin + gate, oswa kesye (role finance) + workspace gate. */
+export async function assertFinanceCashierWithGate(
+  email: string | undefined
+): Promise<{ ok: true; role: 'admin' | 'staff' } | { ok: false }> {
+  if (!email) return { ok: false };
+  const normalized = email.trim().toLowerCase();
+  const cookieStore = await cookies();
+
+  if (normalized === ADMIN_EMAIL.toLowerCase()) {
+    const token = cookieStore.get(ADMIN_GATE_COOKIE)?.value;
+    if (!verifyAdminGateToken(token)) return { ok: false };
+    return { ok: true, role: 'admin' };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: staff } = await admin
+    .from('staff_users')
+    .select('id, role')
+    .eq('email', normalized)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!staff || staff.role !== 'finance') return { ok: false };
+
+  const wsToken = cookieStore.get(WORKSPACE_GATE_COOKIE)?.value;
+  if (!verifyWorkspaceGateToken(wsToken, normalized)) return { ok: false };
+  return { ok: true, role: 'staff' };
+}

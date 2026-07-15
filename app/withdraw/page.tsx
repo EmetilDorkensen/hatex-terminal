@@ -364,7 +364,7 @@ export default function WithdrawPage() {
                          <span className="text-indigo-600">{totalDebit.toLocaleString()} HTG</span>
                        </div>
                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2">
-                         Ajan 20% · HatexCard 80% nan frè a
+                         Ajan
                        </p>
                      </>
                    ) : (
