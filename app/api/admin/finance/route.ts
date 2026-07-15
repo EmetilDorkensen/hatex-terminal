@@ -1,29 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
-import { ADMIN_EMAIL } from '@/lib/admin/auth';
+import { assertFinanceOperatorWithGate } from '@/lib/admin/auth';
 
 type Action = 'approve_deposit' | 'reject' | 'complete_withdrawal';
 
-async function assertFinanceOperator(email: string | undefined): Promise<boolean> {
-  if (!email) return false;
-  const normalized = email.trim().toLowerCase();
-  if (normalized === ADMIN_EMAIL.toLowerCase()) return true;
-
-  const admin = createSupabaseAdminClient();
-  const { data: staff } = await admin
-    .from('staff_users')
-    .select('id')
-    .eq('email', normalized)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  return Boolean(staff);
-}
-
 /**
- * Operasyon finansye admin/staff — verifye wòl sou sèvè, egzekite RPC ak service_role
- * pou wallet_balance toujou kredite/ranbouse (SECURITY DEFINER + auth.role = service_role).
+ * Operasyon finansye admin/staff — verifye wòl + gate (admin gate oswa workspace gate),
+ * egzekite RPC ak service_role pou wallet_balance toujou kredite/ranbouse.
  */
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -41,8 +25,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Ou dwe konekte.' }, { status: 401 });
     }
 
-    if (!(await assertFinanceOperator(user.email))) {
-      return NextResponse.json({ success: false, message: 'Aksè refize.' }, { status: 403 });
+    const gate = await assertFinanceOperatorWithGate(user.email);
+    if (!gate.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'Aksè refize. Antre modpas admin gate (dashboard) oswa workspace gate anvan operasyon finansye.',
+        },
+        { status: 403 }
+      );
     }
 
     const supabase = createSupabaseAdminClient();

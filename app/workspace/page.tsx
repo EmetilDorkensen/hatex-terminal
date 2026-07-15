@@ -416,18 +416,19 @@ export default function WorkspacePage() {
 
         setProcessingId(applicationId);
         try {
-            if (aksyon === 'rejected') {
-                const { data: userProf } = await supabase.from('profiles').select('agent_guarantee_paid, wallet_balance').eq('id', userId).single();
-                if (userProf && Number(userProf.agent_guarantee_paid) > 0) {
-                    const totalRefund = Number(userProf.agent_guarantee_paid) + Math.floor((Number(userProf.agent_guarantee_paid) / 1000) * 7);
-                    await supabase.from('profiles').update({ wallet_balance: Number(userProf.wallet_balance) + totalRefund, agent_balance: 0, agent_capacity: 0, agent_guarantee_paid: 0, agent_status: 'rejected' }).eq('id', userId);
-                } else {
-                    await supabase.from('profiles').update({ agent_status: 'rejected' }).eq('id', userId);
-                }
-            } else {
-                await supabase.from('profiles').update({ agent_status: 'approved' }).eq('id', userId);
-            }
-            await supabase.from('agent_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+            const res = await fetch('/api/admin/applications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    kind: 'agent',
+                    action: aksyon,
+                    application_id: applicationId,
+                    user_id: userId,
+                    reason: aksyon === 'rejected' ? rezon : undefined,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.message || 'Echèk review ajan.');
             await logActivity(`AGENT_${aksyon.toUpperCase()}`, 'agent_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
             alert("Aplikasyon trete!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
@@ -440,32 +441,19 @@ export default function WorkspacePage() {
 
         setProcessingId(applicationId);
         try {
-            if (aksyon === 'rejected') {
-                const { data: userProf } = await supabase.from('profiles').select('wallet_balance, enterprise_fee_paid').eq('id', userId).single();
-                const feePaid = Number(userProf?.enterprise_fee_paid || 0);
-                await supabase.from('profiles').update({
-                    wallet_balance: Number(userProf?.wallet_balance || 0) + feePaid,
-                    enterprise_status: 'rejected',
-                    enterprise_fee_paid: 0,
-                }).eq('id', userId);
-                if (feePaid > 0) {
-                    await supabase.from('transactions').insert({ user_id: userId, type: 'REFUND', amount: feePaid, status: 'success', description: 'Ranbousman Frè Kont Antrepriz Rejte' });
-                }
-            } else {
-                // Bay Ajan PRO otomatikman si li poko gen youn — se yon kont ajan VID (0 HTG).
-                // Frè 49,000 HTG la se pwofi HatexCard sèlman, li PA janm transfere sou kont ajan an.
-                const { data: userProf } = await supabase.from('profiles').select('agent_status').eq('id', userId).single();
-                const updatePayload: any = { account_type: 'business', enterprise_status: 'approved' };
-                if (!userProf || userProf.agent_status !== 'approved') {
-                    updatePayload.agent_status = 'approved';
-                    updatePayload.agent_tier = 'pro';
-                    updatePayload.agent_capacity = 40000;
-                    updatePayload.agent_balance = 0;
-                    updatePayload.agent_guarantee_paid = 0;
-                }
-                await supabase.from('profiles').update(updatePayload).eq('id', userId);
-            }
-            await supabase.from('enterprise_applications').update({ status: aksyon, rejection_reason: aksyon === 'rejected' ? rezon : null }).eq('id', applicationId);
+            const res = await fetch('/api/admin/applications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    kind: 'enterprise',
+                    action: aksyon,
+                    application_id: applicationId,
+                    user_id: userId,
+                    reason: aksyon === 'rejected' ? rezon : undefined,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.message || 'Echèk review antrepriz.');
             await logActivity(`ENTERPRISE_${aksyon.toUpperCase()}`, 'enterprise_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
             alert("Aplikasyon Antrepriz trete!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
