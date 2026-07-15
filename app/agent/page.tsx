@@ -96,7 +96,7 @@ export default function AgentPortal() {
           .from('transactions')
           .select('*')
           .eq('user_id', user.id)
-          .in('type', ['AGENT_DEPOSIT', 'AGENT_WITHDRAWAL', 'AGENT_GUARANTEE', 'AGENT_RECHARGE'])
+          .in('type', ['AGENT_DEPOSIT', 'AGENT_WITHDRAWAL', 'AGENT_GUARANTEE', 'AGENT_RECHARGE', 'AGENT_COMMISSION'])
           .order('created_at', { ascending: false });
         if (txs) setAgentTransactions(txs);
       }
@@ -842,8 +842,8 @@ export default function AgentPortal() {
                            {filteredTransactions.map((tx) => (
                              <div key={tx.id} className="flex justify-between items-center p-4 rounded-2xl border bg-slate-50 shadow-sm">
                                <div className="flex items-center gap-4">
-                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 ${tx.type === 'AGENT_WITHDRAWAL' ? 'bg-emerald-500' : tx.type === 'AGENT_RECHARGE' ? 'bg-blue-500' : tx.type === 'AGENT_GUARANTEE' ? 'bg-indigo-500' : 'bg-rose-500'}`}>
-                                    {tx.type === 'AGENT_WITHDRAWAL' ? <ArrowUpFromLine size={18} /> : tx.type === 'AGENT_RECHARGE' ? <RefreshCw size={18}/> : tx.type === 'AGENT_GUARANTEE' ? <Wallet size={18}/> : <ArrowDownToLine size={18} />}
+                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 ${tx.type === 'AGENT_WITHDRAWAL' || tx.type === 'AGENT_COMMISSION' ? 'bg-emerald-500' : tx.type === 'AGENT_RECHARGE' ? 'bg-blue-500' : tx.type === 'AGENT_GUARANTEE' ? 'bg-indigo-500' : 'bg-rose-500'}`}>
+                                    {tx.type === 'AGENT_WITHDRAWAL' || tx.type === 'AGENT_COMMISSION' ? <ArrowUpFromLine size={18} /> : tx.type === 'AGENT_RECHARGE' ? <RefreshCw size={18}/> : tx.type === 'AGENT_GUARANTEE' ? <Wallet size={18}/> : <ArrowDownToLine size={18} />}
                                  </div>
                                  <div>
                                    <p className="text-sm font-bold">{tx.metadata?.client_email || tx.description}</p>
@@ -853,7 +853,7 @@ export default function AgentPortal() {
                                    </div>
                                  </div>
                                </div>
-                               <p className={`text-base font-bold ${['AGENT_WITHDRAWAL', 'AGENT_RECHARGE'].includes(tx.type) ? 'text-emerald-600' : 'text-slate-900'}`}>{['AGENT_WITHDRAWAL', 'AGENT_RECHARGE'].includes(tx.type) ? '+' : ''}{Math.abs(tx.amount).toLocaleString()} <span className="text-xs">HTG</span></p>
+                               <p className={`text-base font-bold ${['AGENT_WITHDRAWAL', 'AGENT_RECHARGE', 'AGENT_COMMISSION'].includes(tx.type) ? 'text-emerald-600' : 'text-slate-900'}`}>{['AGENT_WITHDRAWAL', 'AGENT_RECHARGE', 'AGENT_COMMISSION'].includes(tx.type) ? '+' : ''}{Math.abs(tx.amount).toLocaleString()} <span className="text-xs">HTG</span></p>
                              </div>
                            ))}
                         </div>

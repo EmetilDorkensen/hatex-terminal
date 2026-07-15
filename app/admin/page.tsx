@@ -268,6 +268,18 @@ export default function AdminSuperPage() {
 
             const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
 
+            // 80% frè retrè kay ajan → pwofi HatexCard
+            const { data: agentWithdrawFeeData } = await supabase
+                .from('transactions')
+                .select('id, user_id, amount, description, created_at')
+                .eq('type', 'AGENT_WITHDRAW_FEE')
+                .eq('status', 'success')
+                .order('created_at', { ascending: false });
+            const totalAgentWithdrawHatexFee = (agentWithdrawFeeData || []).reduce(
+                (acc, f) => acc + Math.abs(Number(f.amount || 0)),
+                0
+            );
+
             const enrichedHistory = (feeData || []).slice(0, 25).map(f => ({
                 ...f,
                 agentName: profiles.find(u => u.id === f.user_id)?.full_name || 'Ajan Enkoni',
@@ -328,9 +340,9 @@ export default function AdminSuperPage() {
             }));
             setKycFeeHistory(enrichedKycHistory);
 
-            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee, antrepriz: totalEnterpriseFee, kat: totalCardFee, kyc: totalKycFee });
+            setFeesBreakdown({ depo: totalDepoFee, retre: totalRetreFee, transfe: totalTransfeFee, ajan: totalAgentFee + totalAgentWithdrawHatexFee, antrepriz: totalEnterpriseFee, kat: totalCardFee, kyc: totalKycFee });
             
-            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalEnterpriseFee + totalCardFee + totalKycFee;
+            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee + totalAgentFee + totalAgentWithdrawHatexFee + totalEnterpriseFee + totalCardFee + totalKycFee;
             setTotalBiznisProfit(granTotalPwofi);
 
             const { data: bizWithdrawData } = await supabase
@@ -359,10 +371,17 @@ export default function AdminSuperPage() {
                 id: `transfe-${idx}`, kalite: 'Transfè', amount: Math.abs(Number(t.amount || 0)), created_at: t.created_at || null, description: 'Frè Transfè P2P',
             }));
 
-            const ajanEntries = (feeData || []).map((f: any) => ({
-                id: f.id, kalite: 'Ajan', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Ajan Enkoni',
-            }));
+            const ajanEntries = [
+                ...(feeData || []).map((f: any) => ({
+                    id: f.id, kalite: 'Ajan', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
+                    description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Ajan Enkoni',
+                })),
+                ...(agentWithdrawFeeData || []).map((f: any) => ({
+                    id: f.id, kalite: 'Retrè Ajan', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
+                    description: f.description || 'Frè HatexCard retrè ajan (80%)',
+                    nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
+                })),
+            ];
 
             const antreprizEntries = (entFeeData || []).map((f: any) => ({
                 id: f.id, kalite: 'Antrepriz', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,

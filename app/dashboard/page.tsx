@@ -744,7 +744,7 @@ export default function Dashboard() {
                       {userData?.kyc_status === 'pending' ? "Verifikasyon an kous..." : kycNotSubmitted ? "Verifikasyon ID Obligatwa" : "KYC pa apwouve ankò"}
                     </p>
                     <button onClick={() => router.push('/kyc')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm shadow-md hover:bg-indigo-700 transition-all">
-                      {userData?.kyc_status === 'pending' ? 'Tann Revizyon' : 'Pase KYC (1150 HTG)'}
+                      {userData?.kyc_status === 'pending' ? 'Tann Revizyon' : 'Pase KYC'}
                     </button>
                   </div>
                 )}

@@ -28,6 +28,34 @@ export const INDIVIDUAL_INVOICE_DAILY_LIMIT = 85000;
 export const INDIVIDUAL_MAX_WALLET_BALANCE = 105000;
 export const ENTERPRISE_MAX_WALLET_BALANCE = 2000000;
 
+/** Frè retrè kay ajan: 50 HTG pou chak 1,000 HTG (5%). */
+export const AGENT_WITHDRAW_FEE_PER_1000 = 50;
+export const AGENT_WITHDRAW_AGENT_SHARE_RATE = 0.2;
+export const AGENT_WITHDRAW_HATEX_SHARE_RATE = 0.8;
+
+export type AgentWithdrawFeeBreakdown = {
+  cashAmount: number;
+  fee: number;
+  agentShare: number;
+  hatexShare: number;
+  totalDebit: number;
+};
+
+/** Kalkile frè retrè ajan (menm fòmil ak SQL RPC). */
+export function calcAgentWithdrawFee(cashAmount: number): AgentWithdrawFeeBreakdown {
+  const amount = Math.max(0, Number(cashAmount) || 0);
+  const fee = Math.round((amount / 1000) * AGENT_WITHDRAW_FEE_PER_1000 * 100) / 100;
+  const agentShare = Math.round(fee * AGENT_WITHDRAW_AGENT_SHARE_RATE * 100) / 100;
+  const hatexShare = Math.round((fee - agentShare) * 100) / 100;
+  return {
+    cashAmount: amount,
+    fee,
+    agentShare,
+    hatexShare,
+    totalDebit: Math.round((amount + fee) * 100) / 100,
+  };
+}
+
 // Limit RESEPSYON via API piblik la (/api/public/payments). Sa a kontwole
 // konbyen kòb yon MACHANN ka resevwa pa API a — apa de plafon balans jeneral
 // la. De nivo verifikasyon: (1) yon sèl peman pa ka depase limit la (pa-tx),

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, AlertTriangle, ShieldCheck, Wallet, ArrowUpRight, Lock, CheckCircle2, Store } from 'lucide-react';
-import { checkSpendingLimit } from '@/lib/security/spending-limits';
+import { checkSpendingLimit, calcAgentWithdrawFee } from '@/lib/security/spending-limits';
 import { isKycApproved } from '@/lib/kyc/status';
 
 export default function WithdrawPage() {
@@ -26,10 +26,19 @@ export default function WithdrawPage() {
   );
 
   const currentAmount = Number(amount) || 0;
-  const isLargeWithdrawal = currentAmount > 15000;
-  
-  const withdrawFee = isLargeWithdrawal ? 0 : currentAmount * 0.05;
-  const netAmount = currentAmount - withdrawFee;
+  const isLargeWithdrawal = currentAmount > 15000 && method !== 'Ajan';
+  const isAgentMethod = method === 'Ajan';
+
+  // MonCash/NatCash: frè 5% retire nan montan (lojik VIP/bank)
+  // Ajan: frè 50/1000 ANPLIS montan kach (kliyan peye total = kach + frè)
+  const agentFee = isAgentMethod ? calcAgentWithdrawFee(currentAmount) : null;
+  const withdrawFee = isAgentMethod
+    ? (agentFee?.fee || 0)
+    : isLargeWithdrawal
+      ? 0
+      : currentAmount * 0.05;
+  const netAmount = isAgentMethod ? currentAmount : currentAmount - withdrawFee;
+  const totalDebit = isAgentMethod ? (agentFee?.totalDebit || 0) : currentAmount;
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -91,7 +100,10 @@ export default function WithdrawPage() {
 
       // 3. TCHEKE LIMIT JOUNALYE/MANSYÈL POU KONT ENDIVIDYÈL YO
       //    (Kont Antrepriz apwouve gen retrè ILIMITE)
-      const limitCheck = await checkSpendingLimit(supabase, profile.id, statusCheck.account_type, currentAmount, 'withdraw');
+      const amountForLimit = method === 'Ajan'
+        ? calcAgentWithdrawFee(currentAmount).totalDebit
+        : currentAmount;
+      const limitCheck = await checkSpendingLimit(supabase, profile.id, statusCheck.account_type, amountForLimit, 'withdraw');
       if (!limitCheck.allowed) {
           setLoading(false);
           return alert(`${limitCheck.message}\n\nPase nan Kont Antrepriz pou retrè ilimite (bouton "Vin Kont Antrepriz" nan Tablodbò a).`);
@@ -102,9 +114,16 @@ export default function WithdrawPage() {
         setLoading(false);
         return alert("Minimòm retrè se 500 HTG");
       }
-      if (currentAmount > (profile?.wallet_balance || 0)) {
+      const neededBalance = method === 'Ajan'
+        ? calcAgentWithdrawFee(currentAmount).totalDebit
+        : currentAmount;
+      if (neededBalance > (profile?.wallet_balance || 0)) {
         setLoading(false);
-        return alert("Ou pa gen ase kòb sou kont ou pou montan sa a.");
+        return alert(
+          method === 'Ajan'
+            ? `Ou pa gen ase kòb. Ou bezwen ${neededBalance.toLocaleString()} HTG (montan kach + frè).`
+            : "Ou pa gen ase kòb sou kont ou pou montan sa a."
+        );
       }
       
       // Valide Enfòmasyon Metòd yo
@@ -169,7 +188,12 @@ export default function WithdrawPage() {
 
       if (rpcResult.is_agent) {
         setShowPinPrompt(false);
-        alert(`Tranzaksyon an reyisi!\n\nAjan ${rpcResult.agent_name} resevwa lajan an sou sistèm nan.\nTanpri mande ajan an ${Number(rpcResult.net_amount).toLocaleString()} HTG kach ou a kounye a.`);
+        alert(
+          `Tranzaksyon an reyisi!\n\n` +
+          `Ajan ${rpcResult.agent_name} resevwa demann lan.\n` +
+          `Mande ajan an ba ou ${Number(rpcResult.cash_amount || rpcResult.net_amount).toLocaleString()} HTG kach.\n` +
+          `Frè: ${Number(rpcResult.fee || 0).toLocaleString()} HTG (yo retire sou kont ou).`
+        );
         router.push('/dashboard');
         return;
       }
@@ -236,7 +260,12 @@ export default function WithdrawPage() {
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2 tracking-tight">Konfime Retrè a</h2>
             <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">
-              Mete PIN 4 chif ou a pou w ka retire <span className="font-bold text-slate-800">{currentAmount.toLocaleString()} HTG</span> sou kont ou.
+              Mete PIN 4 chif ou a pou w ka retire{' '}
+              <span className="font-bold text-slate-800">{currentAmount.toLocaleString()} HTG</span>
+              {isAgentMethod && withdrawFee > 0 && (
+                <> (frè {withdrawFee.toLocaleString()} HTG — total debit {totalDebit.toLocaleString()} HTG)</>
+              )}
+              {' '}sou kont ou.
             </p>
             
             <input 
@@ -319,17 +348,37 @@ export default function WithdrawPage() {
               
                {currentAmount > 0 && !isLargeWithdrawal && (
                  <div className="mt-8 bg-slate-50 border border-gray-100 p-4 rounded-xl space-y-3">
-                   <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-                     <span>{method === 'Ajan' ? 'Frè Ajan an (5%):' : 'Frè Hatexcard (5%):'}</span>
-                     <span className="font-bold text-rose-600">-{withdrawFee.toFixed(2)} HTG</span>
-                   </div>
-                   <div className="h-px bg-gray-200 w-full"></div>
-                   <div className="flex justify-between items-center text-sm font-bold text-slate-800">
-                     <span>Nèt ou pral resevwa:</span>
-                     <span className={method === 'Ajan' ? "text-emerald-600" : "text-indigo-600"}>{netAmount.toFixed(2)} HTG</span>
-                   </div>
-                   {method === 'Ajan' && (
-                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2">Ajan an ap ba ou {netAmount.toFixed(2)} HTG nan men w kach.</p>
+                   {isAgentMethod ? (
+                     <>
+                       <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                         <span>Montan kach ou resevwa:</span>
+                         <span className="font-bold text-emerald-600">{currentAmount.toLocaleString()} HTG</span>
+                       </div>
+                       <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                         <span>Frè (50 HTG / 1,000):</span>
+                         <span className="font-bold text-rose-600">+{withdrawFee.toLocaleString()} HTG</span>
+                       </div>
+                       <div className="h-px bg-gray-200 w-full"></div>
+                       <div className="flex justify-between items-center text-sm font-bold text-slate-800">
+                         <span>Total yo retire sou kont ou:</span>
+                         <span className="text-indigo-600">{totalDebit.toLocaleString()} HTG</span>
+                       </div>
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2">
+                         Ajan 20% · HatexCard 80% nan frè a
+                       </p>
+                     </>
+                   ) : (
+                     <>
+                       <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                         <span>Frè Hatexcard (5%):</span>
+                         <span className="font-bold text-rose-600">-{withdrawFee.toFixed(2)} HTG</span>
+                       </div>
+                       <div className="h-px bg-gray-200 w-full"></div>
+                       <div className="flex justify-between items-center text-sm font-bold text-slate-800">
+                         <span>Nèt ou pral resevwa:</span>
+                         <span className="text-indigo-600">{netAmount.toFixed(2)} HTG</span>
+                       </div>
+                     </>
                    )}
                  </div>
                )}

@@ -19,6 +19,7 @@ export async function calculateGrossBusinessProfit(
     { data: cardFeeData },
     { data: kycFeeData },
     { data: apiFeeData },
+    { data: agentWithdrawFeeData },
   ] = await Promise.all([
     supabase.from('deposits').select('fee').eq('status', 'approved'),
     supabase.from('withdrawals').select('fee').eq('status', 'completed'),
@@ -53,6 +54,12 @@ export async function calculateGrossBusinessProfit(
       .select('amount')
       .eq('type', 'API_FEE')
       .eq('status', 'success'),
+    // 80% frè retrè kay ajan → pwofi HatexCard
+    supabase
+      .from('transactions')
+      .select('amount')
+      .eq('type', 'AGENT_WITHDRAW_FEE')
+      .eq('status', 'success'),
   ]);
 
   const totalDepoFee = (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
@@ -85,6 +92,10 @@ export async function calculateGrossBusinessProfit(
     (acc, f) => acc + Math.abs(Number(f.amount || 0)),
     0
   );
+  const totalAgentWithdrawHatexFee = (agentWithdrawFeeData || []).reduce(
+    (acc, f) => acc + Math.abs(Number(f.amount || 0)),
+    0
+  );
 
   return (
     totalDepoFee +
@@ -94,7 +105,8 @@ export async function calculateGrossBusinessProfit(
     totalEnterpriseFee +
     totalCardFee +
     totalKycFee +
-    totalApiFee
+    totalApiFee +
+    totalAgentWithdrawHatexFee
   );
 }
 

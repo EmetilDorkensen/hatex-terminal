@@ -14,7 +14,8 @@ export type UserTransaction = {
 };
 
 function isHiddenTransferFee(t: UserTransaction): boolean {
-  if (t.type === 'TRANSFER_FEE' || t.type === 'API_FEE') return true;
+  if (t.type === 'TRANSFER_FEE' || t.type === 'API_FEE' || t.type === 'AGENT_WITHDRAW_FEE') return true;
+  if (t.type === 'AGENT_WITHDRAW_CLIENT_FEE') return true;
   const desc = String(t.description || '').toLowerCase();
   if (desc.includes('frè transfè') || desc.includes('frè transfe')) return true;
   if (t.metadata?.hidden_from_user === true) return true;
@@ -79,6 +80,12 @@ export function getTransactionDescription(t: UserTransaction): string {
     if (fee > 0) {
       return `${base} (+ ${fee.toLocaleString()} HTG frè)`;
     }
+    return base;
+  }
+  if (t.type === 'AGENT_WITHDRAWAL_CLIENT') {
+    const fee = Number(t.metadata?.fee || 0);
+    const base = String(t.description || 'Retrè kach kay ajan');
+    if (fee > 0) return `${base} (+ ${fee.toLocaleString()} HTG frè)`;
     return base;
   }
   return String(t.description || t.type);
