@@ -447,6 +447,31 @@ export default function AdminSuperPage() {
     const handleOpenDocument = async (ref: string) => {
         if (!ref) { alert("Pa gen lyen pou dokiman sa a!"); return; }
         if (ref.startsWith('http://') || ref.startsWith('https://')) {
+            // Toujou eseye API a (bucket prive ka gen URL piblik ki pa mache)
+            try {
+                const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
+                const data = await res.json();
+                if (res.ok && data.url) {
+                    window.open(data.url, '_blank');
+                    return;
+                }
+            } catch { /* fall through */ }
+            window.open(ref, '_blank');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
+            const data = await res.json();
+            if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
+            window.open(data.url, '_blank');
+        } catch (e: any) {
+            alert(e.message || 'Pa t kapab louvri dokiman an.');
+        }
+    };
+
+    const handleOpenDepositProof = async (ref: string) => {
+        if (!ref) { alert("Pa gen lyen pou prèv sa a!"); return; }
+        if (ref.startsWith('http://') || ref.startsWith('https://')) {
             window.open(ref, '_blank');
             return;
         }
@@ -1688,8 +1713,8 @@ export default function AdminSuperPage() {
                                                         <XCircle size={16} /> Anile
                                                     </button>
                                                 </div>
-                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenDocument(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
-                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenDocument(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
+                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenDepositProof(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
+                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenDepositProof(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
                                             </div>
                                         )}
                                     </div>

@@ -53,12 +53,40 @@ export async function POST(request: Request) {
     if (!feeKey || !(value >= 0) || !Number.isFinite(value)) {
       return NextResponse.json({ error: 'fee_key ak value ( >= 0 ) obligatwa.' }, { status: 400 });
     }
-    const { data, error } = await db
+
+    // Upsert: si liy lan pa egziste, kreye l
+    const { data: existing } = await db
       .from('platform_fee_settings')
-      .update({ value, updated_at: new Date().toISOString(), updated_by: email })
+      .select('fee_key')
       .eq('fee_key', feeKey)
-      .select()
-      .single();
+      .maybeSingle();
+
+    let data;
+    let error;
+    if (existing) {
+      const upd = await db
+        .from('platform_fee_settings')
+        .update({ value, updated_at: new Date().toISOString(), updated_by: email })
+        .eq('fee_key', feeKey)
+        .select()
+        .single();
+      data = upd.data;
+      error = upd.error;
+    } else {
+      const ins = await db
+        .from('platform_fee_settings')
+        .insert({
+          fee_key: feeKey,
+          label: feeKey,
+          value,
+          unit: 'flat',
+          updated_by: email,
+        })
+        .select()
+        .single();
+      data = ins.data;
+      error = ins.error;
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
     await logAdminAction(db, {
@@ -79,6 +107,24 @@ export async function POST(request: Request) {
     const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : null;
     if (!userId || !feeKey || !(value >= 0) || !Number.isFinite(value)) {
       return NextResponse.json({ error: 'user_id, fee_key, value obligatwa.' }, { status: 400 });
+    }
+
+    const { data: profile } = await db.from('profiles').select('id').eq('id', userId).maybeSingle();
+    if (!profile) {
+      return NextResponse.json({ error: 'Kont (user_id) pa jwenn nan profiles.' }, { status: 404 });
+    }
+
+    // Asire fee_key egziste nan platform_fee_settings (FK)
+    const { data: feeRow } = await db
+      .from('platform_fee_settings')
+      .select('fee_key')
+      .eq('fee_key', feeKey)
+      .maybeSingle();
+    if (!feeRow) {
+      return NextResponse.json(
+        { error: `Frè « ${feeKey} » pa egziste. Kouri migrasyon 20260752.` },
+        { status: 400 }
+      );
     }
 
     const { data, error } = await db

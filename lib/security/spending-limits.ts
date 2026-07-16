@@ -41,10 +41,14 @@ export type AgentWithdrawFeeBreakdown = {
   totalDebit: number;
 };
 
-/** Kalkile frè retrè ajan (menm fòmil ak SQL RPC). */
-export function calcAgentWithdrawFee(cashAmount: number): AgentWithdrawFeeBreakdown {
+/** Kalkile frè retrè ajan — rate opsyonèl (default 50 / 1000). */
+export function calcAgentWithdrawFee(
+  cashAmount: number,
+  feePer1000: number = AGENT_WITHDRAW_FEE_PER_1000
+): AgentWithdrawFeeBreakdown {
   const amount = Math.max(0, Number(cashAmount) || 0);
-  const fee = Math.round((amount / 1000) * AGENT_WITHDRAW_FEE_PER_1000 * 100) / 100;
+  const rate = Math.max(0, Number(feePer1000) || 0);
+  const fee = Math.round((amount / 1000) * rate * 100) / 100;
   const agentShare = Math.round(fee * AGENT_WITHDRAW_AGENT_SHARE_RATE * 100) / 100;
   const hatexShare = Math.round((fee - agentShare) * 100) / 100;
   return {
@@ -68,9 +72,13 @@ export const API_RECEIVE_FEE_PER_1000 = 3;
 /** @deprecated Itilize API_RECEIVE_FEE_PER_1000 — pa yon pousantaj. */
 export const API_RECEIVE_FEE_PERCENT = API_RECEIVE_FEE_PER_1000;
 
-export function calcApiReceiveFee(grossAmount: number): { fee: number; net: number } {
+export function calcApiReceiveFee(
+  grossAmount: number,
+  feePer1000: number = API_RECEIVE_FEE_PER_1000
+): { fee: number; net: number } {
   const gross = Number(grossAmount || 0);
-  const fee = Math.round((gross / 1000) * API_RECEIVE_FEE_PER_1000 * 100) / 100;
+  const rate = Math.max(0, Number(feePer1000) || 0);
+  const fee = Math.round((gross / 1000) * rate * 100) / 100;
   const net = Math.round((gross - fee) * 100) / 100;
   return { fee: Math.max(0, fee), net: Math.max(0, net) };
 }

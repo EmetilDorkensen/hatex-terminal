@@ -28,15 +28,17 @@ export default function WithdrawPage() {
   const currentAmount = Number(amount) || 0;
   const isLargeWithdrawal = currentAmount > 15000 && method !== 'Ajan';
   const isAgentMethod = method === 'Ajan';
+  const [withdrawFeePercent, setWithdrawFeePercent] = useState(5);
+  const [agentWithdrawPer1000, setAgentWithdrawPer1000] = useState(50);
 
-  // MonCash/NatCash: frè 5% retire nan montan (lojik VIP/bank)
-  // Ajan: frè 50/1000 ANPLIS montan kach (kliyan peye total = kach + frè)
-  const agentFee = isAgentMethod ? calcAgentWithdrawFee(currentAmount) : null;
+  // MonCash/NatCash: frè % retire nan montan
+  // Ajan: frè /1000 ANPLIS montan kach
+  const agentFee = isAgentMethod ? calcAgentWithdrawFee(currentAmount, agentWithdrawPer1000) : null;
   const withdrawFee = isAgentMethod
     ? (agentFee?.fee || 0)
     : isLargeWithdrawal
       ? 0
-      : currentAmount * 0.05;
+      : currentAmount * (withdrawFeePercent / 100);
   const netAmount = isAgentMethod ? currentAmount : currentAmount - withdrawFee;
   const totalDebit = isAgentMethod ? (agentFee?.totalDebit || 0) : currentAmount;
 
@@ -47,6 +49,18 @@ export default function WithdrawPage() {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (data) {
            setProfile(data);
+           try {
+             const feeRes = await fetch('/api/fees/mine');
+             const feeData = await feeRes.json().catch(() => ({}));
+             if (feeRes.ok && feeData.fees) {
+               if (feeData.fees.withdraw_fee_percent != null) {
+                 setWithdrawFeePercent(Number(feeData.fees.withdraw_fee_percent));
+               }
+               if (feeData.fees.agent_withdraw_fee_per_1000 != null) {
+                 setAgentWithdrawPer1000(Number(feeData.fees.agent_withdraw_fee_per_1000));
+               }
+             }
+           } catch { /* defaults */ }
            if (!isKycApproved(data.kyc_status)) {
                return;
            }
@@ -101,7 +115,7 @@ export default function WithdrawPage() {
       // 3. TCHEKE LIMIT JOUNALYE/MANSYÈL POU KONT ENDIVIDYÈL YO
       //    (Kont Antrepriz apwouve gen retrè ILIMITE)
       const amountForLimit = method === 'Ajan'
-        ? calcAgentWithdrawFee(currentAmount).totalDebit
+        ? calcAgentWithdrawFee(currentAmount, agentWithdrawPer1000).totalDebit
         : currentAmount;
       const limitCheck = await checkSpendingLimit(supabase, profile.id, statusCheck.account_type, amountForLimit, 'withdraw');
       if (!limitCheck.allowed) {
@@ -115,7 +129,7 @@ export default function WithdrawPage() {
         return alert("Minimòm retrè se 500 HTG");
       }
       const neededBalance = method === 'Ajan'
-        ? calcAgentWithdrawFee(currentAmount).totalDebit
+        ? calcAgentWithdrawFee(currentAmount, agentWithdrawPer1000).totalDebit
         : currentAmount;
       if (neededBalance > (profile?.wallet_balance || 0)) {
         setLoading(false);

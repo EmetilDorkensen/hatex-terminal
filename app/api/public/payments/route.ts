@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { findProfileByCard } from '@/lib/security/card-lookup';
 import { checkSpendingLimit, checkBalanceCap, checkApiReceiveLimit, calcApiReceiveFee } from '@/lib/security/spending-limits';
+import { resolvePlatformFee } from '@/lib/fees/platform';
 import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 import {
@@ -213,7 +214,8 @@ export async function POST(request: Request) {
       return jsonWithBuild({ error: limitCheck.message || 'Limit depans depase.' }, 400);
     }
 
-    const { fee: apiFee, net: merchantNet } = calcApiReceiveFee(safeAmount);
+    const apiFeePer1000 = await resolvePlatformFee(supabase, 'api_fee_per_1000', merchant.id);
+    const { fee: apiFee, net: merchantNet } = calcApiReceiveFee(safeAmount, apiFeePer1000);
 
     const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, merchantNet);
     if (!capCheck.allowed) {

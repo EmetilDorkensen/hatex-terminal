@@ -44,6 +44,7 @@ function EnterprisePortalContent() {
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [enterpriseFee, setEnterpriseFee] = useState(ENTERPRISE_APPLICATION_FEE);
 
   useEffect(() => {
     fetchData();
@@ -57,6 +58,14 @@ function EnterprisePortalContent() {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (!prof) return;
     setProfile(prof);
+
+    try {
+      const feeRes = await fetch('/api/fees/mine');
+      const feeData = await feeRes.json().catch(() => ({}));
+      if (feeRes.ok && feeData.fees?.enterprise_application_fee != null) {
+        setEnterpriseFee(Number(feeData.fees.enterprise_application_fee));
+      }
+    } catch { /* default */ }
 
     if (prof.kyc_status !== 'approved') {
       setStep('kyc_denied');
@@ -109,8 +118,8 @@ function EnterprisePortalContent() {
     if (!legalRepIdDoc) return alert("Pyès idantite reprezantan legal biznis la obligatwa.");
     if (!confidentialityAccepted) return alert("Ou dwe aksepte Angajman Konfidansyalite/Anti-Fwod la pou w kontinye.");
 
-    if (Number(profile?.wallet_balance || 0) < ENTERPRISE_APPLICATION_FEE) {
-      return alert(`Ou bezwen omwen ${ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG sou Wallet ou pou peye frè pasaj la.`);
+    if (Number(profile?.wallet_balance || 0) < enterpriseFee) {
+      return alert(`Ou bezwen omwen ${enterpriseFee.toLocaleString()} HTG sou Wallet ou pou peye frè pasaj la.`);
     }
 
     setStep('confirm_fee');
@@ -138,8 +147,8 @@ function EnterprisePortalContent() {
 
       const { data: freshProf } = await supabase.from('profiles').select('wallet_balance').eq('id', profile.id).single();
       const currentBal = Number(freshProf?.wallet_balance || 0);
-      if (currentBal < ENTERPRISE_APPLICATION_FEE) {
-        throw new Error(`Ou pa gen ase kòb. Ou bezwen ${ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG.`);
+      if (currentBal < enterpriseFee) {
+        throw new Error(`Ou pa gen ase kòb. Ou bezwen ${enterpriseFee.toLocaleString()} HTG.`);
       }
 
       const uploadFile = async (file: File, type: string, label: string) => {
@@ -183,7 +192,7 @@ function EnterprisePortalContent() {
         legal_rep_id_url: legalRepIdUrl,
         confidentiality_accepted: confidentialityAccepted,
         confidentiality_accepted_at: new Date().toISOString(),
-        metadata: { fee_paid: ENTERPRISE_APPLICATION_FEE },
+        metadata: { fee_paid: enterpriseFee },
       }]);
       if (appError) {
         throw new Error(`Erè pandan anrejistreman aplikasyon an: ${appError.message}`);
@@ -206,7 +215,7 @@ function EnterprisePortalContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             channel: 'admin',
-            message: `🏢 <b>Nouvo Aplikasyon Kont Antrepriz</b>\n👤 ${profile.full_name}\n✉️ ${profile.email}\n🏬 Biznis: ${businessName.trim()}\n💰 Frè peye: ${ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG`,
+            message: `🏢 <b>Nouvo Aplikasyon Kont Antrepriz</b>\n👤 ${profile.full_name}\n✉️ ${profile.email}\n🏬 Biznis: ${businessName.trim()}\n💰 Frè peye: ${enterpriseFee.toLocaleString()} HTG`,
             parseMode: 'HTML',
           }),
         });
@@ -353,7 +362,7 @@ function EnterprisePortalContent() {
 
           <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl mb-6">
             <p className="text-xs text-amber-800 font-bold uppercase tracking-wider mb-1">Frè Pasaj</p>
-            <p className="text-2xl font-black text-amber-900">{ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG</p>
+            <p className="text-2xl font-black text-amber-900">{enterpriseFee.toLocaleString()} HTG</p>
             <p className="text-[11px] text-amber-700 mt-1">Peye apre w fin soumèt dokiman yo. Ranbouse otomatikman si aplikasyon an rejte.</p>
           </div>
 
@@ -460,7 +469,7 @@ function EnterprisePortalContent() {
               </div>
               <h2 className="text-xl font-bold text-slate-900 mb-2">Konfime Frè Pasaj la</h2>
               <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">
-                Mete PIN sekirite 4 chif ou a pou peye <span className="font-bold text-slate-800">{ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG</span> epi soumèt aplikasyon w lan.
+                Mete PIN sekirite 4 chif ou a pou peye <span className="font-bold text-slate-800">{enterpriseFee.toLocaleString()} HTG</span> epi soumèt aplikasyon w lan.
               </p>
 
               <input
@@ -502,7 +511,7 @@ function EnterprisePortalContent() {
             <div className="bg-slate-50 p-5 rounded-xl border mb-8">
               <div className="flex justify-between text-sm font-black">
                 <span>Frè Pasaj Kont Antrepriz:</span>
-                <span className="text-rose-600">{ENTERPRISE_APPLICATION_FEE.toLocaleString()} HTG</span>
+                <span className="text-rose-600">{enterpriseFee.toLocaleString()} HTG</span>
               </div>
             </div>
 

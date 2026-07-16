@@ -29,9 +29,11 @@ const TRANSFER_FEE_TIERS: Array<[number, number, number]> = [
 const MIN_TRANSFER_AMOUNT = TRANSFER_FEE_TIERS[0][0];
 const MAX_TRANSFER_AMOUNT = TRANSFER_FEE_TIERS[TRANSFER_FEE_TIERS.length - 1][1];
 
-function getTransferFee(amount: number): number {
+function getTransferFee(amount: number, scalePercent: number = 5): number {
   const tier = TRANSFER_FEE_TIERS.find(([min, max]) => amount >= min && amount <= max);
-  return tier ? tier[2] : 0;
+  const base = tier ? tier[2] : 0;
+  // 5 = nòmal (100% tablo). 0 = gratis. 10 = doub.
+  return Math.round(base * (Math.max(0, scalePercent) / 5) * 100) / 100;
 }
 
 export default function TransferPage() {
@@ -48,6 +50,7 @@ export default function TransferPage() {
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [showFeeTable, setShowFeeTable] = useState(false);
+  const [transferFeeScale, setTransferFeeScale] = useState(5);
 
   // ==========================================
   // ETA POU SISTÈM PIN NAN
@@ -80,6 +83,13 @@ export default function TransferPage() {
         setWalletBalance(Number(prof?.wallet_balance || 0));
         setAccountType(prof?.account_type || 'individual');
         setKycApproved(isKycApproved(prof?.kyc_status));
+        try {
+          const feeRes = await fetch('/api/fees/mine');
+          const feeData = await feeRes.json().catch(() => ({}));
+          if (feeRes.ok && feeData.fees?.transfer_fee_percent != null) {
+            setTransferFeeScale(Number(feeData.fees.transfer_fee_percent));
+          }
+        } catch { /* default 5 */ }
         const statusRes = await fetch('/api/auth/pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -200,7 +210,7 @@ export default function TransferPage() {
       return;
     }
 
-    const fee = getTransferFee(amt);
+    const fee = getTransferFee(amt, transferFeeScale);
     if (walletBalance < amt + fee) {
       setStatus({ type: 'error', msg: `Ou pa gen ase kòb. Ou bezwen ${amt.toLocaleString()} HTG + ${fee.toLocaleString()} HTG (Frè) = ${(amt + fee).toLocaleString()} HTG.` });
       return;
@@ -231,7 +241,7 @@ export default function TransferPage() {
     setStatus({ type: '', msg: '' });
 
     const amt = Number(amount);
-    const fee = getTransferFee(amt);
+    const fee = getTransferFee(amt, transferFeeScale);
 
     try {
       const pinRes = await fetch('/api/auth/pin', {
@@ -371,11 +381,11 @@ export default function TransferPage() {
                 </div>
                 <div className="flex justify-between text-xs font-bold mb-1.5">
                   <span className="text-slate-500">Frè Transfè:</span>
-                  <span className="text-rose-600">+{getTransferFee(Number(amount)).toLocaleString()} HTG</span>
+                  <span className="text-rose-600">+{getTransferFee(Number(amount), transferFeeScale).toLocaleString()} HTG</span>
                 </div>
                 <div className="flex justify-between text-sm font-black border-t border-gray-200 pt-2 mt-1.5">
                   <span>Total k ap soti nan Wallet ou:</span>
-                  <span>{(Number(amount) + getTransferFee(Number(amount))).toLocaleString()} HTG</span>
+                  <span>{(Number(amount) + getTransferFee(Number(amount), transferFeeScale)).toLocaleString()} HTG</span>
                 </div>
               </div>
             )}
@@ -482,11 +492,11 @@ export default function TransferPage() {
               <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-6">
                 <div className="flex justify-between text-xs font-bold mb-2">
                   <span className="text-slate-500">Frè Transfè:</span>
-                  <span className="text-rose-600">+{getTransferFee(Number(amount)).toLocaleString()} HTG</span>
+                  <span className="text-rose-600">+{getTransferFee(Number(amount), transferFeeScale).toLocaleString()} HTG</span>
                 </div>
                 <div className="flex justify-between text-sm font-black border-t border-gray-100 pt-2">
                   <span>Total k ap soti nan Wallet ou:</span>
-                  <span>{(Number(amount) + getTransferFee(Number(amount))).toLocaleString()} HTG</span>
+                  <span>{(Number(amount) + getTransferFee(Number(amount), transferFeeScale)).toLocaleString()} HTG</span>
                 </div>
               </div>
             )}

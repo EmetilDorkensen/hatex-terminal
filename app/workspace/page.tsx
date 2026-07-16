@@ -368,7 +368,22 @@ export default function WorkspacePage() {
     // ==========================================
     // FONKSYON POU KONFÒMITE (KYC & AJAN)
     // ==========================================
-    const handleOpenDocument = (url: string) => window.open(url, '_blank');
+    const handleOpenDocument = async (ref: string) => {
+        if (!ref) { alert('Pa gen dokiman.'); return; }
+        try {
+            const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
+            const data = await res.json();
+            if (!res.ok || !data.url) throw new Error(data.error || 'Pa ka louvri dokiman an.');
+            window.open(data.url, '_blank');
+        } catch (e: any) {
+            // Fallback: URL piblik ansyen
+            if (ref.startsWith('http://') || ref.startsWith('https://')) {
+                window.open(ref, '_blank');
+                return;
+            }
+            alert(e.message || 'Pa t kapab louvri dokiman an.');
+        }
+    };
 
     const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
         if (!legacyValue) return;

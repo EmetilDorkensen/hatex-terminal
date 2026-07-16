@@ -73,7 +73,14 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+      const hint =
+        error.message?.includes('schema cache') || error.message?.includes('Could not find the function')
+          ? ' Kouri migration 20260746 oswa 20260751 nan Supabase SQL Editor, epi Reload schema.'
+          : '';
+      return NextResponse.json(
+        { success: false, message: error.message + hint },
+        { status: 400 }
+      );
     }
 
     const res = data as { success?: boolean; message?: string; refund?: number } | null;
