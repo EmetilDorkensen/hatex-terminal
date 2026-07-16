@@ -31,8 +31,10 @@ export type BusinessProfitSummary = {
   /** gross - refunded */
   net_htg: number;
   withdrawn_htg: number;
-  /** net - withdrawn (sa ki rete / disponib) */
+  /** Balans reyèl nan kont pwofi biznis (ledger) */
   available_htg: number;
+  /** Menm valè — balans kont sekirize */
+  ledger_balance_htg: number;
   kes_global_htg: number;
   breakdown: BusinessProfitBreakdown;
   /** Breakdown net (apre ranbousman pa kategori) */
@@ -202,19 +204,33 @@ export async function getTotalBusinessWithdrawn(supabase: SupabaseClient): Promi
   return (data || []).reduce((acc, row) => acc + Number(row.amount || 0), 0);
 }
 
+export async function getBusinessProfitAccountBalance(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { data } = await supabase
+    .from('business_profit_account')
+    .select('balance')
+    .eq('id', 'hatex_business_profit')
+    .maybeSingle();
+  return round2(Number(data?.balance || 0));
+}
+
 export async function getBusinessProfitSummary(
   supabase: SupabaseClient
 ): Promise<BusinessProfitSummary> {
-  const [breakdown, refunds, withdrawn] = await Promise.all([
+  const [breakdown, refunds, withdrawn, ledgerBalance] = await Promise.all([
     getBusinessProfitBreakdown(supabase),
     getFeeRefundBreakdown(supabase),
     getTotalBusinessWithdrawn(supabase),
+    getBusinessProfitAccountBalance(supabase),
   ]);
 
   const gross = sumBreakdown(breakdown);
   const net = round2(Math.max(0, gross - refunds.total));
-  const available = round2(Math.max(0, net - withdrawn));
   const breakdown_net = applyRefundsToBreakdown(breakdown, refunds);
+
+  // Sous verite: balans kont ledger (kredi frè − debi ranbousman − retrè)
+  const available = ledgerBalance > 0 ? ledgerBalance : net;
 
   const { data: treasury } = await supabase
     .from('platform_treasury')
@@ -228,6 +244,7 @@ export async function getBusinessProfitSummary(
     net_htg: net,
     withdrawn_htg: round2(withdrawn),
     available_htg: available,
+    ledger_balance_htg: available,
     kes_global_htg: Number(treasury?.balance || 0),
     breakdown,
     breakdown_net,

@@ -40,15 +40,23 @@ export async function GET() {
   const db = createSupabaseAdminClient();
   const summary = await getBusinessProfitSummary(db);
 
-  const { data: withdrawals } = await db
-    .from('business_profit_withdrawals')
-    .select('id, amount, note, admin_email, created_at')
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const [{ data: withdrawals }, { data: ledger }] = await Promise.all([
+    db
+      .from('business_profit_withdrawals')
+      .select('id, amount, note, admin_email, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    db
+      .from('business_profit_ledger')
+      .select('id, direction, amount, entry_type, category, balance_after, created_at, metadata')
+      .order('created_at', { ascending: false })
+      .limit(80),
+  ]);
 
   return NextResponse.json({
     ...summary,
     withdrawals: withdrawals || [],
+    ledger: ledger || [],
     breakdown: summary.breakdown,
   });
 }
@@ -93,42 +101,43 @@ export async function POST(request: Request) {
   if (amount > summary.available_htg) {
     return NextResponse.json(
       {
-        error: `Montan depase pwofi disponib la. Disponib: ${summary.available_htg.toLocaleString()} HTG`,
+        error: `Montan depase balans kont pwofi a. Disponib: ${summary.available_htg.toLocaleString()} HTG`,
         ...summary,
       },
       { status: 400 }
     );
   }
 
-  const { data: inserted, error } = await db
+  const { data: rpcResult, error: rpcError } = await db.rpc('hatex_business_profit_withdraw', {
+    p_amount: Number(amount.toFixed(2)),
+    p_admin_email: admin.user.email!,
+    p_note: note || null,
+  });
+
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 400 });
+  }
+
+  const res = rpcResult as {
+    success?: boolean;
+    message?: string;
+    withdrawal_id?: string;
+    amount?: number;
+    balance_after?: number;
+  } | null;
+
+  if (!res?.success) {
+    return NextResponse.json(
+      { error: res?.message || 'Pa t kapab anrejistre retrè a.' },
+      { status: 400 }
+    );
+  }
+
+  const { data: inserted } = await db
     .from('business_profit_withdrawals')
-    .insert({
-      amount: Number(amount.toFixed(2)),
-      note: note || null,
-      admin_email: admin.user.email!,
-    })
     .select('id, amount, note, created_at')
-    .single();
-
-  if (error || !inserted) {
-    return NextResponse.json({ error: 'Pa t kapab anrejistre retrè a.' }, { status: 500 });
-  }
-
-  // Debite Kès Global si gen balans (frè ajan 80% ak lòt kòb trezò)
-  try {
-    const { data: treasury } = await db
-      .from('platform_treasury')
-      .select('balance')
-      .eq('id', 'kes_global')
-      .maybeSingle();
-    const kesBal = Number(treasury?.balance || 0);
-    const debitAmt = Math.min(Number(amount.toFixed(2)), kesBal);
-    if (debitAmt > 0) {
-      await db.rpc('hatex_debit_kes_global', { p_amount: debitAmt });
-    }
-  } catch {
-    /* pa revoke retrè anrejistre a si debit treasury echwe — log sèlman */
-  }
+    .eq('id', res.withdrawal_id!)
+    .maybeSingle();
 
   const newSummary = await getBusinessProfitSummary(db);
   const totalWithdrawn = await getTotalBusinessWithdrawn(db);
@@ -137,23 +146,23 @@ export async function POST(request: Request) {
     adminEmail: admin.user.email!,
     action: 'BUSINESS_PROFIT_WITHDRAWN',
     targetType: 'business_profit_withdrawal',
-    targetId: inserted.id,
-    details: { amount: inserted.amount, note },
+    targetId: res.withdrawal_id!,
+    details: { amount: res.amount, note, ledger_balance_after: res.balance_after },
     ip,
   });
 
   await sendFinanceTelegram(
     `<b>RETRÈ PWOFI BIZNIS</b>\n` +
-      `Montan: ${Number(inserted.amount).toLocaleString()} HTG\n` +
-      `Disponib apre: ${newSummary.available_htg.toLocaleString()} HTG\n` +
+      `Montan: ${Number(res.amount || amount).toLocaleString()} HTG\n` +
+      `Balans kont apre: ${Number(res.balance_after || newSummary.available_htg).toLocaleString()} HTG\n` +
       `Total retire depi kòmansman: ${totalWithdrawn.toLocaleString()} HTG` +
       (note ? `\nNòt: ${note}` : '')
   );
 
   return NextResponse.json({
     success: true,
-    message: 'Retrè pwofi biznis anrejistre.',
-    withdrawal: inserted,
+    message: 'Retrè pwofi biznis anrejistre (kont ledger debite).',
+    withdrawal: inserted || { id: res.withdrawal_id, amount: res.amount, note },
     ...newSummary,
   });
 }

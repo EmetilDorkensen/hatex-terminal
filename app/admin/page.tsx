@@ -413,7 +413,8 @@ export default function AdminSuperPage() {
 
             const totalRetirePwofi = (bizWithdrawData || []).reduce((acc, w) => acc + Number(w.amount || 0), 0);
             setBizProfitWithdrawn(totalRetirePwofi);
-            setBizProfitAvailable(Math.max(0, granTotalNet - totalRetirePwofi));
+            // Retrè yo rete nan istorik sèlman — disponib = total nèt la
+            setBizProfitAvailable(granTotalNet);
             setBizWithdrawHistory(bizWithdrawData || []);
 
             // Souse sèvis (service_role) pou chif ki matche retrè pwofi a
@@ -1048,12 +1049,11 @@ export default function AdminSuperPage() {
                                             <span className="block">
                                                 Disponib pou retrè:{' '}
                                                 <span className="font-bold">{Number(bizProfitAvailable).toLocaleString()} HTG</span>
-                                                {bizProfitWithdrawn > 0 && (
-                                                    <> · Deja retire: <span className="text-rose-600">-{Number(bizProfitWithdrawn).toLocaleString()} HTG</span></>
-                                                )}
                                             </span>
                                         </p>
-                                        <p className="text-[10px] text-emerald-700/70 mt-1">Tout frè sistèm (sof 20% komisyon ajan) — ajou an tan reyèl apre ranbousman</p>
+                                        <p className="text-[10px] text-emerald-700/70 mt-1">
+                                            Kont pwofi sekirize (ledger DB) — ajou an tan reyèl apre frè ak ranbousman
+                                        </p>
                                     </div>
                                     <button
                                         type="button"
