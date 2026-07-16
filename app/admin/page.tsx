@@ -58,6 +58,8 @@ export default function AdminSuperPage() {
     const [unifiedFeeHistory, setUnifiedFeeHistory] = useState<any[]>([]);
     const [bizProfitWithdrawn, setBizProfitWithdrawn] = useState(0);
     const [bizProfitAvailable, setBizProfitAvailable] = useState(0);
+    const [bizProfitRefunded, setBizProfitRefunded] = useState(0);
+    const [bizProfitGross, setBizProfitGross] = useState(0);
     const [bizWithdrawHistory, setBizWithdrawHistory] = useState<any[]>([]);
     const [showBizWithdrawModal, setShowBizWithdrawModal] = useState(false);
     const [bizWithdrawAmount, setBizWithdrawAmount] = useState('');
@@ -353,21 +355,55 @@ export default function AdminSuperPage() {
                 .order('created_at', { ascending: false });
             const totalApiFee = (apiFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
 
+            // Ranbousman frè (FEE_REFUND) — soti nan pwofi biznis an tan reyèl
+            const { data: feeRefundData } = await supabase
+                .from('transactions')
+                .select('id, user_id, amount, description, metadata, created_at')
+                .eq('type', 'FEE_REFUND')
+                .eq('status', 'success')
+                .order('created_at', { ascending: false });
+
+            let refundAjan = 0;
+            let refundAntrepriz = 0;
+            let refundKyc = 0;
+            let refundApi = 0;
+            let refundLot = 0;
+            for (const r of feeRefundData || []) {
+                const amt = Math.abs(Number(r.amount || 0));
+                const cat = String((r.metadata as any)?.category || '').toLowerCase();
+                const desc = String(r.description || '').toLowerCase();
+                if (cat.includes('agent') || desc.includes('ajan')) refundAjan += amt;
+                else if (cat.includes('enterprise') || desc.includes('antrepriz')) refundAntrepriz += amt;
+                else if (cat.includes('kyc') || desc.includes('kyc')) refundKyc += amt;
+                else if (cat.includes('api') || desc.includes('api')) refundApi += amt;
+                else refundLot += amt;
+            }
+            const totalFeeRefunded = refundAjan + refundAntrepriz + refundKyc + refundApi + refundLot;
+
+            const ajanGross = totalAgentFee + totalAgentWithdrawHatexFee;
+            const ajanNet = Math.max(0, ajanGross - refundAjan);
+            const antreprizNet = Math.max(0, totalEnterpriseFee - refundAntrepriz);
+            const kycNet = Math.max(0, totalKycFee - refundKyc);
+            const apiNet = Math.max(0, totalApiFee - refundApi);
+
             setFeesBreakdown({
                 depo: totalDepoFee,
                 retre: totalRetreFee,
                 transfe: totalTransfeFee,
-                ajan: totalAgentFee + totalAgentWithdrawHatexFee,
-                antrepriz: totalEnterpriseFee,
+                ajan: ajanNet,
+                antrepriz: antreprizNet,
                 kat: totalCardFee,
-                kyc: totalKycFee,
-                api: totalApiFee,
+                kyc: kycNet,
+                api: apiNet,
             });
-            
-            const granTotalPwofi = totalDepoFee + totalRetreFee + totalTransfeFee
-                + totalAgentFee + totalAgentWithdrawHatexFee
+
+            const granTotalBrut = totalDepoFee + totalRetreFee + totalTransfeFee
+                + ajanGross
                 + totalEnterpriseFee + totalCardFee + totalKycFee + totalApiFee;
-            setTotalBiznisProfit(granTotalPwofi);
+            const granTotalNet = Math.max(0, granTotalBrut - totalFeeRefunded);
+            setBizProfitGross(granTotalBrut);
+            setBizProfitRefunded(totalFeeRefunded);
+            setTotalBiznisProfit(granTotalNet);
 
             const { data: bizWithdrawData } = await supabase
                 .from('business_profit_withdrawals')
@@ -377,8 +413,34 @@ export default function AdminSuperPage() {
 
             const totalRetirePwofi = (bizWithdrawData || []).reduce((acc, w) => acc + Number(w.amount || 0), 0);
             setBizProfitWithdrawn(totalRetirePwofi);
-            setBizProfitAvailable(Math.max(0, granTotalPwofi - totalRetirePwofi));
+            setBizProfitAvailable(Math.max(0, granTotalNet - totalRetirePwofi));
             setBizWithdrawHistory(bizWithdrawData || []);
+
+            // Souse sèvis (service_role) pou chif ki matche retrè pwofi a
+            try {
+                const profitRes = await fetch('/api/admin/business-withdrawal');
+                if (profitRes.ok) {
+                    const s = await profitRes.json();
+                    if (typeof s.gross_htg === 'number') setBizProfitGross(s.gross_htg);
+                    if (typeof s.refunded_htg === 'number') setBizProfitRefunded(s.refunded_htg);
+                    if (typeof s.net_htg === 'number') setTotalBiznisProfit(s.net_htg);
+                    if (typeof s.withdrawn_htg === 'number') setBizProfitWithdrawn(s.withdrawn_htg);
+                    if (typeof s.available_htg === 'number') setBizProfitAvailable(s.available_htg);
+                    if (s.breakdown_net) {
+                        setFeesBreakdown({
+                            depo: Number(s.breakdown_net.depo || 0),
+                            retre: Number(s.breakdown_net.retre || 0),
+                            transfe: Number(s.breakdown_net.transfe || 0),
+                            ajan: Number(s.breakdown_net.ajan_aktivasyon || 0) + Number(s.breakdown_net.ajan_retrè_hatex || 0),
+                            antrepriz: Number(s.breakdown_net.antrepriz || 0),
+                            kat: Number(s.breakdown_net.kat || 0),
+                            kyc: Number(s.breakdown_net.kyc || 0),
+                            api: Number(s.breakdown_net.api || 0),
+                        });
+                    }
+                    if (Array.isArray(s.withdrawals)) setBizWithdrawHistory(s.withdrawals);
+                }
+            } catch { /* lokal kalkil rete valab */ }
 
             // 🔗 ISTORIK KONPLÈ KÈS GLOBAL — fusyone TOUT sous frè yo (depo,
             // retrè, transfè, ajan, antrepriz, kat) nan YON SÈL lis kwonolojik
@@ -427,6 +489,15 @@ export default function AdminSuperPage() {
                 description: f.description || 'Frè API (3 HTG / 1 000)', nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Machann',
             }));
 
+            const refundEntries = (feeRefundData || []).map((f: any) => ({
+                id: f.id,
+                kalite: 'Ranbousman',
+                amount: -Math.abs(Number(f.amount || 0)),
+                created_at: f.created_at,
+                description: f.description || 'Ranbousman frè',
+                nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan',
+            }));
+
             const retreBankEntries = (bizWithdrawData || []).map((w: any) => ({
                 id: w.id,
                 kalite: 'Retrè Bank',
@@ -435,7 +506,7 @@ export default function AdminSuperPage() {
                 description: w.note || 'Retrè pwofi biznis nan bank',
             }));
 
-            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...kycEntries, ...apiEntries, ...retreBankEntries]
+            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...kycEntries, ...apiEntries, ...refundEntries, ...retreBankEntries]
                 .filter((entry) => entry.created_at)
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .slice(0, 60);
@@ -692,7 +763,13 @@ export default function AdminSuperPage() {
                 : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Tout garanti ou te depoze yo tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
             
             await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            alert(`Aplikasyon an ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`); 
+            const feePart = Number(data.fee_refunded || 0);
+            alert(
+              aksyon === 'approved'
+                ? 'Aplikasyon an Apwouve avèk siksè!'
+                : `Aplikasyon an Rejte e Ranbouse! Wallet: +${Number(data.refund || 0).toLocaleString()} HTG` +
+                  (feePart > 0 ? ` (frè soti nan pwofi: ${feePart.toLocaleString()} HTG)` : '')
+            );
             if (aksyon === 'rejected') setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
             raleDone();
         } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
@@ -733,7 +810,12 @@ export default function AdminSuperPage() {
                 : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon Kont Antrepriz ou epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Frè ou te peye a tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
 
             await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON ANTREPRIZ ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            alert(`Aplikasyon Antrepriz la ${aksyon === 'approved' ? 'Apwouve' : 'Rejte e Ranbouse'} avèk siksè!`);
+            const feePart = Number(data.fee_refunded || data.refund || 0);
+            alert(
+              aksyon === 'approved'
+                ? 'Aplikasyon Antrepriz la Apwouve avèk siksè!'
+                : `Aplikasyon Antrepriz la Rejte e Ranbouse! Frè soti nan pwofi: ${feePart.toLocaleString()} HTG`
+            );
             if (aksyon === 'rejected') setEnterpriseRejectionReason(prev => ({...prev, [applicationId]: ''}));
             raleDone();
         } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
@@ -948,18 +1030,30 @@ export default function AdminSuperPage() {
                                 <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
                                     <div className="relative z-10 mb-6">
-                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Total Frè HatexCard Kolèkte</p>
+                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Total Frè HatexCard Kolèkte (Net)</p>
                                         <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
                                             {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
                                         </h3>
-                                        <p className="text-[11px] text-emerald-800/90 mt-2 font-medium">
-                                            Disponib pou retrè:{' '}
-                                            <span className="font-bold">{Number(bizProfitAvailable).toLocaleString()} HTG</span>
-                                            {bizProfitWithdrawn > 0 && (
-                                                <> · Deja retire: <span className="text-rose-600">-{Number(bizProfitWithdrawn).toLocaleString()} HTG</span></>
-                                            )}
+                                        <p className="text-[11px] text-emerald-800/90 mt-2 font-medium space-y-0.5">
+                                            <span className="block">
+                                                Brut kolèkte:{' '}
+                                                <span className="font-bold">{Number(bizProfitGross).toLocaleString()} HTG</span>
+                                            </span>
+                                            <span className="block">
+                                                Ranbouse:{' '}
+                                                <span className="font-bold text-rose-600">-{Number(bizProfitRefunded).toLocaleString()} HTG</span>
+                                                {' · '}Ki rete (net):{' '}
+                                                <span className="font-bold">{Number(totalBiznisProfit).toLocaleString()} HTG</span>
+                                            </span>
+                                            <span className="block">
+                                                Disponib pou retrè:{' '}
+                                                <span className="font-bold">{Number(bizProfitAvailable).toLocaleString()} HTG</span>
+                                                {bizProfitWithdrawn > 0 && (
+                                                    <> · Deja retire: <span className="text-rose-600">-{Number(bizProfitWithdrawn).toLocaleString()} HTG</span></>
+                                                )}
+                                            </span>
                                         </p>
-                                        <p className="text-[10px] text-emerald-700/70 mt-1">Tout frè sistèm (sof 20% komisyon ajan)</p>
+                                        <p className="text-[10px] text-emerald-700/70 mt-1">Tout frè sistèm (sof 20% komisyon ajan) — ajou an tan reyèl apre ranbousman</p>
                                     </div>
                                     <button
                                         type="button"
@@ -990,7 +1084,7 @@ export default function AdminSuperPage() {
                                             <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe + feesBreakdown.kat).toLocaleString()}</p>
                                         </div>
                                     </div>
-                                    <p className="text-[9px] text-emerald-700/60 mt-2">* Aktivasyon ajan + 80% frè retrè ajan (pa 20% komisyon ajan)</p>
+                                    <p className="text-[9px] text-emerald-700/60 mt-2">* Aktivasyon ajan + 80% frè retrè ajan (pa 20% komisyon ajan). Kategori yo deja net apre ranbousman.</p>
                                 </div>
 
                                 <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">

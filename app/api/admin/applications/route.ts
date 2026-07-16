@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     if (error) {
       const hint =
         error.message?.includes('schema cache') || error.message?.includes('Could not find the function')
-          ? ' Kouri migration 20260746 oswa 20260751 nan Supabase SQL Editor, epi Reload schema.'
+          ? ' Kouri migration 20260751 / 20260753 nan Supabase SQL Editor, epi Reload schema.'
           : '';
       return NextResponse.json(
         { success: false, message: error.message + hint },
@@ -83,7 +83,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const res = data as { success?: boolean; message?: string; refund?: number } | null;
+    const res = data as {
+      success?: boolean;
+      message?: string;
+      refund?: number;
+      fee_refunded?: number;
+    } | null;
     if (!res?.success) {
       return NextResponse.json(
         { success: false, message: res?.message || 'Echèk.' },
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
         user_id: userId,
         reason: action === 'rejected' ? reason : undefined,
         refund: res.refund ?? 0,
+        fee_refunded: (res as { fee_refunded?: number }).fee_refunded ?? 0,
         via: 'api/admin/applications',
       },
       ip,
