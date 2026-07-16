@@ -120,12 +120,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Kont pa jwenn.' }, { status: 404 });
   }
 
-  // Efase fichye anvan RPC (API + SQL purge = doub sekirite)
+  // Efase fichye via Storage API anvan (pa SQL sou storage.objects)
   let storagePurge = { deleted: 0, buckets: [] as string[] };
   try {
     storagePurge = await collectAndPurgeBusinessDocs(db, userId);
-  } catch {
-    /* RPC purge ap kontinye */
+  } catch (e) {
+    console.error('storage purge failed (kontinye reset DB):', e);
   }
 
   const { data, error } = await db.rpc('admin_reset_client_account', { p_user_id: userId });
