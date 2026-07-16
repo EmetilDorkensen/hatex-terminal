@@ -263,31 +263,26 @@ export default function WorkspacePage() {
         setSendingReply(true);
 
         try {
-            const { error } = await supabase.from('support_messages').insert({
-                ticket_id: selectedTicket.id,
-                sender_id: staffProfile.id,
-                message: replyMessage.trim(),
-                is_staff_reply: true // Anplwaye a ap reponn
+            const res = await fetch('/api/workspace/support-reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ticket_id: selectedTicket.id,
+                    message: replyMessage.trim(),
+                }),
             });
-            if (error) throw error;
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || 'Erè nan voye repons lan.');
+            }
 
-            // Chanje estati a fè kliyan an konnen yo reponn li
-            await supabase.from('support_tickets').update({ status: 'answered' }).eq('id', selectedTicket.id);
-
-            setMessages([...messages, { 
-                id: Date.now().toString(), 
-                ticket_id: selectedTicket.id, 
-                sender_id: staffProfile.id, 
-                message: replyMessage.trim(), 
-                is_staff_reply: true, 
-                created_at: new Date().toISOString() 
-            }]);
-
-            // Mete a jou nan lis la sou kote a pou l chanje koulè a
+            const row = data.message;
+            setMessages([...messages, row]);
             setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'answered' } : t));
+            setSelectedTicket({ ...selectedTicket, status: 'answered' });
             setReplyMessage('');
         } catch (err: any) {
-            alert("Erè nan voye repons lan.");
+            alert(err?.message || 'Erè nan voye repons lan.');
         } finally {
             setSendingReply(false);
         }

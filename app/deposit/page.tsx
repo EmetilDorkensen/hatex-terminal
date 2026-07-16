@@ -20,6 +20,7 @@ export default function DepositPage() {
     const [loading, setLoading] = useState(false);
     const [checkingAuth, setCheckingAuth] = useState(true);
     const [files, setFiles] = useState<{ f1: File | null, f2: File | null }>({ f1: null, f2: null });
+    const [depositFeePercent, setDepositFeePercent] = useState(5);
 
     const paymentInfo = {
         'MonCash': { number: '37201241', name: 'Emetil Dorkensen' },
@@ -40,6 +41,13 @@ export default function DepositPage() {
                 // Nou mete email la nan profile la tou pou sekirite
                 setProfile({ ...(profileData || {}), id: user.id, email: user.email });
                 setCheckingAuth(false);
+                try {
+                  const feeRes = await fetch('/api/fees/mine');
+                  const feeData = await feeRes.json().catch(() => ({}));
+                  if (feeRes.ok && feeData.fees?.deposit_fee_percent != null) {
+                    setDepositFeePercent(Number(feeData.fees.deposit_fee_percent));
+                  }
+                } catch { /* keep default 5 */ }
             } else {
                 router.replace('/login');
             }
@@ -47,7 +55,7 @@ export default function DepositPage() {
         getProfile();
     }, [router, supabase]);
 
-    const fee = amount * 0.05;
+    const fee = amount * (depositFeePercent / 100);
     const total = amount + fee;
 
     const handleFileUpload = async (file: File) => {

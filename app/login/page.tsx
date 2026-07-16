@@ -739,14 +739,11 @@ export default function Login() {
 
           </p>
 
-          <Link href="/forgot-password" className="inline-block">
-
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider hover:text-indigo-500 transition-colors">
-
-               Mwen bliye modpas mwen
-
-            </p>
-
+          <Link
+            href="/forgot-password"
+            className="inline-flex items-center justify-center w-full mt-2 px-4 py-3 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider hover:bg-indigo-100 transition-colors"
+          >
+            Mwen bliye modpas mwen — chanje l isit
           </Link>
 
         </div>

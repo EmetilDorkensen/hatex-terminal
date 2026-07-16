@@ -7,6 +7,7 @@ import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
 import AdminAgentRechargePanel from './AdminAgentRechargePanel';
+import AdminFeesPanel from './AdminFeesPanel';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -40,7 +41,7 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite' | 'frais'>('dashboard');
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -584,6 +585,34 @@ export default function AdminSuperPage() {
         catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 
+    const reyinisyalizeKont = async (id: string, email: string, fullName: string) => {
+        if (!confirm(
+            `REYINISYALIZE kont ${fullName || email}?\n\n` +
+            `• Wallet + kat → 0 HTG\n` +
+            `• Kont ajan / antrepriz → siprime\n` +
+            `• KYC → rete (pa bezwen refè)\n\n` +
+            `Aksyon sa a pa ka anile fasil.`
+        )) return;
+        const password = prompt('Antre modpas admin pou konfime:');
+        if (!password) return;
+        setProcessingId(`reset-${id}`);
+        try {
+            const res = await fetch('/api/admin/reset-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: id, password }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.error || 'Echèk reyinisyalizasyon.');
+            alert(data.message || 'Kont reyinisyalize.');
+            raleDone();
+        } catch (err: any) {
+            alert(err.message || 'Erè.');
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
         if (aksyon === 'rejected') { const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:"); if (!rep) return; rezonReje = rep; } 
@@ -850,6 +879,7 @@ export default function AdminSuperPage() {
 
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
                     <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
+                    <button onClick={() => setView('frais')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'frais' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Frè</button>
                     <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
                     <button onClick={() => setView('sekirite')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'sekirite' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         <Lock size={14}/> Sekirite
@@ -1289,6 +1319,14 @@ export default function AdminSuperPage() {
                                                 >
                                                     <FileText size={14} /> Dosye
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => reyinisyalizeKont(user.id, user.email, user.full_name)}
+                                                    disabled={processingId === `reset-${user.id}`}
+                                                    className="w-full md:w-auto bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-amber-100 transition-all shadow-sm"
+                                                >
+                                                    {processingId === `reset-${user.id}` ? '...' : 'Reset 0'}
+                                                </button>
                                                 {user.account_status === 'suspended' ? (
                                                     <button onClick={() => deblokeKont(user.id, user.email)} disabled={processingId === user.id} className="w-full md:w-auto bg-emerald-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-emerald-700 transition-all shadow-sm">AKTIVE KONT</button>
                                                 ) : (
@@ -1531,6 +1569,8 @@ export default function AdminSuperPage() {
                                 ))}
                             </div>
                         )
+                    ) : view === 'frais' ? (
+                        <AdminFeesPanel />
                     ) : view === 'promo' ? (
                         <div>
                             <form onSubmit={handleCreateCode} className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-sm">

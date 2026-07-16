@@ -176,7 +176,15 @@ export default function AgentPortal() {
     const amount = Number(activationAmount);
     if (amount <= 0) return alert("Kantite lajan an pa valab.");
     
-    const fee = Math.floor((amount / 1000) * 7);
+    let agentFeePer1000 = 7;
+    try {
+      const feeRateRes = await fetch('/api/fees/mine');
+      const feeData = await feeRateRes.json().catch(() => ({}));
+      if (feeRateRes.ok && feeData.fees?.agent_fee_per_1000 != null) {
+        agentFeePer1000 = Number(feeData.fees.agent_fee_per_1000);
+      }
+    } catch { /* default 7 */ }
+    const fee = Math.floor((amount / 1000) * agentFeePer1000);
     const totalDeduction = amount + fee;
 
     if (profile.wallet_balance < totalDeduction) {
@@ -192,11 +200,14 @@ export default function AgentPortal() {
     try {
       const uploadFile = async (file: File, type: string) => {
         const fileExt = file.name.split('.').pop();
-        const fileName = `agent-${profile.id}-${type}-${Date.now()}.${fileExt}`;
-        const { error } = await supabase.storage.from('agent_documents').upload(fileName, file);
-        if (error) throw error;
-        const { data } = supabase.storage.from('agent_documents').getPublicUrl(fileName);
-        return data.publicUrl;
+        const fileName = `${profile.id}/agent-${type}-${Date.now()}.${fileExt}`;
+        const { error } = await supabase.storage.from('agent_documents').upload(fileName, file, {
+          contentType: file.type || undefined,
+          upsert: false,
+        });
+        if (error) throw new Error(`Telechajman dokiman echwe (${type}): ${error.message}`);
+        // Chemen prive — admin/kesye li via API; pa bezwen URL piblik
+        return fileName;
       };
 
       const idUrl = await uploadFile(idDoc!, 'id');
@@ -209,12 +220,11 @@ export default function AgentPortal() {
       const bankStatementUrl = selectedTier === 'premium' && bankStatementDoc ? await uploadFile(bankStatementDoc, 'bank_statement') : null;
       const leaseUrl = selectedTier === 'premium' && leaseDoc ? await uploadFile(leaseDoc, 'lease_doc') : null;
 
-      // 🔒 Mouvman kòb + estati ajan fèt ATOMIKMAN sou sèvè (RPC). Navigatè a pa
-      // modifye balans ankò — frè a kalkile sou sèvè tou.
+      const tierForRpc = selectedTier === 'pro' ? 'pro' : selectedTier;
       const { data: actResult, error: actErr } = await supabase.rpc('process_agent_activation', {
         p_user_id: profile.id,
         p_amount: amount,
-        p_tier: selectedTier,
+        p_tier: tierForRpc,
       });
       if (actErr) throw new Error(actErr.message || "Erè pandan aktivasyon an.");
       if (!actResult?.success) throw new Error(actResult?.message || "Aktivasyon an pa reyisi.");

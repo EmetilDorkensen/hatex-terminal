@@ -17,8 +17,13 @@ export default function ResetPassword() {
 
   useEffect(() => {
     const init = async () => {
+      // Sipòte ?code= (PKCE) ak #access_token= (implicit / recovery)
       const params = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
       const code = params.get('code');
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
+
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
@@ -26,10 +31,24 @@ export default function ResetPassword() {
           return;
         }
         window.history.replaceState({}, '', '/reset-password');
+      } else if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) {
+          setMsg({ type: 'error', text: 'Lyen reyinisyalizasyon an pa valab oswa li ekspire.' });
+          return;
+        }
+        window.history.replaceState({}, '', '/reset-password');
       }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setMsg({ type: 'error', text: 'Ou dwe itilize lyen imèl reyinisyalizasyon an.' });
+        setMsg({
+          type: 'error',
+          text: 'Ou dwe itilize lyen imèl la. Ale sou /forgot-password pou mande yon nouvo lyen.',
+        });
         return;
       }
       setReady(true);
@@ -79,7 +98,12 @@ export default function ResetPassword() {
         </div>
 
         {!ready && msg.text ? (
-          <p className={`text-center text-xs font-bold ${msg.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>{msg.text}</p>
+          <div className="space-y-6 text-center">
+            <p className={`text-xs font-bold ${msg.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>{msg.text}</p>
+            <a href="/forgot-password" className="inline-block text-[10px] text-zinc-400 font-black hover:text-red-600">
+              MANDE YON NOUVO LYEN →
+            </a>
+          </div>
         ) : (
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-2 text-left">

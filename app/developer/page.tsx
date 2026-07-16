@@ -421,7 +421,7 @@ curl --request POST \\
                   <p className="text-sm text-slate-600 font-medium mb-4">
                     Pou resevwa <strong>gwo som lajan</strong> sou API ou a (jiska {API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG pa peman),
                     ou dwe pase an <strong>Kont Antrepriz</strong> epi soumèt dokiman legal biznis ou yo.
-                    Sou chak peman API, <strong>{API_RECEIVE_FEE_PER_1000} HTG / 1 000</strong> frè retire otomatikman — ou resevwa <strong>net</strong> sou wallet ou a; frè a ale nan pwofi biznis HatexCard.
+                    Sou chak peman API, <strong>{API_RECEIVE_FEE_PER_1000} HTG / 1 000</strong> frè retire otomatikman — ou resevwa <strong>net</strong> sou wallet ou a.
                   </p>
 
                   <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 mb-5">

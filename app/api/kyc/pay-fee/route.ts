@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getAuthenticatedUser } from '@/lib/kyc/access';
-import { computeKycFeeAmount, KYC_FEE_HTG } from '@/lib/kyc/fees';
+import { KYC_FEE_HTG } from '@/lib/kyc/fees';
+import { resolvePlatformFee } from '@/lib/fees/platform';
 import { KYC_STATUS } from '@/lib/kyc/status';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
@@ -25,10 +26,11 @@ export async function GET() {
     .maybeSingle();
 
   const discount = Number(discountRow?.discount_amount || 0);
-  const amountDue = computeKycFeeAmount(discount);
+  const baseFee = await resolvePlatformFee(admin, 'kyc_fee', user.id);
+  const amountDue = Math.max(0, baseFee - Math.max(0, discount));
 
   return NextResponse.json({
-    base_fee_htg: KYC_FEE_HTG,
+    base_fee_htg: baseFee || KYC_FEE_HTG,
     discount_htg: discount,
     amount_due_htg: amountDue,
     wallet_balance_htg: Number(profile?.wallet_balance || 0),
@@ -79,7 +81,8 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const discount = Number(discountRow?.discount_amount || 0);
-  const charge = computeKycFeeAmount(discount);
+  const baseFee = await resolvePlatformFee(admin, 'kyc_fee', user.id);
+  const charge = Math.max(0, baseFee - Math.max(0, discount));
   const balance = Number(profile.wallet_balance || 0);
 
   if (balance < charge) {
