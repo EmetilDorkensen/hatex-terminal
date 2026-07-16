@@ -62,6 +62,7 @@ export default function AgentPortal() {
   const [hatexPaymentAccount, setHatexPaymentAccount] = useState('');
   const [hatexProofFile, setHatexProofFile] = useState<File | null>(null);
   const [hatexRequests, setHatexRequests] = useState<any[]>([]);
+  const [agentFeePer1000, setAgentFeePer1000] = useState(7);
   
   // Dashboard Ajan
   const [depositEmail, setDepositEmail] = useState('');
@@ -74,6 +75,13 @@ export default function AgentPortal() {
 
   useEffect(() => {
     fetchAgentData();
+    fetch('/api/fees/mine')
+      .then((res) => res.json())
+      .then((data) => {
+        const rate = Number(data?.fees?.agent_fee_per_1000);
+        if (Number.isFinite(rate) && rate >= 0) setAgentFeePer1000(rate);
+      })
+      .catch(() => {});
   }, [supabase, router]);
 
   const loadHatexRequests = async () => {
@@ -166,6 +174,7 @@ export default function AgentPortal() {
       if (!confidentialityAccepted) return alert("Ou dwe aksepte Angajman Konfidansyalite a pou w kontinye.");
     }
 
+    setActivationAmount(selectedTier === 'premium' ? '110000' : '55000');
     setAppStep('payment_plan');
   };
 
@@ -176,14 +185,6 @@ export default function AgentPortal() {
     const amount = Number(activationAmount);
     if (amount <= 0) return alert("Kantite lajan an pa valab.");
     
-    let agentFeePer1000 = 7;
-    try {
-      const feeRateRes = await fetch('/api/fees/mine');
-      const feeData = await feeRateRes.json().catch(() => ({}));
-      if (feeRateRes.ok && feeData.fees?.agent_fee_per_1000 != null) {
-        agentFeePer1000 = Number(feeData.fees.agent_fee_per_1000);
-      }
-    } catch { /* default 7 */ }
     const fee = Math.floor((amount / 1000) * agentFeePer1000);
     const totalDeduction = amount + fee;
 
@@ -191,9 +192,9 @@ export default function AgentPortal() {
         return alert(`Ou pa gen ase kòb sou Wallet ou.\nOu bezwen ${amount} HTG + ${fee} HTG (Frè) = ${totalDeduction} HTG.`);
     }
 
-    const requiredAmount = selectedTier === 'premium' ? 110000 : 40000;
-    if (amount > requiredAmount) {
-        return alert(`Kapasite maksimòm plan ${selectedTier} la se ${requiredAmount.toLocaleString()} HTG.`);
+    const requiredAmount = selectedTier === 'premium' ? 110000 : 55000;
+    if (amount !== requiredAmount) {
+        return alert(`Aktivasyon plan ${selectedTier?.toUpperCase()} mande egzakteman ${requiredAmount.toLocaleString()} HTG.`);
     }
 
     setActionLoading(true);
@@ -327,18 +328,18 @@ export default function AgentPortal() {
   };
 
   // ==========================================
-  // OGMANTE KAPASITE (VÈSMAN AK FRÈ 7HTG)
+  // OGMANTE KAPASITE (VÈSMAN AK FRÈ DINAMIK)
   // ==========================================
   const makeInstallmentPayment = async () => {
     const amount = Number(installmentAmount);
     if (amount <= 0) return alert("Kantite a pa valab.");
     
-    const fee = Math.floor((amount / 1000) * 7);
+    const fee = Math.floor((amount / 1000) * agentFeePer1000);
     const totalDeduction = amount + fee;
 
     if (profile.wallet_balance < totalDeduction) return alert(`Ou bezwen ${totalDeduction.toLocaleString()} HTG sou balans prensipal ou (Kòb + Frè).`);
 
-    const requiredAmount = profile.agent_tier === 'premium' ? 110000 : 40000;
+    const requiredAmount = profile.agent_tier === 'premium' ? 110000 : 55000;
     const remaining = requiredAmount - (profile.agent_guarantee_paid || 0);
 
     if (amount > remaining) return alert(`Ou kapab ajoute maksimòm ${remaining.toLocaleString()} HTG sèlman pou kapasite a.`);
@@ -371,8 +372,11 @@ export default function AgentPortal() {
   // UPGRADE NAN PREMIUM
   // ==========================================
   const handleUpgradeToPremium = async () => {
-    if (profile.wallet_balance < 10000) {
-       return alert("Ou dwe genyen plis pase 10,000 HTG sou Wallet Balans ou pou w kalifye pou pase nan nivo PREMIUM.");
+    const upgradeDeposit = Math.max(0, 110000 - Number(profile.agent_guarantee_paid || 0));
+    const upgradeFee = Math.floor((upgradeDeposit / 1000) * agentFeePer1000);
+    const upgradeTotal = upgradeDeposit + upgradeFee;
+    if (Number(profile.wallet_balance || 0) < upgradeTotal) {
+       return alert(`Pou rive nan kapasite PREMIUM 110,000 HTG, ou bezwen ${upgradeDeposit.toLocaleString()} HTG + ${upgradeFee.toLocaleString()} HTG frè = ${upgradeTotal.toLocaleString()} HTG sou Wallet ou.`);
     }
     if (!upgradePatente || !upgradeCif) {
        return alert("Patant ak CIF obligatwa pou ajan Premium.");
@@ -394,10 +398,13 @@ export default function AgentPortal() {
     try {
       const uploadFile = async (file: File, type: string) => {
         const fileExt = file.name.split('.').pop();
-        const fileName = `agent-${profile.id}-${type}-${Date.now()}.${fileExt}`;
-        await supabase.storage.from('agent_documents').upload(fileName, file);
-        const { data } = supabase.storage.from('agent_documents').getPublicUrl(fileName);
-        return data.publicUrl;
+        const fileName = `${profile.id}/agent-${type}-${Date.now()}.${fileExt}`;
+        const { error } = await supabase.storage.from('agent_documents').upload(fileName, file, {
+          contentType: file.type || undefined,
+          upsert: false,
+        });
+        if (error) throw new Error(`Telechajman dokiman echwe (${type}): ${error.message}`);
+        return fileName;
       };
 
       const patUrl = await uploadFile(upgradePatente, 'patente_upg');
@@ -406,7 +413,9 @@ export default function AgentPortal() {
       const bankStatementUrl = await uploadFile(upgradeBankStatement, 'bank_statement_upg');
       const leaseUrl = await uploadFile(upgradeLease, 'lease_doc_upg');
 
-      await supabase.from('agent_applications').insert([{
+      const { data: application, error: applicationError } = await supabase
+        .from('agent_applications')
+        .insert([{
         user_id: profile.id,
         tier: 'premium',
         status: 'pending',
@@ -418,11 +427,27 @@ export default function AgentPortal() {
         lease_doc_url: leaseUrl,
         confidentiality_accepted: true,
         confidentiality_accepted_at: new Date().toISOString()
-      }]);
+        }])
+        .select('id')
+        .single();
+      if (applicationError || !application) {
+        throw new Error(applicationError?.message || "Pa t kapab kreye demann Premium nan.");
+      }
+      const { data: upgradeResult, error: upgradeError } = await supabase.rpc('process_agent_premium_upgrade', {
+        p_user_id: profile.id,
+        p_application_id: application.id,
+      });
+      if (upgradeError) {
+        // Pa efase aplikasyon an sou yon erè rezo: RPC a ka gentan fin
+        // rezève kòb la sou sèvè a menm si repons lan pa rive.
+        throw new Error(upgradeError.message || "Peman upgrade Premium nan echwe.");
+      }
+      if (!upgradeResult?.success) {
+        await supabase.from('agent_applications').delete().eq('id', application.id).eq('user_id', profile.id);
+        throw new Error(upgradeResult?.message || "Peman upgrade Premium nan echwe.");
+      }
 
-      await supabase.from('profiles').update({ upgrade_status: 'pending' }).eq('id', profile.id);
-
-      alert("Demann pou pase PREMIUM nan soumèt ak siksè! Admin nan ap verifye l.");
+      alert(`Demann PREMIUM nan soumèt! ${Number(upgradeResult.upgrade_deposit || 0).toLocaleString()} HTG + ${Number(upgradeResult.fee || 0).toLocaleString()} HTG frè rezève pandan verifikasyon an.`);
       setShowUpgradeModal(false);
       setUpgradePatente(null);
       setUpgradeCif(null);
@@ -549,7 +574,7 @@ export default function AgentPortal() {
           <div className="bg-white p-8 rounded-3xl shadow-sm flex flex-col hover:border-indigo-300 transition-all border border-gray-200">
             <h2 className="text-2xl font-bold mb-4">Ajan PRO</h2>
             <div className="text-3xl font-bold mb-6">
-              40,000 <span className="text-sm text-slate-500">HTG</span>
+              55,000 <span className="text-sm text-slate-500">HTG</span>
             </div>
             <button
               onClick={() => { setSelectedTier('pro'); setAppStep('upload_docs'); }}
@@ -683,9 +708,9 @@ export default function AgentPortal() {
   }
 
   if (appStep === 'payment_plan') {
-    const requiredAmount = selectedTier === 'premium' ? 110000 : 40000;
+    const requiredAmount = selectedTier === 'premium' ? 110000 : 55000;
     const currentInput = Number(activationAmount);
-    const calculatedFee = Math.floor((currentInput / 1000) * 7);
+    const calculatedFee = Math.floor((requiredAmount / 1000) * agentFeePer1000);
     const totalWithFee = currentInput + calculatedFee;
 
     return (
@@ -699,20 +724,20 @@ export default function AgentPortal() {
             <h2 className="text-2xl font-bold mb-8">Peman Aktivasyon</h2>
 
             <div className="mb-8">
-              <label className="block text-xs font-bold mb-2">Montan w ap peye a (HTG)</label>
+              <label className="block text-xs font-bold mb-2">Garanti obligatwa plan an (HTG)</label>
               <input
                 type="number"
                 value={activationAmount}
-                onChange={(e) => setActivationAmount(e.target.value)}
-                placeholder="0"
-                className="w-full bg-slate-50 p-4 rounded-xl text-lg font-bold border"
+                readOnly
+                className="w-full bg-slate-100 p-4 rounded-xl text-lg font-bold border cursor-not-allowed"
               />
+              <p className="text-[10px] text-slate-500 mt-2">Montan sa a obligatwa; li vin kapasite kont ajan an apre apwobasyon.</p>
             </div>
 
             {currentInput > 0 && (
               <div className="bg-slate-50 p-5 rounded-xl border mb-8">
                 <div className="flex justify-between text-xs font-bold mb-2">
-                  <span>Frè (7 HTG / 1000 HTG):</span>
+                  <span>Frè ({agentFeePer1000.toLocaleString()} HTG / 1000 HTG):</span>
                   <span className="text-rose-600">+{calculatedFee} HTG</span>
                 </div>
                 <div className="flex justify-between text-sm font-black border-t pt-2 mt-2">
@@ -724,7 +749,7 @@ export default function AgentPortal() {
 
             <button
               onClick={submitApplication}
-              disabled={actionLoading || currentInput <= 0}
+              disabled={actionLoading || currentInput !== requiredAmount}
               className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-xs uppercase flex justify-center"
             >
               {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sove Dokiman & Peye'}
@@ -738,7 +763,7 @@ export default function AgentPortal() {
   if (appStep === 'dashboard') {
     const isPremium = profile?.agent_tier === 'premium';
     const capacity = Number(profile?.agent_capacity || 0);
-    const maxAllowedTier = isPremium ? 110000 : 40000;
+    const maxAllowedTier = isPremium ? 110000 : 55000;
 
     return (
       <div className="min-h-screen bg-slate-50 p-4 sm:p-8 font-sans pb-24 relative">
@@ -748,7 +773,11 @@ export default function AgentPortal() {
            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto py-10">
              <div className="bg-white border border-gray-200 p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ArrowUpCircle className="text-indigo-600" /> Pase nan PREMIUM</h2>
-               <p className="text-xs text-slate-500 mb-6">Pou w pase Premium, ou dwe gen 10,000 HTG sou Wallet ou, epi soumèt tout dokiman anba yo.</p>
+               <p className="text-xs text-slate-500 mb-3">Pou pase Premium, kapasite total la dwe rive 110,000 HTG. Sistèm nan ap pran diferans ki manke a ansanm ak frè aktivasyon dinamik la sou Wallet ou.</p>
+               <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 mb-6 text-xs text-indigo-800">
+                 <p>Diferans kapasite: <strong>{Math.max(0, 110000 - Number(profile.agent_guarantee_paid || 0)).toLocaleString()} HTG</strong></p>
+                 <p>Frè aktivasyon: <strong>{Math.floor((Math.max(0, 110000 - Number(profile.agent_guarantee_paid || 0)) / 1000) * agentFeePer1000).toLocaleString()} HTG</strong></p>
+               </div>
                <div className="space-y-4 mb-8">
                  <div>
                    <label className="block text-xs font-bold mb-2 text-indigo-600">Patant Biznis la *</label>
@@ -839,7 +868,7 @@ export default function AgentPortal() {
                        {/* OGMANTE KAPASITE (Peye Frè) */}
                        {capacity < maxAllowedTier && (
                          <div className="pt-4 border-t border-indigo-400/30">
-                            <p className="text-[10px] uppercase font-bold text-indigo-200 mb-2">Ogmante Kapasite (Avèk Frè 7/1000)</p>
+                            <p className="text-[10px] uppercase font-bold text-indigo-200 mb-2">Ogmante Kapasite (Avèk Frè {agentFeePer1000.toLocaleString()}/1000)</p>
                             <div className="flex gap-2">
                               <input type="number" value={installmentAmount} onChange={(e) => setInstallmentAmount(e.target.value)} placeholder="0" className="w-full bg-indigo-900/30 border border-indigo-400/30 p-2 rounded-lg text-sm text-white" />
                               <button onClick={makeInstallmentPayment} disabled={actionLoading} className="bg-white text-indigo-600 px-4 rounded-lg font-bold text-xs uppercase">{actionLoading ? <Loader2 size={14} className="animate-spin" /> : 'Peye'}</button>

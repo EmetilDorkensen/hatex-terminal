@@ -264,7 +264,7 @@ BEGIN
           ELSE agent_tier
         END,
         agent_capacity = CASE
-          WHEN COALESCE(agent_status, 'none') IS DISTINCT FROM 'approved' THEN 40000
+          WHEN COALESCE(agent_status, 'none') IS DISTINCT FROM 'approved' THEN 55000
           ELSE agent_capacity
         END,
         agent_balance = CASE

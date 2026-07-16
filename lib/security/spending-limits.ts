@@ -11,7 +11,7 @@ export const ENTERPRISE_CARD_MONTHLY_LIMIT = 480000;
 
 export const ENTERPRISE_APPLICATION_FEE = 49000;
 export const ENTERPRISE_AUTO_AGENT_TIER = 'pro';
-export const ENTERPRISE_AUTO_AGENT_CAPACITY = 40000;
+export const ENTERPRISE_AUTO_AGENT_CAPACITY = 55000;
 
 // Limit espesifik pou Invoice/Fakti — kont endividyèl gen dwa voye jiska
 // 85,000 HTG/jou nan fakti (total montan tout fakti li kreye), pou anpeche

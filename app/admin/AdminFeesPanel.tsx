@@ -42,7 +42,7 @@ const FEE_EXAMPLES: Record<string, (v: number) => string> = {
   transfer_fee_percent: (v) =>
     `Echèl P2P: ${v}/5 × tablo MonCash. Egz. 1 000 HTG → baz 25 × ${(v / 5).toFixed(2)} = ${(25 * (v / 5)).toLocaleString()} HTG. 0 = gratis.`,
   agent_fee_per_1000: (v) =>
-    `Aktivasyon ajan 40 000 → frè ${Math.floor((40000 / 1000) * v).toLocaleString()} HTG`,
+    `PRO 55 000 → frè ${Math.floor((55000 / 1000) * v).toLocaleString()} HTG · PREMIUM 110 000 → frè ${Math.floor((110000 / 1000) * v).toLocaleString()} HTG`,
   kyc_fee: (v) => `Kliyan peye ${v.toLocaleString()} HTG yon sèl fwa (kat enkli)`,
   enterprise_application_fee: (v) => `Pasaj antrepriz: ${v.toLocaleString()} HTG (ranbouse si rejte)`,
   api_fee_per_1000: (v) =>
