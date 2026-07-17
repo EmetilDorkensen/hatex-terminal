@@ -543,7 +543,7 @@ export default function Dashboard() {
               <button 
                 onClick={() => {
                   if (cardFullyActive) { router.push('/terminal'); setIsMenuOpen(false); } 
-                  else { alert("⚠️ Ou dwe pase KYC (1150 HTG) epi tann apwobasyon anvan w ka itilize Terminal la."); }
+                  else { alert("⚠️ Ou dwe pase KYC epi tann apwobasyon anvan w ka itilize Terminal la."); }
                 }} 
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
               >

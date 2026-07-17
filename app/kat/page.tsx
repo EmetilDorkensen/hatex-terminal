@@ -173,7 +173,7 @@ export default function KatPage() {
               <IdCard size={28} />
             </div>
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">KYC Obligatwa</h3>
-            <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">Peye frè KYC 1150 HTG (kat enkli) epi verifye idantite w.</p>
+            <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">Pase KYC  (kat enkli) epi verifye idantite w.</p>
             <button onClick={() => router.push('/kyc')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold text-xs uppercase shadow-sm transition-colors tracking-wider flex items-center gap-2">
               Pase KYC
             </button>

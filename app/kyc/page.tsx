@@ -263,7 +263,7 @@ export default function KYCPage() {
               </div>
               <h2 className="text-xl font-bold text-slate-900 mb-2 text-center">Frè Verifikasyon KYC</h2>
               <p className="text-xs text-slate-500 text-center mb-6 leading-relaxed">
-                Peye <strong className="text-slate-800">{KYC_FEE_HTG.toLocaleString()} HTG</strong> yon sèl fwa — enkli verifikasyon ID, kat vityèl, ak terminal. Pa gen frè 520 HTG apa apre sa.
+                Peye <strong className="text-slate-800">{KYC_FEE_HTG.toLocaleString()} HTG</strong> yon sèl fwa — enkli verifikasyon ID, kat vityèl, ak terminal. Pa gen okenn frè apa apre sa.
               </p>
 
               <div className="bg-slate-50 rounded-xl p-4 space-y-2 mb-6 border border-gray-100">
