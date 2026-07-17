@@ -8,12 +8,6 @@ import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
 import AdminAgentRechargePanel from './AdminAgentRechargePanel';
 import AdminFeesPanel from './AdminFeesPanel';
-import {
-  ADMIN_PROFILE_SAFE_COLUMNS,
-  KYC_PENDING_SAFE_COLUMNS,
-  DEPOSIT_SAFE_COLUMNS,
-  WITHDRAWAL_SAFE_COLUMNS,
-} from '@/lib/admin/safe-columns';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -133,63 +127,89 @@ export default function AdminSuperPage() {
     };
 
     // ====================================================
-    // FONKSYON RALE DONE
+    // FONKSYON RALE DONE — sèlman via API sèvè (service_role)
     // ====================================================
     const raleDone = async () => {
         setLoading(true);
         try {
-            const { data: u } = await supabase.from('profiles').select(ADMIN_PROFILE_SAFE_COLUMNS).order('created_at', { ascending: false });
-            setAllUsers(u || []);
-
-            const { data: d } = await supabase.from('deposits').select(DEPOSIT_SAFE_COLUMNS).order('created_at', { ascending: false });
-            setDeposits(d || []);
-
-            const { data: w } = await supabase.from('withdrawals').select(WITHDRAWAL_SAFE_COLUMNS).order('created_at', { ascending: false });
-            setWithdrawals(w || []);
-
-            const { data: s } = await supabase.from('profiles').select(ADMIN_PROFILE_SAFE_COLUMNS).eq('account_status', 'suspended').order('created_at', { ascending: false });
-            setSuspendedAccounts(s || []);
-
-            const { data: k } = await supabase.from('profiles').select(KYC_PENDING_SAFE_COLUMNS).eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false });
-            setPendingKyc(k || []);
-
-            const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
-            setPromoCodes(p || []);
-
-            const { data: agData } = await supabase.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-            if (agData && u) {
-                const mergedAgents = agData.map(agent => ({
-                   ...agent,
-                   profiles: u.find(user => user.id === agent.user_id) || {}
-                }));
-                setPendingAgents(mergedAgents);
+            const res = await fetch('/api/admin/dashboard-data', { credentials: 'include' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Pa t kapab chaje done admin nan baz la.');
             }
 
-            const { data: entData } = await supabase.from('enterprise_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-            if (entData && u) {
-                const mergedEnterprises = entData.map(app => ({
-                   ...app,
-                   profiles: u.find(user => user.id === app.user_id) || {}
-                }));
-                setPendingEnterprises(mergedEnterprises);
+            setAllUsers(data.users || []);
+            setDeposits(data.deposits || []);
+            setWithdrawals(data.withdrawals || []);
+            setSuspendedAccounts(data.suspendedAccounts || []);
+            setPendingKyc(data.pendingKyc || []);
+            setPromoCodes(data.promoCodes || []);
+            setPendingAgents(data.pendingAgents || []);
+            setPendingEnterprises(data.pendingEnterprises || []);
+            setStaffMembers(data.staffMembers || []);
+
+            if (data.announcement) {
+                setAnonsText(data.announcement.text || '');
+                setAnonsActive(data.announcement.active !== false);
             }
 
-            const { data: stData } = await supabase.from('staff_users').select('*').order('created_at', { ascending: false });
-            setStaffMembers(stData || []);
-            
-            const { data: anonsData } = await supabase.from('global_settings').select('*').eq('id', 1).maybeSingle();
-            if (anonsData) {
-                setAnonsText(anonsData.announcement_text || '');
-                setAnonsActive(anonsData.announcement_active);
+            setTotalClientBal(Number(data.totals?.clientBal || 0));
+            setTotalCardBal(Number(data.totals?.cardBal || 0));
+
+            if (data.profit) {
+                setBizProfitGross(Number(data.profit.gross_htg || 0));
+                setBizProfitRefunded(Number(data.profit.refunded_htg || 0));
+                setTotalBiznisProfit(Number(data.profit.net_htg || 0));
+                setBizProfitWithdrawn(Number(data.profit.withdrawn_htg || 0));
+                setBizProfitAvailable(Number(data.profit.available_htg || 0));
+                const bn = data.profit.breakdown_net || {};
+                setFeesBreakdown({
+                    depo: Number(bn.depo || 0),
+                    retre: Number(bn.retre || 0),
+                    transfe: Number(bn.transfe || 0),
+                    ajan: Number(bn.ajan_aktivasyon || 0) + Number(bn.ajan_retrè_hatex || 0),
+                    antrepriz: Number(bn.antrepriz || 0),
+                    kat: Number(bn.kat || 0),
+                    kyc: Number(bn.kyc || 0),
+                    api: Number(bn.api || 0),
+                });
             }
 
-            await kalkileTotalBiznis(u || []);
+            if (data.feeHistory) {
+                setAgentFeeHistory(data.feeHistory.agent || []);
+                setEnterpriseFeeHistory(data.feeHistory.enterprise || []);
+                setCardActivationFeeHistory(data.feeHistory.card || []);
+                setKycFeeHistory(data.feeHistory.kyc || []);
+            }
+
+            // Istorik retrè pwofi + unified (deja nan business-withdrawal)
+            try {
+                const profitRes = await fetch('/api/admin/business-withdrawal');
+                if (profitRes.ok) {
+                    const s = await profitRes.json();
+                    if (Array.isArray(s.withdrawals)) setBizWithdrawHistory(s.withdrawals);
+                    if (typeof s.available_htg === 'number') setBizProfitAvailable(s.available_htg);
+                }
+            } catch { /* ignore */ }
 
         } catch (e: any) {
              console.error("Erè rale done:", e);
+             alert(e.message || 'Erè chaje done admin.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const adminOps = async (payload: Record<string, unknown>) => {
+        const res = await fetch('/api/admin/ops', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || 'Aksyon echwe.');
+        return data;
     };
 
     const handleBizProfitWithdraw = async (e: React.FormEvent) => {
@@ -237,289 +257,6 @@ export default function AdminSuperPage() {
         } finally {
             setBizWithdrawLoading(false);
         }
-    };
-
-    const kalkileTotalBiznis = async (profiles: any[]) => {
-        try {
-            const totalKliyan = profiles.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
-            setTotalClientBal(totalKliyan);
-
-            const totalKat = profiles.reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
-            setTotalCardBal(totalKat);
-
-            const { data: depData } = await supabase.from('deposits').select('fee, created_at').eq('status', 'approved');
-            const totalDepoFee = (depData || []).reduce((acc, d) => acc + Number(d.fee || 0), 0);
-
-            const { data: witData } = await supabase.from('withdrawals').select('fee, created_at').eq('status', 'completed');
-            const totalRetreFee = (witData || []).reduce((acc, w) => acc + Number(w.fee || 0), 0);
-
-            const { data: traData } = await supabase.from('transfers').select('fee, status');
-            const totalTransfeFeeOld = (traData || [])
-                .filter(t => !t.status || t.status === 'success' || t.status === 'completed')
-                .reduce((acc, t) => acc + Number(t.fee || 0), 0);
-
-            // Frè transfè P2P yo anrejistre kòm tranzaksyon 'TRANSFER_FEE' (menm sistèm ak frè ajan yo)
-            const { data: transferFeeData } = await supabase
-                .from('transactions')
-                .select('amount, status, created_at')
-                .eq('type', 'TRANSFER_FEE')
-                .eq('status', 'success');
-            const totalTransferFeeNew = (transferFeeData || []).reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
-
-            const totalTransfeFee = totalTransfeFeeOld + totalTransferFeeNew;
-                
-            // Chak frè ajan (aktivasyon oswa ogmantasyon kapasite) antre otomatikman nan Kès Global la
-            // paske li anrejistre kòm yon tranzaksyon 'FEE' — nou rale l isit pou n kalkile total la
-            // EPI pou n bati yon istorik li pou Sipè Admin ka wè chak evènman apa.
-            const { data: feeData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, created_at')
-                .eq('type', 'FEE')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-
-            const totalAgentFee = (feeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
-
-            // 80% frè retrè kay ajan → pwofi HatexCard
-            const { data: agentWithdrawFeeData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, created_at')
-                .eq('type', 'AGENT_WITHDRAW_FEE')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-            const totalAgentWithdrawHatexFee = (agentWithdrawFeeData || []).reduce(
-                (acc, f) => acc + Math.abs(Number(f.amount || 0)),
-                0
-            );
-
-            const enrichedHistory = (feeData || []).slice(0, 25).map(f => ({
-                ...f,
-                agentName: profiles.find(u => u.id === f.user_id)?.full_name || 'Ajan Enkoni',
-                agentEmail: profiles.find(u => u.id === f.user_id)?.email || '',
-            }));
-            setAgentFeeHistory(enrichedHistory);
-
-            // Frè Pasaj Kont Antrepriz (49,000 HTG) — se pwofi HatexCard, li PA janm
-            // antre sou balans/kont ajan moun ki soumèt aplikasyon an.
-            const { data: entFeeData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, created_at')
-                .eq('type', 'ENTERPRISE_FEE')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-
-            const totalEnterpriseFee = (entFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
-
-            const enrichedEnterpriseHistory = (entFeeData || []).slice(0, 25).map(f => ({
-                ...f,
-                clientName: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-                clientEmail: profiles.find(u => u.id === f.user_id)?.email || '',
-            }));
-            setEnterpriseFeeHistory(enrichedEnterpriseHistory);
-
-            // 🔧 KORIJE: Frè Aktivasyon Kat (520 HTG) te envizib nèt nan Kès Global
-            // la — li anrejistre kòm tranzaksyon 'CARD_ACTIVATION' men pa t janm
-            // konte. Kounye a nou rale l, konte l, e bati yon istorik pou li tou.
-            const { data: cardFeeData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, created_at')
-                .eq('type', 'CARD_ACTIVATION')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-
-            const totalCardFee = (cardFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
-
-            const enrichedCardHistory = (cardFeeData || []).slice(0, 25).map(f => ({
-                ...f,
-                clientName: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-                clientEmail: profiles.find(u => u.id === f.user_id)?.email || '',
-            }));
-            setCardActivationFeeHistory(enrichedCardHistory);
-
-            const { data: kycFeeData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, created_at')
-                .eq('type', 'KYC_FEE')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-
-            const totalKycFee = (kycFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
-
-            const enrichedKycHistory = (kycFeeData || []).slice(0, 25).map(f => ({
-                ...f,
-                clientName: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-                clientEmail: profiles.find(u => u.id === f.user_id)?.email || '',
-            }));
-            setKycFeeHistory(enrichedKycHistory);
-
-            // Frè API: 3 HTG / 1 000 resevwa (pa enkli 20% komisyon ajan)
-            const { data: apiFeeData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, created_at')
-                .eq('type', 'API_FEE')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-            const totalApiFee = (apiFeeData || []).reduce((acc, f) => acc + Math.abs(Number(f.amount || 0)), 0);
-
-            // Ranbousman frè (FEE_REFUND) — soti nan pwofi biznis an tan reyèl
-            const { data: feeRefundData } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, metadata, created_at')
-                .eq('type', 'FEE_REFUND')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false });
-
-            let refundAjan = 0;
-            let refundAntrepriz = 0;
-            let refundKyc = 0;
-            let refundApi = 0;
-            let refundLot = 0;
-            for (const r of feeRefundData || []) {
-                const amt = Math.abs(Number(r.amount || 0));
-                const cat = String((r.metadata as any)?.category || '').toLowerCase();
-                const desc = String(r.description || '').toLowerCase();
-                if (cat.includes('agent') || desc.includes('ajan')) refundAjan += amt;
-                else if (cat.includes('enterprise') || desc.includes('antrepriz')) refundAntrepriz += amt;
-                else if (cat.includes('kyc') || desc.includes('kyc')) refundKyc += amt;
-                else if (cat.includes('api') || desc.includes('api')) refundApi += amt;
-                else refundLot += amt;
-            }
-            const totalFeeRefunded = refundAjan + refundAntrepriz + refundKyc + refundApi + refundLot;
-
-            const ajanGross = totalAgentFee + totalAgentWithdrawHatexFee;
-            const ajanNet = Math.max(0, ajanGross - refundAjan);
-            const antreprizNet = Math.max(0, totalEnterpriseFee - refundAntrepriz);
-            const kycNet = Math.max(0, totalKycFee - refundKyc);
-            const apiNet = Math.max(0, totalApiFee - refundApi);
-
-            setFeesBreakdown({
-                depo: totalDepoFee,
-                retre: totalRetreFee,
-                transfe: totalTransfeFee,
-                ajan: ajanNet,
-                antrepriz: antreprizNet,
-                kat: totalCardFee,
-                kyc: kycNet,
-                api: apiNet,
-            });
-
-            const granTotalBrut = totalDepoFee + totalRetreFee + totalTransfeFee
-                + ajanGross
-                + totalEnterpriseFee + totalCardFee + totalKycFee + totalApiFee;
-            const granTotalNet = Math.max(0, granTotalBrut - totalFeeRefunded);
-            setBizProfitGross(granTotalBrut);
-            setBizProfitRefunded(totalFeeRefunded);
-            setTotalBiznisProfit(granTotalNet);
-
-            const { data: bizWithdrawData } = await supabase
-                .from('business_profit_withdrawals')
-                .select('id, amount, note, created_at')
-                .order('created_at', { ascending: false })
-                .limit(50);
-
-            const totalRetirePwofi = (bizWithdrawData || []).reduce((acc, w) => acc + Number(w.amount || 0), 0);
-            setBizProfitWithdrawn(totalRetirePwofi);
-            // Retrè yo rete nan istorik sèlman — disponib = total nèt la
-            setBizProfitAvailable(granTotalNet);
-            setBizWithdrawHistory(bizWithdrawData || []);
-
-            // Souse sèvis (service_role) pou chif ki matche retrè pwofi a
-            try {
-                const profitRes = await fetch('/api/admin/business-withdrawal');
-                if (profitRes.ok) {
-                    const s = await profitRes.json();
-                    if (typeof s.gross_htg === 'number') setBizProfitGross(s.gross_htg);
-                    if (typeof s.refunded_htg === 'number') setBizProfitRefunded(s.refunded_htg);
-                    if (typeof s.net_htg === 'number') setTotalBiznisProfit(s.net_htg);
-                    if (typeof s.withdrawn_htg === 'number') setBizProfitWithdrawn(s.withdrawn_htg);
-                    if (typeof s.available_htg === 'number') setBizProfitAvailable(s.available_htg);
-                    if (s.breakdown_net) {
-                        setFeesBreakdown({
-                            depo: Number(s.breakdown_net.depo || 0),
-                            retre: Number(s.breakdown_net.retre || 0),
-                            transfe: Number(s.breakdown_net.transfe || 0),
-                            ajan: Number(s.breakdown_net.ajan_aktivasyon || 0) + Number(s.breakdown_net.ajan_retrè_hatex || 0),
-                            antrepriz: Number(s.breakdown_net.antrepriz || 0),
-                            kat: Number(s.breakdown_net.kat || 0),
-                            kyc: Number(s.breakdown_net.kyc || 0),
-                            api: Number(s.breakdown_net.api || 0),
-                        });
-                    }
-                    if (Array.isArray(s.withdrawals)) setBizWithdrawHistory(s.withdrawals);
-                }
-            } catch { /* lokal kalkil rete valab */ }
-
-            // 🔗 ISTORIK KONPLÈ KÈS GLOBAL — fusyone TOUT sous frè yo (depo,
-            // retrè, transfè, ajan, antrepriz, kat) nan YON SÈL lis kwonolojik
-            // pou Sipè Admin ka wè tout mouvman kòb biznis la fè nan yon sèl kote.
-            const depoEntries = (depData || [])
-                .filter((d: any) => Number(d.fee) > 0)
-                .map((d: any, idx: number) => ({ id: `depo-${idx}`, kalite: 'Depo', amount: Number(d.fee), created_at: d.created_at || null, description: 'Frè Depo (5%)' }));
-
-            const retreEntries = (witData || [])
-                .filter((w: any) => Number(w.fee) > 0)
-                .map((w: any, idx: number) => ({ id: `retre-${idx}`, kalite: 'Retrè', amount: Number(w.fee), created_at: w.created_at || null, description: 'Frè Retrè (5%)' }));
-
-            const transfeEntries = (transferFeeData || []).map((t: any, idx: number) => ({
-                id: `transfe-${idx}`, kalite: 'Transfè', amount: Math.abs(Number(t.amount || 0)), created_at: t.created_at || null, description: 'Frè Transfè P2P',
-            }));
-
-            const ajanEntries = [
-                ...(feeData || []).map((f: any) => ({
-                    id: f.id, kalite: 'Ajan', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                    description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Ajan Enkoni',
-                })),
-                ...(agentWithdrawFeeData || []).map((f: any) => ({
-                    id: f.id, kalite: 'Retrè Ajan', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                    description: f.description || 'Frè HatexCard retrè ajan (80%)',
-                    nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-                })),
-            ];
-
-            const antreprizEntries = (entFeeData || []).map((f: any) => ({
-                id: f.id, kalite: 'Antrepriz', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-            }));
-
-            const katEntries = (cardFeeData || []).map((f: any) => ({
-                id: f.id, kalite: 'Kat', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                description: f.description, nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-            }));
-
-            const kycEntries = (kycFeeData || []).map((f: any) => ({
-                id: f.id, kalite: 'KYC', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                description: f.description || 'Frè KYC (kat enkli)', nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan Enkoni',
-            }));
-
-            const apiEntries = (apiFeeData || []).map((f: any) => ({
-                id: f.id, kalite: 'API', amount: Math.abs(Number(f.amount || 0)), created_at: f.created_at,
-                description: f.description || 'Frè API (3 HTG / 1 000)', nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Machann',
-            }));
-
-            const refundEntries = (feeRefundData || []).map((f: any) => ({
-                id: f.id,
-                kalite: 'Ranbousman',
-                amount: -Math.abs(Number(f.amount || 0)),
-                created_at: f.created_at,
-                description: f.description || 'Ranbousman frè',
-                nonMoun: profiles.find(u => u.id === f.user_id)?.full_name || 'Kliyan',
-            }));
-
-            const retreBankEntries = (bizWithdrawData || []).map((w: any) => ({
-                id: w.id,
-                kalite: 'Retrè Bank',
-                amount: -Number(w.amount || 0),
-                created_at: w.created_at,
-                description: w.note || 'Retrè pwofi biznis nan bank',
-            }));
-
-            const tousLesFrèYo = [...depoEntries, ...retreEntries, ...transfeEntries, ...ajanEntries, ...antreprizEntries, ...katEntries, ...kycEntries, ...apiEntries, ...refundEntries, ...retreBankEntries]
-                .filter((entry) => entry.created_at)
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .slice(0, 60);
-
-            setUnifiedFeeHistory(tousLesFrèYo);
-        } catch (error) {}
     };
 
     const handleOpenDocument = async (ref: string) => {
@@ -597,7 +334,16 @@ export default function AdminSuperPage() {
     const deleteTranzaksyon = async (id: string, table: string) => {
         if (!confirm("Èske ou vle efase istwa sa a nèt?")) return;
         setProcessingId(id);
-        try { await supabase.from(table).delete().eq('id', id); await logAdminAudit('TRANSACTION_DELETED', table, id); alert("Efase nèt!"); raleDone(); } finally { setProcessingId(null); }
+        try {
+            await adminOps({ action: 'delete_row', table, id });
+            await logAdminAudit('TRANSACTION_DELETED', table, id);
+            alert("Efase nèt!");
+            raleDone();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setProcessingId(null);
+        }
     };
 
     const apwouveDepo = async (d: any) => {
@@ -617,7 +363,7 @@ export default function AdminSuperPage() {
         
         setProcessingId(d.id);
         try {
-            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', d.user_id).single();
+            const p = allUsers.find((u) => u.id === d.user_id) || { full_name: '', email: '' };
 
             const res = await fetch('/api/admin/finance', {
               method: 'POST',
@@ -644,7 +390,7 @@ export default function AdminSuperPage() {
         if (!confirm(`Konfime retrè ${w.amount} HTG sa a?`)) return;
         setProcessingId(w.id);
         try {
-            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', w.user_id).single();
+            const p = allUsers.find((u) => u.id === w.user_id) || { full_name: '', email: '' };
             const res = await fetch('/api/admin/finance', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -665,7 +411,7 @@ export default function AdminSuperPage() {
         if (!rezon) return;
         setProcessingId(item.id);
         try {
-            const { data: p } = await supabase.from('profiles').select('full_name, email').eq('id', item.user_id).single();
+            const p = allUsers.find((u) => u.id === item.user_id) || { full_name: '', email: '' };
             const res = await fetch('/api/admin/finance', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -684,15 +430,29 @@ export default function AdminSuperPage() {
     const deblokeKont = async (id: string, email: string) => {
         if (!confirm(`Èske w vle aktive kont sa a ankò? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'active', is_activated: true, failed_otp_attempts: 0 }).eq('id', id); await logAdminAudit('ACCOUNT_UNSUSPENDED', 'profile', id, { email }); alert(`Kont ${email} lan aktive!`); raleDone(); } 
-        catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+        try {
+            await adminOps({ action: 'unsuspend_account', user_id: id, target_email: email });
+            alert(`Kont ${email} lan aktive!`);
+            raleDone();
+        } catch (err: any) {
+            alert("Erè: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
     };
 
     const sispannKont = async (id: string, email: string) => {
         if (!confirm(`Èske w sèten ou vle SISPANN kont sa a? (${email})`)) return;
         setProcessingId(id);
-        try { await supabase.from('profiles').update({ account_status: 'suspended' }).eq('id', id); await logAdminAudit('ACCOUNT_SUSPENDED', 'profile', id, { email }); alert(`Kont ${email} lan sispandi!`); raleDone(); } 
-        catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
+        try {
+            await adminOps({ action: 'suspend_account', user_id: id, target_email: email });
+            alert(`Kont ${email} lan sispandi!`);
+            raleDone();
+        } catch (err: any) {
+            alert("Erè: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
     };
 
     const reyinisyalizeKont = async (id: string, email: string, fullName: string) => {
@@ -841,19 +601,11 @@ export default function AdminSuperPage() {
 
         setProcessingId('invite_staff');
         try {
-            const { data: existing } = await supabase.from('staff_users').select('*').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
-            if (existing) throw new Error("Imèl sa a gentan sourejistre nan ekip la.");
-
-            const { data: profile } = await supabase.from('profiles').select('full_name').eq('email', inviteEmail.trim().toLowerCase()).maybeSingle();
-            const staffName = profile?.full_name || 'Anplwaye';
-
-            const { error } = await supabase.from('staff_users').insert({
+            await adminOps({
+                action: 'invite_staff',
                 email: inviteEmail.trim().toLowerCase(),
-                full_name: staffName,
                 role: inviteRole,
-                status: 'pending'
             });
-            if (error) throw error;
 
             const roleNames: Record<string, string> = {
                 'super_admin': 'Sipè Admin (CEO)',
@@ -861,15 +613,11 @@ export default function AdminSuperPage() {
                 'compliance': 'Depatman Konfòmite (KYC & Ajan)',
                 'support': 'Sèvis Kliyan (Support)'
             };
+            const staffName = allUsers.find(u => u.email?.toLowerCase() === inviteEmail.trim().toLowerCase())?.full_name || 'Anplwaye';
             
-            // 🔒 SEKIRITE: Pa gen okenn lyen nan imel la ankò. Nou jis anonse
-            // anplwaye a — li dwe konekte sou pwòp kont kliyan li (Dashboard),
-            // epi klike sou bouton "Aksè Espas Travay" pou l kreye modpas fò
-            // espas travay li a pou premye fwa.
             const msg = `Felisitasyon ${staffName}!\n\nAdministrasyon Hatexcard envite w vin travay kòm anplwaye nan depatman: "${roleNames[inviteRole]}".\n\nPou kòmanse:\n1) Konekte sou kont kliyan ou nòmal (menm imel sa a) sou Dashboard Hatexcard.\n2) Louvri meni an, klike sou bouton "Aksè Espas Travay".\n3) Kreye yon modpas fò espesyal pou espas travay ou (li apa de modpas kont kliyan ou a).\n\nPou rezon sekirite, pa gen okenn lyen nan mesaj sa a — sèvi ak Dashboard ou dirèkteman.`;
             
             await voyeEmailKliyan(inviteEmail, staffName, msg, "OU VIN YON ANPLWAYE HATEXCARD");
-            await logAdminAudit('STAFF_INVITED', 'staff_users', inviteEmail, { role: inviteRole });
 
             alert(`Envitasyon an ale! ${staffName} ap resevwa yon mesaj imèl ki di l konekte sou Dashboard li epi klike sou bouton "Aksè Espas Travay".`);
             setInviteEmail('');
@@ -881,9 +629,9 @@ export default function AdminSuperPage() {
         if (!confirm(`Èske w sèten ou vle revoke aksè anplwaye sa a (${email}) nèt?`)) return;
         setProcessingId(`revoke_${id}`);
         try {
-            await supabase.from('staff_users').delete().eq('id', id);
-            await logAdminAudit('STAFF_REVOKED', 'staff_users', id, { email });
-            alert(`Aksè a revoke nèt pou ${email}.`); raleDone();
+            await adminOps({ action: 'revoke_staff', id, target_email: email });
+            alert(`Aksè a revoke nèt pou ${email}.`);
+            raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -893,9 +641,11 @@ export default function AdminSuperPage() {
         const cleanCode = newPromoCode.trim().toUpperCase();
         if (!cleanCode) { alert('Mete yon kòd valab.'); setProcessingId(null); return; }
         try {
-            const { error } = await supabase.from('promo_codes').insert([{ code: cleanCode, reward_amount: parseInt(promoReward) }]);
-            if (error) { if (error.code === '23505') throw new Error('Kòd sa a egziste deja!'); throw error; }
-            alert(`Kòd ${cleanCode} la kreye!`); setNewPromoCode(''); setPromoReward('250'); raleDone();
+            await adminOps({ action: 'create_promo', code: cleanCode, reward_amount: parseInt(promoReward) });
+            alert(`Kòd ${cleanCode} la kreye!`);
+            setNewPromoCode('');
+            setPromoReward('250');
+            raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -903,8 +653,9 @@ export default function AdminSuperPage() {
         e.preventDefault();
         setProcessingId('saving_anons');
         try {
-            await supabase.from('global_settings').update({ announcement_text: anonsText, announcement_active: anonsActive }).eq('id', 1);
-            alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!"); raleDone();
+            await adminOps({ action: 'update_announcement', text: anonsText, active: anonsActive });
+            alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!");
+            raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
