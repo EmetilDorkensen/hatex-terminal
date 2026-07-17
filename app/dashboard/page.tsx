@@ -70,7 +70,7 @@ export default function Dashboard() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
-    if (currentProfile.kyc_status === 'approved' && !currentProfile.card_last4 && !currentProfile.card_number_hash) {
+    if (currentProfile.kyc_status === 'approved' && !currentProfile.card_last4) {
       try {
          const res = await fetch('/api/card/ensure', {
            method: 'POST',
@@ -83,7 +83,7 @@ export default function Dashboard() {
              return {
                ...currentProfile,
                card_last4: data.card.card_last4,
-               exp_date: data.card.exp_date,
+               exp_date: data.card.exp_date || currentProfile.exp_date,
                masked: data.card.masked,
              };
            }
@@ -100,21 +100,21 @@ export default function Dashboard() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          let { data: profile } = await supabase
+          const { data: profile, error: profileErr } = await supabase
             .from('profiles')
-            .select('id, full_name, email, phone, wallet_balance, card_balance, agent_balance, account_status, account_type, kyc_status, is_activated, is_card_activated, is_agent, agent_tier, agent_capacity, card_last4, exp_date, created_at, business_name, workspace_password_hash')
+            .select('id, full_name, email, phone, wallet_balance, card_balance, agent_balance, account_status, account_type, kyc_status, is_activated, is_card_activated, is_agent, agent_tier, agent_capacity, card_last4, card_number_hash, exp_date, created_at, business_name')
             .eq('id', user.id)
             .maybeSingle();
 
+          if (profileErr) {
+            console.error('Erè lekti pwofil:', profileErr.message);
+          }
+
           if (profile) {
-            // workspace_password_hash: sèlman pou konnen si gen password (boolean presence)
-            profile = {
-              ...profile,
-              has_workspace_password: !!profile.workspace_password_hash,
-              workspace_password_hash: undefined,
-            } as any;
-            profile = await generateMissingCard(user.id, profile);
-            setUserData({ ...profile, email: user.email });
+            // Pa chaje secrets (pin/card plaintext) — card_last4 + hash sèlman
+            let safeProfile = profile as any;
+            safeProfile = await generateMissingCard(user.id, safeProfile);
+            setUserData({ ...safeProfile, email: user.email });
             
             const { data: discountData } = await supabase
               .from('user_discounts')
@@ -124,6 +124,16 @@ export default function Dashboard() {
               
             if (discountData) {
               setDiscountAmount(discountData.discount_amount || 0);
+            }
+          } else {
+            // Fallback: si select espesifik echwe, eseye kolòn debaz pou pa bloke kont lan
+            const { data: fallback } = await supabase
+              .from('profiles')
+              .select('id, full_name, email, wallet_balance, card_balance, kyc_status, is_card_activated, account_type, account_status')
+              .eq('id', user.id)
+              .maybeSingle();
+            if (fallback) {
+              setUserData({ ...fallback, email: user.email });
             }
           }
 
@@ -154,10 +164,26 @@ export default function Dashboard() {
           }
 
           const channel = supabase.channel(`profile_realtime_${user.id}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, async (payload) => {
-              let updatedProfile = payload.new;
-              updatedProfile = await generateMissingCard(user.id, updatedProfile);
-              setUserData((prev: any) => ({ ...prev, ...updatedProfile }));
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, (payload) => {
+              const next = payload.new as any;
+              // Pa antre secrets / ciphertext nan UI realtime
+              setUserData((prev: any) => ({
+                ...prev,
+                full_name: next.full_name ?? prev?.full_name,
+                wallet_balance: next.wallet_balance,
+                card_balance: next.card_balance,
+                agent_balance: next.agent_balance,
+                kyc_status: next.kyc_status,
+                is_card_activated: next.is_card_activated,
+                is_activated: next.is_activated,
+                account_status: next.account_status,
+                account_type: next.account_type,
+                card_last4: next.card_last4 ?? prev?.card_last4,
+                exp_date: next.exp_date ?? prev?.exp_date,
+                is_agent: next.is_agent,
+                agent_tier: next.agent_tier,
+                agent_capacity: next.agent_capacity,
+              }));
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'global_settings', filter: `id=eq.1` }, (payload) => {
                setAnnouncement(payload.new.announcement_text);
