@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin
     .from('profiles')
-    .select('id, wallet_balance, kyc_fee_paid, kyc_status, account_status')
+    .select('id, kyc_status, account_status')
     .eq('id', user.id)
     .single();
 
@@ -70,59 +70,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'KYC ou deja apwouve.' }, { status: 400 });
   }
 
-  if (profile.kyc_fee_paid) {
-    return NextResponse.json({ success: true, already_paid: true, message: 'Frè KYC deja peye.' });
+  const { data: rpcRaw, error: rpcErr } = await admin.rpc('process_kyc_fee', {
+    p_user_id: user.id,
+  });
+
+  if (rpcErr) {
+    return NextResponse.json({ error: rpcErr.message || 'Pa t kapab debite wallet la.' }, { status: 500 });
   }
 
-  const { data: discountRow } = await admin
-    .from('user_discounts')
-    .select('discount_amount')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  const discount = Number(discountRow?.discount_amount || 0);
-  const baseFee = await resolvePlatformFee(admin, 'kyc_fee', user.id);
-  const charge = Math.max(0, baseFee - Math.max(0, discount));
-  const balance = Number(profile.wallet_balance || 0);
-
-  if (balance < charge) {
+  const result = typeof rpcRaw === 'string' ? JSON.parse(rpcRaw) : rpcRaw;
+  if (!result?.success) {
+    const status = result?.needs_deposit ? 400 : 400;
     return NextResponse.json(
       {
-        error: `Ou pa gen ase kòb. Ou bezwen ${charge.toLocaleString()} HTG sou wallet ou. Fè yon depo anvan.`,
-        amount_due_htg: charge,
-        wallet_balance_htg: balance,
-        needs_deposit: true,
+        error: result?.message || 'Pa t kapab peye frè KYC.',
+        amount_due_htg: result?.amount_due_htg,
+        wallet_balance_htg: result?.wallet_balance_htg,
+        needs_deposit: result?.needs_deposit,
       },
-      { status: 400 }
+      { status }
     );
   }
 
-  const newBalance = Number((balance - charge).toFixed(2));
-
-  const { error: updateErr } = await admin
-    .from('profiles')
-    .update({ wallet_balance: newBalance, kyc_fee_paid: true })
-    .eq('id', user.id);
-
-  if (updateErr) {
-    return NextResponse.json({ error: 'Pa t kapab debite wallet la.' }, { status: 500 });
+  if (result.already_paid) {
+    return NextResponse.json({ success: true, already_paid: true, message: 'Frè KYC deja peye.' });
   }
-
-  await admin.from('transactions').insert({
-    user_id: user.id,
-    amount: -charge,
-    type: 'KYC_FEE',
-    status: 'success',
-    description:
-      discount > 0
-        ? `Frè KYC konplè (kat enkli, rediksyon -${discount} HTG)`
-        : 'Frè KYC konplè (verifikasyon ID + kat vityèl)',
-  });
 
   return NextResponse.json({
     success: true,
-    charged_htg: charge,
-    wallet_balance_htg: newBalance,
+    charged_htg: result.charged_htg,
+    wallet_balance_htg: result.wallet_balance_htg,
     message: 'Frè KYC peye. Ou ka soumèt dokiman w yo kounye a.',
   });
 }

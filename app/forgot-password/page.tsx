@@ -1,12 +1,6 @@
 "use client";
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
-
-// Konfigirasyon Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -19,14 +13,20 @@ export default function ForgotPassword() {
     setMsg({ type: '', text: '' });
 
     try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: 'https://hatexcard.com/reset-password',
-          });
+      const res = await fetch('/api/auth/send-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-      if (error) {
-        setMsg({ type: 'error', text: "Erè: Nou pa jwenn imèl sa a." });
+      if (!res.ok) {
+        setMsg({ type: 'error', text: data?.message || "Gen yon pwoblèm. Eseye ankò." });
       } else {
-        setMsg({ type: 'success', text: "Nou voye yon lyen sou imèl ou pou w chanje modpas la." });
+        setMsg({
+          type: 'success',
+          text: data?.message || "Si imèl sa a gen yon kont, n ap voye yon lyen pou chanje modpas la.",
+        });
       }
     } catch (err) {
       setMsg({ type: 'error', text: "Gen yon pwoblèm koneksyon." });

@@ -106,8 +106,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
-    const { data: urlData } = admin.storage.from('enterprise_documents').getPublicUrl(fileName);
-    return NextResponse.json({ url: urlData.publicUrl });
+    const { data: urlData, error: signErr } = await admin.storage
+      .from('enterprise_documents')
+      .createSignedUrl(fileName, 60 * 60 * 24 * 7); // 7 jou
+
+    if (signErr || !urlData?.signedUrl) {
+      return NextResponse.json({ error: signErr?.message || 'Pa t kapab kreye lyen dokiman.' }, { status: 500 });
+    }
+
+    // Retounen signed URL + path (pa public URL)
+    return NextResponse.json({ url: urlData.signedUrl, path: fileName });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erè upload dokiman.';
     return NextResponse.json({ error: message }, { status: 500 });

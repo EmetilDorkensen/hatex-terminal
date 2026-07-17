@@ -7,11 +7,8 @@ import { ArrowLeft, Search, User, ShieldCheck, ArrowRightLeft, Lock, AlertTriang
 import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { isKycApproved } from '@/lib/kyc/status';
 
-// ==========================================
-// TABLO FRÈ TRANSFÈ (menm estrikti ak MonCash)
-// Chak liy: [montanMinimòm, montanMaksimòm, frè]
-// ==========================================
-const TRANSFER_FEE_TIERS: Array<[number, number, number]> = [
+// Fallback si baz poko migrate — sous verite: transfer_fee_tiers + hatex_transfer_fee
+const DEFAULT_TRANSFER_FEE_TIERS: Array<[number, number, number]> = [
   [100, 249, 0],
   [250, 499, 5],
   [500, 999, 10],
@@ -26,18 +23,17 @@ const TRANSFER_FEE_TIERS: Array<[number, number, number]> = [
   [75000, 100000, 130],
 ];
 
-const MIN_TRANSFER_AMOUNT = TRANSFER_FEE_TIERS[0][0];
-const MAX_TRANSFER_AMOUNT = TRANSFER_FEE_TIERS[TRANSFER_FEE_TIERS.length - 1][1];
-
-function getTransferFee(amount: number, scalePercent: number = 5): number {
-  const tier = TRANSFER_FEE_TIERS.find(([min, max]) => amount >= min && amount <= max);
-  const base = tier ? tier[2] : 0;
-  // 5 = nòmal (100% tablo). 0 = gratis. 10 = doub.
-  return Math.round(base * (Math.max(0, scalePercent) / 5) * 100) / 100;
-}
-
 export default function TransferPage() {
   const router = useRouter();
+  const [transferFeeTiers, setTransferFeeTiers] = useState(DEFAULT_TRANSFER_FEE_TIERS);
+  const MIN_TRANSFER_AMOUNT = transferFeeTiers[0]?.[0] ?? 100;
+  const MAX_TRANSFER_AMOUNT = transferFeeTiers[transferFeeTiers.length - 1]?.[1] ?? 100000;
+
+  function getTransferFee(amount: number, scalePercent: number = 5): number {
+    const tier = transferFeeTiers.find(([min, max]) => amount >= min && amount <= max);
+    const base = tier ? tier[2] : 0;
+    return Math.round(base * (Math.max(0, scalePercent) / 5) * 100) / 100;
+  }
   const [userId, setUserId] = useState<string | null>(null);
   const [senderEmail, setSenderEmail] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
@@ -90,6 +86,21 @@ export default function TransferPage() {
             setTransferFeeScale(Number(feeData.fees.transfer_fee_percent));
           }
         } catch { /* default 5 */ }
+        try {
+          const { data: tiers } = await supabase
+            .from('transfer_fee_tiers')
+            .select('min_amount, max_amount, base_fee')
+            .order('min_amount', { ascending: true });
+          if (tiers && tiers.length > 0) {
+            setTransferFeeTiers(
+              tiers.map((t: any) => [
+                Number(t.min_amount),
+                Number(t.max_amount),
+                Number(t.base_fee),
+              ] as [number, number, number])
+            );
+          }
+        } catch { /* keep defaults */ }
         const statusRes = await fetch('/api/auth/pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -516,7 +527,7 @@ export default function TransferPage() {
                   <span>Maksimòm</span>
                   <span className="text-right">Frè</span>
                 </div>
-                {TRANSFER_FEE_TIERS.map(([min, max, fee], idx) => (
+                {transferFeeTiers.map(([min, max, fee], idx) => (
                   <div
                     key={`${min}-${max}`}
                     className={`grid grid-cols-3 text-xs font-medium px-4 py-2.5 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'} text-slate-700`}

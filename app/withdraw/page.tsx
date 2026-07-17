@@ -25,11 +25,14 @@ export default function WithdrawPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const currentAmount = Number(amount) || 0;
-  const isLargeWithdrawal = currentAmount > 15000 && method !== 'Ajan';
-  const isAgentMethod = method === 'Ajan';
   const [withdrawFeePercent, setWithdrawFeePercent] = useState(5);
   const [agentWithdrawPer1000, setAgentWithdrawPer1000] = useState(50);
+  const [vipThreshold, setVipThreshold] = useState(15000);
+  const [minWithdraw, setMinWithdraw] = useState(500);
+
+  const currentAmount = Number(amount) || 0;
+  const isLargeWithdrawal = currentAmount > vipThreshold && method !== 'Ajan';
+  const isAgentMethod = method === 'Ajan';
 
   // MonCash/NatCash: frè % retire nan montan
   // Ajan: frè /1000 ANPLIS montan kach
@@ -46,12 +49,20 @@ export default function WithdrawPage() {
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, wallet_balance, account_status, account_type, kyc_status, pin_code_hash, transaction_pin_hash, pin_enabled')
+          .eq('id', user.id)
+          .single();
         if (data) {
            setProfile(data);
            try {
-             const feeRes = await fetch('/api/fees/mine');
+             const [feeRes, limRes] = await Promise.all([
+               fetch('/api/fees/mine'),
+               fetch('/api/limits/mine'),
+             ]);
              const feeData = await feeRes.json().catch(() => ({}));
+             const limData = await limRes.json().catch(() => ({}));
              if (feeRes.ok && feeData.fees) {
                if (feeData.fees.withdraw_fee_percent != null) {
                  setWithdrawFeePercent(Number(feeData.fees.withdraw_fee_percent));
@@ -60,16 +71,19 @@ export default function WithdrawPage() {
                  setAgentWithdrawPer1000(Number(feeData.fees.agent_withdraw_fee_per_1000));
                }
              }
+             if (limRes.ok && limData.limits) {
+               if (limData.limits.vip_withdraw_threshold != null) {
+                 setVipThreshold(Number(limData.limits.vip_withdraw_threshold));
+               }
+               if (limData.limits.min_withdraw != null) {
+                 setMinWithdraw(Number(limData.limits.min_withdraw));
+               }
+             }
            } catch { /* defaults */ }
            if (!isKycApproved(data.kyc_status)) {
                return;
            }
-           if (
-             !data.transaction_pin &&
-             !data.transaction_pin_hash &&
-             !data.pin_code &&
-             !data.pin_code_hash
-           ) {
+           if (!data.transaction_pin_hash && !data.pin_code_hash) {
                alert("Ou dwe gen yon kòd PIN pou sekirize kont ou anvan ou ka retire lajan.");
                router.push('/setting'); 
            }
@@ -124,9 +138,9 @@ export default function WithdrawPage() {
       }
 
       // 4. KONDISYON DEBAZ YO
-      if (currentAmount < 500) {
+      if (currentAmount < minWithdraw) {
         setLoading(false);
-        return alert("Minimòm retrè se 500 HTG");
+        return alert(`Minimòm retrè se ${minWithdraw.toLocaleString()} HTG`);
       }
       const neededBalance = method === 'Ajan'
         ? calcAgentWithdrawFee(currentAmount, agentWithdrawPer1000).totalDebit
@@ -213,8 +227,8 @@ export default function WithdrawPage() {
       }
 
       const msg = rpcResult.is_large
-        ? `🚨 *GWO DEMANN RETRÈ VIP*\n\n👤: ${profile.full_name}\n💰 Montan: ${currentAmount} HTG\n⚠️ _Montan an plis pase 15,000 HTG._`
-        : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (5%): ${rpcResult.fee} HTG\n✅ Nèt pou voye: ${rpcResult.net_amount} HTG\n📲: ${method} (${phone})`;
+        ? `🚨 *GWO DEMANN RETRÈ VIP*\n\n👤: ${profile.full_name}\n💰 Montan: ${currentAmount} HTG\n⚠️ _Montan an plis pase ${vipThreshold.toLocaleString()} HTG._`
+        : `💸 *DEMANN RETRÈ NOUVO*\n\n👤: ${profile.full_name}\n💰 Brits: ${currentAmount} HTG\n📉 Frè (${withdrawFeePercent}%): ${rpcResult.fee} HTG\n✅ Nèt pou voye: ${rpcResult.net_amount} HTG\n📲: ${method} (${phone})`;
 
       await fetch('/api/notifications/telegram', {
         method: 'POST',
@@ -401,7 +415,7 @@ export default function WithdrawPage() {
                  <div className="mt-8 bg-amber-50 border border-amber-200 p-5 rounded-xl text-center shadow-sm">
                     <ShieldCheck size={28} className="text-amber-500 mx-auto mb-2" />
                     <p className="text-xs font-bold uppercase text-amber-800 tracking-wider leading-relaxed">
-                      Transfè VIP (&gt; 15,000 HTG)
+                      Transfè VIP (&gt; {vipThreshold.toLocaleString()} HTG)
                     </p>
                     <p className="text-[10px] font-medium text-amber-700 mt-2 leading-relaxed">
                       Transfè sa p ap gen frè otomatikman. W ap bezwen kontakte nou pou n voye lajan an pou ou nan bank oswa kote w pito a.

@@ -15,17 +15,21 @@ export async function GET(request: Request) {
   const db = createSupabaseAdminClient();
   const userId = new URL(request.url).searchParams.get('user_id');
 
-  const [{ data: settings }, { data: overrides }] = await Promise.all([
+  const [{ data: settings }, { data: overrides }, { data: limits }, { data: agentTiers }] = await Promise.all([
     db.from('platform_fee_settings').select('*').order('fee_key'),
     userId
       ? db.from('account_fee_overrides').select('*').eq('user_id', userId)
       : db.from('account_fee_overrides').select('*, profiles:user_id(full_name, email)').order('updated_at', { ascending: false }).limit(100),
+    db.from('platform_limit_settings').select('*').order('limit_key'),
+    db.from('agent_tiers').select('*').order('tier'),
   ]);
 
   return NextResponse.json({
     success: true,
     settings: settings || [],
     overrides: overrides || [],
+    limits: limits || [],
+    agent_tiers: agentTiers || [],
   });
 }
 
@@ -98,6 +102,64 @@ export async function POST(request: Request) {
       ip,
     });
     return NextResponse.json({ success: true, setting: data });
+  }
+
+  if (action === 'update_limit') {
+    const limitKey = String(body.limit_key || '');
+    const value = Number(body.value);
+    if (!limitKey || !(value >= 0) || !Number.isFinite(value)) {
+      return NextResponse.json({ error: 'limit_key ak value (>= 0) obligatwa.' }, { status: 400 });
+    }
+    const { data, error } = await db
+      .from('platform_limit_settings')
+      .update({ value, updated_at: new Date().toISOString(), updated_by: email })
+      .eq('limit_key', limitKey)
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    await logAdminAction(db, {
+      adminEmail: email,
+      action: 'LIMIT_GLOBAL_UPDATE',
+      targetType: 'platform_limit_settings',
+      targetId: limitKey,
+      details: { value },
+      ip,
+    });
+    return NextResponse.json({ success: true, limit: data });
+  }
+
+  if (action === 'update_agent_tier') {
+    const tier = String(body.tier || '').toLowerCase();
+    const capacity = Number(body.capacity_htg);
+    if (!tier || !(capacity > 0) || !Number.isFinite(capacity)) {
+      return NextResponse.json({ error: 'tier ak capacity_htg (> 0) obligatwa.' }, { status: 400 });
+    }
+    const { data, error } = await db
+      .from('agent_tiers')
+      .upsert({ tier, capacity_htg: capacity, label: tier.toUpperCase(), updated_at: new Date().toISOString() })
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    // Sync matching platform_limit_settings keys
+    const limitKey = tier === 'premium' ? 'agent_premium_capacity' : tier === 'pro' ? 'agent_pro_capacity' : null;
+    if (limitKey) {
+      await db
+        .from('platform_limit_settings')
+        .update({ value: capacity, updated_at: new Date().toISOString(), updated_by: email })
+        .eq('limit_key', limitKey);
+    }
+
+    await logAdminAction(db, {
+      adminEmail: email,
+      action: 'AGENT_TIER_UPDATE',
+      targetType: 'agent_tiers',
+      targetId: tier,
+      details: { capacity_htg: capacity },
+      ip,
+    });
+    return NextResponse.json({ success: true, tier: data });
   }
 
   if (action === 'set_override') {

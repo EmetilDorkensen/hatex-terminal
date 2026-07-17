@@ -63,44 +63,24 @@ export async function POST(req: Request) {
     if (txError || !transaction) return NextResponse.json({ error: 'Tranzaksyon sa pa egziste oswa li pa apatyen a kont ou.' }, { status: 404 });
     if (transaction.status === 'refunded') return NextResponse.json({ error: 'Kòb sa te gentan ranbouse deja.' }, { status: 400 });
 
-    const refundAmount = Number(transaction.amount_htg);
+    const { data: rpcRaw, error: rpcErr } = await supabaseAdmin.rpc('process_plugin_refund', {
+      p_transaction_id: transaction_id,
+      p_merchant_id: merchant_id,
+      p_reason: reason || 'Kliyan an mande ranbousman',
+    });
 
-    // 2. TCHEKE SI MACHANN NAN GEN ASE KÒB POU L REMÈT LAJAN AN
-    //    (🔧 Korije: machann kredite sou `wallet_balance` pa /api/public/payments
-    //    ak RPC peman an, se sa ki dwe debite isit la — pa `card_balance`.)
-    const merchantBalance = Number(transaction.profiles.wallet_balance || 0);
-    if (merchantBalance < refundAmount) {
-      return NextResponse.json({ error: 'Ou pa gen ase kòb sou kont ou pou w fè ranbousman sa a.' }, { status: 400 });
+    if (rpcErr) {
+      return NextResponse.json({ error: rpcErr.message || 'Ranbousman echwe.' }, { status: 500 });
+    }
+    const rpcResult = typeof rpcRaw === 'string' ? JSON.parse(rpcRaw) : rpcRaw;
+    if (!rpcResult?.success) {
+      return NextResponse.json({ error: rpcResult?.message || 'Ranbousman echwe.' }, { status: 400 });
     }
 
-    // 3. FÈ MAJI A: RALE KÒB LA SOU MACHANN NAN, VOYE L BAY KLIYAN AN
-    // Rale kòb la nan men Machann nan
-    await supabaseAdmin.from('profiles')
-      .update({ wallet_balance: merchantBalance - refundAmount })
-      .eq('id', merchant_id);
+    const refundAmount = Number(rpcResult.refunded || transaction.amount_htg);
+    const clientEmail = rpcResult.client_email || transaction.customer_info?.email;
 
-    // Chèche kliyan an (Si l te anrejistre kòm user nan sistèm ou an)
-    // Nou sipoze customer_info gen yon imèl oswa yon id. Si se yon kat, nou mete l sou kat la.
-    const clientEmail = transaction.customer_info?.email;
-    if (clientEmail) {
-      const { data: clientData } = await supabaseAdmin.from('profiles').select('id, card_balance').eq('email', clientEmail).single();
-      if (clientData) {
-         await supabaseAdmin.from('profiles')
-           .update({ card_balance: Number(clientData.card_balance || 0) + refundAmount })
-           .eq('id', clientData.id);
-      }
-    }
-
-    // 4. METE TRANZAKSYON AN AJOU KÒM "REFUNDED"
-    await supabaseAdmin.from('plugin_transactions')
-      .update({ 
-        status: 'refunded', 
-        refund_reason: reason || 'Kliyan an mande ranbousman',
-        refunded_at: new Date().toISOString()
-      })
-      .eq('id', transaction_id);
-
-    // 5. VOYE IMÈL RESI RANBOUSMAN AN BAY KLIYAN AN (Style Amazon)
+    // VOYE IMÈL RESI RANBOUSMAN AN BAY KLIYAN AN (Style Amazon)
     if (clientEmail) {
       const refundDate = new Date().toLocaleDateString('ht-HT', { year: 'numeric', month: 'long', day: 'numeric' });
       const emailHtml = `

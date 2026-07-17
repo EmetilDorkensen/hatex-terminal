@@ -10,6 +10,18 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeNav, setActiveNav] = useState("");
+  const [depositFeePct, setDepositFeePct] = useState(5);
+  const [withdrawFeePct, setWithdrawFeePct] = useState(5);
+
+  useEffect(() => {
+    fetch('/api/public/fees')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.fees?.deposit_fee_percent != null) setDepositFeePct(Number(d.fees.deposit_fee_percent));
+        if (d?.fees?.withdraw_fee_percent != null) setWithdrawFeePct(Number(d.fees.withdraw_fee_percent));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleMouse = (e: MouseEvent) => {
@@ -609,8 +621,8 @@ export default function LandingPage() {
                 { op: "Tranzaksyon P2P (ant itilizatè)", val: "Gratis", hi: true },
                 { op: "Peman bay machann ak kat", val: "Gratis", hi: true },
                 { op: "Rechaj kat vityèl", val: "Gratis", hi: true },
-                { op: "Depo", val: "5%", hi: false },
-                { op: "Retrè", val: "5%", hi: false },
+                { op: "Depo", val: `${depositFeePct}%`, hi: false },
+                { op: "Retrè", val: `${withdrawFeePct}%`, hi: false },
                 { op: "Kreye kont ak verifikasyon KYC", val: "Gratis", hi: true },
                 { op: "Smart Invoice & QR Kòd", val: "Gratis", hi: true },
                 { op: "Aksè API & Plugin", val: "Gratis", hi: true },

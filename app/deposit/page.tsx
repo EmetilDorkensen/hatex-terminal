@@ -34,9 +34,9 @@ export default function DepositPage() {
             if (user) {
                 const { data: profileData } = await supabase
                     .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
+                .select('id, full_name, email, wallet_balance, account_status, account_type, kyc_status')
+                .eq('id', user.id)
+                .single();
                 
                 // Nou mete email la nan profile la tou pou sekirite
                 setProfile({ ...(profileData || {}), id: user.id, email: user.email });
@@ -92,21 +92,18 @@ export default function DepositPage() {
             const url1 = await handleFileUpload(files.f1!);
             const url2 = files.f2 ? await handleFileUpload(files.f2) : url1;
             
-            // 3. Antre done yo nan baz de done a
-            const { error } = await supabase.from('deposits').insert([{
-                user_id: user.id,            
-                amount: Number(amount),      
-                fee: Number(fee),
-                total_to_pay: Number(total),
-                method: method,
-                user_email: user.email,      // Asire nou email la soti nan sesyon auth la pou evite NULL
-                transaction_id: txnId,
-                proof_img_1: url1,
-                proof_img_2: url2,
-                status: 'pending',
-            }]);
-    
+            // 3. Kreye depo via RPC (frè kalkile nan baz)
+            const { data: rpcData, error } = await supabase.rpc('create_deposit_request', {
+                p_amount: Number(amount),
+                p_method: method,
+                p_transaction_id: txnId,
+                p_proof_img_1: url1,
+                p_proof_img_2: url2,
+            });
+
             if (error) throw error;
+            const result = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+            if (!result?.success) throw new Error(result?.message || 'Pa t kapab anrejistre depo a.');
 
             // 4. Notifikasyon Telegram (Opsyonèl men itil pou admin)
             const msg = `🔔 *DEPO HATEX NOUVO*\n👤: ${profile?.full_name || 'Kliyan'}\n📧: ${user.email}\n💰: ${amount} HTG\n🆔: ${txnId}`;
@@ -187,7 +184,7 @@ export default function DepositPage() {
                             
                             <div className="mt-8 pt-6 border-t border-gray-100 space-y-3">
                                 <div className="flex justify-between items-center text-slate-500">
-                                    <span className="text-xs font-semibold">Frè sistèm (5%):</span>
+                                    <span className="text-xs font-semibold">Frè sistèm ({depositFeePercent}%):</span>
                                     <span className="text-sm font-bold text-slate-700">{fee.toFixed(2)} HTG</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-gray-100">

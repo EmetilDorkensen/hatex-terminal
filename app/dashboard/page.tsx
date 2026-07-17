@@ -70,19 +70,25 @@ export default function Dashboard() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
-    if (currentProfile.kyc_status === 'approved' && !currentProfile.card_number) {
+    if (currentProfile.kyc_status === 'approved' && !currentProfile.card_last4 && !currentProfile.card_number_hash) {
       try {
-         const res = await fetch('/api/card/ensure', { method: 'POST' });
+         const res = await fetch('/api/card/ensure', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ reveal: false }),
+         });
          if (res.ok) {
            const data = await res.json();
            if (data.card) {
-             return { ...currentProfile, card_number: data.card.card_number, cvv: data.card.cvv, exp_date: data.card.exp_date };
+             return {
+               ...currentProfile,
+               card_last4: data.card.card_last4,
+               exp_date: data.card.exp_date,
+               masked: data.card.masked,
+             };
            }
          }
       } catch (e) {
-          // Pa gen fallback bò kliyan ankò: pwovizyon kat la fèt SÈLMAN sou sèvè
-          // (/api/card/ensure ak service role) pou nimewo/CVV pa janm jenere ni
-          // ekri an klè depi navigatè a. Si sèvè a pa reponn, n ap reeseye pita.
           console.error('Card ensure failed, will retry later:', e);
       }
     }
@@ -94,9 +100,19 @@ export default function Dashboard() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          let { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+          let { data: profile } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, phone, wallet_balance, card_balance, agent_balance, account_status, account_type, kyc_status, is_activated, is_card_activated, is_agent, agent_tier, agent_capacity, card_last4, exp_date, created_at, business_name, workspace_password_hash')
+            .eq('id', user.id)
+            .maybeSingle();
 
           if (profile) {
+            // workspace_password_hash: sèlman pou konnen si gen password (boolean presence)
+            profile = {
+              ...profile,
+              has_workspace_password: !!profile.workspace_password_hash,
+              workspace_password_hash: undefined,
+            } as any;
             profile = await generateMissingCard(user.id, profile);
             setUserData({ ...profile, email: user.email });
             
@@ -120,7 +136,11 @@ export default function Dashboard() {
               .eq('email', user.email.trim().toLowerCase())
               .maybeSingle();
             if (staff && staff.status !== 'revoked') {
-              setStaffRecord(staff);
+              setStaffRecord({
+                ...staff,
+                has_workspace_password: !!staff.workspace_password_hash,
+                workspace_password_hash: staff.workspace_password_hash ? 'set' : null,
+              });
             }
           }
 
@@ -161,9 +181,35 @@ export default function Dashboard() {
   }, [supabase, router]);
 
   const formatCardNumber = (num: string) => {
+    if (!num && userData?.card_last4) return `**** **** **** ${userData.card_last4}`;
     if (!num) return "**** **** **** ****";
     if (showNumbers) return num.match(/.{1,4}/g)?.join(' ') || num;
     return `${num.substring(0, 4)} **** **** ${num.substring(12, 16)}`;
+  };
+
+  const revealDashboardCard = async () => {
+    if (showNumbers) {
+      setShowNumbers(false);
+      setUserData((prev: any) => ({ ...prev, card_number: undefined, cvv: undefined }));
+      return;
+    }
+    const res = await fetch('/api/card/ensure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reveal: true }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.card?.card_number) {
+      setUserData((prev: any) => ({
+        ...prev,
+        card_number: data.card.card_number,
+        cvv: data.card.cvv,
+        card_last4: data.card.card_last4,
+        exp_date: data.card.exp_date,
+      }));
+      setShowNumbers(true);
+    }
   };
 
   const handleOpenRefundModal = async () => {
@@ -625,7 +671,7 @@ export default function Dashboard() {
                    {isLoggingAdmin ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />} Admin
                 </button>
             )}
-            <button onClick={() => setShowNumbers(!showNumbers)} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
+            <button onClick={() => revealDashboardCard()} className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm">
               <span className="text-lg">{showNumbers ? "🔒" : "👁️"}</span>
             </button>
           </div>
@@ -793,7 +839,7 @@ export default function Dashboard() {
                 <div className={`absolute inset-0 rotate-y-180 backface-hidden rounded-2xl bg-slate-800 border border-slate-700 shadow-xl flex flex-col items-center justify-center ${!cardFullyActive && 'hidden'}`}>
                   <div className="w-full h-12 bg-slate-950 absolute top-6 left-0"></div>
                   <div className="mt-10 bg-white p-2.5 rounded-xl shadow-sm">
-                    <QRCodeSVG value={`Card:${userData?.card_number || 'INVALID'}`} size={100} />
+                    <QRCodeSVG value={`Card:${userData?.card_last4 || userData?.card_number || 'INVALID'}`} size={100} />
                   </div>
                   <p className="text-xs font-semibold text-slate-400 mt-4">Eskane pou Peye</p>
                 </div>

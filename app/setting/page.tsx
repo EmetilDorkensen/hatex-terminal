@@ -131,14 +131,21 @@ export default function SettingsPage() {
     const isConfirmed = window.confirm("Èske w vle nou voye yon lyen sou imèl ou pou w chanje modpas ou a?");
     if (!isConfirmed) return;
 
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `https://hatexcard.com/reset-password`,
-    });
+    try {
+      const res = await fetch('/api/auth/send-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-    if (error) {
-      alert("Erè lè n ap voye imèl la: " + error.message);
-    } else {
-      alert(`Nou voye yon imèl bay ${user.email} pou w ka chanje modpas ou. Tanpri tcheke bwat lèt ou a.`);
+      if (!res.ok) {
+        alert("Erè lè n ap voye imèl la: " + (data?.message || "Eseye ankò."));
+      } else {
+        alert(`Nou voye yon imèl bay ${user.email} pou w ka chanje modpas ou. Tanpri tcheke bwat lèt ou a (ak spam).`);
+      }
+    } catch (err: any) {
+      alert("Gen yon pwoblèm koneksyon. Eseye ankò.");
     }
   };
 

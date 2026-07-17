@@ -25,14 +25,31 @@ export default function KatPage() {
         if (user) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, full_name, email, wallet_balance, card_balance, kyc_status, is_card_activated, card_last4, exp_date, account_type')
             .eq('id', user.id)
             .maybeSingle();
           
           if (profile) {
-            setUserData({ ...profile, email: user.email });
+            let cardFields: any = { card_last4: profile.card_last4, exp_date: profile.exp_date };
+            if (profile.kyc_status === 'approved') {
+              const res = await fetch('/api/card/ensure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reveal: false }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.card) {
+                  cardFields = {
+                    card_last4: data.card.card_last4,
+                    exp_date: data.card.exp_date,
+                    masked: data.card.masked,
+                  };
+                }
+              }
+            }
+            setUserData({ ...profile, email: user.email, ...cardFields });
             
-            // Tcheke si moun nan gen rediksyon (discount) pou n ka regle pri aktivasyon an
             const { data: discountData } = await supabase
               .from('user_discounts')
               .select('discount_amount')
@@ -44,11 +61,21 @@ export default function KatPage() {
             }
           }
 
-          // Realtime update pou balans lan chanje sou kat la menm kote a
           supabase
             .channel(`card_update_${user.id}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, 
-              (payload) => setUserData((prev: any) => ({ ...prev, ...payload.new })))
+              (payload) => {
+                const next = payload.new as any;
+                setUserData((prev: any) => ({
+                  ...prev,
+                  wallet_balance: next.wallet_balance,
+                  card_balance: next.card_balance,
+                  kyc_status: next.kyc_status,
+                  is_card_activated: next.is_card_activated,
+                  card_last4: next.card_last4,
+                  exp_date: next.exp_date,
+                }));
+              })
             .subscribe();
         } else {
           router.push('/login');
@@ -62,7 +89,28 @@ export default function KatPage() {
     fetchUserAndProfile();
   }, [supabase, router]);
 
+  const revealCard = async () => {
+    const res = await fetch('/api/card/ensure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reveal: true }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.card?.card_number) {
+      setUserData((prev: any) => ({
+        ...prev,
+        card_number: data.card.card_number,
+        cvv: data.card.cvv,
+        exp_date: data.card.exp_date,
+        card_last4: data.card.card_last4,
+      }));
+      setShowNumbers(true);
+    }
+  };
+
   const formatCardNumber = (num: string) => {
+    if (!num && userData?.card_last4) return `**** **** **** ${userData.card_last4}`;
     if (!num) return "**** **** **** ****";
     if (!showNumbers) return `**** **** **** ${num.slice(-4)}`;
     return num.replace(/(\d{4})/g, '$1 ').trim();
@@ -171,7 +219,15 @@ export default function KatPage() {
                   {formatCardNumber(userData?.card_number)}
                 </p>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); setShowNumbers(!showNumbers); }} 
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (showNumbers) {
+                      setShowNumbers(false);
+                      setUserData((prev: any) => ({ ...prev, card_number: undefined, cvv: undefined }));
+                    } else {
+                      await revealCard();
+                    }
+                  }} 
                   className="text-indigo-200 hover:text-white transition-colors p-2 shrink-0 disabled:opacity-50"
                   disabled={!cardFullyActive}
                 >

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { buildCardSecurityFields } from '@/lib/security/hash';
+import { buildCardSecurityFields, encryptCardField } from '@/lib/security/hash';
 
 function generateCardDetails() {
   const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
@@ -10,14 +10,14 @@ function generateCardDetails() {
   return { cardNumber, cvv, expDate };
 }
 
-/** Kreye kat vityèl + aktive li otomatikman apre KYC apwouve. */
+/** Kreye kat vityèl + aktive li otomatikman apre KYC apwouve. PAN/CVV chifre at-rest. */
 export async function provisionCardForUser(
   supabase: SupabaseClient,
   userId: string
-): Promise<{ created: boolean; card_number?: string }> {
+): Promise<{ created: boolean; card_last4?: string }> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('card_number, card_number_hash, cvv, exp_date, is_card_activated')
+    .select('card_number, card_number_hash, card_last4, exp_date, is_card_activated')
     .eq('id', userId)
     .single();
 
@@ -25,11 +25,11 @@ export async function provisionCardForUser(
     throw new Error('Pwofil pa jwenn.');
   }
 
-  if (profile.card_number && profile.card_number_hash) {
+  if (profile.card_number_hash) {
     if (!profile.is_card_activated) {
       await supabase.from('profiles').update({ is_card_activated: true }).eq('id', userId);
     }
-    return { created: false, card_number: profile.card_number };
+    return { created: false, card_last4: profile.card_last4 || undefined };
   }
 
   const { cardNumber, cvv, expDate } = generateCardDetails();
@@ -38,8 +38,8 @@ export async function provisionCardForUser(
   const { error } = await supabase
     .from('profiles')
     .update({
-      card_number: cardNumber,
-      cvv,
+      card_number: encryptCardField(cardNumber),
+      cvv: encryptCardField(cvv),
       exp_date: expDate,
       is_card_activated: true,
       ...securityFields,
@@ -48,5 +48,5 @@ export async function provisionCardForUser(
 
   if (error) throw error;
 
-  return { created: true, card_number: cardNumber };
+  return { created: true, card_last4: cardNumber.slice(-4) };
 }

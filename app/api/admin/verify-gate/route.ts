@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
   if (user.email !== ADMIN_EMAIL) {
     return NextResponse.json(
-      { success: false, message: `Kont sa a (${user.email}) pa gen dwa admin. Konekte ak ${ADMIN_EMAIL}.` },
+      { success: false, message: 'Kont sa a pa gen dwa admin.' },
       { status: 403 }
     );
   }

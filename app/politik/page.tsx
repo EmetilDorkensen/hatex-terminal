@@ -1,11 +1,23 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, ArrowLeft, AlertTriangle, Info, Mail, Globe, MessageCircle } from 'lucide-react';
 
 export default function PolitikPage() {
   const router = useRouter();
+  const [depositFeePct, setDepositFeePct] = useState(5);
+  const [withdrawFeePct, setWithdrawFeePct] = useState(5);
+
+  useEffect(() => {
+    fetch('/api/public/fees')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.fees?.deposit_fee_percent != null) setDepositFeePct(Number(d.fees.deposit_fee_percent));
+        if (d?.fees?.withdraw_fee_percent != null) setWithdrawFeePct(Number(d.fees.withdraw_fee_percent));
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-600 font-sans selection:bg-indigo-100">
@@ -302,11 +314,11 @@ export default function PolitikPage() {
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                 <span className="font-medium text-slate-600">Depo</span>
-                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-md text-[10px] tracking-wider">5%</span>
+                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-md text-[10px] tracking-wider">{depositFeePct}%</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-medium text-slate-600">Retrè</span>
-                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-md text-[10px] tracking-wider">5%</span>
+                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-md text-[10px] tracking-wider">{withdrawFeePct}%</span>
               </div>
             </div>
 

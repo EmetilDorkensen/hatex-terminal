@@ -14,7 +14,7 @@ export async function GET() {
 
     const clientRes = await supabaseSession
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number, account_type, enterprise_status')
+      .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, card_last4, card_number_hash, account_type, enterprise_status')
       .eq('id', user.id)
       .single();
 
@@ -26,7 +26,7 @@ export async function GET() {
         const supabaseAdmin = createSupabaseAdminClient();
         const adminRes = await supabaseAdmin
           .from('profiles')
-          .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, webhook_secret, card_number, account_type, enterprise_status')
+          .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, card_last4, card_number_hash, account_type, enterprise_status')
           .eq('id', user.id)
           .single();
         adminProfile = adminRes.data;
@@ -53,7 +53,7 @@ export async function GET() {
         has_api_key: profileHasApiKey(authoritative),
         api_key_prefix: authoritative.api_key_prefix || null,
         api_key_masked: maskApiKey(authoritative.api_key_prefix),
-        has_card: !!authoritative.card_number,
+        has_card: !!(authoritative.card_last4 || authoritative.card_number_hash),
         account_type: authoritative.account_type || 'individual',
         enterprise_status: authoritative.enterprise_status || 'none',
       },

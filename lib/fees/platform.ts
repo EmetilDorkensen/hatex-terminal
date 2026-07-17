@@ -18,7 +18,7 @@ const DEFAULTS: Record<FeeKey, number> = {
   kyc_fee: 1150,
   deposit_fee_percent: 5,
   withdraw_fee_percent: 5,
-  transfer_fee_percent: 1,
+  transfer_fee_percent: 5,
   agent_fee_per_1000: 7,
   agent_withdraw_fee_per_1000: 50,
   api_fee_per_1000: 3,

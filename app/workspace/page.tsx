@@ -10,6 +10,12 @@ import {
     Crown, MessageCircle, Activity, Radio
 } from 'lucide-react';
 import AdminAgentRechargePanel from '@/app/admin/AdminAgentRechargePanel';
+import {
+  ADMIN_PROFILE_SAFE_COLUMNS,
+  KYC_PENDING_SAFE_COLUMNS,
+  DEPOSIT_SAFE_COLUMNS,
+  WITHDRAWAL_SAFE_COLUMNS,
+} from '@/lib/admin/safe-columns';
 
 export default function WorkspacePage() {
     const router = useRouter();
@@ -137,7 +143,7 @@ export default function WorkspacePage() {
         if (canSeeSupport) {
             setActiveTab('tickets');
             tasks.push(
-                supabase.from('profiles').select('id, full_name, email, account_status, wallet_balance, kyc_status, created_at').order('created_at', { ascending: false })
+                supabase.from('profiles').select(ADMIN_PROFILE_SAFE_COLUMNS).order('created_at', { ascending: false })
                     .then(({ data }) => setUsers(data || [])),
                 supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false })
                     .then(({ data }) => setTickets(data || []))
@@ -146,16 +152,16 @@ export default function WorkspacePage() {
 
         if (canSeeFinance) {
             tasks.push(
-                supabase.from('deposits').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+                supabase.from('deposits').select(DEPOSIT_SAFE_COLUMNS).eq('status', 'pending').order('created_at', { ascending: false })
                     .then(({ data }) => setDeposits(data || [])),
-                supabase.from('withdrawals').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+                supabase.from('withdrawals').select(WITHDRAWAL_SAFE_COLUMNS).eq('status', 'pending').order('created_at', { ascending: false })
                     .then(({ data }) => setWithdrawals(data || []))
             );
         }
 
         if (canSeeCompliance) {
             tasks.push(
-                supabase.from('profiles').select('*').eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false })
+                supabase.from('profiles').select(KYC_PENDING_SAFE_COLUMNS).eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false })
                     .then(({ data }) => setPendingKyc(data || [])),
                 supabase.from('agent_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false })
                     .then(({ data }) => setPendingAgents(data || [])),
@@ -309,7 +315,13 @@ export default function WorkspacePage() {
     const apwouveDepo = async (d: any) => {
         const isModified = montanModifye[d.id] !== undefined;
         const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
-        const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
+        let frePouBiznisLa = Number(d.fee || 0);
+        try {
+          const feeRes = await fetch('/api/fees/mine');
+          const feeData = await feeRes.json().catch(() => ({}));
+          const pct = Number(feeData?.fees?.deposit_fee_percent ?? 5);
+          frePouBiznisLa = Number((montanFinal * (pct / 100)).toFixed(2));
+        } catch { /* keep */ }
 
         if (!confirm(`Konfime Depo: \nKliyan resevwa: ${montanFinal} HTG\nFrè (Biznis): ${frePouBiznisLa} HTG`)) return;
         
@@ -322,7 +334,6 @@ export default function WorkspacePage() {
                 action: 'approve_deposit',
                 deposit_id: d.id,
                 final_amount: montanFinal,
-                fee: frePouBiznisLa,
               }),
             });
             const data = await res.json();

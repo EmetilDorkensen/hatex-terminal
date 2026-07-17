@@ -77,7 +77,7 @@ export async function ensureMerchantApiCredentials(
     api_key: null as string | null,
     api_key_prefix: profile.api_key_prefix || null,
     is_merchant: profile.is_merchant === true,
-    webhook_secret: profile.webhook_secret || null,
+    webhook_secret: null as string | null, // reveal-once sèlman
     provisioned: false,
     rotated: false,
     eligibility,
@@ -122,7 +122,7 @@ export async function ensureMerchantApiCredentials(
     api_key: plainApiKey,
     api_key_prefix: plainApiKey ? plainApiKey.slice(0, 12) : profile.api_key_prefix || null,
     is_merchant: true,
-    webhook_secret: webhookSecret,
+    webhook_secret: needsWebhook ? webhookSecret : null,
     provisioned: needsNewApiKey || needsWebhook || needsMerchantFlag,
     rotated: rotate && !!plainApiKey,
     eligibility,

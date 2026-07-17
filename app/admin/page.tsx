@@ -8,6 +8,12 @@ import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
 import AdminAgentRechargePanel from './AdminAgentRechargePanel';
 import AdminFeesPanel from './AdminFeesPanel';
+import {
+  ADMIN_PROFILE_SAFE_COLUMNS,
+  KYC_PENDING_SAFE_COLUMNS,
+  DEPOSIT_SAFE_COLUMNS,
+  WITHDRAWAL_SAFE_COLUMNS,
+} from '@/lib/admin/safe-columns';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -132,19 +138,19 @@ export default function AdminSuperPage() {
     const raleDone = async () => {
         setLoading(true);
         try {
-            const { data: u } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+            const { data: u } = await supabase.from('profiles').select(ADMIN_PROFILE_SAFE_COLUMNS).order('created_at', { ascending: false });
             setAllUsers(u || []);
 
-            const { data: d } = await supabase.from('deposits').select('*').order('created_at', { ascending: false });
+            const { data: d } = await supabase.from('deposits').select(DEPOSIT_SAFE_COLUMNS).order('created_at', { ascending: false });
             setDeposits(d || []);
 
-            const { data: w } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
+            const { data: w } = await supabase.from('withdrawals').select(WITHDRAWAL_SAFE_COLUMNS).order('created_at', { ascending: false });
             setWithdrawals(w || []);
 
-            const { data: s } = await supabase.from('profiles').select('*').eq('account_status', 'suspended').order('created_at', { ascending: false });
+            const { data: s } = await supabase.from('profiles').select(ADMIN_PROFILE_SAFE_COLUMNS).eq('account_status', 'suspended').order('created_at', { ascending: false });
             setSuspendedAccounts(s || []);
 
-            const { data: k } = await supabase.from('profiles').select('*').eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false });
+            const { data: k } = await supabase.from('profiles').select(KYC_PENDING_SAFE_COLUMNS).eq('kyc_status', 'pending').not('kyc_selfie', 'is', null).order('created_at', { ascending: false });
             setPendingKyc(k || []);
 
             const { data: p } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
@@ -597,7 +603,14 @@ export default function AdminSuperPage() {
     const apwouveDepo = async (d: any) => {
         const isModified = montanModifye[d.id] !== undefined;
         const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
-        const frePouBiznisLa = isModified ? Number((montanFinal * 0.05).toFixed(2)) : Number(d.fee || 0);
+        // Frè a rekalkile nan baz (admin_approve_deposit) — preview sèlman
+        let frePouBiznisLa = Number(d.fee || 0);
+        try {
+          const feeRes = await fetch('/api/fees/mine');
+          const feeData = await feeRes.json().catch(() => ({}));
+          const pct = Number(feeData?.fees?.deposit_fee_percent ?? 5);
+          frePouBiznisLa = Number((montanFinal * (pct / 100)).toFixed(2));
+        } catch { /* keep row fee */ }
         const totalPeye = montanFinal + frePouBiznisLa;
 
         if (!confirm(`TCHEKE DEPO SA BYEN:\n\n- Kliyan an ap resevwa: ${montanFinal} HTG\n- Frè pou Antrepriz la (Biznis): ${frePouBiznisLa} HTG\n- Total kliyan an te dwe voye sou Moncash la se: ${totalPeye} HTG\n\nÈske w wè ${totalPeye} HTG a sou telefòn ou? Si wi, konfime l.`)) return;
@@ -613,7 +626,7 @@ export default function AdminSuperPage() {
                 action: 'approve_deposit',
                 deposit_id: d.id,
                 final_amount: montanFinal,
-                fee: frePouBiznisLa,
+                // fee ignored by RPC — recomputed from platform_fee_settings
               }),
             });
             const data = await res.json();
@@ -1787,7 +1800,7 @@ export default function AdminSuperPage() {
                                                 <div className="mt-6 space-y-2">
                                                     <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                                                         <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Frè Biznis La (5%):</span>
-                                                        <span className="text-xs text-emerald-700 font-bold">+{montanModifye[item.id] ? (montanModifye[item.id] * 0.05).toFixed(2) : item.fee} HTG</span>
+                                                        <span className="text-xs text-emerald-700 font-bold">+{item.fee} HTG</span>
                                                     </div>
                                                     <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
                                                         <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Total Kliyan te dwe voye a:</span>

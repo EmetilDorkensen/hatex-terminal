@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { ADMIN_GATE_COOKIE, verifyAdminGateToken } from '@/lib/security/admin-gate';
+import { WORKSPACE_GATE_COOKIE, verifyWorkspaceGateToken } from '@/lib/security/workspace-gate';
 
 export const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 
@@ -31,8 +32,13 @@ export async function isActiveStaff(email: string | undefined): Promise<boolean>
   return Boolean(staff && staff.status !== 'revoked' && staff.workspace_password_hash);
 }
 
+/** Staff dwe gen workspace gate cookie; admin dwe gen admin gate. */
 export async function canViewKycDocuments(userEmail: string | undefined): Promise<boolean> {
   if (!userEmail) return false;
   if (userEmail === ADMIN_EMAIL && (await isAdminWithGate(userEmail))) return true;
-  return isActiveStaff(userEmail);
+
+  if (!(await isActiveStaff(userEmail))) return false;
+  const cookieStore = await cookies();
+  const wsToken = cookieStore.get(WORKSPACE_GATE_COOKIE)?.value;
+  return verifyWorkspaceGateToken(wsToken, userEmail);
 }

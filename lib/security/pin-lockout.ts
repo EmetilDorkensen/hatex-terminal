@@ -34,11 +34,9 @@ export function isPinLocked(profile: PinProfile): { locked: boolean; message?: s
 }
 
 export async function verifyWalletPin(profile: PinProfile, pin: string): Promise<boolean> {
+  // Pa aksepte plaintext pin_code ankò — sèlman hash
   if (profile.pin_code_hash) {
     return verifyPin(pin, profile.pin_code_hash);
-  }
-  if (profile.pin_code) {
-    return profile.pin_code === pin;
   }
   return false;
 }
@@ -46,9 +44,6 @@ export async function verifyWalletPin(profile: PinProfile, pin: string): Promise
 export async function verifyTransactionPin(profile: PinProfile, pin: string): Promise<boolean> {
   if (profile.transaction_pin_hash) {
     return verifyPin(pin, profile.transaction_pin_hash);
-  }
-  if (profile.transaction_pin) {
-    return profile.transaction_pin === pin;
   }
   return false;
 }
@@ -68,12 +63,7 @@ export async function verifyAnyPin(profile: PinProfile, pin: string): Promise<{
 }
 
 export function hasAnyPin(profile: Pick<PinProfile, 'pin_code' | 'pin_code_hash' | 'transaction_pin' | 'transaction_pin_hash'>): boolean {
-  return !!(
-    profile.pin_code_hash ||
-    profile.pin_code ||
-    profile.transaction_pin_hash ||
-    profile.transaction_pin
-  );
+  return !!(profile.pin_code_hash || profile.transaction_pin_hash);
 }
 
 export async function buildPinFailureUpdate(currentAttempts: number) {

@@ -11,6 +11,14 @@ type FeeSetting = {
   description?: string | null;
 };
 
+type LimitSetting = {
+  limit_key: string;
+  label: string;
+  value: number;
+  unit: string;
+  description?: string | null;
+};
+
 type OverrideRow = {
   id: string;
   user_id: string;
@@ -59,6 +67,9 @@ const UNIT_HINT: Record<string, string> = {
 /** Admin sèlman — frè global + frè espesyal pa kont (konekte ak baz). */
 export default function AdminFeesPanel() {
   const [settings, setSettings] = useState<FeeSetting[]>([]);
+  const [limits, setLimits] = useState<LimitSetting[]>([]);
+  const [limitDrafts, setLimitDrafts] = useState<Record<string, string>>({});
+  const [agentTiers, setAgentTiers] = useState<{ tier: string; capacity_htg: number; label: string }[]>([]);
   const [overrides, setOverrides] = useState<OverrideRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -86,11 +97,18 @@ export default function AdminFeesPanel() {
       list.sort((a, b) => FEE_ORDER.indexOf(a.fee_key) - FEE_ORDER.indexOf(b.fee_key));
       setSettings(list);
       setOverrides(data.overrides || []);
+      setLimits(data.limits || []);
+      setAgentTiers(data.agent_tiers || []);
       const d: Record<string, string> = {};
       list.forEach((s) => {
         d[s.fee_key] = String(s.value);
       });
       setDrafts(d);
+      const ld: Record<string, string> = {};
+      (data.limits || []).forEach((l: LimitSetting) => {
+        ld[l.limit_key] = String(l.value);
+      });
+      setLimitDrafts(ld);
       if (list[0] && !list.find((s) => s.fee_key === ovFeeKey)) {
         setOvFeeKey(list[0].fee_key);
       }
@@ -120,6 +138,47 @@ export default function AdminFeesPanel() {
       if (!res.ok) throw new Error(data.error || 'Echèk sove nan baz done.');
       await load();
       setOkMsg(`Frè « ${feeKey} » sove nan baz: ${value}. Nouvo tranzaksyon ap itilize l.`);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveLimit = async (limitKey: string) => {
+    const value = Number(limitDrafts[limitKey]);
+    if (!(value >= 0) || !Number.isFinite(value)) return alert('Montan pa valab.');
+    setBusy(`lim-${limitKey}`);
+    setOkMsg('');
+    try {
+      const res = await fetch('/api/admin/fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_limit', limit_key: limitKey, value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Echèk sove limit.');
+      await load();
+      setOkMsg(`Limit « ${limitKey} » sove: ${value}.`);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveTier = async (tier: string, capacity: number) => {
+    setBusy(`tier-${tier}`);
+    try {
+      const res = await fetch('/api/admin/fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_agent_tier', tier, capacity_htg: capacity }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Echèk.');
+      await load();
+      setOkMsg(`Kapasite ajan ${tier.toUpperCase()} → ${capacity.toLocaleString()} HTG`);
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -263,7 +322,12 @@ export default function AdminFeesPanel() {
             ) : (
               settings.map((s) => {
                 const draftVal = Number(drafts[s.fee_key] ?? s.value);
-                const example = FEE_EXAMPLES[s.fee_key]?.(Number.isFinite(draftVal) ? draftVal : Number(s.value));
+                const proCap = Number(agentTiers.find((t) => t.tier === 'pro')?.capacity_htg || 55000);
+                const premCap = Number(agentTiers.find((t) => t.tier === 'premium')?.capacity_htg || 110000);
+                const example =
+                  s.fee_key === 'agent_fee_per_1000'
+                    ? `PRO ${proCap.toLocaleString()} → frè ${Math.floor((proCap / 1000) * draftVal).toLocaleString()} HTG · PREMIUM ${premCap.toLocaleString()} → frè ${Math.floor((premCap / 1000) * draftVal).toLocaleString()} HTG`
+                    : FEE_EXAMPLES[s.fee_key]?.(Number.isFinite(draftVal) ? draftVal : Number(s.value));
                 return (
                   <div key={s.fee_key} className="border border-slate-100 rounded-2xl p-4 space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-start gap-3">
@@ -301,6 +365,65 @@ export default function AdminFeesPanel() {
                   </div>
                 );
               })
+            )}
+          </div>
+
+          <div className="bg-white border border-emerald-100 rounded-3xl p-6 shadow-sm space-y-4">
+            <p className="text-xs font-bold uppercase text-emerald-700 tracking-wider">Limit sistèm (baz done)</p>
+            {limits.length === 0 ? (
+              <p className="text-sm text-rose-600 font-bold">Kouri migrasyon 20260759 pou tablo platform_limit_settings.</p>
+            ) : (
+              limits.map((l) => (
+                <div key={l.limit_key} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-slate-100 rounded-2xl p-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-900">{l.label}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">{l.limit_key}</p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={limitDrafts[l.limit_key] ?? ''}
+                    onChange={(e) => setLimitDrafts((prev) => ({ ...prev, [l.limit_key]: e.target.value }))}
+                    className="w-32 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy === `lim-${l.limit_key}`}
+                    onClick={() => saveLimit(l.limit_key)}
+                    className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase"
+                  >
+                    {busy === `lim-${l.limit_key}` ? '...' : 'Sove'}
+                  </button>
+                </div>
+              ))
+            )}
+            {agentTiers.length > 0 && (
+              <div className="pt-2 space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase">Kapasite ajan (agent_tiers)</p>
+                {agentTiers.map((t) => (
+                  <div key={t.tier} className="flex items-center gap-3">
+                    <span className="text-sm font-bold w-24">{t.label || t.tier}</span>
+                    <input
+                      type="number"
+                      defaultValue={t.capacity_htg}
+                      id={`tier-cap-${t.tier}`}
+                      className="w-32 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy === `tier-${t.tier}`}
+                      onClick={() => {
+                        const el = document.getElementById(`tier-cap-${t.tier}`) as HTMLInputElement | null;
+                        saveTier(t.tier, Number(el?.value || t.capacity_htg));
+                      }}
+                      className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold"
+                    >
+                      Sove
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
