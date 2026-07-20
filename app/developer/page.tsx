@@ -307,7 +307,7 @@ if (data.success) {
   console.log('Reyisi:', data.transaction_id, 'debite:', data.debited_from);
 } else {
   console.error('Erè:', data.error);
-  // Si fon ensifizan: data.balances.card_htg, data.balances.wallet_htg
+  // Si fon ensifizan: data.error === "Fon ensifizan"
 }`,
     php: `<?php
 // ⚠️ Sèlman sou sèvè PHP ou a

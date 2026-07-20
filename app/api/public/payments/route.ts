@@ -7,7 +7,7 @@ import { deliverWebhookEvent } from '@/lib/security/webhook-delivery';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 import {
   CLIENT_PAYMENT_PROFILE_SELECT,
-  balanceDiagnosticsFromBalances,
+  normalizeInsufficientFundsMessage,
   validateClientForCardPayment,
 } from '@/lib/security/client-payment-balance';
 import {
@@ -36,18 +36,6 @@ function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders
       ...(extraHeaders || {}),
     }
   );
-}
-
-function balanceDiagnostics(
-  balances: { card_balance: number; wallet_balance: number },
-  amount: number,
-  debitFrom?: 'card' | 'wallet'
-) {
-  return {
-    ...balanceDiagnosticsFromBalances(balances, amount),
-    debit_from: debitFrom,
-    build: API_BUILD_VERSION,
-  };
 }
 
 /** Tcheke si nouvo kòd la sou Vercel (san otantifikasyon). */
@@ -189,17 +177,10 @@ export async function POST(request: Request) {
     if (!paymentCheck.ok) {
       if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild(
-        {
-          error: paymentCheck.error,
-          ...(paymentCheck.balances
-            ? { balances: balanceDiagnostics(paymentCheck.balances, safeAmount) }
-            : {}),
-        },
+        { error: normalizeInsufficientFundsMessage(paymentCheck.error) },
         paymentCheck.status
       );
     }
-
-    const clientBalances = paymentCheck.balances;
 
     if (freshClient.id === merchant.id) {
       if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
@@ -244,10 +225,7 @@ export async function POST(request: Request) {
       const status = rpcResult?.duplicate ? 409 : 400;
       const rpcMessage = rpcResult?.message || rpcError?.message || 'Echèk nan egzekisyon peman an.';
       return jsonWithBuild(
-        {
-          error: rpcMessage,
-          balances: balanceDiagnostics(clientBalances, safeAmount, paymentCheck.debitFrom),
-        },
+        { error: normalizeInsufficientFundsMessage(rpcMessage) },
         status
       );
     }

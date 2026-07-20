@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { hashCardNumber } from '@/lib/security/hash';
+import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
 
 const MAX_CARD_ATTEMPTS = 6;
 const CARD_LOCK_WINDOW_SEC = 15 * 60;
@@ -66,7 +67,10 @@ export async function POST(
 
     const res = result as { success?: boolean; message?: string; redirect_url?: string } | null;
     if (!res?.success) {
-      return NextResponse.json({ success: false, message: res?.message || 'Peman an echwe.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: normalizeInsufficientFundsMessage(res?.message || 'Peman an echwe.') },
+        { status: 400 }
+      );
     }
 
     // Webhook machann — sou sèvè sèlman (pa ekspoze URL nan navigatè)

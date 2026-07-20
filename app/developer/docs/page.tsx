@@ -198,12 +198,7 @@ if (data.success) {
 }`}</pre>
           <p className="text-gray-400 text-sm mt-4 mb-2">Erè fon ensifizan (HTTP 400):</p>
           <pre className="text-sm text-gray-300 bg-gray-900 rounded-lg p-4 border border-gray-800 overflow-x-auto">{`{
-  "error": "Fon ensifizan pou 1500.00 HTG. Balans kat: ...",
-  "balances": {
-    "card_htg": 500,
-    "wallet_htg": 0,
-    "required_htg": 1500
-  }
+  "error": "Fon ensifizan"
 }`}</pre>
           <div className="overflow-x-auto mt-4">
             <table className="w-full text-sm border border-gray-800 rounded-lg overflow-hidden">

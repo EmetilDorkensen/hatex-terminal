@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { hashCardNumber } from '@/lib/security/hash';
+import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
 
 // Peman abònman ak kat — TOUT verifikasyon ak mouvman balans fèt sou sèvè a.
 // Navigatè a pa janm resevwa balans/PII kliyan an ankò, ni li pa modifye okenn
@@ -102,7 +103,10 @@ export async function POST(request: Request) {
 
     const res = result as { success?: boolean; message?: string; reference?: string } | null;
     if (!res?.success) {
-      return NextResponse.json({ success: false, error: res?.message || 'Peman an pa t reyisi.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: normalizeInsufficientFundsMessage(res?.message || 'Peman an pa t reyisi.') },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ success: true, reference: res.reference });

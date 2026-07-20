@@ -209,12 +209,7 @@ BEGIN
   ELSIF COALESCE(v_client_wallet_balance, 0) >= p_amount THEN
     v_debit_source := 'wallet';
   ELSE
-    RETURN json_build_object(
-      'success', false,
-      'message',
-      'Ou pa gen ase fon. Kat: ' || COALESCE(v_client_card_balance, 0)
-        || ' HTG, Wallet: ' || COALESCE(v_client_wallet_balance, 0) || ' HTG.'
-    );
+    RETURN json_build_object('success', false, 'message', 'Fon ensifizan');
   END IF;
 
   SELECT wallet_balance, account_type
@@ -358,7 +353,7 @@ BEGIN
     RETURN json_build_object('success', false, 'message', 'Kont kliyan an pa aktif.');
   END IF;
   IF v_client_card < v_inv.amount THEN
-    RETURN json_build_object('success', false, 'message', 'Ou pa gen ase fon sou kat ou a.');
+    RETURN json_build_object('success', false, 'message', 'Fon ensifizan');
   END IF;
 
   SELECT COALESCE(wallet_balance, 0), account_type
@@ -457,7 +452,7 @@ BEGIN
   END IF;
 
   IF v_client_card_balance < p_amount THEN
-    RETURN json_build_object('success', false, 'message', 'Ou pa gen ase fon sou kat ou a.');
+    RETURN json_build_object('success', false, 'message', 'Fon ensifizan');
   END IF;
 
   SELECT COALESCE(wallet_balance, 0), account_type
@@ -549,7 +544,7 @@ BEGIN
 
   SELECT card_balance INTO v_client_card FROM public.profiles WHERE id = v_sub.client_id;
   IF COALESCE(v_client_card, 0) < p_amount THEN
-    RETURN json_build_object('success', false, 'message', 'Balans kat kliyan an pa ase.');
+    RETURN json_build_object('success', false, 'message', 'Fon ensifizan');
   END IF;
 
   SELECT wallet_balance, account_type INTO v_merchant_wallet, v_merchant_type
@@ -611,7 +606,7 @@ BEGIN
   END IF;
 
   IF COALESCE(v_buyer.card_balance, 0) < v_payment.amount THEN
-    RETURN json_build_object('success', false, 'message', 'Ou pa gen ase lajan sou kat ou pou peman sa a.');
+    RETURN json_build_object('success', false, 'message', 'Fon ensifizan');
   END IF;
 
   SELECT wallet_balance, account_type INTO v_merchant_balance, v_merchant_account_type

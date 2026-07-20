@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { hashCardNumber } from '@/lib/security/hash';
+import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
 
 const MAX_CARD_ATTEMPTS = 6;
 const CARD_LOCK_WINDOW_SEC = 15 * 60;
@@ -71,14 +72,17 @@ export async function POST(
     if (error) {
       console.error('invoice pay rpc:', error.message);
       return NextResponse.json(
-        { success: false, message: error.message || 'Peman an pa t reyisi.' },
+        { success: false, message: normalizeInsufficientFundsMessage(error.message || 'Peman an pa t reyisi.') },
         { status: 400 }
       );
     }
 
     const res = result as { success?: boolean; message?: string } | null;
     if (!res?.success) {
-      return NextResponse.json({ success: false, message: res?.message || 'Peman an echwe.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: normalizeInsufficientFundsMessage(res?.message || 'Peman an echwe.') },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ success: true, message: res.message || 'Peman an reyisi!' });

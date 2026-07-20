@@ -52,24 +52,31 @@ export function balanceDiagnosticsFromBalances(
   };
 }
 
+/** Mesaj inik pou tout peman kat san ase lajan — pa ekspoze balans ni chemen teknik. */
+export const INSUFFICIENT_FUNDS_MESSAGE = 'Fon ensifizan';
+
 /** Menm mesaj ak subscribe/[id]/page.tsx lè card_balance pa ase pou montan an. */
-export function insufficientCardBalanceMessage(balances: ClientPaymentBalances, amount: number): string {
-  return `Ou pa gen ase fon sou kat ou a. Balans kat ou se: ${balances.card_balance.toFixed(2)} HTG (bezwen ${amount.toFixed(2)} HTG).`;
+export function insufficientCardBalanceMessage(_balances?: ClientPaymentBalances, _amount?: number): string {
+  return INSUFFICIENT_FUNDS_MESSAGE;
 }
 
-export function insufficientClientFundsMessage(balances: ClientPaymentBalances, amount: number): string {
-  if (balances.card_balance < amount && balances.wallet_balance >= amount) {
-    return (
-      `Balans kat (${balances.card_balance.toFixed(2)} HTG) pa ase, men wallet ou gen ${balances.wallet_balance.toFixed(2)} HTG. ` +
-      `Peman an ap soti nan wallet la. Pou debite kat la dirèkteman, ale sou /kat/recharge.`
-    );
+export function insufficientClientFundsMessage(_balances?: ClientPaymentBalances, _amount?: number): string {
+  return INSUFFICIENT_FUNDS_MESSAGE;
+}
+
+/** Si RPC oswa lòt kouch voye mesaj long sou fon, normalize l. */
+export function normalizeInsufficientFundsMessage(message: string | null | undefined): string {
+  const m = String(message || '');
+  if (
+    /fon ensifizan/i.test(m) ||
+    /pa gen ase fon/i.test(m) ||
+    /pa gen ase lajan/i.test(m) ||
+    /balans kat/i.test(m) ||
+    /card_balance/i.test(m)
+  ) {
+    return INSUFFICIENT_FUNDS_MESSAGE;
   }
-  return (
-    `Fon ensifizan pou ${amount.toFixed(2)} HTG. ` +
-    `Balans kat (profiles.card_balance): ${balances.card_balance.toFixed(2)} HTG, ` +
-    `balans wallet: ${balances.wallet_balance.toFixed(2)} HTG. ` +
-    `Si lajan an sou Dashboard (wallet) epi pa sou /kat, ale sou /kat/recharge pou transfere l sou kat la.`
-  );
+  return m || INSUFFICIENT_FUNDS_MESSAGE;
 }
 
 export type ClientPaymentValidation =

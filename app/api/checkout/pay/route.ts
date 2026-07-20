@@ -4,6 +4,7 @@ import { findProfileByCard } from '@/lib/security/card-lookup';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { hashCardNumber } from '@/lib/security/hash';
 import { checkApiReceiveLimit } from '@/lib/security/spending-limits';
+import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
 
 const MAX_CARD_ATTEMPTS = 6;
 const CARD_LOCK_WINDOW_SEC = 15 * 60;
@@ -127,7 +128,10 @@ export async function POST(request: Request) {
 
     const res = result as { success?: boolean; message?: string; transaction_id?: string } | null;
     if (!res?.success) {
-      return NextResponse.json({ success: false, message: res?.message || 'Peman an echwe.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: normalizeInsufficientFundsMessage(res?.message || 'Peman an echwe.') },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({
