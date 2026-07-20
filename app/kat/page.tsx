@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { ArrowLeft, Copy, Eye, EyeOff, ShieldCheck, Lock, IdCard, CheckCircle2, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Eye, EyeOff, ShieldCheck, Lock, IdCard, CheckCircle2, Plus, Loader2, Snowflake, Unlock } from 'lucide-react';
+import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
 
 export default function KatPage() {
   const router = useRouter();
@@ -12,6 +13,11 @@ export default function KatPage() {
   const [loading, setLoading] = useState(true);
   const [showNumbers, setShowNumbers] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [freezeTarget, setFreezeTarget] = useState<boolean | null>(null);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [freezeBusy, setFreezeBusy] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,7 +31,7 @@ export default function KatPage() {
         if (user) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('id, full_name, email, wallet_balance, card_balance, kyc_status, is_card_activated, card_last4, exp_date, account_type')
+            .select('id, full_name, email, wallet_balance, card_balance, kyc_status, is_card_activated, is_card_frozen, card_last4, exp_date, account_type')
             .eq('id', user.id)
             .maybeSingle();
           
@@ -72,6 +78,7 @@ export default function KatPage() {
                   card_balance: next.card_balance,
                   kyc_status: next.kyc_status,
                   is_card_activated: next.is_card_activated,
+                  is_card_frozen: next.is_card_frozen,
                   card_last4: next.card_last4,
                   exp_date: next.exp_date,
                 }));
@@ -125,6 +132,51 @@ export default function KatPage() {
 
   const kycPending = userData?.kyc_status !== 'approved';
   const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
+  const cardFrozen = userData?.is_card_frozen === true;
+
+  const openFreezePrompt = (freeze: boolean) => {
+    setFreezeTarget(freeze);
+    setEnteredPin('');
+    setPinError('');
+    setShowPinPrompt(true);
+  };
+
+  const executeFreezeToggle = async () => {
+    if (enteredPin.length !== 4 || freezeTarget === null) {
+      setPinError('PIN nan dwe gen 4 chif');
+      return;
+    }
+    setFreezeBusy(true);
+    setPinError('');
+    try {
+      const res = await fetch('/api/card/freeze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frozen: freezeTarget, pin: enteredPin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.needs_pin_setup) {
+          setPinError(data.error || 'Kreye PIN nan Paramèt.');
+          return;
+        }
+        setPinError(data.error || 'Operasyon echwe.');
+        setEnteredPin('');
+        return;
+      }
+      setUserData((prev: any) =>
+        prev ? { ...prev, is_card_frozen: data.is_card_frozen === true } : prev
+      );
+      setShowPinPrompt(false);
+      setFreezeTarget(null);
+      setCopyStatus(data.is_card_frozen ? 'Kat friz' : 'Kat aktif ankò');
+      setTimeout(() => setCopyStatus(''), 2500);
+    } catch {
+      setPinError('Erè koneksyon.');
+    } finally {
+      setFreezeBusy(false);
+    }
+  };
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
@@ -155,9 +207,9 @@ export default function KatPage() {
         <div className="text-right">
           <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider leading-none mb-1">Kat Vityèl</p>
           <div className="flex items-center justify-end gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${cardFullyActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-            <p className={`text-xs font-bold uppercase tracking-wide ${cardFullyActive ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {cardFullyActive ? 'Aktif' : 'Bloke'}
+            <div className={`w-2 h-2 rounded-full ${!cardFullyActive ? 'bg-rose-500' : cardFrozen ? 'bg-sky-500' : 'bg-emerald-500'}`}></div>
+            <p className={`text-xs font-bold uppercase tracking-wide ${!cardFullyActive ? 'text-rose-600' : cardFrozen ? 'text-sky-600' : 'text-emerald-600'}`}>
+              {!cardFullyActive ? 'Bloke' : cardFrozen ? 'Friz' : 'Aktif'}
             </p>
           </div>
         </div>
@@ -173,7 +225,7 @@ export default function KatPage() {
               <IdCard size={28} />
             </div>
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">KYC Obligatwa</h3>
-            <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">Pase KYC  (kat enkli) epi verifye idantite w.</p>
+            <p className="text-xs text-slate-500 font-medium mb-6 px-4 leading-relaxed">Pase KYC (525 HTG soumèt) epi verifye idantite w.</p>
             <button onClick={() => router.push('/kyc')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-bold text-xs uppercase shadow-sm transition-colors tracking-wider flex items-center gap-2">
               Pase KYC
             </button>
@@ -182,12 +234,17 @@ export default function KatPage() {
 
         {userData?.kyc_status === 'approved' && !cardFullyActive && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-3xl bg-white/95 backdrop-blur-md p-6 text-center border border-indigo-200 shadow-sm mx-auto aspect-[1.58/1]">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
-            <p className="text-sm font-bold text-slate-800">Ap prepare kat ou...</p>
+            <FeaturesUnlockPanel
+              variant="overlay"
+              onUnlocked={() => {
+                setUserData((prev: any) =>
+                  prev ? { ...prev, is_card_activated: true, features_unlock_paid: true } : prev
+                );
+                window.location.reload();
+              }}
+            />
           </div>
         )}
-
-        {/* KAT VISUAL — removed separate 520 activation overlay */}
 
         {/* DESIGN KAT LA */}
         <div className={`relative bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-indigo-700/50 w-full aspect-[1.58/1] flex flex-col justify-between overflow-hidden transition-all duration-300`}>
@@ -266,6 +323,15 @@ export default function KatPage() {
       {/* AKSYON YO (Sèlman si kat la aktif) */}
       {cardFullyActive && (
         <div className="max-w-[420px] mx-auto w-full space-y-4 animate-in slide-in-from-bottom-6 duration-500">
+          {cardFrozen && (
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 text-center">
+              <p className="text-xs font-bold text-sky-800 uppercase tracking-wider mb-1">Kat friz</p>
+              <p className="text-[11px] text-sky-700 leading-relaxed">
+                Ou pa ka peye anyen ak kat sa a jiskaske ou defriz li (PIN obligatwa).
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={() => handleCopy(userData?.card_number, "Nimewo")} 
@@ -280,6 +346,19 @@ export default function KatPage() {
               <Copy size={16} className="text-indigo-500" /> Kopye CVV
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => openFreezePrompt(!cardFrozen)}
+            className={`w-full py-4 rounded-xl font-bold uppercase text-[11px] sm:text-xs tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm border ${
+              cardFrozen
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                : 'bg-white hover:bg-sky-50 text-sky-800 border-sky-200'
+            }`}
+          >
+            {cardFrozen ? <Unlock size={18} /> : <Snowflake size={18} />}
+            {cardFrozen ? 'Defriz / Aktive Kat' : 'Friz Kat la'}
+          </button>
           
           <button 
             onClick={() => router.push('/kat/recharge')}
@@ -287,6 +366,75 @@ export default function KatPage() {
           >
             <Plus size={18} /> Rechaje Kat la (0 Frè)
           </button>
+        </div>
+      )}
+
+      {showPinPrompt && freezeTarget !== null && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 p-8 rounded-3xl w-full max-w-sm text-center shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${
+              freezeTarget ? 'bg-sky-50 text-sky-600 border-sky-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+            }`}>
+              {freezeTarget ? <Snowflake size={28} /> : <Unlock size={28} />}
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2 tracking-tight">
+              {freezeTarget ? 'Friz Kat la' : 'Defriz Kat la'}
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">
+              {freezeTarget
+                ? 'Antre PIN 4 chif ou a pou friz kat la. Apre sa, kat la pa ka peye anyen.'
+                : 'Antre PIN 4 chif ou a pou aktive kat la ankò epi pèmèt peman.'}
+            </p>
+
+            <input
+              type="password"
+              maxLength={4}
+              autoFocus
+              placeholder="••••"
+              value={enteredPin}
+              onChange={(e) => setEnteredPin(e.target.value.replace(/[^0-9]/g, ''))}
+              className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl text-center text-3xl font-mono tracking-[0.5em] outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 mb-6 text-slate-900 transition-all shadow-sm"
+            />
+
+            {pinError && (
+              <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg mb-6">
+                <p className="text-xs text-rose-600 font-bold uppercase tracking-wider">{pinError}</p>
+                {pinError.includes('Paramèt') && (
+                  <button
+                    type="button"
+                    onClick={() => router.push('/setting')}
+                    className="mt-2 text-[10px] font-bold text-indigo-600 underline"
+                  >
+                    Ale nan Paramèt
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPinPrompt(false);
+                  setFreezeTarget(null);
+                  setEnteredPin('');
+                  setPinError('');
+                }}
+                disabled={freezeBusy}
+                className="flex-1 bg-white border border-gray-300 text-slate-700 py-3.5 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 transition-all shadow-sm"
+              >
+                Anile
+              </button>
+              <button
+                type="button"
+                onClick={executeFreezeToggle}
+                disabled={freezeBusy || enteredPin.length !== 4}
+                className="flex-1 bg-indigo-600 text-white py-3.5 rounded-xl font-bold uppercase text-xs hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm flex items-center justify-center"
+              >
+                {freezeBusy ? <Loader2 size={16} className="animate-spin" /> : 'Konfime'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

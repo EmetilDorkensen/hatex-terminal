@@ -51,11 +51,12 @@ const FEE_EXAMPLES: Record<string, (v: number) => string> = {
     `Echèl P2P: ${v}/5 × tablo MonCash. Egz. 1 000 HTG → baz 25 × ${(v / 5).toFixed(2)} = ${(25 * (v / 5)).toLocaleString()} HTG. 0 = gratis.`,
   agent_fee_per_1000: (v) =>
     `PRO 55 000 → frè ${Math.floor((55000 / 1000) * v).toLocaleString()} HTG · PREMIUM 110 000 → frè ${Math.floor((110000 / 1000) * v).toLocaleString()} HTG`,
-  kyc_fee: (v) => `Kliyan peye ${v.toLocaleString()} HTG yon sèl fwa (kat enkli)`,
+  kyc_fee: (v) => `Premye pati: ${v.toLocaleString()} HTG pou soumèt dokiman KYC (pwofi biznis)`,
   enterprise_application_fee: (v) => `Pasaj antrepriz: ${v.toLocaleString()} HTG (ranbouse si rejte)`,
   api_fee_per_1000: (v) =>
     `API resevwa 10 000 → frè ${((10000 / 1000) * v).toLocaleString()} HTG, machann net ${(10000 - (10000 / 1000) * v).toLocaleString()}`,
-  card_activation_fee: (v) => (v <= 0 ? 'Pa itilize (KYC enkli kat)' : `Frè kat: ${v.toLocaleString()} HTG`),
+  card_activation_fee: (v) =>
+    `Dezyèm pati: ${v.toLocaleString()} HTG pou debloke kat, terminal ak fakti apre KYC apwouve`,
 };
 
 const UNIT_HINT: Record<string, string> = {
@@ -468,7 +469,7 @@ export default function AdminFeesPanel() {
                     Frè aktif pou kont sa a: depo {previewFees.deposit_fee_percent ?? '—'}% ·
                     retrè {previewFees.withdraw_fee_percent ?? '—'}% ·
                     ajan {previewFees.agent_withdraw_fee_per_1000 ?? '—'}/1000 ·
-                    KYC {previewFees.kyc_fee ?? '—'} HTG
+                    KYC {previewFees.kyc_fee ?? '—'} + debloke {previewFees.card_activation_fee ?? '—'} HTG
                   </p>
                 )}
               </div>

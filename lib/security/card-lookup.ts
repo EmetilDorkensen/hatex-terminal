@@ -18,6 +18,8 @@ type CardProfile = {
   cvv?: string | null;
   card_number_hash?: string | null;
   cvv_hash?: string | null;
+  is_card_frozen?: boolean | null;
+  is_card_activated?: boolean | null;
 };
 
 function matchesExpiry(profileExp: string | null | undefined, rawExp: string, slashedExp: string): boolean {
@@ -52,7 +54,7 @@ export async function findProfileByCard(
 
   const { data: hashedProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, exp_date, cvv_hash, card_number_hash, card_last4')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, exp_date, cvv_hash, card_number_hash, card_last4, is_card_frozen, is_card_activated')
     .eq('card_number_hash', cardHash)
     .maybeSingle();
 
@@ -62,12 +64,15 @@ export async function findProfileByCard(
     if (!matchesExpiry(hashedProfile.exp_date, rawExp, slashedExp)) {
       return { profile: null, error: 'Dat ekspirasyon pa bon.' };
     }
+    if (hashedProfile.is_card_frozen === true) {
+      return { profile: null, error: 'Kat sa a friz. Defriz li anvan ou ka peye.' };
+    }
     return { profile: hashedProfile };
   }
 
   const { data: legacyProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, exp_date, card_number, cvv')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, exp_date, card_number, cvv, is_card_frozen, is_card_activated')
     .eq('card_number', cleanCard)
     .maybeSingle();
 
@@ -78,6 +83,9 @@ export async function findProfileByCard(
   }
   if (!matchesExpiry(legacyProfile.exp_date, rawExp, slashedExp)) {
     return { profile: null, error: 'Dat ekspirasyon pa bon.' };
+  }
+  if (legacyProfile.is_card_frozen === true) {
+    return { profile: null, error: 'Kat sa a friz. Defriz li anvan ou ka peye.' };
   }
 
   await upgradeLegacyCard(supabase, legacyProfile, cleanCard, cvv);
@@ -94,24 +102,30 @@ export async function findProfileByCardSimple(
 
   const { data: hashedProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, cvv_hash')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, cvv_hash, is_card_frozen')
     .eq('card_number_hash', cardHash)
     .maybeSingle();
 
   if (hashedProfile) {
     const cvvOk = await verifyCvv(cvv, hashedProfile.cvv_hash);
     if (!cvvOk) return { profile: null, error: 'CVV pa bon.' };
+    if (hashedProfile.is_card_frozen === true) {
+      return { profile: null, error: 'Kat sa a friz. Defriz li anvan ou ka peye.' };
+    }
     return { profile: hashedProfile };
   }
 
   const { data: legacyProfile } = await supabase
     .from('profiles')
-    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, card_number, cvv')
+    .select('id, wallet_balance, card_balance, full_name, account_status, account_type, card_number, cvv, is_card_frozen')
     .eq('card_number', cleanCard)
     .eq('cvv', String(cvv))
     .maybeSingle();
 
   if (legacyProfile) {
+    if (legacyProfile.is_card_frozen === true) {
+      return { profile: null, error: 'Kat sa a friz. Defriz li anvan ou ka peye.' };
+    }
     await upgradeLegacyCard(supabase, legacyProfile, cleanCard, cvv);
   }
   return { profile: legacyProfile };

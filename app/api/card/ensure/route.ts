@@ -10,8 +10,8 @@ import {
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 
 type CardPayload = {
-  card_number: string;
-  cvv: string;
+  card_number: string | null;
+  cvv: string | null;
   exp_date: string | null;
   card_last4: string;
   masked: string;
@@ -31,7 +31,7 @@ async function buildOwnerCardResponse(
   };
 }
 
-/** Owner-only: retounen kat dechifre. Pa ekspoze via profiles.select. */
+/** Owner-only: retounen kat dechifre. Pa ekspoze via profiles.select. Kle jiskaske is_card_activated. */
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const supabase = createSupabaseAdminClient();
     const { data: profile } = await supabase
       .from('profiles')
-      .select('kyc_status, card_number, cvv, exp_date, card_number_hash, card_last4')
+      .select('kyc_status, is_card_activated, features_unlock_paid, card_number, cvv, exp_date, card_number_hash, card_last4')
       .eq('id', user.id)
       .single();
 
@@ -60,11 +60,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ card: null });
     }
 
+    const unlocked =
+      profile.is_card_activated === true || profile.features_unlock_paid === true;
+
+    // Kat egziste men bloke — pa revele PAN/CVV, pa kreye nouvo
     if (profile.card_number_hash && profile.card_number) {
       let plainNum = decryptCardField(profile.card_number);
       let plainCvv = decryptCardField(profile.cvv);
 
-      // Migrasyon: si te rete plaintext, chifre l kounye a
       if (plainNum && plainCvv && (!isEncryptedCardField(profile.card_number) || !isEncryptedCardField(profile.cvv))) {
         await supabase
           .from('profiles')
@@ -75,7 +78,24 @@ export async function POST(request: Request) {
           .eq('id', user.id);
       }
 
-      if (!plainNum || !plainCvv) {
+      if (!plainNum) {
+        return NextResponse.json({ card: null, error: 'Kat pa ka li.' }, { status: 500 });
+      }
+
+      if (!unlocked) {
+        return NextResponse.json({
+          locked: true,
+          card: {
+            card_number: null,
+            cvv: null,
+            exp_date: profile.exp_date,
+            card_last4: profile.card_last4 || plainNum.slice(-4),
+            masked: maskCardNumber(plainNum),
+          },
+        });
+      }
+
+      if (!plainCvv) {
         return NextResponse.json({ card: null, error: 'Kat pa ka li.' }, { status: 500 });
       }
 
@@ -96,6 +116,15 @@ export async function POST(request: Request) {
       });
     }
 
+    // Pa kreye kat san debloke — admin KYC approve se ki kreye l bloke
+    if (!unlocked) {
+      return NextResponse.json({
+        locked: true,
+        card: null,
+        message: 'Peye frè debloke (525 HTG) pou aktive kat, terminal ak fakti.',
+      });
+    }
+
     const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
     const newCardNum = `4550${random4()}${random4()}${random4()}`;
     const newCvv = Math.floor(100 + Math.random() * 900).toString();
@@ -111,6 +140,7 @@ export async function POST(request: Request) {
         cvv: encryptCardField(newCvv),
         exp_date: newExp,
         is_card_activated: true,
+        features_unlock_paid: true,
         ...securityFields,
       })
       .eq('id', user.id);

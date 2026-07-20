@@ -36,6 +36,8 @@ export async function GET() {
     wallet_balance_htg: Number(profile?.wallet_balance || 0),
     kyc_fee_paid: profile?.kyc_fee_paid === true,
     kyc_status: profile?.kyc_status,
+    phase: 'submit',
+    note: 'Premye 525 HTG pou soumèt dokiman. Dezyèm 525 HTG apre apwobasyon pou debloke kat/terminal/fakti.',
   });
 }
 
@@ -100,6 +102,6 @@ export async function POST(request: Request) {
     success: true,
     charged_htg: result.charged_htg,
     wallet_balance_htg: result.wallet_balance_htg,
-    message: 'Frè KYC peye. Ou ka soumèt dokiman w yo kounye a.',
+    message: 'Frè soumèt KYC peye (525 HTG). Ou ka telechaje dokiman yo kounye a.',
   });
 }

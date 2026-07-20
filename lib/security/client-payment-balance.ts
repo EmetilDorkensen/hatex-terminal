@@ -6,7 +6,7 @@ export type ClientPaymentBalances = {
 
 /** Menm chanm yo lòt paj peman kat yo li nan `profiles` (subscribe, verify-card, checkout RPC). */
 export const CLIENT_PAYMENT_PROFILE_SELECT =
-  'id, card_balance, wallet_balance, account_status, full_name, account_type, is_activated, is_card_activated';
+  'id, card_balance, wallet_balance, account_status, full_name, account_type, is_activated, is_card_activated, is_card_frozen';
 
 export type ClientPaymentProfile = {
   id: string;
@@ -17,6 +17,7 @@ export type ClientPaymentProfile = {
   account_type?: string | null;
   is_activated?: boolean | null;
   is_card_activated?: boolean | null;
+  is_card_frozen?: boolean | null;
 };
 
 export function normalizeClientBalances(row: {
@@ -88,6 +89,14 @@ export function validateClientForCardPayment(
         profile.account_status === 'suspended'
           ? 'Kont ou sispann. Kontakte sipò HatexCard pou debloke l.'
           : 'Kont ki asosye ak kat sa a pa aktif.',
+    };
+  }
+
+  if (profile.is_card_frozen === true) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'Kat ou friz. Defriz li nan paj Kat (PIN obligatwa) anvan ou ka peye.',
     };
   }
 

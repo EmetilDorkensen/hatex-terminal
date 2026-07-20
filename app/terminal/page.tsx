@@ -366,7 +366,7 @@ export default function TerminalPage() {
         if (!isMounted) return;
 
         if (!canAccessTerminal(prof)) {
-          alert('Ou dwe gen KYC apwouve epi kat aktive anvan w itilize Terminal la.');
+          alert('Ou dwe gen KYC apwouve epi peye frè debloke (525 HTG) anvan w itilize Terminal la.');
           router.push('/dashboard');
           return;
         }

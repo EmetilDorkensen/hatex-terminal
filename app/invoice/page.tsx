@@ -8,6 +8,7 @@ import {
   AlertTriangle, Building2, Clock, XCircle, Trash2, ShieldCheck, Link as LinkIcon
 } from 'lucide-react';
 import { checkSpendingLimit, INDIVIDUAL_INVOICE_DAILY_LIMIT, isEnterpriseAccount } from '@/lib/security/spending-limits';
+import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
 
 export default function InvoicePage() {
   const router = useRouter();
@@ -83,12 +84,23 @@ export default function InvoicePage() {
 
       const { data: freshProfile } = await supabase
         .from('profiles')
-        .select('kyc_status, business_name, full_name, account_type')
+        .select('kyc_status, is_card_activated, features_unlock_paid, business_name, full_name, account_type')
         .eq('id', user.id)
         .single();
 
       if (freshProfile?.kyc_status !== 'approved') {
         setMessage({ type: 'error', text: "Ou dwe pase verifikasyon KYC anvan ou ka voye fakti." });
+        setSending(false);
+        return;
+      }
+
+      const unlocked =
+        freshProfile?.is_card_activated === true || freshProfile?.features_unlock_paid === true;
+      if (!unlocked) {
+        setMessage({
+          type: 'error',
+          text: 'Kat, terminal ak fakti bloke. Peye 525 HTG sou dashboard pou debloke yo.',
+        });
         setSending(false);
         return;
       }
@@ -190,6 +202,10 @@ export default function InvoicePage() {
     );
   }
 
+  const invoiceUnlocked =
+    profile?.kyc_status === 'approved' &&
+    (profile?.is_card_activated === true || profile?.features_unlock_paid === true);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-16">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8">
@@ -211,6 +227,26 @@ export default function InvoicePage() {
             </p>
           </div>
         </div>
+
+        {profile?.kyc_status === 'approved' && !invoiceUnlocked && (
+          <FeaturesUnlockPanel
+            variant="banner"
+            onUnlocked={() => {
+              setProfile((prev: any) =>
+                prev ? { ...prev, is_card_activated: true, features_unlock_paid: true } : prev
+              );
+            }}
+          />
+        )}
+
+        {profile?.kyc_status !== 'approved' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
+            Ou dwe pase KYC anvan ou ka voye fakti.{' '}
+            <button type="button" className="font-bold underline" onClick={() => router.push('/kyc')}>
+              Ale nan KYC
+            </button>
+          </div>
+        )}
 
         {/* Limit info */}
         <div className={`p-4 rounded-2xl border mb-6 flex items-start gap-3 ${enterprise ? 'bg-emerald-50 border-emerald-100' : 'bg-indigo-50 border-indigo-100'}`}>
@@ -276,7 +312,7 @@ export default function InvoicePage() {
 
           <button
             type="submit"
-            disabled={sending}
+            disabled={sending || !invoiceUnlocked}
             className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
           >
             {sending ? <Loader2 className="animate-spin" size={20} /> : (<><Send size={16} /> Voye Fakti</>)}

@@ -261,14 +261,15 @@ export default function KYCPage() {
               <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-5 border border-indigo-100 mx-auto">
                 <CreditCard size={28} />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2 text-center">Frè Verifikasyon KYC</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-2 text-center">Frè Soumèt KYC</h2>
               <p className="text-xs text-slate-500 text-center mb-6 leading-relaxed">
-                Peye <strong className="text-slate-800">{KYC_FEE_HTG.toLocaleString()} HTG</strong> yon sèl fwa — enkli verifikasyon ID, kat vityèl, ak terminal. Pa gen okenn frè apa apre sa.
+                Premye pati: <strong className="text-slate-800">{KYC_FEE_HTG.toLocaleString()} HTG</strong> sou wallet pou soumèt dokiman.
+                Apre apwobasyon, yon dezyèm <strong className="text-slate-800">525 HTG</strong> ap debloke kat, terminal ak fakti.
               </p>
 
               <div className="bg-slate-50 rounded-xl p-4 space-y-2 mb-6 border border-gray-100">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Frè KYC (kat enkli)</span>
+                  <span className="text-slate-500">Frè soumèt dokiman</span>
                   <span className="font-bold">{KYC_FEE_HTG.toLocaleString()} HTG</span>
                 </div>
                 {(feeInfo?.discount_htg || 0) > 0 && (

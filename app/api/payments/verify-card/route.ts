@@ -45,12 +45,19 @@ export async function POST(request: Request) {
 
     const { data: fullProfile } = await supabase
       .from('profiles')
-      .select('id, is_activated, account_status')
+      .select('id, is_activated, account_status, is_card_frozen')
       .eq('id', profile.id)
       .single();
 
     if (!fullProfile) {
       return NextResponse.json({ valid: false, error: 'Kat pa rekonèt.' }, { status: 401 });
+    }
+
+    if (fullProfile.is_card_frozen === true) {
+      return NextResponse.json(
+        { valid: false, error: 'Kat sa a friz. Defriz li anvan ou ka peye.', card_frozen: true },
+        { status: 403 }
+      );
     }
 
     // ⚠️ Pa janm retounen PII (non, imèl, balans, UUID) bay yon moun ki jis gen

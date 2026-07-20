@@ -10,11 +10,23 @@ function generateCardDetails() {
   return { cardNumber, cvv, expDate };
 }
 
-/** Kreye kat vityèl + aktive li otomatikman apre KYC apwouve. PAN/CVV chifre at-rest. */
+export type ProvisionCardOptions = {
+  /** true = debloke itilizasyon; false = kreye kat men rete bloke (kle). */
+  activate?: boolean;
+};
+
+/**
+ * Kreye kat vityèl (PAN/CVV chifre at-rest).
+ * Apre KYC apwouve: activate=false (kle jiskaske dezyèm 525).
+ * Apre unlock fee: activate=true.
+ */
 export async function provisionCardForUser(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  options: ProvisionCardOptions = {}
 ): Promise<{ created: boolean; card_last4?: string }> {
+  const activate = options.activate === true;
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('card_number, card_number_hash, card_last4, exp_date, is_card_activated')
@@ -26,7 +38,7 @@ export async function provisionCardForUser(
   }
 
   if (profile.card_number_hash) {
-    if (!profile.is_card_activated) {
+    if (activate && !profile.is_card_activated) {
       await supabase.from('profiles').update({ is_card_activated: true }).eq('id', userId);
     }
     return { created: false, card_last4: profile.card_last4 || undefined };
@@ -41,7 +53,7 @@ export async function provisionCardForUser(
       card_number: encryptCardField(cardNumber),
       cvv: encryptCardField(cvv),
       exp_date: expDate,
-      is_card_activated: true,
+      is_card_activated: activate,
       ...securityFields,
     })
     .eq('id', userId);

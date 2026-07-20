@@ -7,6 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { checkStrongPassword } from '@/lib/security/password-strength';
 import { isKycApproved } from '@/lib/kyc/status';
 import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
+import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
@@ -543,7 +544,7 @@ export default function Dashboard() {
               <button 
                 onClick={() => {
                   if (cardFullyActive) { router.push('/terminal'); setIsMenuOpen(false); } 
-                  else { alert("⚠️ Ou dwe pase KYC epi tann apwobasyon anvan w ka itilize Terminal la."); }
+                  else { alert("Ou dwe pase KYC, tann apwobasyon, epi peye 525 HTG pou debloke Terminal la."); }
                 }} 
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
               >
@@ -763,13 +764,34 @@ export default function Dashboard() {
                 </div>
                 <span className="text-xs font-semibold text-slate-700">Transfè</span>
               </button>
-              <button onClick={() => router.push('/invoice')} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:shadow-md transition-all group">
+              <button
+                onClick={() => {
+                  if (!cardFullyActive) {
+                    alert('Ou dwe debloke opsyon yo (525 HTG) anvan ou ka voye fakti.');
+                    return;
+                  }
+                  router.push('/invoice');
+                }}
+                className={`bg-white border p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all group ${cardFullyActive ? 'border-gray-200 hover:border-indigo-300 hover:shadow-md' : 'border-gray-100 opacity-60'}`}
+              >
                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <Receipt size={20} />
                 </div>
                 <span className="text-xs font-semibold text-slate-700">Invoice</span>
               </button>
             </div>
+
+            {userData?.kyc_status === 'approved' && !cardFullyActive && (
+              <FeaturesUnlockPanel
+                variant="banner"
+                onUnlocked={() => {
+                  setUserData((prev: any) =>
+                    prev ? { ...prev, is_card_activated: true, features_unlock_paid: true } : prev
+                  );
+                  window.location.reload();
+                }}
+              />
+            )}
 
             {/* Bouton Kont Antrepriz */}
             {userData?.account_type === 'business' && userData?.enterprise_status === 'approved' ? (
@@ -822,9 +844,16 @@ export default function Dashboard() {
                 )}
 
                 {userData?.kyc_status === 'approved' && !cardFullyActive && (
-                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-white/90 backdrop-blur-sm p-6 text-center border border-gray-200 shadow-sm">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
-                    <p className="text-sm font-bold text-slate-900">Ap prepare kat ou...</p>
+                  <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-2xl bg-white/95 backdrop-blur-sm p-4 text-center border border-indigo-200 shadow-sm">
+                    <FeaturesUnlockPanel
+                      variant="overlay"
+                      onUnlocked={() => {
+                        setUserData((prev: any) =>
+                          prev ? { ...prev, is_card_activated: true, features_unlock_paid: true } : prev
+                        );
+                        window.location.reload();
+                      }}
+                    />
                   </div>
                 )}
 
