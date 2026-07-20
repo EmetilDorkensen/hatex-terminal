@@ -264,7 +264,7 @@ export default function KYCPage() {
               <h2 className="text-xl font-bold text-slate-900 mb-2 text-center">Frè Soumèt KYC</h2>
               <p className="text-xs text-slate-500 text-center mb-6 leading-relaxed">
                 Premye pati: <strong className="text-slate-800">{KYC_FEE_HTG.toLocaleString()} HTG</strong> sou wallet pou soumèt dokiman.
-                Apre apwobasyon, yon dezyèm <strong className="text-slate-800">525 HTG</strong> ap debloke kat, terminal ak fakti.
+                 <strong className="text-slate-800"></strong> .
               </p>
 
               <div className="bg-slate-50 rounded-xl p-4 space-y-2 mb-6 border border-gray-100">
