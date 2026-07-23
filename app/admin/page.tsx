@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle, Mail } from 'lucide-react';
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
@@ -451,6 +451,35 @@ export default function AdminSuperPage() {
             raleDone();
         } catch (err: any) {
             alert("Erè: " + err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const voyeKycSurvey = async (userId: string, email: string, force = false) => {
+        setProcessingId(`survey-${userId}`);
+        try {
+            let res = await fetch('/api/admin/kyc-survey/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, force }),
+            });
+            let data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Voye echwe.');
+            if (data.already_recent && !force) {
+                const ok = confirm('Email deja voye nan 24h. Renvoy ankò?');
+                if (!ok) return;
+                res = await fetch('/api/admin/kyc-survey/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, force: true }),
+                });
+                data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Voye echwe.');
+            }
+            alert(data.message || `Kesyonman voye bay ${email}`);
+        } catch (err: any) {
+            alert('Erè: ' + (err.message || 'Pa t kapab voye.'));
         } finally {
             setProcessingId(null);
         }
@@ -1204,6 +1233,17 @@ export default function AdminSuperPage() {
                                                 >
                                                     <FileText size={14} /> Dosye
                                                 </button>
+                                                {(user.kyc_status !== 'approved' && user.kyc_status !== 'pending') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => voyeKycSurvey(user.id, user.email)}
+                                                        disabled={processingId === `survey-${user.id}`}
+                                                        className="w-full md:w-auto bg-violet-50 border border-violet-200 text-violet-800 px-4 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-violet-100 transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                                    >
+                                                        {processingId === `survey-${user.id}` ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                                                        Kesyonman
+                                                    </button>
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => reyinisyalizeKont(user.id, user.email, user.full_name)}

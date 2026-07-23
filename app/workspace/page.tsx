@@ -7,7 +7,7 @@ import {
     ShieldCheck, DollarSign, UserCheck as UserCheckIcon, Users, 
     Search, Loader2, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, 
     XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
-    Crown, MessageCircle, Activity, Radio
+    Crown, MessageCircle, Activity, Radio, Mail
 } from 'lucide-react';
 import AdminAgentRechargePanel from '@/app/admin/AdminAgentRechargePanel';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
@@ -249,6 +249,35 @@ export default function WorkspacePage() {
             alert("Estati kont lan chanje!");
             checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const voyeKycSurvey = async (userId: string, email: string) => {
+        setProcessingId(`survey-${userId}`);
+        try {
+            let res = await fetch('/api/workspace/kyc-survey/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId }),
+            });
+            let data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Voye echwe.');
+            if (data.already_recent) {
+                const ok = confirm('Email deja voye nan 24h. Renvoy ankò?');
+                if (!ok) return;
+                res = await fetch('/api/workspace/kyc-survey/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, force: true }),
+                });
+                data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Voye echwe.');
+            }
+            alert(data.message || `Kesyonman voye bay ${email}`);
+        } catch (err: any) {
+            alert('Erè: ' + (err.message || 'Pa t kapab voye.'));
+        } finally {
+            setProcessingId(null);
+        }
     };
 
     const loadTicketChat = async (ticket: any) => {
@@ -570,7 +599,7 @@ export default function WorkspacePage() {
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit mb-4">
                             <button onClick={() => { setActiveTab('tickets'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'tickets' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Mesaj Kliyan ({tickets.filter(t => t.status === 'open').length})</button>
-                            <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Jere Kont</button>
+                            <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kliyan</button>
                             <button onClick={() => { setActiveTab('kyc-survey'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc-survey' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kesyonman KYC</button>
                         </div>
 
@@ -588,6 +617,7 @@ export default function WorkspacePage() {
                                         <thead>
                                             <tr className="bg-slate-50 border-b border-gray-200">
                                                 <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Kliyan</th>
+                                                <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">KYC</th>
                                                 <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Estati Kont</th>
                                                 <th className="p-4 text-xs font-bold uppercase text-slate-500 tracking-wider text-right">Aksyon</th>
                                             </tr>
@@ -601,21 +631,46 @@ export default function WorkspacePage() {
                                                     </td>
                                                     <td className="p-4">
                                                         <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase border ${
+                                                            user.kyc_status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                            user.kyc_status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                            user.kyc_status === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                            'bg-slate-50 text-slate-600 border-slate-200'
+                                                        }`}>
+                                                            {user.kyc_status === 'approved' ? 'Apwouve' :
+                                                             user.kyc_status === 'pending' ? 'An tann' :
+                                                             user.kyc_status === 'rejected' ? 'Refize' : 'Pa soumèt'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase border ${
                                                             user.account_status === 'suspended' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                         }`}>
                                                             {user.account_status}
                                                         </span>
                                                     </td>
                                                     <td className="p-4 text-right">
-                                                        <button 
-                                                            onClick={() => toggleAccountStatus(user.id, user.account_status, user.email)}
-                                                            disabled={processingId === user.id}
-                                                            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-                                                                user.account_status === 'suspended' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-white border border-rose-200 text-rose-600 hover:bg-rose-50'
-                                                            }`}
-                                                        >
-                                                            {processingId === user.id ? <Loader2 size={14} className="animate-spin inline" /> : user.account_status === 'suspended' ? 'Debloke' : 'Sispann'}
-                                                        </button>
+                                                        <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                                                            {(user.kyc_status !== 'approved' && user.kyc_status !== 'pending') && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => voyeKycSurvey(user.id, user.email)}
+                                                                    disabled={processingId === `survey-${user.id}`}
+                                                                    className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm bg-violet-50 border border-violet-200 text-violet-800 hover:bg-violet-100 inline-flex items-center gap-1.5"
+                                                                >
+                                                                    {processingId === `survey-${user.id}` ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                                                                    Kesyonman
+                                                                </button>
+                                                            )}
+                                                            <button 
+                                                                onClick={() => toggleAccountStatus(user.id, user.account_status, user.email)}
+                                                                disabled={processingId === user.id}
+                                                                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
+                                                                    user.account_status === 'suspended' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-white border border-rose-200 text-rose-600 hover:bg-rose-50'
+                                                                }`}
+                                                            >
+                                                                {processingId === user.id ? <Loader2 size={14} className="animate-spin inline" /> : user.account_status === 'suspended' ? 'Debloke' : 'Sispann'}
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
