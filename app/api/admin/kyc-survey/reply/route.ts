@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     .update({
       staff_replied_at: new Date().toISOString(),
       staff_reply_preview: message.slice(0, 280),
-      staff_replied_by: adminUser.email || 'admin',
+      staff_replied_by: adminUser.user.email || 'admin',
     })
     .eq('id', responseId);
 

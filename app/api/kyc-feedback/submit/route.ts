@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       if (!Array.isArray(val) || val.length === 0) {
         return NextResponse.json({ error: `Chwazi omwen yon opsyon: ${q.label}` }, { status: 400 });
       }
-      const allowed = new Set(q.options.map((o) => o.value));
+      const allowed = new Set<string>(q.options.map((o) => o.value as string));
       const clean = val.filter((v): v is string => typeof v === 'string' && allowed.has(v));
       if (!clean.length) {
         return NextResponse.json({ error: `Opsyon pa valab: ${q.label}` }, { status: 400 });
