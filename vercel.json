@@ -7,6 +7,10 @@
     {
       "path": "/api/developer/webhooks/process-retries",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/kyc-survey",
+      "schedule": "0 12 * * *"
     }
   ]
 }

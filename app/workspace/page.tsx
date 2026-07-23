@@ -10,6 +10,7 @@ import {
     Crown, MessageCircle, Activity, Radio
 } from 'lucide-react';
 import AdminAgentRechargePanel from '@/app/admin/AdminAgentRechargePanel';
+import KycSurveyPanel from '@/components/KycSurveyPanel';
 import {
   ADMIN_PROFILE_SAFE_COLUMNS,
   KYC_PENDING_SAFE_COLUMNS,
@@ -570,9 +571,12 @@ export default function WorkspacePage() {
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit mb-4">
                             <button onClick={() => { setActiveTab('tickets'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'tickets' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Mesaj Kliyan ({tickets.filter(t => t.status === 'open').length})</button>
                             <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Jere Kont</button>
+                            <button onClick={() => { setActiveTab('kyc-survey'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc-survey' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kesyonman KYC</button>
                         </div>
 
-                        {activeTab === 'clients' ? (
+                        {activeTab === 'kyc-survey' ? (
+                            <KycSurveyPanel mode="workspace" />
+                        ) : activeTab === 'clients' ? (
                             <>
                                 <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3">
                                     <Search size={20} className="text-slate-400 ml-2" />

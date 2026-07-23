@@ -8,6 +8,7 @@ import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
 import AdminAgentRechargePanel from './AdminAgentRechargePanel';
 import AdminFeesPanel from './AdminFeesPanel';
+import KycSurveyPanel from '@/components/KycSurveyPanel';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -41,7 +42,7 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite' | 'frais'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'kyc-survey' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite' | 'frais'>('dashboard');
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -738,6 +739,7 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('depo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'depo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Depo ({deposits.filter(d => d.status === 'pending').length})</button>
                     <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
+                    <button onClick={() => setView('kyc-survey')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc-survey' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kesyonman KYC</button>
                     
                     <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         Ajan 
@@ -1280,6 +1282,8 @@ export default function AdminSuperPage() {
                                 ))}
                             </div>
                         )
+                    ) : view === 'kyc-survey' ? (
+                        <KycSurveyPanel mode="admin" />
                     ) : view === 'ajan' ? (
                         pendingAgents.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
