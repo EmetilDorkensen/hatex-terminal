@@ -3,8 +3,9 @@ import { Resend } from 'resend';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { assertFinanceOperatorWithGate } from '@/lib/admin/auth';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
-import { KYC_STATUS, kycStatusLabel } from '@/lib/kyc/status';
+import { kycStatusLabel } from '@/lib/kyc/status';
 import { escapeHtml, KYC_SURVEY_FROM, labelAnswers } from '@/lib/kyc/survey';
+import { loadPendingKycWithLastSend } from '@/lib/kyc/survey-pending';
 
 async function requireSupportStaff() {
   const supabaseAuth = await createSupabaseServerClient();
@@ -47,24 +48,20 @@ export async function GET(request: Request) {
   }
 
   const db = createSupabaseAdminClient();
-  const { data: responses } = await db
-    .from('kyc_survey_responses')
-    .select('id, user_id, answers, free_text, created_at, staff_replied_at, staff_reply_preview, staff_replied_by')
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const [{ data: responses }, pending] = await Promise.all([
+    db
+      .from('kyc_survey_responses')
+      .select('id, user_id, answers, free_text, created_at, staff_replied_at, staff_reply_preview, staff_replied_by')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    loadPendingKycWithLastSend(db, 500),
+  ]);
 
   const userIds = Array.from(new Set((responses || []).map((r) => r.user_id)));
   const { data: profiles } = userIds.length
     ? await db.from('profiles').select('id, full_name, email, kyc_status').in('id', userIds)
     : { data: [] as any[] };
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
-
-  const { data: pending } = await db
-    .from('profiles')
-    .select('id, full_name, email, kyc_status, created_at')
-    .in('kyc_status', [KYC_STATUS.NOT_SUBMITTED, KYC_STATUS.REJECTED])
-    .order('created_at', { ascending: false })
-    .limit(200);
 
   return NextResponse.json({
     responses: (responses || []).map((r) => {
@@ -78,10 +75,7 @@ export async function GET(request: Request) {
         labeled_answers: labelAnswers((r.answers || {}) as Record<string, string | string[]>),
       };
     }),
-    pending_kyc: (pending || []).map((p) => ({
-      ...p,
-      kyc_status_label: kycStatusLabel(p.kyc_status),
-    })),
+    pending_kyc: pending,
   });
 }
 
