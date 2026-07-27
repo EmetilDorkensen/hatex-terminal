@@ -2,8 +2,16 @@ const FACE_COMPARE_URL = 'https://api-us.faceplusplus.com/facepp/v3/compare';
 const FACE_DETECT_URL = 'https://api-us.faceplusplus.com/facepp/v3/detect';
 const OCR_ID_URL = 'https://api-us.faceplusplus.com/cardpp/v1/ocridcard';
 
-const MIN_FACE_CONFIDENCE = 58;
-const REVIEW_FACE_CONFIDENCE = 48;
+/**
+ * CIN / paspò Ayiti: foto ID souvan ansyen, lamine, oswa piti → Face++ bay nòt ba
+ * menm pou menm moun lan. Pa bloke kliyan fasil — voye ka limit yo bay admin.
+ *
+ * Face++ 1e-3 threshold ≈ 62. Nou aksepte otomatikman pi ba, epi review imen pou zòn gri.
+ */
+const MIN_FACE_CONFIDENCE = 50;
+const REVIEW_FACE_CONFIDENCE = 30;
+/** Sèlman anba sa a nou rejte otomatikman (lè API a te bay yon nòt reyèl). */
+const HARD_REJECT_CONFIDENCE = 20;
 
 function getFaceCredentials() {
   const apiKey = process.env.FACEPLUSPLUS_API_KEY;
@@ -14,12 +22,19 @@ function getFaceCredentials() {
   return { apiKey, apiSecret };
 }
 
+/** Clone pou ka Face++ / FormData li menm Blob plizyè fwa san stream vide. */
+async function cloneImageFile(file: File, suffix = 'clone'): Promise<File> {
+  const buf = await file.arrayBuffer();
+  const name = file.name || `kyc-${suffix}.jpg`;
+  return new File([buf], name, { type: file.type || 'image/jpeg' });
+}
+
 export type FaceCompareResult = {
   success: boolean;
   confidence?: number;
   error?: string;
   needsReview?: boolean;
-  method?: 'face_token' | 'image';
+  method?: 'face_token' | 'image' | 'api_fallback';
 };
 
 export type FaceDetectResult = {
@@ -83,7 +98,13 @@ async function compareByFaceTokens(token1: string, token2: string): Promise<Face
   const result = await res.json().catch(() => ({}));
 
   if (result.error_message) {
-    return { success: false, error: result.error_message, method: 'face_token', confidence: 0 };
+    return {
+      success: false,
+      error: result.error_message,
+      method: 'face_token',
+      confidence: 0,
+      needsReview: true,
+    };
   }
 
   const confidence = Number(result.confidence || 0);
@@ -102,7 +123,13 @@ async function compareByImages(idFile: File, selfieFile: File): Promise<FaceComp
   const result = await res.json().catch(() => ({}));
 
   if (result.error_message) {
-    return { success: false, error: result.error_message, method: 'image', confidence: 0 };
+    return {
+      success: false,
+      error: result.error_message,
+      method: 'image',
+      confidence: 0,
+      needsReview: true,
+    };
   }
 
   const confidence = Number(result.confidence || 0);
@@ -110,12 +137,45 @@ async function compareByImages(idFile: File, selfieFile: File): Promise<FaceComp
 }
 
 function evaluateConfidence(best: FaceCompareResult): FaceCompareResult {
-  const confidence = best.confidence || 0;
+  const confidence = Number(best.confidence || 0);
+  const apiFailed = Boolean(best.error) && confidence <= 0;
+
+  // Erè Face++ / timeout / quota → pa bloke kliyan; admin verifye
+  if (apiFailed) {
+    return {
+      ...best,
+      success: true,
+      confidence: 0,
+      needsReview: true,
+      method: best.method || 'api_fallback',
+      error: undefined,
+    };
+  }
 
   if (confidence >= MIN_FACE_CONFIDENCE) {
     return { ...best, success: true, confidence, needsReview: false };
   }
+
+  // Zòn gri (foto ID ansyen / limyè fèb) → aksepte soumisyon, flag revizyon
   if (confidence >= REVIEW_FACE_CONFIDENCE) {
+    return { ...best, success: true, confidence, needsReview: true };
+  }
+
+  // Konpare pa jwenn nòt (0) men pa gen erè API — souvan figi ID twò piti sou CIN.
+  // Voye bay admin olye bloke kliyan ki gen foto klè.
+  if (confidence <= 0) {
+    return {
+      ...best,
+      success: true,
+      confidence: 0,
+      needsReview: true,
+      method: best.method || 'api_fallback',
+      error: undefined,
+    };
+  }
+
+  // Nòt trè ba men > 0: toujou bay revizyon imen si li pa anba hard reject
+  if (confidence >= HARD_REJECT_CONFIDENCE) {
     return { ...best, success: true, confidence, needsReview: true };
   }
 
@@ -123,10 +183,8 @@ function evaluateConfidence(best: FaceCompareResult): FaceCompareResult {
     ...best,
     success: false,
     confidence,
-    error:
-      confidence > 0
-        ? `Figi ou pa koresponn ase ak foto ID a (konfyans ${confidence.toFixed(1)}%). Eseye yon selfie pi klè, dwat, nan limyè natirèl.`
-        : 'Nou pa t kapab verifye figi a otomatikman. Verifye foto ID ak selfie yo klè, epi eseye ankò.',
+    needsReview: false,
+    error: `Figi ou pa koresponn ak foto ID a (konfyans ${confidence.toFixed(1)}%). Asire se menm moun lan, selfie dwat nan limyè natirèl, san linèt solèy / mask.`,
   };
 }
 
@@ -148,21 +206,41 @@ export async function compareIdSelfie(idFile: File, selfieFile: File): Promise<F
     };
   }
 
+  // Clone chak fwa pou evite Blob/stream vide apre plizyè FormData append
+  const idForImage = await cloneImageFile(idFile, 'id-img');
+  const selfieForImage = await cloneImageFile(selfieFile, 'selfie-img');
+  const idForDetect = await cloneImageFile(idFile, 'id-det');
+  const selfieForDetect = await cloneImageFile(selfieFile, 'selfie-det');
+
   let best: FaceCompareResult = { success: false, confidence: 0 };
 
-  const imageCompare = await compareByImages(idFile, selfieFile);
-  best = imageCompare;
+  try {
+    const imageCompare = await compareByImages(idForImage, selfieForImage);
+    best = imageCompare;
+  } catch (e) {
+    best = {
+      success: false,
+      confidence: 0,
+      needsReview: true,
+      method: 'api_fallback',
+      error: e instanceof Error ? e.message : 'Compare echwe',
+    };
+  }
 
-  const [idDetect, selfieDetect] = await Promise.all([
-    detectPrimaryFace(idFile),
-    detectPrimaryFace(selfieFile),
-  ]);
+  try {
+    const [idDetect, selfieDetect] = await Promise.all([
+      detectPrimaryFace(idForDetect),
+      detectPrimaryFace(selfieForDetect),
+    ]);
 
-  if (idDetect.faceToken && selfieDetect.faceToken) {
-    const tokenCompare = await compareByFaceTokens(idDetect.faceToken, selfieDetect.faceToken);
-    if ((tokenCompare.confidence || 0) > (best.confidence || 0)) {
-      best = tokenCompare;
+    if (idDetect.faceToken && selfieDetect.faceToken) {
+      const tokenCompare = await compareByFaceTokens(idDetect.faceToken, selfieDetect.faceToken);
+      if ((tokenCompare.confidence || 0) > (best.confidence || 0)) {
+        best = tokenCompare;
+      }
     }
+  } catch {
+    // Detect/token opsyonèl — pa kraze si image compare deja gen nòt
   }
 
   return evaluateConfidence(best);
@@ -260,16 +338,23 @@ export async function validateKycDocumentSides(opts: {
     if (!(opts.idBack instanceof File)) {
       return { ok: false, error: 'Foto DÈYÈ CIN obligatwa.' };
     }
-    const backDetect = await detectPrimaryFace(opts.idBack);
-    if (backDetect.faceCount >= 1) {
-      const sideCompare = await compareByImages(opts.idFront, opts.idBack);
-      if ((sideCompare.confidence || 0) >= 90) {
-        return {
-          ok: false,
-          error:
-            'Foto DÈYÈ a sanble se menm FAS ak DEVAN an. Voye foto lòt bò kat la (pa menm foto fas lan).',
-        };
+    try {
+      const backClone = await cloneImageFile(opts.idBack, 'back');
+      const frontClone = await cloneImageFile(opts.idFront, 'front-side');
+      const backDetect = await detectPrimaryFace(backClone);
+      // Dèyè CIN Ayiti pa gen figi — si gen figi + match trè wo ak fas, se kopi fas
+      if (backDetect.faceCount >= 1) {
+        const sideCompare = await compareByImages(frontClone, backClone);
+        if ((sideCompare.confidence || 0) >= 92) {
+          return {
+            ok: false,
+            error:
+              'Foto DÈYÈ a sanble se menm FAS ak DEVAN an. Voye foto lòt bò kat la (pa menm foto fas lan).',
+          };
+        }
       }
+    } catch {
+      // Pa bloke soumisyon si deteksyon kote echwe — admin ka verifye
     }
   }
 

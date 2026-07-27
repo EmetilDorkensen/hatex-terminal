@@ -123,21 +123,25 @@ export default function KYCPage() {
   const compressKycImage = async (file: File, label: string) => {
     setVerifyStep(`Konprese ${label}...`);
     const isSelfie = label.toLowerCase().includes('selfie');
-    // Selfie: pa konprese twòp — deteksyon figi echwe sou foto twòp konprese
+    const isIdFront = label.toLowerCase().includes('devan');
+    // Selfie / ID: pa konprese twòp — Face++ bezwen figi klè (CIN gen ti foto)
     if (isSelfie && file.size <= 2.5 * 1024 * 1024) {
+      return file;
+    }
+    if (isIdFront && file.size <= 2 * 1024 * 1024) {
       return file;
     }
     try {
       return await imageCompression(file, {
-        maxSizeMB: isSelfie ? 1.2 : 0.75,
-        maxWidthOrHeight: isSelfie ? 1600 : 1400,
+        maxSizeMB: isSelfie ? 1.4 : isIdFront ? 1.2 : 0.9,
+        maxWidthOrHeight: isSelfie ? 1800 : isIdFront ? 1800 : 1500,
         useWebWorker: false,
-        initialQuality: isSelfie ? 0.92 : 0.82,
+        initialQuality: isSelfie ? 0.92 : isIdFront ? 0.9 : 0.85,
         fileType: 'image/jpeg',
       });
     } catch {
       // Fall back si konpresyon echwe — limenm gen chans pase si foto a deja pi piti
-      if (file.size <= 1.5 * 1024 * 1024) return file;
+      if (file.size <= 2 * 1024 * 1024) return file;
       throw new Error(`Pa t kapab konprese ${label}. Fèmen lòt aplikasyon epi pran yon foto pi piti.`);
     }
   };
@@ -340,7 +344,7 @@ export default function KYCPage() {
 
             <div className="mt-8 flex items-center justify-center gap-2 text-slate-400">
               <ScanFace size={16} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Selfie + ID verifye pa AI anvan revizyon imen</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest">Selfie + ID verifye — ka limit yo ale bay ekip la</span>
             </div>
           </div>
         )}

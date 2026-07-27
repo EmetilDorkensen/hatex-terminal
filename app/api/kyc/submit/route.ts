@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // B) Konpare figi ID ↔ selfie (face_token + fallback imaj)
+  // B) Konpare figi ID ↔ selfie — ka limit / erè API ale nan revizyon imen (pa bloke fasil)
   const faceResult = await compareIdSelfie(idFront, selfie);
   if (!faceResult.success) {
     const isConfig = faceResult.error?.includes('FACEPLUSPLUS') || faceResult.error?.includes('konfigire');
@@ -109,7 +109,8 @@ export async function POST(request: Request) {
       {
         error: isConfig
           ? 'Verifikasyon figi pa disponib sou sèvè a. Admin dwe mete FACEPLUSPLUS_API_KEY ak FACEPLUSPLUS_API_SECRET nan Vercel.'
-          : faceResult.error || 'Konpare figi echwe.',
+          : faceResult.error ||
+            'Figi a pa koresponn ak ID a. Verifye se menm moun lan epi eseye ankò ak limyè natirèl.',
         face_confidence: faceResult.confidence ?? null,
       },
       { status: isConfig ? 503 : 400 }
