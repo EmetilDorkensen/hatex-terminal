@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const targetUserId = url.searchParams.get('userId');
   const doc = url.searchParams.get('doc') as DocField | null;
+  const wantRedirect = url.searchParams.get('redirect') === '1';
 
   if (!targetUserId || !doc || !DOC_COLUMN[doc]) {
     return NextResponse.json({ error: 'Paramèt manke.' }, { status: 400 });
@@ -51,8 +52,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Dokiman pa egziste.' }, { status: 404 });
   }
 
+  const respond = (target: string, meta: Record<string, unknown> = {}) => {
+    if (wantRedirect) {
+      try {
+        const parsed = new URL(target);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+          return NextResponse.json({ error: 'Lyèn pa valab.' }, { status: 400 });
+        }
+        return NextResponse.redirect(parsed.toString(), 302);
+      } catch {
+        return NextResponse.json({ error: 'Lyèn pa valab.' }, { status: 400 });
+      }
+    }
+    return NextResponse.json({ url: target, ...meta });
+  };
+
   if (!isKycStoragePath(stored)) {
-    return NextResponse.json({ url: stored, legacy: true });
+    return respond(stored, { legacy: true });
   }
 
   const { data, error } = await admin.storage
@@ -63,5 +79,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pa t kapab jenere lyen sekirite.' }, { status: 500 });
   }
 
-  return NextResponse.json({ url: data.signedUrl, expires_in: SIGNED_URL_TTL_SEC });
+  return respond(data.signedUrl, { expires_in: SIGNED_URL_TTL_SEC });
 }

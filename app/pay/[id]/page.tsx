@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CreditCard, Lock, Calendar, ShieldCheck } from 'lucide-react';
+import { safeRedirect } from '@/lib/security/safe-url';
 
 export default function CheckoutPage() {
   const params = useParams();
@@ -96,7 +97,9 @@ export default function CheckoutPage() {
 
       const redirect = result.redirect_url || paymentData?.redirect_url;
       setTimeout(() => {
-        if (redirect) window.location.href = redirect;
+        if (redirect && !safeRedirect(redirect)) {
+          setMsg({ type: 'success', text: '✅ Peman an pase. Retounen nan sit machann lan manyèlman.' });
+        }
       }, 2000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erè pandan peman an.';

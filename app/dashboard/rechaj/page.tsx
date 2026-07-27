@@ -27,24 +27,20 @@ export default function RechajKatPage() {
 
   const handleTransfer = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
-    if (totalDeduction > profile.wallet_balance) {
-      alert("Kòb sou Balans Prensipal ou pa ase!");
-      return;
-    }
 
     setLoading(true);
 
-    // Rele fonksyon SQL pou transfere kòb la
-    const { error } = await supabase.rpc('transfer_wallet_to_card', {
-      user_id_input: profile.id,
-      amount_input: parseFloat(amount),
-      fee_input: FEE_RECHAJ
+    const res = await fetch('/api/wallet/card-recharge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: parseFloat(amount) }),
     });
+    const data = await res.json();
 
-    if (error) {
-      alert("Erè nan transfè a: " + error.message);
+    if (!res.ok || !data.success) {
+      alert(data.message || 'Erè nan transfè a');
     } else {
-      alert("Kat ou rechaje ak siksè!");
+      alert('Kat ou rechaje ak siksè!');
       router.push('/dashboard');
     }
     setLoading(false);

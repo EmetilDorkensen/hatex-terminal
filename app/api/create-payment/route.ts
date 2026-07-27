@@ -8,6 +8,8 @@ import {
   rateLimitMerchantApiKey,
   rateLimitMerchantIp,
 } from '@/lib/security/merchant-api';
+import { isSafeWebhookUrl } from '@/lib/security/webhook-delivery';
+import { safeExternalUrl } from '@/lib/security/safe-url';
 
 export async function POST(req: Request) {
   try {
@@ -35,6 +37,20 @@ export async function POST(req: Request) {
       return merchantApiJson({ error: 'Manke enfòmasyon nan demann lan' }, 400);
     }
 
+    const safeRedirect = safeExternalUrl(String(redirect_url));
+    if (!safeRedirect) {
+      return merchantApiJson({ error: 'redirect_url pa valab (https obligatwa).' }, 400);
+    }
+
+    let safeWebhook: string | null = null;
+    if (webhook_url) {
+      const check = isSafeWebhookUrl(String(webhook_url).trim());
+      if (!check.safe) {
+        return merchantApiJson({ error: check.reason || 'webhook_url pa otorize.' }, 400);
+      }
+      safeWebhook = String(webhook_url).trim();
+    }
+
     const keyRl = await rateLimitMerchantApiKey(apiKey, 60, 60);
     if (!keyRl.allowed) {
       return merchantApiJson({ error: 'Twòp demann pou kle API sa a.' }, 429);
@@ -50,22 +66,20 @@ export async function POST(req: Request) {
       return merchantApiJson({ error: 'Kont machann sa a bloke. Peman enposib.' }, 403);
     }
 
-    // 3. Nou kreye "Tikè Peman an" (Fakti a) nan baz done nou an
     const { data: paymentRequest, error: insertErr } = await supabaseAdmin
       .from('payment_requests')
       .insert([{
         merchant_id: merchant.id,
         amount: Number(amount_htg),
         order_id: order_id,
-        redirect_url: redirect_url,
-        webhook_url: webhook_url || null
+        redirect_url: safeRedirect,
+        webhook_url: safeWebhook,
       }])
       .select()
       .single();
 
     if (insertErr) throw insertErr;
 
-    // 4. Nou jere Lyen Peman an epi nou voye l bay sit WordPress la
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const checkoutUrl = `${baseUrl}/pay/${paymentRequest.id}`;
 

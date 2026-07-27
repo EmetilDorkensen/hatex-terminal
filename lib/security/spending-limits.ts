@@ -25,8 +25,8 @@ export const INDIVIDUAL_INVOICE_DAILY_LIMIT = 85000;
 // gen dwa REZIDE sou kont lan nenpòt ki moman — pou rezon anti-blanchiman
 // ak jesyon risk. Kont ki DEJA depase plafon an (anvan règ sa a) pa jennen;
 // verifikasyon an aplike sèlman sou NOUVO kòb k ap antre yo.
-export const INDIVIDUAL_MAX_WALLET_BALANCE = 105000;
-export const ENTERPRISE_MAX_WALLET_BALANCE = 2000000;
+export const INDIVIDUAL_MAX_WALLET_BALANCE = 1200000;
+export const ENTERPRISE_MAX_WALLET_BALANCE = 12000000;
 
 /** Frè retrè kay ajan: 50 HTG pou chak 1,000 HTG (5%). */
 export const AGENT_WITHDRAW_FEE_PER_1000 = 50;
@@ -60,17 +60,20 @@ export function calcAgentWithdrawFee(
   };
 }
 
-// Limit RESEPSYON via API piblik la (/api/public/payments). Sa a kontwole
-// konbyen kòb yon MACHANN ka resevwa pa API a — apa de plafon balans jeneral
-// la. De nivo verifikasyon: (1) yon sèl peman pa ka depase limit la (pa-tx),
-// (2) total tout peman API resevwa nan yon jou pa ka depase limit la (pa-jou).
-export const API_RECEIVE_INDIVIDUAL_LIMIT = 50000;
-export const API_RECEIVE_ENTERPRISE_LIMIT = 2000000;
+// Limit RESEPSYON via API piblik la (/api/public/payments).
+export const API_RECEIVE_INDIVIDUAL_LIMIT = 1000000;
+export const API_RECEIVE_ENTERPRISE_LIMIT = 10000000;
 
-/** Frè platfòm sou peman API: 3 HTG pou chak 1 000 HTG resevwa. */
-export const API_RECEIVE_FEE_PER_1000 = 3;
+/** Frè platfòm sou peman API: 0 HTG (gratis). */
+export const API_RECEIVE_FEE_PER_1000 = 0;
 /** @deprecated Itilize API_RECEIVE_FEE_PER_1000 — pa yon pousantaj. */
 export const API_RECEIVE_FEE_PERCENT = API_RECEIVE_FEE_PER_1000;
+
+/** Limit retrè: kantite + max pa tranzaksyon / jou */
+export const INDIVIDUAL_WITHDRAW_MAX_PER_TX = 25000;
+export const INDIVIDUAL_WITHDRAW_MAX_COUNT_DAILY = 5;
+export const ENTERPRISE_WITHDRAW_MAX_PER_TX = 75000;
+export const ENTERPRISE_WITHDRAW_MAX_COUNT_DAILY = 12;
 
 export function calcApiReceiveFee(
   grossAmount: number,
@@ -185,13 +188,34 @@ export async function checkSpendingLimit(
     return { allowed: true, todayTotal, monthTotal: 0, dailyLimit: INDIVIDUAL_INVOICE_DAILY_LIMIT, monthlyLimit: Infinity };
   }
 
+  if (enterprise && channel === 'transfer') {
+    return { allowed: true, todayTotal: 0, monthTotal: 0, dailyLimit: Infinity, monthlyLimit: Infinity };
+  }
+
+  // Retrè: max pa tx + (count enforced nan DB via hatex_assert_withdraw_rules)
+  if (channel === 'withdraw') {
+    const maxPerTx = enterprise ? ENTERPRISE_WITHDRAW_MAX_PER_TX : INDIVIDUAL_WITHDRAW_MAX_PER_TX;
+    if (amount > maxPerTx) {
+      return {
+        allowed: false,
+        message: `Yon sèl retrè pa ka depase ${maxPerTx.toLocaleString()} HTG.`,
+        todayTotal: 0,
+        monthTotal: 0,
+        dailyLimit: maxPerTx,
+        monthlyLimit: Infinity,
+      };
+    }
+    // Kantite / jou verifye nan baz done (RPC) — pre-check UI sèlman sou montan
+    return { allowed: true, todayTotal: 0, monthTotal: 0, dailyLimit: maxPerTx, monthlyLimit: Infinity };
+  }
+
   if (enterprise && channel !== 'card') {
     return { allowed: true, todayTotal: 0, monthTotal: 0, dailyLimit: Infinity, monthlyLimit: Infinity };
   }
 
   const dailyLimit = enterprise ? ENTERPRISE_CARD_DAILY_LIMIT : INDIVIDUAL_DAILY_LIMIT;
   const monthlyLimit = enterprise ? ENTERPRISE_CARD_MONTHLY_LIMIT : INDIVIDUAL_MONTHLY_LIMIT;
-  const types = channel === 'transfer' ? TRANSFER_TYPES : channel === 'withdraw' ? WITHDRAW_TYPES : CARD_SPEND_TYPES;
+  const types = channel === 'transfer' ? TRANSFER_TYPES : CARD_SPEND_TYPES;
 
   const [todayTotal, monthTotal] = await Promise.all([
     sumOutgoing(supabase, userId, types, startOfToday().toISOString()),
@@ -228,8 +252,8 @@ export interface BalanceCapResult {
  * resevwa, elatriye) ta fè balans prensipal li (`wallet_balance`) depase
  * plafon otorize a, dapre tip kont lan.
  *
- * - Kont Endividyèl: plafon 105,000 HTG.
- * - Kont Antrepriz apwouve: plafon 2,000,000 HTG.
+ * - Kont Endividyèl: plafon 1,200,000 HTG.
+ * - Kont Antrepriz apwouve: plafon 12,000,000 HTG.
  *
  * ⚠️ Sa a SÈLMAN aplike sou operasyon ki bay yon kont NOUVO kòb (depo,
  * transfè/peman resevwa, elatriye). Li PA dwe aplike sou ranbousman/anilasyon
@@ -288,7 +312,7 @@ async function sumApiReceivedToday(
 
 /**
  * Verifye si yon machann ka RESEVWA yon peman via API piblik la, dapre limit
- * resepsyon an (50,000 HTG kont endividyèl / 2,000,000 HTG kont antrepriz).
+ * resepsyon an (1,000,000 HTG kont endividyèl / 10,000,000 HTG kont antrepriz).
  * Kontwole TOUDE: montan yon sèl peman (pa-tranzaksyon) AK total jounalye.
  *
  * ⚠️ Sa a se yon pre-check rapid. Verifikasyon final la (kont kous ant plizyè

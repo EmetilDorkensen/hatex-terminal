@@ -7,6 +7,7 @@ import {
   Loader2, CreditCard, Receipt, Store, User,
   AlertCircle, ShieldCheck, Ban, Lock, Info
 } from 'lucide-react';
+import SafeImg from '@/components/SafeImg';
 
 export default function InvoiceCheckout() {
   const { id } = useParams();
@@ -130,7 +131,7 @@ export default function InvoiceCheckout() {
           <div className="text-center mb-8 mt-2">
             <div className="relative w-20 h-20 mx-auto mb-4 group">
               {merchantLogo ? (
-                <img
+                <SafeImg
                   src={merchantLogo}
                   alt={merchantName}
                   className="w-full h-full rounded-2xl object-cover border-2 border-gray-100 shadow-sm"

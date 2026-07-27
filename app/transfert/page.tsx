@@ -265,16 +265,20 @@ export default function TransferPage() {
          throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
 
-      // Plafon balans destinatè a verifye ATOMIKMAN anndan RPC
-      // `process_transfer_by_email` — pa bezwen li balans li depi navigatè a.
-      const { error: rpcError } = await supabase.rpc('process_transfer_by_email', {
-        p_sender_id: userId,
-        p_receiver_email: email.toLowerCase().trim(),
-        p_amount: amt,
-        p_fee: fee,
+      // Transfè via API sèvè (MFA + frè/limit nan DB)
+      const transferRes = await fetch('/api/wallet/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receiver_email: email.toLowerCase().trim(),
+          amount: amt,
+        }),
       });
+      const transferData = await transferRes.json();
   
-      if (rpcError) throw rpcError;
+      if (!transferRes.ok || !transferData.success) {
+        throw new Error(transferData.message || 'Transfè echwe.');
+      }
 
       if (fee > 0) {
         setWalletBalance(walletBalance - amt - fee);

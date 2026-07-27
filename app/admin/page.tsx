@@ -9,6 +9,7 @@ import AdminClientDossier from './AdminClientDossier';
 import AdminAgentRechargePanel from './AdminAgentRechargePanel';
 import AdminFeesPanel from './AdminFeesPanel';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
+import { openSafeUrl } from '@/lib/security/safe-url';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -267,19 +268,18 @@ export default function AdminSuperPage() {
             try {
                 const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
                 const data = await res.json();
-                if (res.ok && data.url) {
-                    window.open(data.url, '_blank');
+                if (res.ok && data.url && openSafeUrl(data.url)) {
                     return;
                 }
             } catch { /* fall through */ }
-            window.open(ref, '_blank');
+            if (!openSafeUrl(ref)) alert('Lyèn dokiman an pa valab.');
             return;
         }
         try {
             const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
             const data = await res.json();
             if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-            window.open(data.url, '_blank');
+            if (!openSafeUrl(data.url)) throw new Error('Lyèn dokiman an pa valab.');
         } catch (e: any) {
             alert(e.message || 'Pa t kapab louvri dokiman an.');
         }
@@ -288,14 +288,14 @@ export default function AdminSuperPage() {
     const handleOpenDepositProof = async (ref: string) => {
         if (!ref) { alert("Pa gen lyen pou prèv sa a!"); return; }
         if (ref.startsWith('http://') || ref.startsWith('https://')) {
-            window.open(ref, '_blank');
+            if (!openSafeUrl(ref)) alert('Lyèn prèv la pa valab.');
             return;
         }
         try {
             const res = await fetch(`/api/admin/deposit-proof?ref=${encodeURIComponent(ref)}`);
             const data = await res.json();
             if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-            window.open(data.url, '_blank');
+            if (!openSafeUrl(data.url)) throw new Error('Lyèn prèv la pa valab.');
         } catch (e: any) {
             alert(e.message || 'Pa t kapab louvri prèv la.');
         }
@@ -304,14 +304,14 @@ export default function AdminSuperPage() {
     const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
         if (!legacyValue) { alert("Pa gen dokiman sa a!"); return; }
         if (legacyValue.startsWith('http://') || legacyValue.startsWith('https://')) {
-            window.open(legacyValue, '_blank');
+            if (!openSafeUrl(legacyValue)) alert('Lyèn dokiman an pa valab.');
             return;
         }
         try {
             const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
             const data = await res.json();
             if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-            window.open(data.url, '_blank');
+            if (!openSafeUrl(data.url)) throw new Error('Lyèn dokiman an pa valab.');
         } catch (e: any) {
             alert(e.message || 'Pa t kapab louvri dokiman an.');
         }

@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { ensureMerchantApiCredentials, canAccessTerminal } from '@/lib/security/merchant-provisioning';
 import { profileHasApiKey, maskApiKey } from '@/lib/security/api-key';
+import SafeImg from '@/components/SafeImg';
 import { 
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
   ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
@@ -606,10 +607,9 @@ export default function TerminalPage() {
     const pngUrl = canvas.toDataURL('image/png');
     const downloadLink = document.createElement('a');
     downloadLink.href = pngUrl;
-    downloadLink.download = `hatex-qr-${profile?.id?.slice(0,8)}.png`;
-    document.body.appendChild(downloadLink);
+    downloadLink.download = 'hatex-qr.png';
+    downloadLink.rel = 'noopener';
     downloadLink.click();
-    document.body.removeChild(downloadLink);
   };
 
   // ============================================================
@@ -1274,7 +1274,7 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
             <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
               {profile?.avatar_url ? (
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-slate-100 border border-gray-200 shrink-0 shadow-sm">
-                  <img src={profile.avatar_url} alt="Logo" className="w-full h-full object-cover" />
+                  <SafeImg src={profile.avatar_url} alt="Logo" className="w-full h-full object-cover" />
                 </div>
               ) : (
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-50 flex items-center justify-center border border-gray-200 shrink-0">

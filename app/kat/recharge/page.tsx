@@ -41,23 +41,24 @@ export default function RechargeKatPage() {
     setStatus({ type: '', msg: '' });
 
     try {
-      const { data, error } = await supabase.rpc('process_card_recharge', {
-        p_user_id: userData.id,
-        p_amount: val 
+      const res = await fetch('/api/wallet/card-recharge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: val }),
       });
+      const data = await res.json();
 
-      if (error) throw error;
-
-      if (data && data.success) {
-        setStatus({ type: 'success', msg: data.message });
-        setAmount('');
-        setTimeout(() => router.push('/kat'), 2500);
-      } else {
+      if (!res.ok || !data?.success) {
         setStatus({ type: 'error', msg: data?.message || 'Echèk tranzaksyon' });
+        return;
       }
+
+      setStatus({ type: 'success', msg: data.message || 'Rechaj reyisi' });
+      setAmount('');
+      setTimeout(() => router.push('/kat'), 2500);
     } catch (err: any) {
       console.error("Erè:", err);
-      setStatus({ type: 'error', msg: 'Erè 400: SQL la pako ajou nan baz de done a.' });
+      setStatus({ type: 'error', msg: 'Erè koneksyon. Eseye ankò.' });
     } finally {
       setLoading(false);
     }

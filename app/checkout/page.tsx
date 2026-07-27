@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { CreditCard, Calendar, Lock, AlertCircle, Loader2, Store, CheckSquare, Square, History } from 'lucide-react';
+import SafeImg from '@/components/SafeImg';
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -110,12 +111,26 @@ function CheckoutContent() {
     setError('');
 
     try {
+      // 1) Bloke montan nan DB
+      const lockRes = await fetch('/api/checkout/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, amount: parseFloat(amount) }),
+      });
+      const lockData = await lockRes.json();
+      if (!lockRes.ok || !lockData.success || !lockData.lock_id) {
+        setError(lockData.message || 'Pa t kapab prepare peman an.');
+        setProcessing(false);
+        return;
+      }
+
+      // 2) Peye ak lock_id (montan soti nan DB, pa nan body)
       const res = await fetch('/api/checkout/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
-          amount: parseFloat(amount),
+          lock_id: lockData.lock_id,
           card_number: cleanCard,
           card_expiry: cardExpiry,
           card_cvv: cardCvv,
@@ -131,22 +146,21 @@ function CheckoutContent() {
       }
 
       if (data.success) {
-        // If user wants to save card, store only last 4 digits and expiry (no CVV!)
         if (saveCard) {
           const cardInfo = {
             id: Date.now().toString(),
             last4: cleanCard.slice(-4),
             expiry: cardExpiry,
-            brand: 'Visa/MC', // You could detect card type
+            brand: 'Visa/MC',
           };
-          const updated = [...savedCards, cardInfo].slice(-3); // Keep only last 3
+          const updated = [...savedCards, cardInfo].slice(-3);
           localStorage.setItem('hatex_saved_cards', JSON.stringify(updated));
           setSavedCards(updated);
         }
 
-        // REDIREKSYON AN – SA A ENPÒTAN!
+        const paidAmount = data.amount ?? amount;
         router.push(
-          `/checkout/success?id=${encodeURIComponent(data.transaction_id)}&amount=${encodeURIComponent(amount)}${
+          `/checkout/success?id=${encodeURIComponent(data.transaction_id)}&amount=${encodeURIComponent(paidAmount)}${
             data.reference ? `&ref=${encodeURIComponent(data.reference)}` : ''
           }`
         );
@@ -197,7 +211,7 @@ function CheckoutContent() {
         <div className="text-center mb-8">
           {merchant?.avatar_url && (
             <div className="flex justify-center mb-4">
-              <img 
+              <SafeImg 
                 src={merchant.avatar_url} 
                 alt={merchant.business_name || merchant.full_name}
                 className="w-20 h-20 rounded-2xl object-cover border border-gray-200 shadow-sm bg-white"

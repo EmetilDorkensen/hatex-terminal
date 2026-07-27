@@ -17,6 +17,7 @@ import {
   DEPOSIT_SAFE_COLUMNS,
   WITHDRAWAL_SAFE_COLUMNS,
 } from '@/lib/admin/safe-columns';
+import { openSafeUrl } from '@/lib/security/safe-url';
 
 export default function WorkspacePage() {
     const router = useRouter();
@@ -415,11 +416,11 @@ export default function WorkspacePage() {
             const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
             const data = await res.json();
             if (!res.ok || !data.url) throw new Error(data.error || 'Pa ka louvri dokiman an.');
-            window.open(data.url, '_blank');
+            if (!openSafeUrl(data.url)) throw new Error('Lyèn dokiman an pa valab.');
         } catch (e: any) {
             // Fallback: URL piblik ansyen
             if (ref.startsWith('http://') || ref.startsWith('https://')) {
-                window.open(ref, '_blank');
+                if (!openSafeUrl(ref)) alert('Lyèn dokiman an pa valab.');
                 return;
             }
             alert(e.message || 'Pa t kapab louvri dokiman an.');
@@ -429,14 +430,15 @@ export default function WorkspacePage() {
     const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
         if (!legacyValue) return;
         if (legacyValue.startsWith('http://') || legacyValue.startsWith('https://')) {
-            window.open(legacyValue, '_blank');
+            if (!openSafeUrl(legacyValue)) alert('Lyèn dokiman an pa valab.');
             return;
         }
         try {
             const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
             const data = await res.json();
-            if (res.ok && data.url) window.open(data.url, '_blank');
-            else alert(data.error || 'Pa t kapab louvri dokiman an.');
+            if (res.ok && data.url) {
+                if (!openSafeUrl(data.url)) alert('Lyèn dokiman an pa valab.');
+            } else alert(data.error || 'Pa t kapab louvri dokiman an.');
         } catch {
             alert('Erè nan louvri dokiman an.');
         }

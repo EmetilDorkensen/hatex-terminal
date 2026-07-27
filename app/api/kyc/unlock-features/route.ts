@@ -7,6 +7,7 @@ import { KYC_STATUS } from '@/lib/kyc/status';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { provisionCardForUser } from '@/lib/kyc/card-provision';
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
+import { requireMoneySession } from '@/lib/security/require-money-session';
 
 /** Estati debloke (kat / terminal / invoice). */
 export async function GET() {
@@ -46,10 +47,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Twòp tantativ. Eseye ankò nan ${rl.retryAfterSec}s.` }, { status: 429 });
   }
 
-  const { user } = await getAuthenticatedUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Ou dwe konekte.' }, { status: 401 });
-  }
+  const money = await requireMoneySession();
+  if (!money.ok) return money.response;
+  const user = money.user;
 
   const admin = createSupabaseAdminClient();
 

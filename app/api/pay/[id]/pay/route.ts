@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { hashCardNumber } from '@/lib/security/hash';
 import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
+import { isSafeWebhookUrl } from '@/lib/security/webhook-delivery';
 
 const MAX_CARD_ATTEMPTS = 6;
 const CARD_LOCK_WINDOW_SEC = 15 * 60;
@@ -73,21 +74,24 @@ export async function POST(
       );
     }
 
-    // Webhook machann — sou sèvè sèlman (pa ekspoze URL nan navigatè)
+    // Webhook machann — sèlman URL HTTPS ki pase filtre anti-SSRF
     if (paymentReq.webhook_url) {
-      try {
-        await fetch(paymentReq.webhook_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order_id: paymentReq.order_id,
-            status: 'paid',
-            transaction_id: paymentId,
-            amount_htg: paymentReq.amount,
-          }),
-        });
-      } catch {
-        /* webhook echwe — peman deja konfime */
+      const hookCheck = isSafeWebhookUrl(String(paymentReq.webhook_url));
+      if (hookCheck.safe) {
+        try {
+          await fetch(paymentReq.webhook_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              order_id: paymentReq.order_id,
+              status: 'paid',
+              transaction_id: paymentId,
+              amount_htg: paymentReq.amount,
+            }),
+          });
+        } catch {
+          /* webhook echwe — peman deja konfime */
+        }
       }
     }
 

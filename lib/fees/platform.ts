@@ -21,7 +21,7 @@ const DEFAULTS: Record<FeeKey, number> = {
   transfer_fee_percent: 5,
   agent_fee_per_1000: 7,
   agent_withdraw_fee_per_1000: 50,
-  api_fee_per_1000: 3,
+  api_fee_per_1000: 0,
   enterprise_application_fee: 49000,
   card_activation_fee: 525,
 };

@@ -199,20 +199,22 @@ export default function WithdrawPage() {
         throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
       }
 
-      // Fonksyon SQL 'process_wallet_withdrawal' la fè TOUT verifikasyon yo
-      // (estati kont, KYC, balans) AK debi/kredi a ATOMIKMAN nan baz done a —
-      // nou pa voye okenn "nouvo balans" kalkile bò kote navigatè a ankò.
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('process_wallet_withdrawal', {
-        p_user_id: profile.id,
-        p_amount: currentAmount,
-        p_method: method,
-        p_phone: phone || null,
-        p_agent_code: method === 'Ajan' ? agentCode : null,
-        p_user_email: profile.email,
+      // Fonksyon SQL verifye TOUT nan DB — via API sèvè (MFA + pa RPC dirèk navigatè)
+      const withdrawRes = await fetch('/api/wallet/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: currentAmount,
+          method,
+          phone: phone || null,
+          agent_code: method === 'Ajan' ? agentCode : null,
+        }),
       });
+      const rpcResult = await withdrawRes.json();
 
-      if (rpcError) throw new Error(rpcError.message || "Sistèm nan jwenn yon pwoblèm.");
-      if (!rpcResult?.success) throw new Error(rpcResult?.message || "Retrè a echwe. Tanpri re-eseye.");
+      if (!withdrawRes.ok || !rpcResult?.success) {
+        throw new Error(rpcResult?.message || "Retrè a echwe. Tanpri re-eseye.");
+      }
 
       if (rpcResult.is_agent) {
         setShowPinPrompt(false);

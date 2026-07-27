@@ -5,6 +5,7 @@ import { KYC_FEE_HTG } from '@/lib/kyc/fees';
 import { resolvePlatformFee } from '@/lib/fees/platform';
 import { KYC_STATUS } from '@/lib/kyc/status';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { requireMoneySession } from '@/lib/security/require-money-session';
 
 export async function GET() {
   const { user } = await getAuthenticatedUser();
@@ -48,10 +49,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Twòp tantativ. Eseye ankò nan ${rl.retryAfterSec}s.` }, { status: 429 });
   }
 
-  const { user } = await getAuthenticatedUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Ou dwe konekte.' }, { status: 401 });
-  }
+  const money = await requireMoneySession();
+  if (!money.ok) return money.response;
+  const user = money.user;
 
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin

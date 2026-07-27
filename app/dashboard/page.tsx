@@ -8,6 +8,7 @@ import { checkStrongPassword } from '@/lib/security/password-strength';
 import { isKycApproved } from '@/lib/kyc/status';
 import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
 import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
+import SafeImg from '@/components/SafeImg';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
@@ -622,7 +623,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-4">
               <div className="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center text-slate-600 font-bold">
                 {userData?.avatar_url ? (
-                  <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  <SafeImg src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   userData?.full_name?.charAt(0) || "U"
                 )}
@@ -668,7 +669,7 @@ export default function Dashboard() {
               />
               <label htmlFor="avatarUpload" className="block w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all relative cursor-pointer">
                 {userData?.avatar_url ? (
-                  <img src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  <SafeImg src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-600 text-2xl font-bold">
                     {userData?.full_name?.charAt(0) || "H"}

@@ -93,16 +93,31 @@ function statusBadge(status: string | null | undefined, map: Record<string, stri
   );
 }
 
-function DocLink({ label, url, variant = 'default' }: { label: string; url?: string | null; variant?: 'default' | 'amber' }) {
-  if (!url) return null;
+function DocLink({
+  label,
+  docRef,
+  variant = 'default',
+}: {
+  label: string;
+  docRef?: string | null;
+  variant?: 'default' | 'amber';
+}) {
+  if (!docRef) return null;
   const base =
     variant === 'amber'
       ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
       : 'bg-slate-50 text-slate-700 border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200';
+
   return (
     <button
       type="button"
-      onClick={() => window.open(url, '_blank')}
+      onClick={() => {
+        // Same-origin sèlman — API fè 302 nan signed URL (pa Open Redirect kote kliyan)
+        const path = '/api/admin/application-doc?ref=' + encodeURIComponent(docRef) + '&redirect=1';
+        if (path.startsWith('/api/admin/application-doc?')) {
+          window.open(path, '_blank', 'noopener,noreferrer');
+        }
+      }}
       className={`text-[10px] px-4 py-2.5 rounded-lg border transition-all font-bold tracking-wider uppercase flex items-center gap-1.5 ${base}`}
     >
       <EyeOff size={14} />
@@ -124,19 +139,16 @@ function KycDocButton({
 }) {
   if (!stored) return null;
 
-  const open = async () => {
-    if (stored.startsWith('http://') || stored.startsWith('https://')) {
-      window.open(stored, '_blank');
-      return;
-    }
-    try {
-      const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-      window.open(data.url, '_blank');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Pa t kapab louvri dokiman an.';
-      alert(msg);
+  const open = () => {
+    // Same-origin KYC document route — pa louvri URL ekstèn dirèkteman
+    const path =
+      '/api/kyc/document?userId=' +
+      encodeURIComponent(userId) +
+      '&doc=' +
+      encodeURIComponent(doc) +
+      '&redirect=1';
+    if (path.startsWith('/api/kyc/document?')) {
+      window.open(path, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -155,12 +167,12 @@ function KycDocButton({
 function enterpriseDocs(app: EnterpriseApp) {
   return (
     <div className="flex flex-wrap gap-2">
-      <DocLink label="Patant" url={app.patente_url} />
-      <DocLink label="CIF" url={app.cif_url} />
-      <DocLink label="Anrejistreman" url={app.business_registration_url} />
-      <DocLink label="Relve Bankè" url={app.bank_statement_url} />
-      <DocLink label="Kontra Lokal" url={app.lease_doc_url} />
-      <DocLink label="ID Reprezantan" url={app.legal_rep_id_url} variant="amber" />
+      <DocLink label="Patant" docRef={app.patente_url} />
+      <DocLink label="CIF" docRef={app.cif_url} />
+      <DocLink label="Anrejistreman" docRef={app.business_registration_url} />
+      <DocLink label="Relve Bankè" docRef={app.bank_statement_url} />
+      <DocLink label="Kontra Lokal" docRef={app.lease_doc_url} />
+      <DocLink label="ID Reprezantan" docRef={app.legal_rep_id_url} variant="amber" />
     </div>
   );
 }
@@ -168,15 +180,15 @@ function enterpriseDocs(app: EnterpriseApp) {
 function agentDocs(app: AgentApp) {
   return (
     <div className="flex flex-wrap gap-2">
-      <DocLink label="Pyès Idantite" url={app.id_doc_url} />
-      <DocLink label="Prèv Adrès" url={app.address_doc_url} />
-      <DocLink label="Foto Lokal" url={app.location_photo_url} />
-      <DocLink label="Selfie + ID" url={app.selfie_with_id_url} variant="amber" />
-      <DocLink label="Patant" url={app.patente_url} />
-      <DocLink label="CIF" url={app.cif_url} />
-      <DocLink label="Kazye Jidisyè" url={app.criminal_record_url} />
-      <DocLink label="Relve Bankè" url={app.bank_statement_url} />
-      <DocLink label="Kontra Lokal" url={app.lease_doc_url} />
+      <DocLink label="Pyès Idantite" docRef={app.id_doc_url} />
+      <DocLink label="Prèv Adrès" docRef={app.address_doc_url} />
+      <DocLink label="Foto Lokal" docRef={app.location_photo_url} />
+      <DocLink label="Selfie + ID" docRef={app.selfie_with_id_url} variant="amber" />
+      <DocLink label="Patant" docRef={app.patente_url} />
+      <DocLink label="CIF" docRef={app.cif_url} />
+      <DocLink label="Kazye Jidisyè" docRef={app.criminal_record_url} />
+      <DocLink label="Relve Bankè" docRef={app.bank_statement_url} />
+      <DocLink label="Kontra Lokal" docRef={app.lease_doc_url} />
     </div>
   );
 }

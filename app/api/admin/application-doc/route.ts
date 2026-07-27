@@ -38,13 +38,30 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const ref = url.searchParams.get('ref')?.trim() || '';
+  const wantRedirect = url.searchParams.get('redirect') === '1';
   if (!ref) {
     return NextResponse.json({ error: 'Referans dokiman manke.' }, { status: 400 });
   }
 
+  const respondWithUrl = (target: string, meta: Record<string, unknown> = {}) => {
+    if (wantRedirect) {
+      // Same-origin entry → 302 nan signed URL (evite Open Redirect kote kliyan)
+      try {
+        const parsed = new URL(target);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+          return NextResponse.json({ error: 'Lyèn pa valab.' }, { status: 400 });
+        }
+        return NextResponse.redirect(parsed.toString(), 302);
+      } catch {
+        return NextResponse.json({ error: 'Lyèn pa valab.' }, { status: 400 });
+      }
+    }
+    return NextResponse.json({ url: target, ...meta });
+  };
+
   // Si se URL piblik ki toujou aksesib, retounen l dirèkteman
   if ((ref.startsWith('http://') || ref.startsWith('https://')) && !ref.includes('/storage/v1/object/')) {
-    return NextResponse.json({ url: ref, expires_in: 0, bucket: 'external' });
+    return respondWithUrl(ref, { expires_in: 0, bucket: 'external' });
   }
 
   const location = resolveApplicationDocLocation(ref);
@@ -72,7 +89,7 @@ export async function GET(request: Request) {
         details: { bucket },
         ip,
       });
-      return NextResponse.json({ url: data.signedUrl, expires_in: SIGNED_URL_TTL_SEC, bucket });
+      return respondWithUrl(data.signedUrl, { expires_in: SIGNED_URL_TTL_SEC, bucket });
     }
   }
 
