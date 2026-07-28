@@ -1,10 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 import { buildCardSecurityFields, encryptCardField } from '@/lib/security/hash';
 
 function generateCardDetails() {
-  const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
+  const random4 = () => String(crypto.randomInt(1000, 10000));
   const cardNumber = `4550${random4()}${random4()}${random4()}`;
-  const cvv = Math.floor(100 + Math.random() * 900).toString();
+  const cvv = String(crypto.randomInt(100, 1000));
   const now = new Date();
   const expDate = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
   return { cardNumber, cvv, expDate };
@@ -37,11 +38,19 @@ export async function provisionCardForUser(
     throw new Error('Pwofil pa jwenn.');
   }
 
-  if (profile.card_number_hash) {
+  // Nenpòt idantite kat ki deja la → pa janm kreye yon nouvo nimewo
+  if (profile.card_number_hash || profile.card_last4 || profile.card_number) {
     if (activate && !profile.is_card_activated) {
-      await supabase.from('profiles').update({ is_card_activated: true }).eq('id', userId);
+      const { error: actErr } = await supabase
+        .from('profiles')
+        .update({ is_card_activated: true })
+        .eq('id', userId);
+      if (actErr) throw new Error(actErr.message);
     }
-    return { created: false, card_last4: profile.card_last4 || undefined };
+    return {
+      created: false,
+      card_last4: profile.card_last4 || undefined,
+    };
   }
 
   const { cardNumber, cvv, expDate } = generateCardDetails();
@@ -58,7 +67,13 @@ export async function provisionCardForUser(
     })
     .eq('id', userId);
 
-  if (error) throw error;
+  if (error) {
+    const hint =
+      /varying\(16\)|too long/i.test(error.message || '')
+        ? ' Kouri migrasyon 20260765 (card_number/cvv → TEXT) nan Supabase.'
+        : '';
+    throw new Error(`${error.message || 'Pa t kapab kreye kat.'}${hint}`);
+  }
 
   return { created: true, card_last4: cardNumber.slice(-4) };
 }

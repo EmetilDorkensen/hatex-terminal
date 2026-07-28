@@ -463,8 +463,8 @@ export default function WorkspacePage() {
             if (aksyon === 'approved') {
                 alert(
                     data.card_ok === false
-                        ? (data.message || 'KYC apwouve, men kat pa t kreye. Verifye CARD_HASH_SECRET.')
-                        : 'KYC apwouve — kat kreye otomatikman!'
+                        ? (data.message || 'KYC apwouve, men kat pa t kreye.')
+                        : (data.message || 'KYC apwouve — kat kreye otomatikman!')
                 );
             } else {
                 alert('KYC rejte!');

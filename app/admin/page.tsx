@@ -29,6 +29,7 @@ export default function AdminSuperPage() {
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
+    const [missingCards, setMissingCards] = useState<any[]>([]);
     const [promoCodes, setPromoCodes] = useState<any[]>([]);
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
@@ -145,6 +146,7 @@ export default function AdminSuperPage() {
             setWithdrawals(data.withdrawals || []);
             setSuspendedAccounts(data.suspendedAccounts || []);
             setPendingKyc(data.pendingKyc || []);
+            setMissingCards(data.missingCards || []);
             setPromoCodes(data.promoCodes || []);
             setPendingAgents(data.pendingAgents || []);
             setPendingEnterprises(data.pendingEnterprises || []);
@@ -530,12 +532,14 @@ export default function AdminSuperPage() {
             const mesajE = aksyon === 'approved'
                 ? `Felisitasyon ${full_name}! Dokiman w yo apwouve. Kat vityèl ou ak terminal ou aktive otomatikman.`
                 : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
-            await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            if (aksyon !== 'approved' || data.fresh_approval !== false) {
+                await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
+            }
             if (aksyon === 'approved') {
                 alert(
                     data.card_ok === false
-                        ? (data.message || 'KYC apwouve, men kat pa t kreye. Verifye CARD_HASH_SECRET.')
-                        : 'KYC apwouve — kat kreye otomatikman!'
+                        ? (data.message || 'KYC apwouve, men kat pa t kreye.')
+                        : (data.message || 'KYC apwouve — kat kreye otomatikman!')
                 );
             } else {
                 alert('KYC rejte avèk siksè!');
@@ -1300,10 +1304,35 @@ export default function AdminSuperPage() {
                             </form>
                         </div>
                     ) : view === 'kyc' ? (
-                        pendingKyc.length === 0 ? (
+                        pendingKyc.length === 0 && missingCards.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn KYC k ap tann</div>
                         ) : (
                             <div className="space-y-4">
+                                {missingCards.length > 0 && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 sm:p-6 space-y-3">
+                                        <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wider">
+                                            KYC apwouve san kat ({missingCards.length})
+                                        </h3>
+                                        <p className="text-xs text-amber-800">
+                                            Apre migrasyon kolòn kat (TEXT), klike « Kreye kat » pou chak kliyan.
+                                        </p>
+                                        {missingCards.map((user) => (
+                                            <div key={`missing-card-${user.id}`} className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between bg-white/80 rounded-2xl border border-amber-100 px-4 py-3">
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-900">{user.full_name || 'San Non'}</p>
+                                                    <p className="text-xs text-slate-500">{user.email}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => jereKyc(user.id, user.full_name, user.email, 'approved')}
+                                                    disabled={processingId === user.id}
+                                                    className="bg-amber-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition-all shadow-sm flex items-center justify-center gap-2"
+                                                >
+                                                    {processingId === user.id ? <Loader2 size={16} className="animate-spin" /> : 'Kreye kat'}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                                 {pendingKyc.map((user) => (
                                     <div key={user.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col md:flex-row gap-6 items-center transition-all hover:shadow-md">
                                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0"><UserX size={32} /></div>

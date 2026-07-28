@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildCardSecurityFields,
   cleanCardNumber,
+  encryptCardField,
   hashCardNumber,
   verifyCvv,
 } from './hash';
@@ -38,7 +39,11 @@ async function upgradeLegacyCard(
   const fields = await buildCardSecurityFields(cleanCard, cvv);
   await supabase
     .from('profiles')
-    .update(fields)
+    .update({
+      ...fields,
+      card_number: encryptCardField(cleanCard),
+      cvv: encryptCardField(cvv),
+    })
     .eq('id', profile.id);
 }
 

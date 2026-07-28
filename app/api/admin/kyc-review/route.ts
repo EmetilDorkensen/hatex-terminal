@@ -60,38 +60,50 @@ export async function POST(request: Request) {
     }
 
     if (action === 'approved') {
-      if (profile.kyc_status === KYC_STATUS.APPROVED) {
-        return NextResponse.json({ error: 'KYC deja apwouve.' }, { status: 409 });
-      }
-
-      // Apwouve KYC anvan — pa kite echèk kat anpeche apwobasyon.
       const alreadyUnlocked = profile.features_unlock_paid === true;
-      const { error: approveErr } = await admin
-        .from('profiles')
-        .update({
-          kyc_status: KYC_STATUS.APPROVED,
-          kyc_rejection_reason: null,
-          is_activated: true,
-          // Pa efase debloke si kliyan te deja peye 2yèm frè a
-          ...(alreadyUnlocked
-            ? {}
-            : { is_card_activated: false, features_unlock_paid: false }),
-        })
-        .eq('id', userId);
+      const alreadyApproved = profile.kyc_status === KYC_STATUS.APPROVED;
 
-      if (approveErr) {
-        return NextResponse.json(
-          { error: `Pa t kapab apwouve KYC: ${approveErr.message}` },
-          { status: 500 }
-        );
+      // Si KYC deja apwouve men kat manke (echèk anvan), eseye kreye kat sèlman.
+      if (!alreadyApproved) {
+        const { error: approveErr } = await admin
+          .from('profiles')
+          .update({
+            kyc_status: KYC_STATUS.APPROVED,
+            kyc_rejection_reason: null,
+            is_activated: true,
+            ...(alreadyUnlocked
+              ? {}
+              : { is_card_activated: false, features_unlock_paid: false }),
+          })
+          .eq('id', userId);
+
+        if (approveErr) {
+          return NextResponse.json(
+            { error: `Pa t kapab apwouve KYC: ${approveErr.message}` },
+            { status: 500 }
+          );
+        }
       }
 
       let cardOk = true;
       let cardWarning: string | undefined;
+      let cardCreated = false;
       try {
-        await provisionCardForUser(admin, userId, {
+        const result = await provisionCardForUser(admin, userId, {
           activate: alreadyUnlocked,
         });
+        cardCreated = result.created === true;
+        if (alreadyApproved && !cardCreated) {
+          return NextResponse.json({
+            success: true,
+            action: 'approved',
+            message: 'KYC deja apwouve epi kat deja egziste.',
+            features_locked: !alreadyUnlocked,
+            card_ok: true,
+            card_created: false,
+            fresh_approval: false,
+          });
+        }
       } catch (cardErr: unknown) {
         cardOk = false;
         const msg =
@@ -107,32 +119,39 @@ export async function POST(request: Request) {
         console.error('[kyc-review] provisionCard failed', userId, msg);
       }
 
-      if (gate.role === 'admin') {
+      if (gate.role === 'admin' && (!alreadyApproved || cardCreated || !cardOk)) {
         await logAdminAction(admin, {
           adminEmail: user.email,
-          action: 'KYC_APPROVED',
+          action: alreadyApproved ? 'KYC_CARD_RETRY' : 'KYC_APPROVED',
           targetType: 'profile',
           targetId: userId,
           details: {
             locked_until_unlock_fee: !alreadyUnlocked,
             card_provisioned: cardOk,
+            card_created: cardCreated,
             card_warning: cardWarning || null,
           },
           ip,
         });
       }
 
+      const successMsg = !cardOk
+        ? `KYC apwouve, men kat pa t kreye: ${cardWarning}`
+        : alreadyApproved && cardCreated
+          ? 'Kat kreye avèk siksè pou KYC ki te deja apwouve.'
+          : alreadyUnlocked
+            ? 'KYC apwouve. Kat deja debloke.'
+            : 'KYC apwouve. Kat kreye men bloke — kliyan dwe peye 525 HTG pou debloke kat, terminal ak fakti.';
+
       return NextResponse.json({
         success: true,
         action: 'approved',
-        message: cardOk
-          ? alreadyUnlocked
-            ? 'KYC apwouve. Kat deja debloke.'
-            : 'KYC apwouve. Kat kreye men bloke — kliyan dwe peye 525 HTG pou debloke kat, terminal ak fakti.'
-          : `KYC apwouve, men kat pa t kreye: ${cardWarning}. Verifye CARD_HASH_SECRET sou sèvè a.`,
+        message: successMsg,
         features_locked: !alreadyUnlocked,
         card_ok: cardOk,
+        card_created: cardCreated,
         card_warning: cardWarning,
+        fresh_approval: !alreadyApproved,
       });
     }
 

@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
 
   const generateMissingCard = async (userId: string, currentProfile: any) => {
+    // Si last4 deja nan baz, pa bezwen rele ensure (evite trafik)
     if (currentProfile.kyc_status === 'approved' && !currentProfile.card_last4) {
       try {
          const res = await fetch('/api/card/ensure', {
@@ -81,7 +82,7 @@ export default function Dashboard() {
          });
          if (res.ok) {
            const data = await res.json();
-           if (data.card) {
+           if (data.card?.card_last4) {
              return {
                ...currentProfile,
                card_last4: data.card.card_last4,
@@ -104,7 +105,7 @@ export default function Dashboard() {
         if (user) {
           const { data: profile, error: profileErr } = await supabase
             .from('profiles')
-            .select('id, full_name, email, phone, wallet_balance, card_balance, agent_balance, account_status, account_type, kyc_status, is_activated, is_card_activated, is_agent, agent_tier, agent_capacity, card_last4, card_number_hash, exp_date, created_at, business_name')
+            .select('id, full_name, email, phone, wallet_balance, card_balance, agent_balance, account_status, account_type, kyc_status, is_activated, is_card_activated, is_agent, agent_tier, agent_capacity, card_last4, exp_date, created_at, business_name')
             .eq('id', user.id)
             .maybeSingle();
 

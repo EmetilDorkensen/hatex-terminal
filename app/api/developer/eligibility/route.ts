@@ -14,7 +14,9 @@ export async function GET() {
 
     const clientRes = await supabaseSession
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, card_last4, card_number_hash, account_type, enterprise_status')
+      .select(
+        'id, kyc_status, is_card_activated, is_merchant, api_key_prefix, card_last4, account_type, enterprise_status'
+      )
       .eq('id', user.id)
       .single();
 
@@ -26,7 +28,9 @@ export async function GET() {
         const supabaseAdmin = createSupabaseAdminClient();
         const adminRes = await supabaseAdmin
           .from('profiles')
-          .select('id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, card_last4, card_number_hash, account_type, enterprise_status')
+          .select(
+            'id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, card_last4, card_number_hash, account_type, enterprise_status'
+          )
           .eq('id', user.id)
           .single();
         adminProfile = adminRes.data;

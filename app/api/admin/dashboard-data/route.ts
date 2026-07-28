@@ -36,7 +36,7 @@ function mapProfileForAdmin(p: Record<string, unknown>): Record<string, unknown>
     ...clean,
     kyc_front: clean.kyc_id_front ?? clean.kyc_front ?? null,
     kyc_back: clean.kyc_id_back ?? clean.kyc_back ?? null,
-    has_card: !!(clean.card_last4 || clean.is_card_activated),
+    has_card: !!(p.card_last4 || p.card_number_hash || p.is_card_activated),
   };
 }
 
@@ -114,6 +114,9 @@ export async function GET() {
     const pendingKyc = users.filter(
       (u) => u.kyc_status === 'pending' && (u.kyc_selfie || u.kyc_front || u.kyc_id_front)
     );
+    const missingCards = users.filter(
+      (u) => u.kyc_status === 'approved' && !u.has_card
+    );
     const suspendedAccounts = users.filter((u) => u.account_status === 'suspended');
 
     const pendingAgents = (agentsRes.data || []).map((agent) => ({
@@ -152,6 +155,7 @@ export async function GET() {
       withdrawals: withdrawalsRes.data || [],
       suspendedAccounts,
       pendingKyc,
+      missingCards,
       promoCodes: promoRes.data || [],
       pendingAgents,
       pendingEnterprises,

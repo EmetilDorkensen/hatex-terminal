@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import {
-  buildCardSecurityFields,
   decryptCardField,
   encryptCardField,
   isEncryptedCardField,
   maskCardNumber,
 } from '@/lib/security/hash';
+import { provisionCardForUser } from '@/lib/kyc/card-provision';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 
 type CardPayload = {
@@ -31,13 +31,24 @@ async function buildOwnerCardResponse(
   };
 }
 
-/** Owner-only: retounen kat dechifre. Pa ekspoze via profiles.select. Kle jiskaske is_card_activated. */
+function hasStoredCard(profile: {
+  card_number?: string | null;
+  card_number_hash?: string | null;
+  card_last4?: string | null;
+}): boolean {
+  return !!(profile.card_number_hash || profile.card_last4 || profile.card_number);
+}
+
+/** Owner-only: retounen kat dechifre. Pa janm kreye yon NOUVO nimewo sou reload. */
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
     const rl = await rateLimit(`card-ensure:${ip}`, 30, 300);
     if (!rl.allowed) {
-      return NextResponse.json({ error: `Twòp tantativ. Eseye ankò nan ${rl.retryAfterSec}s.` }, { status: 429 });
+      return NextResponse.json(
+        { error: `Twòp tantativ. Eseye ankò nan ${rl.retryAfterSec}s.` },
+        { status: 429 }
+      );
     }
 
     const supabaseAuth = await createSupabaseServerClient();
@@ -50,11 +61,19 @@ export async function POST(request: Request) {
     const reveal = body?.reveal === true;
 
     const supabase = createSupabaseAdminClient();
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('kyc_status, is_card_activated, features_unlock_paid, card_number, cvv, exp_date, card_number_hash, card_last4')
-      .eq('id', user.id)
-      .single();
+
+    const loadProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select(
+          'kyc_status, is_card_activated, features_unlock_paid, card_number, cvv, exp_date, card_number_hash, card_last4'
+        )
+        .eq('id', user.id)
+        .single();
+      return data;
+    };
+
+    let profile = await loadProfile();
 
     if (!profile || profile.kyc_status !== 'approved') {
       return NextResponse.json({ card: null });
@@ -63,23 +82,65 @@ export async function POST(request: Request) {
     const unlocked =
       profile.is_card_activated === true || profile.features_unlock_paid === true;
 
-    // Kat egziste men bloke — pa revele PAN/CVV, pa kreye nouvo
-    if (profile.card_number_hash && profile.card_number) {
+    // Kat deja nan baz — pa janm regeneré nimewo a
+    if (hasStoredCard(profile)) {
       let plainNum = decryptCardField(profile.card_number);
       let plainCvv = decryptCardField(profile.cvv);
 
-      if (plainNum && plainCvv && (!isEncryptedCardField(profile.card_number) || !isEncryptedCardField(profile.cvv))) {
-        await supabase
+      // Migrasyon legacy plaintext → chifre (yon fwa). Pa chanje PAN.
+      if (
+        plainNum &&
+        plainCvv &&
+        (!isEncryptedCardField(profile.card_number) || !isEncryptedCardField(profile.cvv))
+      ) {
+        const { error: encErr } = await supabase
           .from('profiles')
           .update({
             card_number: encryptCardField(plainNum),
             cvv: encryptCardField(plainCvv),
           })
           .eq('id', user.id);
+        if (encErr) {
+          console.error('[card/ensure] encrypt migrate failed', encErr.message);
+        }
       }
 
+      const last4 =
+        profile.card_last4 ||
+        (plainNum ? plainNum.slice(-4) : null) ||
+        '';
+
       if (!plainNum) {
-        return NextResponse.json({ card: null, error: 'Kat pa ka li.' }, { status: 500 });
+        // Gen idantite kat (last4/hash) men pa ka dechifre — pa kreye yon lòt
+        if (!unlocked) {
+          return NextResponse.json({
+            locked: true,
+            card: last4
+              ? {
+                  card_number: null,
+                  cvv: null,
+                  exp_date: profile.exp_date,
+                  card_last4: last4,
+                  masked: `**** **** **** ${last4}`,
+                }
+              : null,
+          });
+        }
+        return NextResponse.json(
+          {
+            card: last4
+              ? {
+                  card_number: null,
+                  cvv: null,
+                  exp_date: profile.exp_date,
+                  card_last4: last4,
+                  masked: `**** **** **** ${last4}`,
+                }
+              : null,
+            error: 'Kat pa ka li. Kontakte sipò.',
+          },
+          { status: last4 ? 200 : 500 }
+        );
       }
 
       if (!unlocked) {
@@ -89,14 +150,10 @@ export async function POST(request: Request) {
             card_number: null,
             cvv: null,
             exp_date: profile.exp_date,
-            card_last4: profile.card_last4 || plainNum.slice(-4),
+            card_last4: last4 || plainNum.slice(-4),
             masked: maskCardNumber(plainNum),
           },
         });
-      }
-
-      if (!plainCvv) {
-        return NextResponse.json({ card: null, error: 'Kat pa ka li.' }, { status: 500 });
       }
 
       if (!reveal) {
@@ -105,10 +162,17 @@ export async function POST(request: Request) {
             card_number: null,
             cvv: null,
             exp_date: profile.exp_date,
-            card_last4: profile.card_last4 || plainNum.slice(-4),
+            card_last4: last4 || plainNum.slice(-4),
             masked: maskCardNumber(plainNum),
           },
         });
+      }
+
+      if (!plainCvv) {
+        return NextResponse.json(
+          { card: null, error: 'Kat pa ka li (CVV).' },
+          { status: 500 }
+        );
       }
 
       return NextResponse.json({
@@ -116,7 +180,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Pa kreye kat san debloke — admin KYC approve se ki kreye l bloke
+    // Pa gen kat nan baz
     if (!unlocked) {
       return NextResponse.json({
         locked: true,
@@ -125,42 +189,44 @@ export async function POST(request: Request) {
       });
     }
 
-    const random4 = () => Math.floor(1000 + Math.random() * 9000).toString();
-    const newCardNum = `4550${random4()}${random4()}${random4()}`;
-    const newCvv = Math.floor(100 + Math.random() * 900).toString();
-    const now = new Date();
-    const newExp = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear() + 3).substring(2)}`;
+    // Sèlman si debloke epi VRÈMAN pa gen kat: kreye YON fwa (idempotan), verifye erè
+    try {
+      await provisionCardForUser(supabase, user.id, { activate: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Pa t kapab kreye kat.';
+      console.error('[card/ensure] provision failed', message);
+      return NextResponse.json({ card: null, error: message }, { status: 500 });
+    }
 
-    const securityFields = await buildCardSecurityFields(newCardNum, newCvv);
+    profile = await loadProfile();
+    if (!profile || !hasStoredCard(profile)) {
+      return NextResponse.json(
+        { card: null, error: 'Kat pa t anrejistre. Verifye kolòn card_number (TEXT).' },
+        { status: 500 }
+      );
+    }
 
-    await supabase
-      .from('profiles')
-      .update({
-        card_number: encryptCardField(newCardNum),
-        cvv: encryptCardField(newCvv),
-        exp_date: newExp,
-        is_card_activated: true,
-        features_unlock_paid: true,
-        ...securityFields,
-      })
-      .eq('id', user.id);
+    const plainNum = decryptCardField(profile.card_number);
+    const plainCvv = decryptCardField(profile.cvv);
+    const last4 = profile.card_last4 || (plainNum ? plainNum.slice(-4) : '');
 
-    if (!reveal) {
+    if (!reveal || !plainNum || !plainCvv) {
       return NextResponse.json({
         card: {
           card_number: null,
           cvv: null,
-          exp_date: newExp,
-          card_last4: newCardNum.slice(-4),
-          masked: maskCardNumber(newCardNum),
+          exp_date: profile.exp_date,
+          card_last4: last4,
+          masked: plainNum ? maskCardNumber(plainNum) : `**** **** **** ${last4}`,
         },
       });
     }
 
     return NextResponse.json({
-      card: await buildOwnerCardResponse(newCardNum, newCvv, newExp),
+      card: await buildOwnerCardResponse(plainNum, plainCvv, profile.exp_date),
     });
-  } catch {
+  } catch (err: unknown) {
+    console.error('[card/ensure]', err instanceof Error ? err.message : err);
     return NextResponse.json({ error: 'Erè sèvè.' }, { status: 500 });
   }
 }
