@@ -11,7 +11,7 @@ export async function requireAdminUser() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || user.email?.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return null;
   }
 

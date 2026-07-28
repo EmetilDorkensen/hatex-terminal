@@ -84,9 +84,28 @@ export function getTransactionDescription(t: UserTransaction): string {
   }
   if (t.type === 'AGENT_WITHDRAWAL_CLIENT') {
     const fee = Number(t.metadata?.fee || 0);
-    const base = String(t.description || 'Retrè kach kay ajan');
+    const base = cleanPublicFeeDescription(String(t.description || 'Retrè kach kay ajan'));
     if (fee > 0) return `${base} (+ ${fee.toLocaleString()} HTG frè)`;
     return base;
   }
-  return String(t.description || t.type);
+  if (t.type === 'KYC_FEE') {
+    return cleanPublicFeeDescription(
+      String(t.description || 'Frè KYC soumèt dokiman')
+    );
+  }
+  if (t.type === 'CARD_ACTIVATION' || t.type === 'FEATURES_UNLOCK') {
+    return cleanPublicFeeDescription(
+      String(t.description || 'Frè debloke kat / terminal / fakti')
+    );
+  }
+  return cleanPublicFeeDescription(String(t.description || t.type));
+}
+
+/** Retire nòt entèn « pwofi HatexCard » nan mesaj kliyan wè. */
+function cleanPublicFeeDescription(raw: string): string {
+  return raw
+    .replace(/\s*[—–\-]\s*pwofi\s+HatexCard\b/gi, '')
+    .replace(/\s*\(\s*pwofi\s+HatexCard\s*\)/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }

@@ -17,7 +17,9 @@ export async function getAuthenticatedUser() {
 }
 
 export async function isAdminWithGate(userEmail: string | undefined): Promise<boolean> {
-  if (userEmail !== ADMIN_EMAIL) return false;
+  if (!userEmail || userEmail.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return false;
+  }
   const cookieStore = await cookies();
   const token = cookieStore.get(ADMIN_GATE_COOKIE)?.value;
   return verifyAdminGateToken(token);

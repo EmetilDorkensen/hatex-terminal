@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
-import { hasValidAdminGate, ADMIN_EMAIL } from '@/lib/admin/auth';
-import { isActiveStaff } from '@/lib/kyc/access';
+import { assertFinanceOperatorWithGate } from '@/lib/admin/auth';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { logAdminAction } from '@/lib/admin/audit-log';
 import {
@@ -27,13 +26,18 @@ export async function GET(request: Request) {
   } = await session.auth.getUser();
 
   if (!user?.email) {
-    return NextResponse.json({ error: 'Aksè refize.' }, { status: 403 });
+    return NextResponse.json({ error: 'Aksè refize. Ou dwe konekte.' }, { status: 403 });
   }
 
-  const isAdmin = user.email === ADMIN_EMAIL && (await hasValidAdminGate());
-  const isStaff = await isActiveStaff(user.email);
-  if (!isAdmin && !isStaff) {
-    return NextResponse.json({ error: 'Aksè refize.' }, { status: 403 });
+  const gate = await assertFinanceOperatorWithGate(user.email);
+  if (!gate.ok) {
+    return NextResponse.json(
+      {
+        error:
+          'Aksè refize. Antre modpas admin gate oswa workspace gate anvan.',
+      },
+      { status: 403 }
+    );
   }
 
   const url = new URL(request.url);
@@ -45,7 +49,6 @@ export async function GET(request: Request) {
 
   const respondWithUrl = (target: string, meta: Record<string, unknown> = {}) => {
     if (wantRedirect) {
-      // Same-origin entry → 302 nan signed URL (evite Open Redirect kote kliyan)
       try {
         const parsed = new URL(target);
         if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
@@ -59,8 +62,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ url: target, ...meta });
   };
 
-  // Si se URL piblik ki toujou aksesib, retounen l dirèkteman
-  if ((ref.startsWith('http://') || ref.startsWith('https://')) && !ref.includes('/storage/v1/object/')) {
+  if (
+    (ref.startsWith('http://') || ref.startsWith('https://')) &&
+    !ref.includes('/storage/v1/object/')
+  ) {
     return respondWithUrl(ref, { expires_in: 0, bucket: 'external' });
   }
 
@@ -70,7 +75,6 @@ export async function GET(request: Request) {
   }
 
   const db = createSupabaseAdminClient();
-  // Asire bucket yo egziste
   await db.storage.createBucket('agent_documents', { public: false }).catch(() => null);
   await db.storage.createBucket('enterprise_documents', { public: false }).catch(() => null);
 
@@ -79,17 +83,24 @@ export async function GET(request: Request) {
     if (tried.has(bucket)) continue;
     tried.add(bucket);
 
-    const { data, error } = await db.storage.from(bucket).createSignedUrl(location.path, SIGNED_URL_TTL_SEC);
+    const { data, error } = await db.storage
+      .from(bucket)
+      .createSignedUrl(location.path, SIGNED_URL_TTL_SEC);
     if (!error && data?.signedUrl) {
-      await logAdminAction(db, {
-        adminEmail: user.email,
-        action: 'APPLICATION_DOC_VIEWED',
-        targetType: 'application_document',
-        targetId: location.path,
-        details: { bucket },
-        ip,
+      if (gate.role === 'admin') {
+        await logAdminAction(db, {
+          adminEmail: user.email,
+          action: 'APPLICATION_DOC_VIEWED',
+          targetType: 'application_document',
+          targetId: location.path,
+          details: { bucket },
+          ip,
+        });
+      }
+      return respondWithUrl(data.signedUrl, {
+        expires_in: SIGNED_URL_TTL_SEC,
+        bucket,
       });
-      return respondWithUrl(data.signedUrl, { expires_in: SIGNED_URL_TTL_SEC, bucket });
     }
   }
 

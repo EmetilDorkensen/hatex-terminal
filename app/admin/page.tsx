@@ -289,15 +289,10 @@ export default function AdminSuperPage() {
 
     const handleOpenDepositProof = async (ref: string) => {
         if (!ref) { alert("Pa gen lyen pou prèv sa a!"); return; }
-        if (ref.startsWith('http://') || ref.startsWith('https://')) {
-            if (!openSafeUrl(ref)) alert('Lyèn prèv la pa valab.');
-            return;
-        }
         try {
-            const res = await fetch(`/api/admin/deposit-proof?ref=${encodeURIComponent(ref)}`);
-            const data = await res.json();
-            if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-            if (!openSafeUrl(data.url)) throw new Error('Lyèn prèv la pa valab.');
+            // redirect=1 → 302 signed URL (menm jan ak dokiman KYC) — evite blòk popup / openSafeUrl
+            const openUrl = `/api/admin/deposit-proof?ref=${encodeURIComponent(ref)}&redirect=1`;
+            window.open(openUrl, '_blank', 'noopener,noreferrer');
         } catch (e: any) {
             alert(e.message || 'Pa t kapab louvri prèv la.');
         }

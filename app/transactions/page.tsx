@@ -40,14 +40,24 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [supabase]);
 
-  const maskEmail = (email: string) => {
-    if (!email || !email.includes('@')) return "";
-    const [name, domain] = email.split('@');
-    if (name.length <= 3) return `${name}...@${domain}`;
-    return `${name.substring(0, 3)}.....@${domain}`;
-  };
-
   const getDynamicDescription = (t: any) => getTransactionDescription(t);
+
+  const getTypeLabel = (type: string, isSubscription: boolean) => {
+    if (isSubscription) return 'ABÒNMAN';
+    switch (type) {
+      case 'SALE':
+        return 'LAVANT';
+      case 'PAYMENT':
+        return 'ACHA';
+      case 'KYC_FEE':
+        return 'KYC';
+      case 'CARD_ACTIVATION':
+      case 'FEATURES_UNLOCK':
+        return 'AKTIVASYON';
+      default:
+        return type;
+    }
+  };
 
   const displayTransactions = useMemo(
     () => prepareUserTransactions(transactions),
@@ -55,15 +65,28 @@ export default function TransactionsPage() {
   );
 
   const filteredTransactions = displayTransactions.filter((t) => {
-    const isManualOldRecord = t.description?.includes("Voye bay") || t.description?.includes("Resevwa nan men yon zanmi");
+    const isManualOldRecord =
+      t.description?.includes('Voye bay') ||
+      t.description?.includes('Resevwa nan men yon zanmi');
     if (isManualOldRecord && t.type === 'TRANSFER') return false;
 
     if (activeTab === 'TOUT') return true;
     if (activeTab === 'DEPO') return t.type === 'DEPOSIT';
     if (activeTab === 'TRANSFER') return t.type === 'P2P' || t.type === 'TRANSFER';
     if (activeTab === 'RETRÈ') return t.type === 'WITHDRAWAL';
-    if (activeTab === 'KAT') return t.type === 'CARD_RECHARGE' || t.type === 'PAYMENT' || t.type === 'SALE';
-    if (activeTab === 'ABÒNMAN') return t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription === true;
+    if (activeTab === 'KAT') {
+      return (
+        t.type === 'CARD_RECHARGE' ||
+        t.type === 'PAYMENT' ||
+        t.type === 'SALE' ||
+        t.type === 'CARD_ACTIVATION' ||
+        t.type === 'KYC_FEE' ||
+        t.type === 'FEATURES_UNLOCK'
+      );
+    }
+    if (activeTab === 'ABÒNMAN') {
+      return t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription === true;
+    }
     return true;
   });
 
@@ -80,6 +103,10 @@ export default function TransactionsPage() {
       case 'DEPOSIT': return <Download size={20} className="text-emerald-600" />;
       case 'WITHDRAWAL': return <Upload size={20} className="text-rose-600" />;
       case 'CARD_RECHARGE': return <CreditCard size={20} className="text-indigo-600" />;
+      case 'CARD_ACTIVATION':
+      case 'KYC_FEE':
+      case 'FEATURES_UNLOCK':
+        return <CreditCard size={20} className="text-indigo-600" />;
       case 'PAYMENT': return <ShoppingBag size={20} className="text-amber-600" />;
       case 'SALE': return <ShoppingBag size={20} className="text-emerald-600" />;
       case 'P2P': return <ArrowRightLeft size={20} className="text-blue-600" />;
@@ -136,23 +163,27 @@ export default function TransactionsPage() {
           ))}
         </div>
 
-        {loading ? (
+        {loading && (
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
-        ) : filteredTransactions.length === 0 ? (
+        )}
+
+        {!loading && filteredTransactions.length === 0 && (
           <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
             <History size={48} className="mx-auto mb-4 text-slate-300" />
             <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Pa gen aktivite nan kategori sa a</p>
           </div>
-        ) : (
+        )}
+
+        {!loading && filteredTransactions.length > 0 && (
           <div className="space-y-3">
             {filteredTransactions.map((t) => {
               const isSubscription = t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription;
               
               // NOUVO: Sistèm nan ap chache 'order_id' ki sot nan SQL la an premye. 
               // Si l pa jwenn li (pou ansyen tranzaksyon yo), l ap itilize 12 lèt nan ansyen ID a.
-              const displayId = t.order_id || t.id.replace(/-/g, '').substring(0, 12).toUpperCase();
+              const displayId = t.order_id || t.id.replaceAll('-', '').substring(0, 12).toUpperCase();
               
               return (
                 <div key={t.id} className={`bg-white border ${isSubscription ? 'border-indigo-200 shadow-sm' : 'border-gray-200'} p-4 sm:p-5 rounded-2xl transition-all hover:shadow-md group`}>
@@ -199,7 +230,7 @@ export default function TransactionsPage() {
                         <span className="text-xs text-slate-500 font-semibold uppercase">HTG</span>
                       </div>
                       <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isSubscription ? 'text-indigo-500' : 'text-slate-400'}`}>
-                        {isSubscription ? 'ABÒNMAN' : (t.type === 'SALE' ? 'LAVANT' : (t.type === 'PAYMENT' ? 'ACHA' : t.type))}
+                        {getTypeLabel(t.type, !!isSubscription)}
                       </p>
                     </div>
                   </div>
