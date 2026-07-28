@@ -1,3 +1,5 @@
 {
-    "deno.enable": true
+    "deno.enable": true,
+    "snyk.advanced.organization": "fa48f587-8b5a-456f-8dce-45939e1ae661",
+    "snyk.advanced.autoSelectOrganization": true
 }

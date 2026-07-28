@@ -531,7 +531,16 @@ export default function AdminSuperPage() {
                 ? `Felisitasyon ${full_name}! Dokiman w yo apwouve. Kat vityèl ou ak terminal ou aktive otomatikman.`
                 : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
             await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            alert(aksyon === 'approved' ? 'KYC apwouve — kat kreye otomatikman!' : 'KYC rejte avèk siksè!'); raleDone();
+            if (aksyon === 'approved') {
+                alert(
+                    data.card_ok === false
+                        ? (data.message || 'KYC apwouve, men kat pa t kreye. Verifye CARD_HASH_SECRET.')
+                        : 'KYC apwouve — kat kreye otomatikman!'
+                );
+            } else {
+                alert('KYC rejte avèk siksè!');
+            }
+            raleDone();
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
     };
 

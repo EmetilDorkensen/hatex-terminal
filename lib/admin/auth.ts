@@ -41,8 +41,12 @@ export async function assertFinanceOperatorWithGate(
   if (normalized === ADMIN_EMAIL.toLowerCase()) {
     const adminToken = cookieStore.get(ADMIN_GATE_COOKIE)?.value;
     if (verifyAdminGateToken(adminToken)) return { ok: true, role: 'admin' };
-    // Admin prensipal la ka antre nan /workspace kòm yon anplwaye tou.
-    // Nan ka sa a, aksepte gate workspace ki mare ak menm imel la.
+    // Admin ka travay nan /workspace ak workspace gate (san liy staff_users).
+    const wsAdmin = cookieStore.get(WORKSPACE_GATE_COOKIE)?.value;
+    if (verifyWorkspaceGateToken(wsAdmin, normalized)) {
+      return { ok: true, role: 'admin' };
+    }
+    return { ok: false };
   }
 
   const admin = createSupabaseAdminClient();

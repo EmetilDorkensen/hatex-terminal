@@ -460,7 +460,16 @@ export default function WorkspacePage() {
             if (!res.ok) throw new Error(data.error || 'Erè KYC');
 
             await logActivity(`KYC_${aksyon.toUpperCase()}`, 'profile', id, aksyon === 'rejected' ? { reason: rezon, full_name } : { full_name });
-            alert(aksyon === 'approved' ? 'KYC apwouve — kat kreye otomatikman!' : 'KYC rejte!'); checkAuthAndFetchData();
+            if (aksyon === 'approved') {
+                alert(
+                    data.card_ok === false
+                        ? (data.message || 'KYC apwouve, men kat pa t kreye. Verifye CARD_HASH_SECRET.')
+                        : 'KYC apwouve — kat kreye otomatikman!'
+                );
+            } else {
+                alert('KYC rejte!');
+            }
+            checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
