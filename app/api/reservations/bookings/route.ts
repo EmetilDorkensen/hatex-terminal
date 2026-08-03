@@ -116,6 +116,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: 'Adrès livrezon obligatwa.' }, { status: 400 });
   }
 
+  const customerNote = String(body.customer_note || '')
+    .trim()
+    .slice(0, 500);
+
   const unitPrice = Number(listing.price);
   const quantity = Math.max(1, Number(body.quantity) || 1);
   const amount = computeBookingAmount({
@@ -141,6 +145,7 @@ export async function POST(request: Request) {
       delivery_requested: deliveryRequested,
       delivery_fee: deliveryFee,
       delivery_address: deliveryRequested ? String(body.delivery_address).trim() : null,
+      customer_note: customerNote || null,
       amount,
       status: 'pending',
     })

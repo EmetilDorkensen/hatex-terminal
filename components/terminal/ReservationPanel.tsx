@@ -60,6 +60,9 @@ type Booking = {
   amount: number;
   status: string;
   paid_at?: string;
+  scheduled_at?: string;
+  customer_note?: string | null;
+  receipt_snapshot?: { customer_note?: string } | null;
   listing?: { title?: string; category?: string };
 };
 
@@ -825,7 +828,11 @@ export default function ReservationPanel({ origin }: { origin: string }) {
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <p className="text-xs text-slate-400 flex items-center gap-1">
                     <Calendar size={12} />
-                    {b.paid_at ? new Date(b.paid_at).toLocaleString('fr-HT') : '—'}
+                    {b.scheduled_at
+                      ? new Date(b.scheduled_at).toLocaleString('fr-HT')
+                      : b.paid_at
+                        ? new Date(b.paid_at).toLocaleString('fr-HT')
+                        : '—'}
                   </p>
                   {b.status === 'paid' && (
                     <button
@@ -837,6 +844,14 @@ export default function ReservationPanel({ origin }: { origin: string }) {
                     </button>
                   )}
                 </div>
+                {(b.customer_note || b.receipt_snapshot?.customer_note) && (
+                  <p className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                    <span className="font-bold text-indigo-600 uppercase tracking-wider text-[9px] block mb-0.5">
+                      Nòt kliyan
+                    </span>
+                    {b.customer_note || b.receipt_snapshot?.customer_note}
+                  </p>
+                )}
               </div>
             ))}
           {bookings.filter((b) => b.status === 'paid' || b.status === 'refunded').length === 0 && (

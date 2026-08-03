@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/kyc-survey",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/reservation-subscriptions",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

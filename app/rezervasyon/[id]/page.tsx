@@ -20,6 +20,7 @@ function ListingDetailInner() {
   const [quantity, setQuantity] = useState(1);
   const [delivery, setDelivery] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [customerNote, setCustomerNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -53,6 +54,7 @@ function ListingDetailInner() {
           quantity,
           delivery_requested: delivery,
           delivery_address: deliveryAddress,
+          customer_note: customerNote.trim() || undefined,
         }),
       });
       const json = await res.json();
@@ -226,6 +228,21 @@ function ListingDetailInner() {
               )}
             </>
           )}
+
+          <label className="block text-xs font-semibold text-slate-600">
+            Sa ou ta renmen anplis? (opsyonèl)
+            <textarea
+              rows={3}
+              maxLength={500}
+              placeholder="Egzanp: san piman, tab bò fenèt, randevou 6è, elatriye…"
+              className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-y min-h-[80px]"
+              value={customerNote}
+              onChange={(e) => setCustomerNote(e.target.value)}
+            />
+            <span className="text-[10px] text-slate-400 font-medium">
+              Nòt sa a ap ale nan WhatsApp ak imèl machann nan.
+            </span>
+          </label>
 
           {err && <p className="text-sm text-red-600">{err}</p>}
           <button

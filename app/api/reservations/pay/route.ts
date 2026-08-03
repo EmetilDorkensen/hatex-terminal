@@ -6,6 +6,7 @@ import { findProfileByCard } from '@/lib/security/card-lookup';
 import { hashCardNumber } from '@/lib/security/hash';
 import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
 import { sendSubscriptionPaidEmails } from '@/lib/reservations/notify-subscription';
+import { sendReservationPaidMerchantEmail } from '@/lib/reservations/notify-booking';
 import type { ListingMeta } from '@/lib/reservations/types';
 
 const MAX_CARD_ATTEMPTS = 6;
@@ -134,7 +135,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (listingCat === 'subscription' && buyerId) {
+  if (buyerId) {
     try {
       const [{ data: buyerProf }, { data: merchantProf }] = await Promise.all([
         admin.from('profiles').select('email, full_name').eq('id', buyerId).maybeSingle(),
@@ -145,15 +146,37 @@ export async function POST(request: Request) {
           .maybeSingle(),
       ]);
       const meta = (listing?.meta || {}) as ListingMeta;
-      await sendSubscriptionPaidEmails({
-        buyerEmail: buyerProf?.email,
-        buyerName: buyerProf?.full_name,
+
+      if (listingCat === 'subscription') {
+        await sendSubscriptionPaidEmails({
+          buyerEmail: buyerProf?.email,
+          buyerName: buyerProf?.full_name,
+          merchantEmail: merchantProf?.email,
+          merchantName: merchantProf?.business_name || merchantProf?.full_name,
+          planTitle: listing?.title || 'Abònman',
+          amount: Number(booking.amount),
+          intervalDays: Number(meta.billing_interval_days || meta.duration_days || 30),
+          description: listing?.description,
+        });
+      }
+
+      // Notifikasyon machann pou TOUT rezèvasyon / abònman peye
+      await sendReservationPaidMerchantEmail({
         merchantEmail: merchantProf?.email,
         merchantName: merchantProf?.business_name || merchantProf?.full_name,
-        planTitle: listing?.title || 'Abònman',
+        buyerName: buyerProf?.full_name,
+        buyerEmail: buyerProf?.email,
+        listingTitle: listing?.title || 'Rezèvasyon',
+        category: listingCat,
         amount: Number(booking.amount),
-        intervalDays: Number(meta.billing_interval_days || meta.duration_days || 30),
-        description: listing?.description,
+        scheduledAt: booking.scheduled_at,
+        scheduledEnd: booking.scheduled_end,
+        quantity: booking.quantity,
+        deliveryRequested: booking.delivery_requested,
+        deliveryAddress: booking.delivery_address,
+        customerNote: booking.customer_note,
+        paymentMethod: method,
+        referenceId: res.reference_id || null,
       });
     } catch {
       // Pa kraze peman si imèl echwe

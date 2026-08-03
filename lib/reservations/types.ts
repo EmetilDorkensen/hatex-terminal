@@ -180,11 +180,33 @@ export function buildClientWhatsAppMessage(snapshot: {
   billing_interval_days?: number;
   car_make?: string;
   car_year?: string | number;
+  scheduled_at?: string;
+  scheduled_end?: string;
+  customer_note?: string;
+  delivery_requested?: boolean;
+  delivery_address?: string;
+  quantity?: number;
 }): string {
   const isSub = snapshot.category === 'subscription';
   const title = snapshot.listing_title || (isSub ? 'abònman' : 'sèvis');
   const amount = Number(snapshot.amount || 0).toLocaleString();
   const buyer = snapshot.buyer_name || 'Kliyan';
+  const note = String(snapshot.customer_note || '').trim();
+
+  const formatWhen = (iso?: string) => {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('fr-HT', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return iso;
+    }
+  };
 
   if (isSub) {
     const days = snapshot.billing_interval_days || '';
@@ -193,6 +215,7 @@ export function buildClientWhatsAppMessage(snapshot: {
       `Mwen peye abònman « ${title} » sou HatexCard (${amount} HTG).`,
       days ? `Dire / debit: chak ${days} jou.` : '',
       snapshot.description ? `Detay: ${snapshot.description}` : '',
+      note ? `Nòt mwen: ${note}` : '',
       'Tanpri aktive abònman an pou mwen. Mèsi.',
     ].filter(Boolean);
     return lines.join('\n');
@@ -201,9 +224,16 @@ export function buildClientWhatsAppMessage(snapshot: {
   return [
     `Bonjou, mwen se ${buyer}.`,
     `Mwen peye rezèvasyon « ${title} » sou HatexCard (${amount} HTG).`,
+    snapshot.scheduled_at ? `Dat / lè: ${formatWhen(snapshot.scheduled_at)}` : '',
+    snapshot.scheduled_end ? `Jiska: ${formatWhen(snapshot.scheduled_end)}` : '',
+    snapshot.quantity && Number(snapshot.quantity) > 1 ? `Kantite: ${snapshot.quantity}` : '',
     snapshot.car_make
       ? `Machin: ${snapshot.car_make}${snapshot.car_year ? ` (${snapshot.car_year})` : ''}`
       : '',
+    snapshot.delivery_requested
+      ? `Livrezon: ${snapshot.delivery_address || 'Wi'}`
+      : '',
+    note ? `Nòt mwen / sa m ta renmen anplis: ${note}` : '',
     'Mwen ap vin jan m te rezève a. Mèsi.',
   ]
     .filter(Boolean)
