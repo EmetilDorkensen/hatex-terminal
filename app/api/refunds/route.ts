@@ -152,6 +152,39 @@ export async function POST(req: Request) {
     }
   }
 
+  // Fèmen demann kliyan pending + mesaj REFUND_REQUEST ki matche sous sa
+  try {
+    const now = new Date().toISOString();
+    await admin
+      .from('hatex_refund_requests')
+      .update({ status: 'refunded', updated_at: now })
+      .eq('merchant_id', merchantId)
+      .eq('source', source)
+      .eq('source_id', sourceId)
+      .eq('status', 'pending');
+
+    const { data: notices } = await admin
+      .from('transactions')
+      .select('id, metadata')
+      .eq('user_id', merchantId)
+      .eq('type', 'REFUND_REQUEST')
+      .contains('metadata', { source, source_id: sourceId });
+
+    for (const n of notices || []) {
+      const meta =
+        n.metadata && typeof n.metadata === 'object' && !Array.isArray(n.metadata)
+          ? (n.metadata as Record<string, unknown>)
+          : {};
+      if (meta.refunded === true) continue;
+      await stampHistoryTxRefunded(admin, merchantId, n.id, {
+        refund_source: source,
+        refund_source_id: sourceId,
+      });
+    }
+  } catch {
+    // pa kraze siksè RPC
+  }
+
   try {
     const [{ data: merchantProf }, buyerEmail] = await Promise.all([
       admin

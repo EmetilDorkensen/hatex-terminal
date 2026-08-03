@@ -10,6 +10,8 @@ type Props = {
   invoiceId?: string;
   amount?: number;
   alreadyRefunded?: boolean;
+  /** Rezon default (egzanp rezon kliyan nan demann). */
+  defaultReason?: string;
   onDone?: () => void;
   className?: string;
   compact?: boolean;
@@ -20,6 +22,7 @@ export function HistoryRefundButton({
   invoiceId,
   amount,
   alreadyRefunded,
+  defaultReason,
   onDone,
   className = '',
   compact = false,
@@ -43,14 +46,17 @@ export function HistoryRefundButton({
   const handleRefund = async () => {
     setError(null);
     const reason =
-      window.prompt('Rezon ranbousman (opsyonèl):', 'Machann ranbouse kliyan') || '';
+      window.prompt(
+        'Rezon ranbousman (opsyonèl):',
+        defaultReason || 'Machann ranbouse kliyan'
+      ) || '';
     const amtLabel =
-      amount != null && Number.isFinite(amount)
+      amount != null && Number.isFinite(amount) && amount > 0
         ? `${Number(amount).toLocaleString()} HTG`
         : 'kob la';
     if (
       !confirm(
-        `Ranbouse ${amtLabel}? Kob la soti nan wallet ou epi tounen bay moun ki te peye a.`
+        `Ranbouse ${amtLabel}? Kob la soti nan wallet ou epi tounen sou kat moun ki te peye a (san frè).`
       )
     ) {
       return;

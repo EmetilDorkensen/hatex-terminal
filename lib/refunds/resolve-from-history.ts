@@ -35,13 +35,31 @@ export async function resolveRefundFromHistoryTx(
   if (error || !tx) {
     return { ok: false, message: 'Tranzaksyon pa jwenn.' };
   }
-  if (!(Number(tx.amount) > 0)) {
-    return { ok: false, message: 'Sèlman resevwa (kob antre) yo ka ranbouse.' };
-  }
 
   const meta = asMeta(tx.metadata);
   if (meta.refunded === true) {
     return { ok: false, message: 'Deja ranbouse.' };
+  }
+
+  // Mesaj « demann ranbousman » nan istorik machann
+  if (tx.type === 'REFUND_REQUEST') {
+    if (meta.source && meta.source_id) {
+      return {
+        ok: true,
+        resolved: {
+          source: meta.source as ResolvedRefund['source'],
+          source_id: String(meta.source_id),
+        },
+      };
+    }
+    if (meta.merchant_credit_tx_id) {
+      return resolveRefundFromHistoryTx(admin, merchantId, String(meta.merchant_credit_tx_id));
+    }
+    return { ok: false, message: 'Demann ranbousman pa konplè.' };
+  }
+
+  if (!(Number(tx.amount) > 0)) {
+    return { ok: false, message: 'Sèlman resevwa (kob antre) yo ka ranbouse.' };
   }
 
   if (meta.booking_id && (tx.type === 'RESERVATION_RECEIPT' || meta.source === 'reservation')) {
@@ -159,23 +177,109 @@ export async function stampHistoryTxRefunded(
 ) {
   const { data: tx } = await admin
     .from('transactions')
-    .select('metadata')
+    .select('metadata, type')
     .eq('id', historyTxId)
     .eq('user_id', merchantId)
     .maybeSingle();
   if (!tx) return;
 
   const meta = asMeta(tx.metadata);
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    metadata: {
+      ...meta,
+      refunded: true,
+      refunded_at: now,
+      ...extra,
+    },
+  };
+  if (tx.type === 'REFUND_REQUEST') patch.status = 'success';
+
   await admin
     .from('transactions')
-    .update({
-      metadata: {
-        ...meta,
-        refunded: true,
-        refunded_at: new Date().toISOString(),
-        ...extra,
-      },
-    })
+    .update(patch)
     .eq('id', historyTxId)
     .eq('user_id', merchantId);
+
+  // Si se te yon demann kliyan: make request + credit/buyer txs kòm ranbouse
+  if (tx.type === 'REFUND_REQUEST') {
+    await stampRefundRequestFulfilled(admin, merchantId, historyTxId, meta);
+  }
+}
+
+async function stampRefundRequestFulfilled(
+  admin: SupabaseClient,
+  merchantId: string,
+  noticeTxId: string,
+  meta: Record<string, unknown>
+) {
+  const now = new Date().toISOString();
+  const source = meta.source ? String(meta.source) : null;
+  const sourceId = meta.source_id ? String(meta.source_id) : null;
+
+  await admin
+    .from('hatex_refund_requests')
+    .update({ status: 'refunded', updated_at: now })
+    .eq('merchant_id', merchantId)
+    .eq('merchant_notice_tx_id', noticeTxId);
+
+  if (source && sourceId) {
+    await admin
+      .from('hatex_refund_requests')
+      .update({ status: 'refunded', updated_at: now })
+      .eq('merchant_id', merchantId)
+      .eq('source', source)
+      .eq('source_id', sourceId)
+      .eq('status', 'pending');
+  }
+
+  const creditTxId = meta.merchant_credit_tx_id ? String(meta.merchant_credit_tx_id) : null;
+  if (creditTxId && creditTxId !== noticeTxId) {
+    const { data: creditTx } = await admin
+      .from('transactions')
+      .select('metadata')
+      .eq('id', creditTxId)
+      .eq('user_id', merchantId)
+      .maybeSingle();
+    if (creditTx) {
+      await admin
+        .from('transactions')
+        .update({
+          metadata: {
+            ...asMeta(creditTx.metadata),
+            refunded: true,
+            refunded_at: now,
+            refund_source: source,
+            refund_source_id: sourceId,
+          },
+        })
+        .eq('id', creditTxId)
+        .eq('user_id', merchantId);
+    }
+  }
+
+  const buyerTxId = meta.buyer_tx_id ? String(meta.buyer_tx_id) : null;
+  const buyerId = meta.buyer_id ? String(meta.buyer_id) : null;
+  if (buyerTxId && buyerId) {
+    const { data: buyerTx } = await admin
+      .from('transactions')
+      .select('metadata')
+      .eq('id', buyerTxId)
+      .eq('user_id', buyerId)
+      .maybeSingle();
+    if (buyerTx) {
+      await admin
+        .from('transactions')
+        .update({
+          metadata: {
+            ...asMeta(buyerTx.metadata),
+            refunded: true,
+            refunded_at: now,
+            refund_requested: true,
+          },
+        })
+        .eq('id', buyerTxId)
+        .eq('user_id', buyerId);
+    }
+  }
 }

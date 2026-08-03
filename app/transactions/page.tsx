@@ -6,7 +6,9 @@ import { createBrowserClient } from '@supabase/ssr';
 import { RefreshCcw, Copy, CheckCircle2, ArrowLeft, Download, Upload, CreditCard, ShoppingBag, ArrowRightLeft, Repeat, History } from 'lucide-react';
 import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
 import { isHistoryRefundable } from '@/lib/transactions/refundable';
+import { isClientRefundRequestable } from '@/lib/refunds/resolve-from-buyer';
 import { HistoryRefundButton } from '@/components/transactions/HistoryRefundButton';
+import { RequestRefundButton } from '@/components/transactions/RequestRefundButton';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -226,19 +228,31 @@ export default function TransactionsPage() {
 
                     <div className="flex sm:flex-col justify-between sm:justify-center items-center sm:items-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 shrink-0">
                       <div className="flex items-baseline gap-1">
-                        <p className={`text-base sm:text-lg font-bold ${t.amount > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                          {t.amount > 0 ? '+' : ''}{Math.abs(t.amount).toLocaleString()}
+                        <p className={`text-base sm:text-lg font-bold ${t.amount > 0 || t.type === 'REFUND_REQUEST' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                          {t.type === 'REFUND_REQUEST'
+                            ? Number(t.metadata?.amount || 0).toLocaleString()
+                            : `${t.amount > 0 ? '+' : ''}${Math.abs(t.amount).toLocaleString()}`}
                         </p>
                         <span className="text-xs text-slate-500 font-semibold uppercase">HTG</span>
                       </div>
-                      <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isSubscription ? 'text-indigo-500' : 'text-slate-400'}`}>
-                        {getTypeLabel(t.type, !!isSubscription)}
+                      <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isSubscription ? 'text-indigo-500' : t.type === 'REFUND_REQUEST' ? 'text-amber-600' : 'text-slate-400'}`}>
+                        {t.type === 'REFUND_REQUEST' ? 'DEMANN' : getTypeLabel(t.type, !!isSubscription)}
                       </p>
                     </div>
                   </div>
 
-                  {(t.metadata?.merchant_message || t.metadata?.customer_message) && (
+                  {(t.metadata?.merchant_message || t.metadata?.customer_message || t.type === 'REFUND_REQUEST') && (
                     <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                      {t.type === 'REFUND_REQUEST' && t.metadata?.reason && (
+                        <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                          <span className="text-[9px] text-amber-700 font-bold uppercase tracking-widest block mb-1">
+                            Rezon kliyan
+                          </span>
+                          <p className="text-xs text-amber-950 font-medium leading-relaxed">
+                            &quot;{String(t.metadata.reason)}&quot;
+                          </p>
+                        </div>
+                      )}
                       {t.metadata?.merchant_message && (
                         <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100/50">
                           <span className="text-[9px] text-indigo-600 font-bold uppercase tracking-widest block mb-1">Mesaj Machann:</span>
@@ -254,10 +268,39 @@ export default function TransactionsPage() {
                     </div>
                   )}
 
+                  {isClientRefundRequestable(t) && (
+                    <RequestRefundButton
+                      buyerTxId={t.id}
+                      amount={Math.abs(Number(t.amount))}
+                      alreadyRequested={t.metadata?.refund_requested === true}
+                      onDone={() => {
+                        setTransactions((prev) =>
+                          prev.map((row) =>
+                            row.id === t.id
+                              ? {
+                                  ...row,
+                                  metadata: { ...(row.metadata || {}), refund_requested: true },
+                                }
+                              : row
+                          )
+                        );
+                      }}
+                    />
+                  )}
+
                   {isHistoryRefundable(t) && (
                     <HistoryRefundButton
                       historyTxId={t.id}
-                      amount={Number(t.amount)}
+                      amount={
+                        t.type === 'REFUND_REQUEST'
+                          ? Number(t.metadata?.amount || 0)
+                          : Number(t.amount)
+                      }
+                      defaultReason={
+                        t.type === 'REFUND_REQUEST' && t.metadata?.reason
+                          ? String(t.metadata.reason)
+                          : undefined
+                      }
                       alreadyRefunded={t.metadata?.refunded === true}
                       onDone={() => {
                         setTransactions((prev) =>
@@ -266,6 +309,7 @@ export default function TransactionsPage() {
                               ? {
                                   ...row,
                                   metadata: { ...(row.metadata || {}), refunded: true },
+                                  status: 'success',
                                 }
                               : row
                           )

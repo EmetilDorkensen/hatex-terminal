@@ -59,6 +59,11 @@ export function prepareUserTransactions<T extends UserTransaction>(transactions:
 }
 
 export function getTransactionDescription(t: UserTransaction): string {
+  if (t.type === 'REFUND_REQUEST') {
+    return cleanPublicFeeDescription(
+      String(t.description || 'Demann ranbousman kliyan')
+    );
+  }
   if (t.type === 'REFUND_IN') {
     return cleanPublicFeeDescription(String(t.description || 'Ranbousman resevwa'));
   }

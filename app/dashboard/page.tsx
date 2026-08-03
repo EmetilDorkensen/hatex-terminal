@@ -8,7 +8,9 @@ import { checkStrongPassword } from '@/lib/security/password-strength';
 import { isKycApproved } from '@/lib/kyc/status';
 import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
 import { isHistoryRefundable } from '@/lib/transactions/refundable';
+import { isClientRefundRequestable } from '@/lib/refunds/resolve-from-buyer';
 import { HistoryRefundButton } from '@/components/transactions/HistoryRefundButton';
+import { RequestRefundButton } from '@/components/transactions/RequestRefundButton';
 import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
 import SafeImg from '@/components/SafeImg';
 import { 
@@ -974,11 +976,45 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
+                    {t.type === 'REFUND_REQUEST' && t.metadata?.reason && (
+                      <p className="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                        Rezon: &quot;{String(t.metadata.reason)}&quot;
+                      </p>
+                    )}
+                    {isClientRefundRequestable(t) && (
+                      <RequestRefundButton
+                        compact
+                        buyerTxId={t.id}
+                        amount={Math.abs(Number(t.amount))}
+                        alreadyRequested={t.metadata?.refund_requested === true}
+                        onDone={() => {
+                          setRecentTransactions((prev) =>
+                            prev.map((row) =>
+                              row.id === t.id
+                                ? {
+                                    ...row,
+                                    metadata: { ...(row.metadata || {}), refund_requested: true },
+                                  }
+                                : row
+                            )
+                          );
+                        }}
+                      />
+                    )}
                     {isHistoryRefundable(t) && (
                       <HistoryRefundButton
                         compact
                         historyTxId={t.id}
-                        amount={Number(t.amount)}
+                        amount={
+                          t.type === 'REFUND_REQUEST'
+                            ? Number(t.metadata?.amount || 0)
+                            : Number(t.amount)
+                        }
+                        defaultReason={
+                          t.type === 'REFUND_REQUEST' && t.metadata?.reason
+                            ? String(t.metadata.reason)
+                            : undefined
+                        }
                         alreadyRefunded={t.metadata?.refunded === true}
                         onDone={() => {
                           setRecentTransactions((prev) =>

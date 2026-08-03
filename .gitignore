@@ -29,3 +29,5 @@ supabase/schema-from-prod.sql
 supabase/schema-for-dev.sql
 supabase/schema-public-only.sql
 
+.vercel
+.env*

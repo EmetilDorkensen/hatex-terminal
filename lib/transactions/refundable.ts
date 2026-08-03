@@ -14,20 +14,25 @@ const MERCHANT_CREDIT_TYPES = new Set([
   'SALE',
   'SALE_SDK',
   'MERCHANT_RECEIPT',
+  'REFUND_REQUEST',
 ]);
 
 export function isHistoryRefundable(t: RefundableTx): boolean {
+  const type = String(t.type || '');
+  if (type === 'REFUND_REQUEST') {
+    return t.metadata?.refunded !== true;
+  }
+
   const amount = Number(t.amount || 0);
   if (!(amount > 0)) return false;
   if (t.metadata?.refunded === true) return false;
   if (t.type === 'REFUND_OUT' || t.type === 'REFUND_IN') return false;
 
   const status = String(t.status || '').toLowerCase();
-  if (status && !['success', 'paid', 'completed', 'approved'].includes(status)) {
+  if (status && !['success', 'paid', 'completed', 'approved', 'pending'].includes(status)) {
     return false;
   }
 
-  const type = String(t.type || '');
   if (!MERCHANT_CREDIT_TYPES.has(type)) return false;
 
   const meta = t.metadata || {};
@@ -39,7 +44,6 @@ export function isHistoryRefundable(t: RefundableTx): boolean {
   if (meta.plugin_tx_id || meta.source === 'plugin') return true;
   if (meta.source === 'public_api') return true;
   if (type === 'SALE_SDK' || type === 'MERCHANT_RECEIPT') return true;
-  // SALE genyen (fakti / QR / abònman plan) — sèvè a ap verifye
   if (type === 'SALE') return true;
 
   return false;
