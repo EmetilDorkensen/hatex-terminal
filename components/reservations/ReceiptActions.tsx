@@ -11,9 +11,14 @@ export type ReceiptSnapshot = {
   unit_price?: number;
   delivery_fee?: number;
   delivery_requested?: boolean;
+  delivery_address?: string;
   amount?: number;
   scheduled_at?: string;
+  scheduled_end?: string;
+  quantity?: number;
+  customer_note?: string;
   buyer_name?: string;
+  buyer_email?: string;
   merchant_name?: string;
   business_name?: string;
   logo_url?: string;
@@ -22,6 +27,7 @@ export type ReceiptSnapshot = {
   merchant_address?: string;
   listing_phone?: string;
   listing_description?: string;
+  description?: string;
   billing_interval_days?: number;
   car_make?: string;
   car_year?: string | number;

@@ -8,10 +8,11 @@ import { CreditCard, Wallet } from 'lucide-react';
 function PayInner() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const searchParams = useSearchParams();
-  const forceCard = searchParams.get('card') === '1';
+  const forceCardParam = searchParams.get('card') === '1';
   const router = useRouter();
   const [booking, setBooking] = useState<any>(null);
-  const [method, setMethod] = useState<'wallet' | 'card'>(forceCard ? 'card' : 'wallet');
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [method, setMethod] = useState<'wallet' | 'card'>('card');
   const [card, setCard] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
@@ -29,6 +30,7 @@ function PayInner() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      setLoggedIn(!!user);
       if (user) {
         const { data: p } = await supabase
           .from('profiles')
@@ -42,9 +44,13 @@ function PayInner() {
       const json = await res.json();
       const b = json.booking || (json.bookings || []).find((x: any) => x.id === bookingId);
       setBooking(b || null);
-      if (b?.listing?.category === 'subscription' || forceCard) setMethod('card');
+      const mustCard =
+        forceCardParam ||
+        !user ||
+        b?.listing?.category === 'subscription';
+      setMethod(mustCard ? 'card' : 'wallet');
     })();
-  }, [bookingId, forceCard]);
+  }, [bookingId, forceCardParam]);
 
   const pay = async () => {
     setBusy(true);
@@ -77,6 +83,7 @@ function PayInner() {
 
   const isSub = booking?.listing?.category === 'subscription';
   const amount = Number(booking?.amount || 0);
+  const forceCard = forceCardParam || !loggedIn || isSub;
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
@@ -86,12 +93,17 @@ function PayInner() {
           <>
             <p className="text-sm text-slate-600">{booking.listing?.title || 'Rezèvasyon'}</p>
             <p className="text-3xl font-bold text-indigo-700">{amount.toLocaleString()} HTG</p>
+            {!loggedIn && (
+              <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                Ou pa bezwen konekte — peze ak kat HatexCard ou.
+              </p>
+            )}
           </>
         ) : (
           <p className="text-sm text-slate-500">Ap chaje detay…</p>
         )}
 
-        {!isSub && !forceCard && (
+        {!forceCard && (
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -117,14 +129,14 @@ function PayInner() {
         {method === 'wallet' && walletBal != null && (
           <p className="text-xs text-slate-500">Balans wallet: {walletBal.toLocaleString()} HTG</p>
         )}
-        {method === 'card' && cardBal != null && !forceCard && (
+        {method === 'card' && cardBal != null && loggedIn && !forceCard && (
           <p className="text-xs text-slate-500">Balans kat ou: {cardBal.toLocaleString()} HTG</p>
         )}
 
         {method === 'card' && (
           <div className="space-y-3">
             <input
-              placeholder="Nimewo kat"
+              placeholder="Nimewo kat HatexCard"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
               value={card}
               onChange={(e) => setCard(e.target.value)}
@@ -146,9 +158,11 @@ function PayInner() {
           </div>
         )}
 
-        {isSub && (
+        {(isSub || forceCard) && (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2">
-            Abònman mande peman ak kat HatexCard.
+            {isSub
+              ? 'Abònman mande peman ak kat HatexCard.'
+              : 'Peman ak kat HatexCard (san koneksyon).'}
           </p>
         )}
 

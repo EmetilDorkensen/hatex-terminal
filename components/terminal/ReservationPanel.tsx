@@ -61,9 +61,35 @@ type Booking = {
   status: string;
   paid_at?: string;
   scheduled_at?: string;
+  scheduled_end?: string | null;
+  quantity?: number;
+  nights_or_days?: number;
+  delivery_requested?: boolean;
+  delivery_address?: string | null;
+  delivery_fee?: number;
+  unit_price?: number;
   customer_note?: string | null;
-  receipt_snapshot?: { customer_note?: string } | null;
-  listing?: { title?: string; category?: string };
+  payment_method?: string | null;
+  reference_id?: string | null;
+  receipt_snapshot?: {
+    customer_note?: string;
+    buyer_name?: string;
+    buyer_email?: string;
+    listing_title?: string;
+    listing_photos?: string[];
+    category?: string;
+    car_make?: string;
+    car_year?: string;
+  } | null;
+  buyer?: { full_name?: string; email?: string; phone?: string } | null;
+  listing?: {
+    title?: string;
+    category?: string;
+    photos?: string[];
+    address?: string;
+    zone?: string;
+    phone?: string;
+  };
 };
 
 export default function ReservationPanel({ origin }: { origin: string }) {
@@ -794,7 +820,7 @@ export default function ReservationPanel({ origin }: { origin: string }) {
       )}
 
       {tab === 'sales' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="bg-indigo-600 text-white rounded-2xl p-5">
             <p className="text-xs uppercase opacity-80 font-bold">Total lavant peye (san ranbouse)</p>
             <p className="text-2xl font-bold mt-1">
@@ -805,58 +831,177 @@ export default function ReservationPanel({ origin }: { origin: string }) {
               HTG
             </p>
           </div>
-          {bookings
-            .filter((b) => b.status === 'paid' || b.status === 'refunded')
-            .map((b) => (
-              <div key={b.id} className="bg-white border border-gray-200 rounded-xl p-4 text-sm">
-                <div className="flex justify-between gap-2 items-start">
-                  <div>
-                    <span className="font-semibold text-slate-800">
-                      {b.listing?.title || 'Rezèvasyon'}
-                    </span>
-                    <p className="text-[10px] uppercase font-bold mt-1 text-slate-400">
-                      {b.status === 'refunded' ? 'Ranbouse' : 'Peye'}
-                      {b.listing?.category === 'subscription' ? ' · Abònman' : ''}
-                    </p>
-                  </div>
-                  <span
-                    className={`font-bold ${b.status === 'refunded' ? 'text-slate-400 line-through' : 'text-emerald-700'}`}
-                  >
-                    +{Number(b.amount).toLocaleString()} HTG
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-xs text-slate-400 flex items-center gap-1">
-                    <Calendar size={12} />
-                    {b.scheduled_at
-                      ? new Date(b.scheduled_at).toLocaleString('fr-HT')
-                      : b.paid_at
-                        ? new Date(b.paid_at).toLocaleString('fr-HT')
-                        : '—'}
-                  </p>
-                  {b.status === 'paid' && (
-                    <button
-                      type="button"
-                      onClick={() => void refundSale(b)}
-                      className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline"
-                    >
-                      <RotateCcw size={12} /> Ranbouse
-                    </button>
-                  )}
-                </div>
-                {(b.customer_note || b.receipt_snapshot?.customer_note) && (
-                  <p className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                    <span className="font-bold text-indigo-600 uppercase tracking-wider text-[9px] block mb-0.5">
-                      Nòt kliyan
-                    </span>
-                    {b.customer_note || b.receipt_snapshot?.customer_note}
-                  </p>
-                )}
-              </div>
-            ))}
-          {bookings.filter((b) => b.status === 'paid' || b.status === 'refunded').length === 0 && (
-            <p className="text-center text-slate-500 text-sm py-8">Pa gen lavant ankò.</p>
-          )}
+
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-slate-900">Tablo detay rezèvasyon</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Tout enfò kliyan chwazi (non, sèvis, dat, kantite, foto, livrezon, nòt…)
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[1100px] w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5 font-bold">Foto</th>
+                    <th className="px-3 py-2.5 font-bold">Kliyan</th>
+                    <th className="px-3 py-2.5 font-bold">Sèvis</th>
+                    <th className="px-3 py-2.5 font-bold">Dat / lè</th>
+                    <th className="px-3 py-2.5 font-bold">Kantite</th>
+                    <th className="px-3 py-2.5 font-bold">Livrezon</th>
+                    <th className="px-3 py-2.5 font-bold">Nòt kliyan</th>
+                    <th className="px-3 py-2.5 font-bold">Montan</th>
+                    <th className="px-3 py-2.5 font-bold">Estati</th>
+                    <th className="px-3 py-2.5 font-bold">Aksyon</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {bookings
+                    .filter((b) => b.status === 'paid' || b.status === 'refunded')
+                    .map((b) => {
+                      const snap = b.receipt_snapshot || {};
+                      const photo =
+                        b.listing?.photos?.[0] ||
+                        (Array.isArray(snap.listing_photos) ? snap.listing_photos[0] : null);
+                      const clientName =
+                        b.buyer?.full_name || snap.buyer_name || 'Kliyan';
+                      const clientEmail = b.buyer?.email || snap.buyer_email || '';
+                      const clientPhone = b.buyer?.phone || '';
+                      const title = b.listing?.title || snap.listing_title || 'Sèvis';
+                      const cat = b.listing?.category || snap.category || '';
+                      const note = b.customer_note || snap.customer_note || '';
+                      const when = b.scheduled_at
+                        ? new Date(b.scheduled_at).toLocaleString('fr-HT', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '—';
+                      const until = b.scheduled_end
+                        ? new Date(b.scheduled_end).toLocaleString('fr-HT', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : null;
+                      return (
+                        <tr key={b.id} className="align-top hover:bg-slate-50/80">
+                          <td className="px-3 py-3">
+                            <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-100 border border-gray-100">
+                              {photo ? (
+                                <SafeImg src={photo} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400">
+                                  Pa gen
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="font-bold text-slate-900">{clientName}</p>
+                            {clientEmail && (
+                              <p className="text-[10px] text-slate-500 mt-0.5 break-all">{clientEmail}</p>
+                            )}
+                            {clientPhone && (
+                              <p className="text-[10px] text-slate-500">{clientPhone}</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="font-semibold text-slate-800">{title}</p>
+                            <p className="text-[10px] uppercase text-slate-400 font-bold mt-0.5">
+                              {cat || '—'}
+                            </p>
+                            {(snap.car_make || b.listing?.address) && (
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                {snap.car_make
+                                  ? `${snap.car_make}${snap.car_year ? ` (${snap.car_year})` : ''}`
+                                  : b.listing?.address}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <p className="font-medium text-slate-800">{when}</p>
+                            {until && <p className="text-[10px] text-slate-500">Jiska {until}</p>}
+                            {b.nights_or_days && Number(b.nights_or_days) > 1 && (
+                              <p className="text-[10px] text-slate-500">
+                                {b.nights_or_days} jou/nuit
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 font-semibold text-slate-800">
+                            {Number(b.quantity || 1)}
+                          </td>
+                          <td className="px-3 py-3 max-w-[160px]">
+                            {b.delivery_requested ? (
+                              <div>
+                                <p className="font-bold text-emerald-700 text-[10px] uppercase">Wi</p>
+                                <p className="text-[11px] text-slate-600 mt-0.5 break-words">
+                                  {b.delivery_address || '—'}
+                                </p>
+                                {Number(b.delivery_fee || 0) > 0 && (
+                                  <p className="text-[10px] text-slate-400">
+                                    +{Number(b.delivery_fee).toLocaleString()} HTG
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">Non</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 max-w-[200px]">
+                            {note ? (
+                              <p className="text-[11px] text-slate-700 whitespace-pre-wrap break-words bg-indigo-50/50 border border-indigo-100 rounded-lg p-2">
+                                {note}
+                              </p>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <p
+                              className={`font-bold ${b.status === 'refunded' ? 'text-slate-400 line-through' : 'text-emerald-700'}`}
+                            >
+                              {Number(b.amount).toLocaleString()} HTG
+                            </p>
+                            <p className="text-[10px] text-slate-400 uppercase">
+                              {b.payment_method || '—'}
+                            </p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span
+                              className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${
+                                b.status === 'paid'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                  : 'bg-slate-100 text-slate-500 border border-slate-200'
+                              }`}
+                            >
+                              {b.status === 'refunded' ? 'Ranbouse' : 'Peye'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            {b.status === 'paid' && (
+                              <button
+                                type="button"
+                                onClick={() => void refundSale(b)}
+                                className="text-xs font-bold text-amber-700 flex items-center gap-1 hover:underline"
+                              >
+                                <RotateCcw size={12} /> Ranbouse
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              {bookings.filter((b) => b.status === 'paid' || b.status === 'refunded').length === 0 && (
+                <p className="text-center text-slate-500 text-sm py-10">Pa gen lavant ankò.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

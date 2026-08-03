@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
 import { ReservationReceiptActions, type ReceiptSnapshot } from '@/components/reservations/ReceiptActions';
 
 export default function ReservationSuccessPage() {
@@ -13,21 +12,18 @@ export default function ReservationSuccessPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
     (async () => {
-      const { data } = await supabase
-        .from('reservation_bookings')
-        .select('id, status, receipt_snapshot, reference_id, amount')
-        .eq('id', bookingId)
-        .maybeSingle();
+      const res = await fetch(`/api/reservations/bookings?id=${bookingId}`);
+      const json = await res.json();
+      const data = json.booking;
       if (data?.receipt_snapshot) {
         setSnapshot(data.receipt_snapshot as ReceiptSnapshot);
       } else if (data) {
         setSnapshot({
           amount: Number(data.amount),
+          listing_title: data.listing?.title,
+          customer_note: data.customer_note,
+          scheduled_at: data.scheduled_at,
         });
       }
       setLoading(false);

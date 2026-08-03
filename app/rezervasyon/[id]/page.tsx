@@ -55,6 +55,7 @@ function ListingDetailInner() {
           delivery_requested: delivery,
           delivery_address: deliveryAddress,
           customer_note: customerNote.trim() || undefined,
+          from_share: fromShare,
         }),
       });
       const json = await res.json();
@@ -63,7 +64,7 @@ function ListingDetailInner() {
         return;
       }
       router.push(
-        `/rezervasyon/pay/${json.booking.id}${fromShare || isSub ? '?card=1' : ''}`
+        `/rezervasyon/pay/${json.booking.id}?card=1${fromShare ? '&from=share' : ''}`
       );
     } finally {
       setBusy(false);
