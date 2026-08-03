@@ -7,12 +7,14 @@ import { createBrowserClient } from '@supabase/ssr';
 import { checkStrongPassword } from '@/lib/security/password-strength';
 import { isKycApproved } from '@/lib/kyc/status';
 import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
+import { isHistoryRefundable } from '@/lib/transactions/refundable';
+import { HistoryRefundButton } from '@/components/transactions/HistoryRefundButton';
 import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
 import SafeImg from '@/components/SafeImg';
 import { 
   RefreshCcw, AlertTriangle, X, CheckCircle, ShieldCheck, 
   Send, CheckCircle2, MessageSquare, Plus, ArrowUpRight, 
-  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2, Building2, Receipt, Lock, AlertCircle
+  ArrowRightLeft, Home, CreditCard, Terminal, History, Store, Settings, Menu, Headset, Briefcase, Loader2, Building2, Receipt, Lock, AlertCircle, CalendarDays
 } from 'lucide-react'; 
 
 export default function Dashboard() {
@@ -546,7 +548,7 @@ export default function Dashboard() {
               <button 
                 onClick={() => {
                   if (cardFullyActive) { router.push('/terminal'); setIsMenuOpen(false); } 
-                  else { alert("Ou dwe pase KYC, tann apwobasyon, epi peye 525 HTG pou debloke Terminal la."); }
+                  else { alert("Ou dwe pase KYC, tann apwobasyon, epi peye 1899 HTG pou debloke Terminal la."); }
                 }} 
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 font-medium transition-all"
               >
@@ -795,6 +797,25 @@ export default function Dashboard() {
               />
             )}
 
+            {/* Bouton Rezèvasyon — bò kote Kont Antrepriz */}
+            <button
+              onClick={() => router.push('/rezervasyon')}
+              className="w-full bg-white border border-gray-200 p-4 rounded-xl flex items-center justify-between gap-3 hover:border-indigo-300 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0">
+                  <CalendarDays size={16} />
+                </div>
+                <div className="text-left">
+                  <span className="text-xs font-bold text-slate-700 block">Rezèvasyon</span>
+                  <span className="text-[9px] text-slate-400 uppercase tracking-wider">
+                    Otèl · Resto · Machin · Abònman
+                  </span>
+                </div>
+              </div>
+              <ArrowUpRight size={16} className="text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0" />
+            </button>
+
             {/* Bouton Kont Antrepriz */}
             {userData?.account_type === 'business' && userData?.enterprise_status === 'approved' ? (
               <button onClick={() => router.push('/enterprise')} className="w-full bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between gap-3 hover:shadow-md transition-all">
@@ -934,23 +955,42 @@ export default function Dashboard() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {recentTransactions.map((t) => (
-                  <div key={t.id} className="p-4 sm:p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.amount > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                        {t.amount > 0 ? <ArrowDownToLine size={18} /> : <ArrowUpFromLine size={18} />}
+                  <div key={t.id} className="p-4 sm:p-5 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.amount > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
+                          {t.amount > 0 ? <ArrowDownToLine size={18} /> : <ArrowUpFromLine size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{getTransactionDescription(t)}</p>
+                          <p className="text-xs text-slate-500 truncate mt-0.5">
+                            {new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{getTransactionDescription(t)}</p>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">
-                          {new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                      <div className="text-right shrink-0 pl-4">
+                        <p className={`text-sm font-bold ${t.amount > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                          {t.amount > 0 ? '+' : ''}{Number(t.amount).toLocaleString('en-US', {minimumFractionDigits: 2})} <span className="text-[10px] text-slate-500">HTG</span>
                         </p>
                       </div>
                     </div>
-                    <div className="text-right shrink-0 pl-4">
-                      <p className={`text-sm font-bold ${t.amount > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                        {t.amount > 0 ? '+' : ''}{Number(t.amount).toLocaleString('en-US', {minimumFractionDigits: 2})} <span className="text-[10px] text-slate-500">HTG</span>
-                      </p>
-                    </div>
+                    {isHistoryRefundable(t) && (
+                      <HistoryRefundButton
+                        compact
+                        historyTxId={t.id}
+                        amount={Number(t.amount)}
+                        alreadyRefunded={t.metadata?.refunded === true}
+                        onDone={() => {
+                          setRecentTransactions((prev) =>
+                            prev.map((row) =>
+                              row.id === t.id
+                                ? { ...row, metadata: { ...(row.metadata || {}), refunded: true } }
+                                : row
+                            )
+                          );
+                        }}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

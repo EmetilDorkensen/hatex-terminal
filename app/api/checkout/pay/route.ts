@@ -5,6 +5,7 @@ import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { hashCardNumber } from '@/lib/security/hash';
 import { checkApiReceiveLimit } from '@/lib/security/spending-limits';
 import { normalizeInsufficientFundsMessage } from '@/lib/security/client-payment-balance';
+import { resolveQrPaymentTokenId } from '@/lib/security/qr-payment-token';
 
 const MAX_CARD_ATTEMPTS = 6;
 const CARD_LOCK_WINDOW_SEC = 15 * 60;
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const lockId = String(body.lock_id || '').trim();
-    const token = String(body.token || '').trim();
+    const token = resolveQrPaymentTokenId(String(body.token || '').trim());
     const cleanCard = String(body.card_number || '').replace(/\D/g, '');
     const cvv = String(body.card_cvv || '');
     const cardExpiry = String(body.card_expiry || '');

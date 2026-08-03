@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
+import { resolveQrPaymentTokenId } from '@/lib/security/qr-payment-token';
 
-/** Valide token QR epi retounen enfòmasyon piblik machann (SAN api_key). */
+/** Valide token QR epi retounen enfòmasyon piblik machann (SAN api_key / UUID). */
 export async function GET(request: Request) {
-  const token = new URL(request.url).searchParams.get('token')?.trim();
+  const raw = new URL(request.url).searchParams.get('token')?.trim();
+  const token = resolveQrPaymentTokenId(raw);
   if (!token) {
-    return NextResponse.json({ valid: false, message: 'Token manke.' }, { status: 400 });
+    return NextResponse.json({ valid: false, message: 'Token manke oswa pa valab.' }, { status: 400 });
   }
 
   try {
@@ -42,7 +44,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       valid: true,
       merchant: {
-        id: merchant.id,
         business_name: merchant.business_name,
         full_name: merchant.full_name,
         avatar_url: merchant.avatar_url,

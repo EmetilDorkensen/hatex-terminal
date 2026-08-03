@@ -59,6 +59,28 @@ export function prepareUserTransactions<T extends UserTransaction>(transactions:
 }
 
 export function getTransactionDescription(t: UserTransaction): string {
+  if (t.type === 'REFUND_IN') {
+    return cleanPublicFeeDescription(String(t.description || 'Ranbousman resevwa'));
+  }
+  if (t.type === 'REFUND_OUT') {
+    return cleanPublicFeeDescription(String(t.description || 'Ranbousman voye'));
+  }
+  if (t.type === 'RESERVATION_PAYMENT') {
+    const isSub =
+      t.metadata?.category === 'subscription' ||
+      String(t.description || '').toLowerCase().includes('abònman');
+    return cleanPublicFeeDescription(
+      String(t.description || (isSub ? 'Abònman' : 'Rezèvasyon'))
+    );
+  }
+  if (t.type === 'RESERVATION_RECEIPT') {
+    const isSub =
+      t.metadata?.category === 'subscription' ||
+      String(t.description || '').toLowerCase().includes('abònman');
+    return cleanPublicFeeDescription(
+      String(t.description || (isSub ? 'Lavant abònman' : 'Lavant rezèvasyon'))
+    );
+  }
   if (t.type === 'SUBSCRIPTION' || t.metadata?.is_subscription) {
     const planName = String(t.metadata?.plan_name || 'PLAN');
     const merchantName = String(t.metadata?.merchant_name || 'BIZNIS');

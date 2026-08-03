@@ -24,3 +24,8 @@ Thumbs.db
 # verifikasyon tip (TypeScript)
 *.tsbuildinfo
 next-env.d.ts
+# Local DB dumps (may contain secrets)
+supabase/schema-from-prod.sql
+supabase/schema-for-dev.sql
+supabase/schema-public-only.sql
+

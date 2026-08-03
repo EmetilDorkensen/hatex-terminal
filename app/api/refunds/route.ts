@@ -1,118 +1,195 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
+import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
+import { requireMoneySession } from '@/lib/security/require-money-session';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 import { isUntrustedBrowserRequest, merchantApiJson, parseBearerApiKey } from '@/lib/security/merchant-api';
+import { sendRefundEmails } from '@/lib/reservations/notify-refund';
+import {
+  resolveRefundFromHistoryTx,
+  stampHistoryTxRefunded,
+} from '@/lib/refunds/resolve-from-history';
 
+const SOURCES = new Set(['reservation', 'subscription', 'invoice', 'plugin', 'payment_request']);
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Global refund API — tout verifye sou sèvè.
+ * - Sesyon + MFA: Terminal / dashboard / istorik
+ * - Bearer API key: plugin (konpatibilite ansyen)
+ *
+ * Body:
+ * - { source, source_id } — dirèk
+ * - { history_tx_id } — resolve nan tranzaksyon machann (istorik)
+ * - { invoice_id } — fakti peye
+ * - { transaction_id } — plugin tx (Bearer)
+ */
 export async function POST(req: Request) {
-  try {
+  const ip = getClientIp(req);
+  const rl = await rateLimit(`hatex-refund:${ip}`, 15, 300);
+  if (!rl.allowed) {
+    return NextResponse.json({ success: false, message: 'Twòp demann.' }, { status: 429 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const reason = body.reason ? String(body.reason).slice(0, 500) : null;
+  const historyTxId = body.history_tx_id ? String(body.history_tx_id).trim() : '';
+  const invoiceIdOnly = body.invoice_id && !body.source ? String(body.invoice_id).trim() : '';
+
+  const admin = createSupabaseAdminClient();
+  let merchantId: string | null = null;
+
+  const bearer = parseBearerApiKey(req);
+  if (bearer) {
     if (isUntrustedBrowserRequest(req)) {
-      return merchantApiJson({ error: 'API sa a se sèlman pou sèvè machann.' }, 403);
+      return merchantApiJson({ success: false, message: 'API sa a se sèlman pou sèvè machann.' }, 403);
     }
-
-    const ip = getClientIp(req);
-    const rl = await rateLimit(`refunds:${ip}`, 20, 60);
-    if (!rl.allowed) {
-      return NextResponse.json({ error: 'Twòp demann. Eseye ankò.' }, { status: 429 });
-    }
-
-    // 🔐 OTANTIFIKASYON OBLIGATWA: se sèlman machann ki gen kle API valab la
-    // (Bearer token) ki ka mande yon ranbousman — `merchant_id` PA JANM dwe
-    // soti nan kò rekèt la, sinon nenpòt moun ka fòse yon ranbousman.
-    const apiKey = parseBearerApiKey(req);
-    if (!apiKey) {
-      return merchantApiJson({ error: 'Aksè refize. Kle API (Bearer Token) manke oswa li pa fòmate byen.' }, 401);
-    }
-
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    );
-
-    const merchant = await authenticateMerchantApiKey(supabaseAdmin, apiKey);
-
-    if (!merchant || !merchant.is_merchant) {
-      return NextResponse.json({ error: 'Kle API sa a pa valab oswa kont lan pa otorize.' }, { status: 403 });
+    const merchant = await authenticateMerchantApiKey(admin, bearer);
+    if (!merchant?.is_merchant) {
+      return NextResponse.json({ success: false, message: 'Kle API pa valab.' }, { status: 403 });
     }
     if (merchant.account_status === 'suspended') {
-      return NextResponse.json({ error: 'Kont machann sa a pa aktif.' }, { status: 403 });
+      return NextResponse.json({ success: false, message: 'Kont sispann.' }, { status: 403 });
     }
-
-    const merchant_id = merchant.id;
-
-    const body = await req.json();
-    const { transaction_id, reason } = body;
-
-    if (!transaction_id) {
-      return NextResponse.json({ error: 'Manke enfòmasyon pou tranzaksyon an.' }, { status: 400 });
-    }
-
-    // 1. CHÈCHE TRANZAKSYON AN EPI TCHEKE SI L POKO RANBOUSE
-    //    (`.eq('merchant_id', merchant_id)` la a se garanti ki anpeche yon
-    //    machann ranbouse yon tranzaksyon ki pa pou li — machann_id soti
-    //    dirèkteman nan kle API otantifye a, pa nan kò rekèt la.)
-    const { data: transaction, error: txError } = await supabaseAdmin
-      .from('plugin_transactions')
-      .select('*, profiles:merchant_id(email, full_name, wallet_balance)')
-      .eq('id', transaction_id)
-      .eq('merchant_id', merchant_id)
-      .single();
-
-    if (txError || !transaction) return NextResponse.json({ error: 'Tranzaksyon sa pa egziste oswa li pa apatyen a kont ou.' }, { status: 404 });
-    if (transaction.status === 'refunded') return NextResponse.json({ error: 'Kòb sa te gentan ranbouse deja.' }, { status: 400 });
-
-    const { data: rpcRaw, error: rpcErr } = await supabaseAdmin.rpc('process_plugin_refund', {
-      p_transaction_id: transaction_id,
-      p_merchant_id: merchant_id,
-      p_reason: reason || 'Kliyan an mande ranbousman',
-    });
-
-    if (rpcErr) {
-      return NextResponse.json({ error: rpcErr.message || 'Ranbousman echwe.' }, { status: 500 });
-    }
-    const rpcResult = typeof rpcRaw === 'string' ? JSON.parse(rpcRaw) : rpcRaw;
-    if (!rpcResult?.success) {
-      return NextResponse.json({ error: rpcResult?.message || 'Ranbousman echwe.' }, { status: 400 });
-    }
-
-    const refundAmount = Number(rpcResult.refunded || transaction.amount_htg);
-    const clientEmail = rpcResult.client_email || transaction.customer_info?.email;
-
-    // VOYE IMÈL RESI RANBOUSMAN AN BAY KLIYAN AN (Style Amazon)
-    if (clientEmail) {
-      const refundDate = new Date().toLocaleDateString('ht-HT', { year: 'numeric', month: 'long', day: 'numeric' });
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-          <h2 style="color: #16a34a; text-align: center;">Ranbousman w lan fèt!</h2>
-          <p style="color: #333;">Bonjou,</p>
-          <p style="color: #555;">Machann <strong>${transaction.profiles.full_name}</strong> fèk ranbouse w pou kòmand <strong>#${transaction.order_id}</strong> la.</p>
-          
-          <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>Kantite:</strong> <span style="color: #16a34a; font-size: 18px; font-weight: bold;">${refundAmount} HTG</span></p>
-            <p style="margin: 5px 0;"><strong>Rezon:</strong> ${reason || 'Pa presize'}</p>
-            <p style="margin: 5px 0;"><strong>Dat:</strong> ${refundDate}</p>
-          </div>
-          
-          <p style="color: #555; font-size: 14px;">Lajan an gentan retounen sou balans HatexCard ou a. Ou ka itilize l touswit!</p>
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-          <p style="color: #888; font-size: 12px; text-align: center;">Sistèm peman sekirize pa HatexCard.</p>
-        </div>
-      `;
-
-      await resend.emails.send({
-        from: 'HatexCard <notifications@hatexcard.com>',
-        to: clientEmail,
-        subject: `Ranbousman: ${refundAmount} HTG soti nan ${transaction.profiles.full_name}`,
-        html: emailHtml
-      });
-    }
-
-    return NextResponse.json({ success: true, message: 'Ranbousman an pase nèt!' });
-
-  } catch (error: any) {
-    console.error("Erè API Ranbousman:", error);
-    return NextResponse.json({ error: 'Erè nan sèvè a pandan ranbousman an.' }, { status: 500 });
+    merchantId = merchant.id;
+  } else {
+    const auth = await requireMoneySession();
+    if (!auth.ok) return auth.response;
+    merchantId = auth.user.id;
   }
+
+  if (!merchantId) {
+    return NextResponse.json({ success: false, message: 'Machann pa idantifye.' }, { status: 401 });
+  }
+
+  let source = String(body.source || '').trim();
+  let sourceId = String(body.source_id || '').trim();
+
+  // Plugin API key path (ansyen): transaction_id = plugin_transactions.id
+  if (!source && !historyTxId && !invoiceIdOnly && body.transaction_id) {
+    source = 'plugin';
+    sourceId = String(body.transaction_id).trim();
+  }
+
+  if (historyTxId) {
+    if (!UUID_RE.test(historyTxId)) {
+      return NextResponse.json({ success: false, message: 'ID tranzaksyon pa valab.' }, { status: 400 });
+    }
+    const resolved = await resolveRefundFromHistoryTx(admin, merchantId, historyTxId);
+    if (!resolved.ok) {
+      return NextResponse.json({ success: false, message: resolved.message }, { status: 400 });
+    }
+    source = resolved.resolved.source;
+    sourceId = resolved.resolved.source_id;
+  } else if (invoiceIdOnly) {
+    source = 'invoice';
+    sourceId = invoiceIdOnly;
+  }
+
+  if (!SOURCES.has(source) || !sourceId) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          'source + source_id, history_tx_id, oswa invoice_id obligatwa (transaction_id pou plugin).',
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!UUID_RE.test(sourceId)) {
+    return NextResponse.json({ success: false, message: 'ID pa valab.' }, { status: 400 });
+  }
+
+  const { data: rpcRaw, error: rpcErr } = await admin.rpc('process_hatex_refund', {
+    p_source: source,
+    p_source_id: sourceId,
+    p_merchant_id: merchantId,
+    p_reason: reason,
+  });
+
+  if (rpcErr) {
+    return NextResponse.json({ success: false, message: rpcErr.message || 'Ranbousman echwe.' }, { status: 400 });
+  }
+
+  const result =
+    typeof rpcRaw === 'string' ? JSON.parse(rpcRaw) : (rpcRaw as Record<string, unknown> | null);
+
+  if (!result?.success) {
+    return NextResponse.json(
+      { success: false, message: String(result?.message || 'Ranbousman echwe.') },
+      { status: 400 }
+    );
+  }
+
+  if (historyTxId) {
+    try {
+      await stampHistoryTxRefunded(admin, merchantId, historyTxId, {
+        refund_source: source,
+        refund_source_id: sourceId,
+      });
+    } catch {
+      // pa kraze siksè RPC
+    }
+  } else if (source === 'invoice') {
+    // Stamp SALE ki gen invoice_id nan metadata
+    try {
+      const { data: sales } = await admin
+        .from('transactions')
+        .select('id, metadata')
+        .eq('user_id', merchantId)
+        .eq('type', 'SALE')
+        .contains('metadata', { invoice_id: sourceId });
+      for (const s of sales || []) {
+        await stampHistoryTxRefunded(admin, merchantId, s.id, {
+          refund_source: source,
+          refund_source_id: sourceId,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const [{ data: merchantProf }, buyerEmail] = await Promise.all([
+      admin
+        .from('profiles')
+        .select('email, full_name, business_name')
+        .eq('id', merchantId)
+        .maybeSingle(),
+      Promise.resolve(result.buyer_email as string | null | undefined),
+    ]);
+
+    let buyerName: string | null = null;
+    if (result.buyer_id) {
+      const { data: b } = await admin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', String(result.buyer_id))
+        .maybeSingle();
+      buyerName = b?.full_name || null;
+    }
+
+    await sendRefundEmails({
+      buyerEmail: buyerEmail || null,
+      merchantEmail: merchantProf?.email,
+      merchantName: merchantProf?.business_name || merchantProf?.full_name,
+      buyerName,
+      amount: Number(result.refunded || 0),
+      title: String(result.title || 'Ranbousman'),
+      reason,
+    });
+  } catch {
+    // pa kraze siksè RPC
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: result.message || 'Ranbousman an pase.',
+    refunded: result.refunded,
+    reference_id: result.reference_id,
+    credit_target: result.credit_target,
+  });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Terminal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import JSZip from 'jszip';
@@ -12,19 +11,23 @@ import { ensureMerchantApiCredentials, canAccessTerminal } from '@/lib/security/
 import { profileHasApiKey, maskApiKey } from '@/lib/security/api-key';
 import SafeImg from '@/components/SafeImg';
 import { 
+  Terminal,
   History, Mail, LayoutGrid, Copy, CheckCircle2, 
-  ArrowLeft, Globe, Wallet, RefreshCw, ShieldCheck,
-  User, AlertTriangle, Lock, Box, FileText, Upload, 
-  Filter, Download, TrendingUp, Package, BarChart3,
-  ArrowUpRight, DollarSign, Zap, Play, Youtube,
-  Code, CreditCard, Settings, Bell, HelpCircle,
-  Clock, XCircle, Eye, Edit, Trash2,
-  PlusCircle, List, Grid, Search, Calendar,
-  DownloadCloud, UploadCloud, Key, Shield, Link,
-  Smartphone, Monitor, Server, Cloud, DownloadIcon,
-  ShoppingBag, PenTool, Chrome, Wifi, Image, QrCode,
-  Loader2, RotateCw
+  ArrowLeft, Wallet, RefreshCw, ShieldCheck,
+  User, Lock, FileText, 
+  Download, TrendingUp, Package,
+  DollarSign,
+  Settings,
+  Clock, XCircle, Trash2,
+  PlusCircle, Search, Calendar,
+  DownloadCloud, UploadCloud, DownloadIcon,
+  ShoppingBag, Wifi, Image, QrCode,
+  Loader2, RotateCw, CalendarDays
 } from 'lucide-react';
+import ReservationPanel from '@/components/terminal/ReservationPanel';
+import { HistoryRefundButton } from '@/components/transactions/HistoryRefundButton';
+import { isHistoryRefundable, isInvoiceRefundable } from '@/lib/transactions/refundable';
+import { getTransactionDescription } from '@/lib/transactions/display';
 
 // Konpozan QR (itilize qrcode pou desine canvas)
 const QRCodeComponent = ({ value, size = 150 }: { value: string; size?: number }) => {
@@ -44,7 +47,7 @@ const QRCodeComponent = ({ value, size = 150 }: { value: string; size?: number }
 export default function TerminalPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
-  const [mode, setMode] = useState<'dashboard' | 'plugins' | 'invoices' | 'transactions' | 'settings'>('dashboard');
+  const [mode, setMode] = useState<'dashboard' | 'plugins' | 'invoices' | 'transactions' | 'settings' | 'rezervasyon'>('dashboard');
   const [subMode, setSubMode] = useState<'list' | 'create' | 'details'>('list');
   
   // Data states
@@ -194,7 +197,7 @@ export default function TerminalPage() {
         if (result.eligibility.missingKyc) {
           alert('KYC kont ou poko apwouve. Tanpri tann apwobasyon admin sou paj /kyc la.');
         } else if (result.eligibility.missingCardActivation) {
-          alert('Ou dwe peye frè KYC la (1150 HTG, kat enkli) epi pase verifikasyon anvan w jwenn aksè API a.');
+          alert('Ou dwe peye frè debloke (525 HTG) pou aktive kat, terminal ak fakti.');
         }
         return null;
       }
@@ -540,25 +543,42 @@ export default function TerminalPage() {
 
   const recentSales = useMemo(() => {
     const sdk = transactions
-      .filter(tx => (tx.type === 'SALE_SDK' || tx.type === 'SALE') && tx.status === 'success')
-      .map(tx => ({ 
-        ...tx, 
-        source: tx.metadata?.payment_method === 'qrcode' ? 'QR' : 'SDK', 
-        client: tx.metadata?.customer_name || tx.customer_name || tx.customer_email || 'Kliyan Hatex' 
+      .filter(
+        (tx) =>
+          (tx.type === 'SALE_SDK' ||
+            tx.type === 'SALE' ||
+            tx.type === 'RESERVATION_RECEIPT' ||
+            tx.type === 'MERCHANT_RECEIPT') &&
+          tx.status === 'success'
+      )
+      .map((tx) => ({
+        ...tx,
+        source:
+          tx.type === 'RESERVATION_RECEIPT'
+            ? 'Rezèvasyon'
+            : tx.metadata?.payment_method === 'qrcode'
+              ? 'QR'
+              : tx.type === 'MERCHANT_RECEIPT'
+                ? 'Plugin'
+                : 'SDK',
+        client:
+          tx.metadata?.customer_name ||
+          tx.customer_name ||
+          tx.customer_email ||
+          (tx.type === 'RESERVATION_RECEIPT' ? 'Kliyan rezèvasyon' : 'Kliyan Hatex'),
       }));
-      
+
     const inv = invoices
-      .filter(i => i.status === 'paid')
-      .map(i => ({ 
-        ...i, 
-        source: 'Invoice', 
-        client: i.client_email || 'Kliyan Invoice', 
-        type: 'INVOICE' 
+      .filter((i) => i.status === 'paid' || i.status === 'refunded')
+      .map((i) => ({
+        ...i,
+        source: 'Invoice',
+        client: i.client_email || 'Kliyan Invoice',
+        type: 'INVOICE',
       }));
-      
+
     return [...sdk, ...inv]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 20);
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [transactions, invoices]);
 
   // ============================================================
@@ -598,7 +618,8 @@ export default function TerminalPage() {
   const paymentUrl = useMemo(() => {
     if (!paymentToken) return '';
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-    return `${baseUrl}/checkout?token=${paymentToken}`;
+    // Chemen opake /q/... — pa /checkout?token=hex nan navigatè a
+    return `${baseUrl}/q/${paymentToken}`;
   }, [paymentToken]);
 
   const downloadQR = () => {
@@ -1197,6 +1218,16 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
         </button>
 
         <button
+          onClick={() => setMode('rezervasyon')}
+          className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
+            mode === 'rezervasyon' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
+          }`}
+        >
+          <CalendarDays size={14} className="mb-1 md:mb-0 md:mr-2" />
+          <span>Rezèv<span className="hidden md:inline">asyon</span></span>
+        </button>
+
+        <button
           onClick={() => setMode('transactions')}
           className={`flex flex-col md:flex-row items-center justify-center p-2 sm:px-4 sm:py-2.5 rounded-lg border font-bold text-[10px] uppercase transition-all ${
             mode === 'transactions' ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
@@ -1304,11 +1335,11 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
                 <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
                   <QRCodeComponent value={paymentUrl} size={150} />
                 </div>
-                <p className="text-[10px] text-slate-500 font-medium mt-4 break-all w-full max-w-[250px] text-center truncate">
-                  {paymentUrl}
-                </p>
-                <p className="text-xs text-slate-600 font-medium mt-2 text-center">
+                <p className="text-xs text-slate-600 font-medium mt-4 text-center">
                   Skane sa a pou peye dirèkteman nan kont ou.
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium mt-1 text-center">
+                  Lyèn QR kriple — ID pa parèt nan URL.
                 </p>
               </div>
             </div>
@@ -1474,30 +1505,44 @@ add_filter('woocommerce_payment_gateways', function(\$methods) {
             {invoices.length > 0 ? (
               <div className="space-y-3">
                 {invoices.slice(0, 5).map((inv: any) => (
-                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white border border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>
-                        {inv.status === 'paid' ? <CheckCircle2 size={16} /> : inv.status === 'pending' ? <Clock size={16} /> : <XCircle size={16} />}
+                  <div key={inv.id} className="flex flex-col gap-2 p-4 bg-white border border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>
+                          {inv.status === 'paid' ? <CheckCircle2 size={16} /> : inv.status === 'pending' ? <Clock size={16} /> : <XCircle size={16} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{inv.client_email || 'Kliyan'}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[8px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Fakti</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{formatDate(inv.created_at)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{inv.client_email || 'Kliyan'}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[8px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Fakti</span>
-                          <span className="text-[10px] text-slate-400 font-medium">{formatDate(inv.created_at)}</span>
+                      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 gap-4">
+                        <div className={`text-sm font-bold ${inv.status === 'paid' || inv.status === 'refunded' ? 'text-emerald-600' : 'text-slate-900'} shrink-0`}>
+                          {inv.status === 'paid' || inv.status === 'refunded' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()} HTG
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          {inv.status === 'pending' && (
+                            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors"><Copy size={16} /></button>
+                          )}
+                          <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 gap-4">
-                      <div className={`text-sm font-bold ${inv.status === 'paid' ? 'text-emerald-600' : 'text-slate-900'} shrink-0`}>
-                        {inv.status === 'paid' ? '+' : ''}{parseFloat(inv.amount).toLocaleString()} HTG
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        {inv.status === 'pending' && (
-                          <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors"><Copy size={16} /></button>
-                        )}
-                        <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors"><Trash2 size={16} /></button>
-                      </div>
-                    </div>
+                    {isInvoiceRefundable(inv) && (
+                      <HistoryRefundButton
+                        compact
+                        invoiceId={inv.id}
+                        amount={Number(inv.amount)}
+                        onDone={() => {
+                          setInvoices((prev) =>
+                            prev.map((row) => (row.id === inv.id ? { ...row, status: 'refunded' } : row))
+                          );
+                        }}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -1780,27 +1825,41 @@ if (data.success) {
         ) : (
           <div className="space-y-3">
             {filteredInvoices.map((inv) => (
-              <div key={inv.id} className="bg-white border border-gray-200 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-indigo-300 hover:shadow-sm transition-all shadow-sm">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 ${inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>
-                    {inv.status === 'paid' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+              <div key={inv.id} className="bg-white border border-gray-200 p-4 sm:p-5 rounded-2xl flex flex-col hover:border-indigo-300 hover:shadow-sm transition-all shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 ${inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>
+                      {inv.status === 'paid' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{inv.client_email}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{formatDate(inv.created_at)}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{inv.client_email}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{formatDate(inv.created_at)}</p>
+                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-4 sm:pt-0 mt-2 sm:mt-0 gap-6">
+                    <div className="text-base font-bold text-slate-900 shrink-0">
+                      {inv.status === 'paid' || inv.status === 'refunded' ? <span className="text-emerald-600">+</span> : ''}{parseFloat(inv.amount).toLocaleString()} <span className="text-xs text-slate-500">HTG</span>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {inv.status === 'pending' && (
+                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors" title="Kopye lyen an"><Copy size={16} /></button>
+                      )}
+                      <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors" title="Efase"><Trash2 size={16} /></button>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-4 sm:pt-0 mt-2 sm:mt-0 gap-6">
-                  <div className="text-base font-bold text-slate-900 shrink-0">
-                    {inv.status === 'paid' ? <span className="text-emerald-600">+</span> : ''}{parseFloat(inv.amount).toLocaleString()} <span className="text-xs text-slate-500">HTG</span>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    {inv.status === 'pending' && (
-                      <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/checkout-invoice/${inv.id}`); alert("Lyen kopye!"); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 border border-indigo-100 transition-colors" title="Kopye lyen an"><Copy size={16} /></button>
-                    )}
-                    <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 border border-rose-100 transition-colors" title="Efase"><Trash2 size={16} /></button>
-                  </div>
-                </div>
+                {isInvoiceRefundable(inv) && (
+                  <HistoryRefundButton
+                    compact
+                    invoiceId={inv.id}
+                    amount={Number(inv.amount)}
+                    onDone={() => {
+                      setInvoices((prev) =>
+                        prev.map((row) => (row.id === inv.id ? { ...row, status: 'refunded' } : row))
+                      );
+                    }}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -1825,20 +1884,58 @@ if (data.success) {
         {recentSales.length > 0 ? (
           recentSales.slice(0, 30).map((tx, i) => {
             const client = tx.client || 'Kliyan';
+            const isInvoiceRow = tx.type === 'INVOICE';
+            const showRefund = isInvoiceRow
+              ? isInvoiceRefundable(tx)
+              : isHistoryRefundable(tx);
             return (
-              <div key={i} className="bg-white border border-gray-200 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-indigo-300 hover:shadow-sm transition-all shadow-sm">
-                <div className="flex items-center gap-4 w-full sm:w-auto flex-1 min-w-0">
-                  <div className={`w-10 h-10 ${getInitialColor(client)} rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-sm`}>{getInitials(client)}</div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-sm text-slate-900 truncate">{(tx as any).type || 'PÈMAN'}</h4>
-                    <p className="text-xs font-medium text-slate-500 truncate mt-0.5">{client}</p>
-                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">{formatDate(tx.created_at)}</p>
+              <div key={tx.id || i} className="bg-white border border-gray-200 p-4 sm:p-5 rounded-2xl flex flex-col hover:border-indigo-300 hover:shadow-sm transition-all shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-4 w-full sm:w-auto flex-1 min-w-0">
+                    <div className={`w-10 h-10 ${getInitialColor(client)} rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-sm`}>{getInitials(client)}</div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm text-slate-900 truncate">
+                        {isInvoiceRow
+                          ? 'FAKTI'
+                          : getTransactionDescription(tx) || (tx as any).type || 'PÈMAN'}
+                      </h4>
+                      <p className="text-xs font-medium text-slate-500 truncate mt-0.5">{client}</p>
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">{formatDate(tx.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 mt-2 sm:mt-0 gap-4">
+                    <div className="text-base font-bold text-emerald-600 shrink-0">+{parseFloat(tx.amount).toLocaleString()} <span className="text-xs text-slate-500">HTG</span></div>
+                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md shrink-0 ${tx.status === 'success' || tx.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : tx.status === 'refunded' ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>{tx.status}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto border-t sm:border-none border-gray-100 pt-3 sm:pt-0 mt-2 sm:mt-0 gap-4">
-                  <div className="text-base font-bold text-emerald-600 shrink-0">+{parseFloat(tx.amount).toLocaleString()} <span className="text-xs text-slate-500">HTG</span></div>
-                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md shrink-0 ${tx.status === 'success' || tx.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>{tx.status}</span>
-                </div>
+                {showRefund && (
+                  <HistoryRefundButton
+                    compact
+                    historyTxId={isInvoiceRow ? undefined : tx.id}
+                    invoiceId={isInvoiceRow ? tx.id : undefined}
+                    amount={Number(tx.amount)}
+                    alreadyRefunded={
+                      isInvoiceRow
+                        ? tx.status === 'refunded'
+                        : tx.metadata?.refunded === true
+                    }
+                    onDone={() => {
+                      if (isInvoiceRow) {
+                        setInvoices((prev) =>
+                          prev.map((row) => (row.id === tx.id ? { ...row, status: 'refunded' } : row))
+                        );
+                      } else {
+                        setTransactions((prev) =>
+                          prev.map((row) =>
+                            row.id === tx.id
+                              ? { ...row, metadata: { ...(row.metadata || {}), refunded: true } }
+                              : row
+                          )
+                        );
+                      }
+                    }}
+                  />
+                )}
               </div>
             );
           })
@@ -1879,6 +1976,9 @@ if (data.success) {
           {mode === 'dashboard' && renderDashboard()}
           {mode === 'plugins' && renderPlugins()}
           {mode === 'invoices' && renderInvoices()}
+          {mode === 'rezervasyon' && (
+            <ReservationPanel origin={typeof window !== 'undefined' ? window.location.origin : ''} />
+          )}
           {mode === 'transactions' && renderTransactions()}
           {mode === 'settings' && renderSettings()}
         </div>

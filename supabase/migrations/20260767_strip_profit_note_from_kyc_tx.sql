@@ -1,182 +1,186 @@
 -- ============================================================
--- Retire « — pwofi HatexCard » nan mesaj tranzaksyon KYC / debloke
--- (kliyan pa bezwen wè nòt entèn pwofi)
+-- HatexCard — Kat chifre + otorite baz done
+-- 1) Guard UPDATE elaji (aktivasyon, friz, last4, frè…)
+-- 2) Guard INSERT (pa fo balans/kat nan enskripsyon)
+-- 3) Navigatè pa ka SELECT/UPDATE PAN/CVV/hash sekrè
+--    (API service_role sèlman)
+-- Kouri nan Supabase > SQL Editor.
 -- ============================================================
 
--- Netwaye ansyen liy
-UPDATE public.transactions
-SET description = trim(
-  regexp_replace(
-    regexp_replace(description, '\s*[—–\-]\s*pwofi\s+HatexCard', '', 'gi'),
-    '\s+',
-    ' ',
-    'g'
-  )
-)
-WHERE description ILIKE '%pwofi HatexCard%'
-  AND type IN ('KYC_FEE', 'CARD_ACTIVATION', 'FEATURES_UNLOCK');
-
--- process_kyc_fee — menm lojik, deskripsyon san nòt pwofi
-CREATE OR REPLACE FUNCTION public.process_kyc_fee(p_user_id UUID DEFAULT NULL)
-RETURNS JSON
+-- ------------------------------------------------------------
+-- 1) UPDATE guard
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.guard_profile_sensitive_columns()
+RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_uid UUID := COALESCE(p_user_id, auth.uid());
-  v_bal NUMERIC;
-  v_status TEXT;
-  v_kyc TEXT;
-  v_paid BOOLEAN;
-  v_base NUMERIC;
-  v_discount NUMERIC;
-  v_charge NUMERIC;
-  v_new NUMERIC;
+  v_email TEXT := auth.jwt() ->> 'email';
 BEGIN
-  IF auth.uid() IS NOT NULL AND auth.uid() <> v_uid AND auth.role() IS DISTINCT FROM 'service_role' THEN
-    RETURN json_build_object('success', false, 'message', 'Aksè refize.');
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
   END IF;
 
-  SELECT wallet_balance, account_status, kyc_status, COALESCE(kyc_fee_paid, false)
-    INTO v_bal, v_status, v_kyc, v_paid
-  FROM public.profiles WHERE id = v_uid FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RETURN json_build_object('success', false, 'message', 'Pwofil pa jwenn.');
-  END IF;
-  IF v_status = 'suspended' THEN
-    RETURN json_build_object('success', false, 'message', 'Kont ou sispandi.');
-  END IF;
-  IF v_kyc = 'approved' THEN
-    RETURN json_build_object('success', false, 'message', 'KYC ou deja apwouve.');
-  END IF;
-  IF v_paid THEN
-    RETURN json_build_object('success', true, 'already_paid', true, 'message', 'Frè KYC (soumèt) deja peye.');
+  IF v_email = 'adminhatexcard@gmail.com' THEN
+    RETURN NEW;
   END IF;
 
-  v_base := public.hatex_resolve_fee('kyc_fee', v_uid, 525);
-  SELECT COALESCE(discount_amount, 0) INTO v_discount
-  FROM public.user_discounts WHERE user_id = v_uid;
-  v_discount := COALESCE(v_discount, 0);
-  v_charge := GREATEST(0, v_base - v_discount);
-
-  IF COALESCE(v_bal, 0) < v_charge THEN
-    RETURN json_build_object(
-      'success', false,
-      'message', 'Ou bezwen omwen ' || v_charge || ' HTG sou wallet pou pase KYC.',
-      'amount_due_htg', v_charge,
-      'wallet_balance_htg', v_bal,
-      'needs_deposit', true
-    );
+  IF v_email IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.staff_users
+    WHERE email = lower(v_email) AND status = 'active'
+  ) THEN
+    RETURN NEW;
   END IF;
 
-  UPDATE public.profiles
-  SET wallet_balance = COALESCE(wallet_balance, 0) - v_charge,
-      kyc_fee_paid = true
-  WHERE id = v_uid
-  RETURNING wallet_balance INTO v_new;
+  IF NEW.wallet_balance IS DISTINCT FROM OLD.wallet_balance
+     OR NEW.card_balance IS DISTINCT FROM OLD.card_balance
+     OR NEW.agent_balance IS DISTINCT FROM OLD.agent_balance
+     OR NEW.agent_capacity IS DISTINCT FROM OLD.agent_capacity
+     OR NEW.agent_guarantee_paid IS DISTINCT FROM OLD.agent_guarantee_paid
+     OR NEW.agent_status IS DISTINCT FROM OLD.agent_status
+     OR NEW.account_status IS DISTINCT FROM OLD.account_status
+     OR NEW.account_type IS DISTINCT FROM OLD.account_type
+     OR NEW.kyc_status IS DISTINCT FROM OLD.kyc_status
+     OR NEW.is_activated IS DISTINCT FROM OLD.is_activated
+     OR NEW.is_merchant IS DISTINCT FROM OLD.is_merchant
+     OR NEW.enterprise_status IS DISTINCT FROM OLD.enterprise_status
+     OR NEW.enterprise_fee_paid IS DISTINCT FROM OLD.enterprise_fee_paid
+     OR NEW.kyc_fee_paid IS DISTINCT FROM OLD.kyc_fee_paid
+     OR NEW.features_unlock_paid IS DISTINCT FROM OLD.features_unlock_paid
+     OR NEW.is_card_activated IS DISTINCT FROM OLD.is_card_activated
+     OR NEW.is_card_frozen IS DISTINCT FROM OLD.is_card_frozen
+     OR COALESCE(NEW.card_number, '') IS DISTINCT FROM COALESCE(OLD.card_number, '')
+     OR COALESCE(NEW.card_number_hash, '') IS DISTINCT FROM COALESCE(OLD.card_number_hash, '')
+     OR COALESCE(NEW.cvv, '') IS DISTINCT FROM COALESCE(OLD.cvv, '')
+     OR COALESCE(NEW.cvv_hash, '') IS DISTINCT FROM COALESCE(OLD.cvv_hash, '')
+     OR COALESCE(NEW.card_last4, '') IS DISTINCT FROM COALESCE(OLD.card_last4, '')
+     OR COALESCE(NEW.exp_date, '') IS DISTINCT FROM COALESCE(OLD.exp_date, '')
+     OR COALESCE(NEW.pin_code_hash, '') IS DISTINCT FROM COALESCE(OLD.pin_code_hash, '')
+     OR COALESCE(NEW.transaction_pin_hash, '') IS DISTINCT FROM COALESCE(OLD.transaction_pin_hash, '')
+     OR COALESCE(NEW.api_key, '') IS DISTINCT FROM COALESCE(OLD.api_key, '')
+     OR COALESCE(NEW.api_key_hash, '') IS DISTINCT FROM COALESCE(OLD.api_key_hash, '')
+     OR COALESCE(NEW.api_key_prefix, '') IS DISTINCT FROM COALESCE(OLD.api_key_prefix, '')
+     OR COALESCE(NEW.webhook_secret, '') IS DISTINCT FROM COALESCE(OLD.webhook_secret, '')
+     OR COALESCE(NEW.agent_code, '') IS DISTINCT FROM COALESCE(OLD.agent_code, '')
+     OR COALESCE(NEW.kyc_id_number_hash, '') IS DISTINCT FROM COALESCE(OLD.kyc_id_number_hash, '')
+  THEN
+    RAISE EXCEPTION 'Chanjman sa a pa otorize dirèkteman. Sèvi ak operasyon ofisyèl sistèm nan.';
+  END IF;
 
-  INSERT INTO public.transactions (user_id, amount, type, status, description)
-  VALUES (
-    v_uid, -v_charge, 'KYC_FEE', 'success',
-    CASE WHEN v_discount > 0
-      THEN 'Frè KYC soumèt dokiman (rediksyon -' || v_discount || ' HTG)'
-      ELSE 'Frè KYC soumèt dokiman (525 HTG)'
-    END
-  );
-
-  RETURN json_build_object(
-    'success', true,
-    'charged_htg', v_charge,
-    'wallet_balance_htg', v_new,
-    'phase', 'submit'
-  );
+  RETURN NEW;
 END;
 $$;
 
--- process_features_unlock_fee — deskripsyon san nòt pwofi
-CREATE OR REPLACE FUNCTION public.process_features_unlock_fee(p_user_id UUID DEFAULT NULL)
-RETURNS JSON
+DROP TRIGGER IF EXISTS trg_guard_profile_sensitive ON public.profiles;
+CREATE TRIGGER trg_guard_profile_sensitive
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.guard_profile_sensitive_columns();
+
+-- ------------------------------------------------------------
+-- 2) INSERT guard
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.guard_profile_sensitive_insert()
+RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  v_uid UUID := COALESCE(p_user_id, auth.uid());
-  v_bal NUMERIC;
-  v_status TEXT;
-  v_kyc TEXT;
-  v_unlock BOOLEAN;
-  v_base NUMERIC;
-  v_charge NUMERIC;
-  v_new NUMERIC;
 BEGIN
-  IF auth.uid() IS NOT NULL AND auth.uid() <> v_uid AND auth.role() IS DISTINCT FROM 'service_role' THEN
-    RETURN json_build_object('success', false, 'message', 'Aksè refize.');
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
   END IF;
 
-  SELECT wallet_balance, account_status, kyc_status,
-         COALESCE(features_unlock_paid, false)
-    INTO v_bal, v_status, v_kyc, v_unlock
-  FROM public.profiles WHERE id = v_uid FOR UPDATE;
+  NEW.wallet_balance := 0;
+  NEW.card_balance := 0;
+  NEW.agent_balance := 0;
+  NEW.agent_capacity := 0;
+  NEW.agent_guarantee_paid := false;
+  NEW.agent_status := 'none';
+  NEW.account_status := 'active';
+  NEW.account_type := COALESCE(NULLIF(NEW.account_type, ''), 'individual');
+  NEW.kyc_status := 'not_submitted';
+  NEW.is_activated := false;
+  NEW.is_merchant := false;
+  NEW.is_card_activated := false;
+  NEW.is_card_frozen := false;
+  NEW.kyc_fee_paid := false;
+  NEW.features_unlock_paid := false;
+  NEW.enterprise_fee_paid := false;
+  NEW.enterprise_status := 'none';
 
-  IF NOT FOUND THEN
-    RETURN json_build_object('success', false, 'message', 'Pwofil pa jwenn.');
-  END IF;
-  IF v_status = 'suspended' THEN
-    RETURN json_build_object('success', false, 'message', 'Kont ou sispandi.');
-  END IF;
-  IF v_kyc IS DISTINCT FROM 'approved' THEN
-    RETURN json_build_object('success', false, 'message', 'KYC dwe apwouve anvan ou debloke opsyon yo.');
-  END IF;
-  IF v_unlock THEN
-    RETURN json_build_object(
-      'success', true,
-      'already_paid', true,
-      'message', 'Opsyon yo deja debloke.'
-    );
-  END IF;
+  NEW.card_number := NULL;
+  NEW.cvv := NULL;
+  NEW.card_number_hash := NULL;
+  NEW.cvv_hash := NULL;
+  NEW.card_last4 := NULL;
+  NEW.exp_date := NULL;
+  NEW.pin_code_hash := NULL;
+  NEW.transaction_pin_hash := NULL;
+  NEW.api_key := NULL;
+  NEW.api_key_hash := NULL;
+  NEW.api_key_prefix := NULL;
+  NEW.webhook_secret := NULL;
+  NEW.agent_code := NULL;
 
-  v_base := public.hatex_resolve_fee('card_activation_fee', v_uid, 525);
-  v_charge := GREATEST(0, v_base);
-
-  IF COALESCE(v_bal, 0) < v_charge THEN
-    RETURN json_build_object(
-      'success', false,
-      'message', 'Ou bezwen ' || v_charge || ' HTG pou debloke kat, terminal ak fakti.',
-      'amount_due_htg', v_charge,
-      'wallet_balance_htg', v_bal,
-      'needs_deposit', true
-    );
-  END IF;
-
-  UPDATE public.profiles
-  SET wallet_balance = COALESCE(wallet_balance, 0) - v_charge,
-      features_unlock_paid = true,
-      is_card_activated = true,
-      is_activated = true
-  WHERE id = v_uid
-  RETURNING wallet_balance INTO v_new;
-
-  INSERT INTO public.transactions (user_id, amount, type, status, description)
-  VALUES (
-    v_uid, -v_charge, 'CARD_ACTIVATION', 'success',
-    'Frè debloke kat / terminal / fakti (525 HTG)'
-  );
-
-  RETURN json_build_object(
-    'success', true,
-    'charged_htg', v_charge,
-    'wallet_balance_htg', v_new,
-    'phase', 'unlock',
-    'features_unlock_paid', true
-  );
+  RETURN NEW;
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.process_kyc_fee(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.process_kyc_fee(UUID) TO authenticated, service_role;
+DROP TRIGGER IF EXISTS trg_guard_profile_sensitive_insert ON public.profiles;
+CREATE TRIGGER trg_guard_profile_sensitive_insert
+  BEFORE INSERT ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.guard_profile_sensitive_insert();
 
-REVOKE EXECUTE ON FUNCTION public.process_features_unlock_fee(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.process_features_unlock_fee(UUID) TO authenticated, service_role;
+-- ------------------------------------------------------------
+-- 3) PAN/CVV/hash: navigatè pa ka li ni ekri (sèlman service_role)
+--    Pa revoke account_status elatriye — staff workspace bezwen yo.
+-- ------------------------------------------------------------
+DO $$
+BEGIN
+  BEGIN
+    REVOKE SELECT (
+      card_number, cvv, card_number_hash, cvv_hash,
+      pin_code_hash, transaction_pin_hash,
+      api_key, api_key_hash, webhook_secret,
+      kyc_id_number_hash, current_session_token
+    ) ON public.profiles FROM authenticated;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'REVOKE SELECT authenticated: %', SQLERRM;
+  END;
+
+  BEGIN
+    REVOKE SELECT (
+      card_number, cvv, card_number_hash, cvv_hash,
+      pin_code_hash, transaction_pin_hash,
+      api_key, api_key_hash, webhook_secret,
+      kyc_id_number_hash, current_session_token
+    ) ON public.profiles FROM anon;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'REVOKE SELECT anon: %', SQLERRM;
+  END;
+
+  BEGIN
+    REVOKE UPDATE (
+      card_number, cvv, card_number_hash, cvv_hash
+    ) ON public.profiles FROM authenticated;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'REVOKE UPDATE authenticated: %', SQLERRM;
+  END;
+
+  BEGIN
+    REVOKE UPDATE (
+      card_number, cvv, card_number_hash, cvv_hash
+    ) ON public.profiles FROM anon;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'REVOKE UPDATE anon: %', SQLERRM;
+  END;
+END $$;
+
+COMMENT ON FUNCTION public.guard_profile_sensitive_columns() IS
+  'Bloke UPDATE finans/kat/KYC/aktivasyon depi navigatè (pa admin/staff).';
+COMMENT ON FUNCTION public.guard_profile_sensitive_insert() IS
+  'Fòse pwofil nouvo san balans/kat/privilèj fo.';

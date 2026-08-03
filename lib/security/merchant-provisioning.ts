@@ -38,6 +38,7 @@ type MerchantProfileLike = {
   id: string;
   kyc_status?: string | null;
   is_card_activated?: boolean | null;
+  features_unlock_paid?: boolean | null;
   api_key?: string | null;
   api_key_hash?: string | null;
   api_key_prefix?: string | null;
@@ -45,14 +46,15 @@ type MerchantProfileLike = {
   webhook_secret?: string | null;
 };
 
-/** Menm kondisyon ak Dashboard/Terminal: KYC apwouve + kat aktive. */
+/** Menm kondisyon ak Dashboard/Terminal: KYC apwouve + kat/opsyon debloke. */
 export function canAccessTerminal(profile: MerchantProfileLike | null | undefined): boolean {
   return checkMerchantEligibility(profile).eligible;
 }
 
 export function checkMerchantEligibility(profile: MerchantProfileLike | null | undefined): MerchantEligibility {
   const kycOk = profile?.kyc_status === 'approved';
-  const cardOk = profile?.is_card_activated === true;
+  const cardOk =
+    profile?.is_card_activated === true || profile?.features_unlock_paid === true;
   return {
     eligible: kycOk && cardOk,
     missingKyc: !kycOk,

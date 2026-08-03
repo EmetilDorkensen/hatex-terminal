@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { RefreshCcw, Copy, CheckCircle2, ArrowLeft, Download, Upload, CreditCard, ShoppingBag, ArrowRightLeft, Repeat, History } from 'lucide-react';
 import { prepareUserTransactions, getTransactionDescription } from '@/lib/transactions/display';
+import { isHistoryRefundable } from '@/lib/transactions/refundable';
+import { HistoryRefundButton } from '@/components/transactions/HistoryRefundButton';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -250,6 +252,26 @@ export default function TransactionsPage() {
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {isHistoryRefundable(t) && (
+                    <HistoryRefundButton
+                      historyTxId={t.id}
+                      amount={Number(t.amount)}
+                      alreadyRefunded={t.metadata?.refunded === true}
+                      onDone={() => {
+                        setTransactions((prev) =>
+                          prev.map((row) =>
+                            row.id === t.id
+                              ? {
+                                  ...row,
+                                  metadata: { ...(row.metadata || {}), refunded: true },
+                                }
+                              : row
+                          )
+                        );
+                      }}
+                    />
                   )}
                 </div>
               );

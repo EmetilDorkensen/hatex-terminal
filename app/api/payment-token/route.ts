@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { randomBytes } from 'crypto';
+import { encryptQrPaymentToken } from '@/lib/security/qr-payment-token';
 
 export async function GET() {
   try {
@@ -31,8 +32,8 @@ export async function GET() {
       .gte('expires_at', new Date().toISOString())
       .maybeSingle();
 
-    if (existing) {
-      return NextResponse.json({ token: existing.id });
+    if (existing?.id) {
+      return NextResponse.json({ token: encryptQrPaymentToken(existing.id) });
     }
 
     const token = randomBytes(16).toString('hex');
@@ -52,7 +53,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Pa ka kreye token' }, { status: 500 });
     }
 
-    return NextResponse.json({ token });
+    return NextResponse.json({ token: encryptQrPaymentToken(token) });
   } catch (error) {
     console.error('Payment token error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

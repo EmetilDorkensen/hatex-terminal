@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { checkApiReceiveLimit } from '@/lib/security/spending-limits';
+import { resolveQrPaymentTokenId } from '@/lib/security/qr-payment-token';
 
 /**
  * Bloke montan QR nan DB anvan peman — navigatè pa ka chanje amount sou /pay.
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const token = String(body.token || '').trim();
+    const token = resolveQrPaymentTokenId(String(body.token || '').trim());
     const amount = Number(body.amount);
 
     if (!token) {

@@ -5,10 +5,10 @@ import { Suspense, useEffect, useState } from 'react';
 import { CreditCard, Calendar, Lock, AlertCircle, Loader2, Store, CheckSquare, Square, History } from 'lucide-react';
 import SafeImg from '@/components/SafeImg';
 
-function CheckoutContent() {
+function CheckoutContent({ tokenOverride }: { tokenOverride?: string }) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get('token');
+  const token = tokenOverride || searchParams.get('token');
   
   const [merchant, setMerchant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -386,6 +386,21 @@ function CheckoutContent() {
 
       </div>
     </div>
+  );
+}
+
+export function CheckoutWithToken({ token }: { token: string }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+          <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
+        </div>
+      </div>
+    }>
+      <CheckoutContent tokenOverride={token} />
+    </Suspense>
   );
 }
 
