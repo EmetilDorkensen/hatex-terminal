@@ -9,6 +9,7 @@ import {
   validateListingInput,
 } from '@/lib/reservations/types';
 import { decryptMerchantShareToken } from '@/lib/reservations/share-token';
+import { deleteReservationMediaFiles } from '@/lib/reservations/media';
 
 function publicMerchantPayload(m: {
   business_name?: string | null;
@@ -374,6 +375,14 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
+
+  // Efase foto ki soti nan ofri a nan storage
+  if (Array.isArray(body.photos)) {
+    const next = new Set((body.photos as unknown[]).map(String));
+    const removed = (existing.photos || []).filter((u: string) => !next.has(u));
+    await deleteReservationMediaFiles(admin, removed);
+  }
+
   return NextResponse.json({ success: true, listing: data });
 }
 
@@ -395,7 +404,7 @@ export async function DELETE(request: Request) {
   const admin = createSupabaseAdminClient();
   const { data: existing } = await admin
     .from('reservation_listings')
-    .select('id, merchant_id')
+    .select('id, merchant_id, photos')
     .eq('id', id)
     .maybeSingle();
 
@@ -403,42 +412,28 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: false, message: 'Ofri pa jwenn.' }, { status: 404 });
   }
 
-  const { count: activeSubs } = await admin
+  const now = new Date().toISOString();
+
+  // Anile abònman aktif (sèvis ap disparèt)
+  await admin
     .from('reservation_subscriptions')
-    .select('id', { count: 'exact', head: true })
+    .update({ status: 'cancelled', cancelled_at: now, updated_at: now })
     .eq('listing_id', id)
     .in('status', ['active', 'past_due']);
 
-  if ((activeSubs || 0) > 0) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          'Ou pa ka efase ofri sa a: gen kliyan ki toujou aktif sou abònman an. Tann yo anile anvan.',
-      },
-      { status: 409 }
-    );
-  }
-
-  const { count: paidCount } = await admin
+  // Anile rezèvasyon ki poko peye
+  await admin
     .from('reservation_bookings')
-    .select('id', { count: 'exact', head: true })
+    .update({ status: 'cancelled', updated_at: now })
     .eq('listing_id', id)
-    .eq('status', 'paid');
+    .eq('status', 'pending');
 
-  if ((paidCount || 0) > 0) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: 'Ou pa ka efase sèvis sa a: gen moun ki deja achte li. Ou ka dezaktive li.',
-      },
-      { status: 409 }
-    );
-  }
+  // Efase foto nan storage anvan listing la
+  await deleteReservationMediaFiles(admin, existing.photos || []);
 
   const { error } = await admin.from('reservation_listings').delete().eq('id', id);
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
-  return NextResponse.json({ success: true, message: 'Ofri efase.' });
+  return NextResponse.json({ success: true, message: 'Ofri efase. Foto yo efase tou.' });
 }

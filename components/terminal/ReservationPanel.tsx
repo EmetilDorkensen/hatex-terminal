@@ -136,7 +136,7 @@ export default function ReservationPanel({ origin }: { origin: string }) {
   });
 
   const deleteListing = async (id: string) => {
-    if (!confirm('Efase ofri sa a nèt?')) return;
+    if (!confirm('Efase ofri sa a nèt? Foto yo ap efase tou. Abònman aktif yo ap anile.')) return;
     setMsg(null);
     const res = await fetch('/api/reservations/listings', {
       method: 'DELETE',
@@ -407,7 +407,7 @@ export default function ReservationPanel({ origin }: { origin: string }) {
           [
             ['profile', 'Pwofil'],
             ['create', 'Kreye'],
-            ['listings', 'Ofri m yo'],
+            ['listings', 'Pwodwi mwen yo'],
             ['sales', 'Lavant'],
             ['subs', 'Abònman'],
           ] as const
