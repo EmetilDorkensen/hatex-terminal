@@ -95,11 +95,52 @@ function SignupForm() {
         }
 
         localStorage.removeItem('hatex_promo');
-        setMsg({ type: 'success', text: 'Kont la kreye! Tanpri tcheke imèl ou pou konfime enskripsyon an.' });
+
+        // Voye konfimasyon atravè Resend (SMTP Supabase souvan bloke / rate-limit)
+        try {
+          await fetch('/api/auth/send-confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim().toLowerCase() }),
+          });
+        } catch {
+          /* pa kraze siksè enskripsyon */
+        }
+
+        setMsg({
+          type: 'success',
+          text: 'Kont la kreye! Nou voye yon imèl konfimasyon — tcheke inbox / spam ou.',
+        });
       }
 
     } catch (error: any) {
       setMsg({ type: 'error', text: error.message || 'Gen yon erè ki rive pandan kreyasyon an.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendConfirm = async () => {
+    const clean = email.trim().toLowerCase();
+    if (!clean) {
+      setMsg({ type: 'error', text: 'Antre imèl ou anvan.' });
+      return;
+    }
+    setLoading(true);
+    setMsg({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/auth/send-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: clean }),
+      });
+      const json = await res.json().catch(() => ({}));
+      setMsg({
+        type: res.ok ? 'success' : 'error',
+        text: json.message || (res.ok ? 'Imèl konfimasyon renouvle.' : 'Pa t kapab voye.'),
+      });
+    } catch {
+      setMsg({ type: 'error', text: 'Koneksyon echwe.' });
     } finally {
       setLoading(false);
     }
@@ -212,6 +253,14 @@ function SignupForm() {
       </form>
 
       <div className="mt-8 text-center space-y-4 pt-6 border-t border-gray-100">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void resendConfirm()}
+          className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold uppercase tracking-wider disabled:opacity-60"
+        >
+          Pa resevwa imèl la? Renouvle konfimasyon
+        </button>
         <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
           Ou gen kont deja? <Link href="/login" className="text-indigo-600 hover:text-indigo-800 transition-colors ml-1">Konekte La</Link>
         </p>

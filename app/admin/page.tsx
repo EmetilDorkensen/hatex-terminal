@@ -70,6 +70,7 @@ export default function AdminSuperPage() {
     const [bizWithdrawPassword, setBizWithdrawPassword] = useState('');
     const [bizWithdrawLoading, setBizWithdrawLoading] = useState(false);
     const [bizWithdrawError, setBizWithdrawError] = useState('');
+    const [flushConfirmLoading, setFlushConfirmLoading] = useState(false);
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -815,6 +816,58 @@ export default function AdminSuperPage() {
                             </div>
 
                             <AdminAgentRechargePanel />
+
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                                        <Mail size={16} /> Renouvle konfimasyon enskripsyon
+                                    </p>
+                                    <p className="text-xs text-amber-800/80 mt-1">
+                                        Voye imèl konfimasyon (Resend) bay tout kont ki poko aktive imèl yo.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={flushConfirmLoading}
+                                    onClick={async () => {
+                                        if (
+                                            !confirm(
+                                                'Voye nouvo imèl konfimasyon bay TOUT itilizatè ki poko konfime? Sa ka pran kèk minit.'
+                                            )
+                                        ) {
+                                            return;
+                                        }
+                                        setFlushConfirmLoading(true);
+                                        try {
+                                            const res = await fetch('/api/admin/resend-confirmations', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({}),
+                                            });
+                                            const json = await res.json().catch(() => ({}));
+                                            if (!res.ok || !json.success) {
+                                                alert(json.message || 'Echwe.');
+                                                return;
+                                            }
+                                            alert(
+                                                `Fini: ${json.sent || 0} voye, ${json.failed || 0} echwe (sou ${json.pending_count || 0} ki te an atant).`
+                                            );
+                                        } catch {
+                                            alert('Koneksyon echwe.');
+                                        } finally {
+                                            setFlushConfirmLoading(false);
+                                        }
+                                    }}
+                                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-60 shrink-0"
+                                >
+                                    {flushConfirmLoading ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                        <Send size={14} />
+                                    )}
+                                    Bat tout konfimasyon bloke
+                                </button>
+                            </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between">

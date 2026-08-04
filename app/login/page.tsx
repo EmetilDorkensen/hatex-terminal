@@ -739,6 +739,37 @@ export default function Login() {
 
           </p>
 
+          <button
+            type="button"
+            disabled={loading || !email.trim()}
+            onClick={async () => {
+              const clean = email.trim().toLowerCase();
+              if (!clean) {
+                setErrorMsg('Antre imèl ou pou renouvle konfimasyon an.');
+                return;
+              }
+              setLoading(true);
+              setErrorMsg('');
+              try {
+                const res = await fetch('/api/auth/send-confirm', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: clean }),
+                });
+                const json = await res.json().catch(() => ({}));
+                setErrorMsg('');
+                alert(json.message || 'Si kont la poko konfime, n ap voye yon nouvo lyen.');
+              } catch {
+                setErrorMsg('Pa t kapab voye imèl konfimasyon.');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="inline-flex items-center justify-center w-full mt-2 px-4 py-3 rounded-xl border border-amber-100 bg-amber-50 text-amber-800 text-xs font-bold uppercase tracking-wider hover:bg-amber-100 transition-colors disabled:opacity-60"
+          >
+            Pa resevwa imèl konfimasyon? Renouvle l
+          </button>
+
           <Link
             href="/forgot-password"
             className="inline-flex items-center justify-center w-full mt-2 px-4 py-3 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider hover:bg-indigo-100 transition-colors"
