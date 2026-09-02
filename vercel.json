@@ -7,14 +7,6 @@
     {
       "path": "/api/cron/kyc-survey",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/payouts",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/moncash-settle",
-      "schedule": "* * * * *"
     }
   ]
 }
