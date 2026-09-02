@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { checkMerchantEligibility, ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
-import { maskApiKey } from '@/lib/security/api-key';
+import { maskApiKey, maskPublishableKey } from '@/lib/security/api-key';
 
 /** Jenere yon nouvo kle API (ansyen an pa mache ankò). Retounen kle an klè yon sèl fwa. */
 export async function POST(req: Request) {
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const supabaseAdmin = createSupabaseAdminClient();
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, webhook_secret')
+      .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret')
       .eq('id', user.id)
       .single();
 
@@ -46,6 +46,9 @@ export async function POST(req: Request) {
       api_key: result.api_key,
       api_key_prefix: result.api_key_prefix,
       api_key_masked: maskApiKey(result.api_key_prefix),
+      api_key_pk: result.api_key_pk,
+      api_key_pk_prefix: result.api_key_pk_prefix,
+      api_key_pk_masked: maskPublishableKey(result.api_key_pk_prefix),
       revealed_once: true,
       message: 'Nouvo kle API jenere. Ansyen kle a pa valab ankò. Mete ajou entegrasyon ou.',
     });

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const admin = createSupabaseAdminClient();
     const { data: profile, error: profileErr } = await admin
       .from('profiles')
-      .select('id, full_name, email, kyc_status, kyc_fee_paid, is_card_activated, features_unlock_paid')
+      .select('id, full_name, email, kyc_status, kyc_fee_paid, is_card_activated, features_unlock_paid, intended_plan, plan_status')
       .eq('id', userId)
       .single();
 
@@ -82,6 +82,38 @@ export async function POST(request: Request) {
             { error: `Pa t kapab apwouve KYC: ${approveErr.message}` },
             { status: 500 }
           );
+        }
+
+        await admin
+          .from('hatex_kyc_applications')
+          .update({
+            status: 'approved',
+            updated_at: new Date().toISOString(),
+            rejection_reason: null,
+          })
+          .eq('user_id', userId)
+          .in('status', ['submitted', 'in_review', 'draft']);
+      }
+
+      if (profile.intended_plan === 'capacity' || profile.intended_plan === 'premium') {
+        const { settlePendingMonCashPayments } = await import('@/lib/moncash/settle');
+        await settlePendingMonCashPayments(admin, userId);
+        const { data: after } = await admin
+          .from('profiles')
+          .select('plan, plan_status, plan_period_end')
+          .eq('id', userId)
+          .maybeSingle();
+        const periodOk =
+          after?.plan_period_end && new Date(after.plan_period_end).getTime() > Date.now();
+        const paidActive =
+          (after?.plan === 'capacity' || after?.plan === 'premium') &&
+          after.plan_status === 'active' &&
+          periodOk;
+        if (!paidActive) {
+          await admin
+            .from('profiles')
+            .update({ plan_status: 'pending_payment' })
+            .eq('id', userId);
         }
       }
 
@@ -141,7 +173,7 @@ export async function POST(request: Request) {
           ? 'Kat kreye avèk siksè pou KYC ki te deja apwouve.'
           : alreadyUnlocked
             ? 'KYC apwouve. Kat deja debloke.'
-            : 'KYC apwouve. Kat kreye men bloke — kliyan dwe peye 525 HTG pou debloke kat, terminal ak fakti.';
+            : 'KYC apwouve. Si kliyan an te peye abonnman an, kapasite jou a ap ogmante otomatikman.';
 
       return NextResponse.json({
         success: true,
@@ -169,6 +201,16 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    await admin
+      .from('hatex_kyc_applications')
+      .update({
+        status: 'rejected',
+        rejection_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .in('status', ['submitted', 'in_review', 'draft']);
 
     if (gate.role === 'admin') {
       await logAdminAction(admin, {

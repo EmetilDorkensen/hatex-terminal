@@ -112,7 +112,7 @@ export default function FeaturesUnlockPanel({ variant = 'banner', onUnlocked }: 
         </div>
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">Kat bloke</h3>
         <p className="text-xs text-slate-500 font-medium mb-4 leading-relaxed">
-          Peye <strong className="text-slate-800">{fee.toLocaleString()} HTG</strong> pou debloke kat, terminal ak fakti.
+          Peye <strong className="text-slate-800">{fee.toLocaleString()} HTG</strong> pou debloke kat ak fakti.
         </p>
         <p className="text-[10px] text-slate-400 mb-3 flex items-center gap-1">
           <Wallet size={12} /> {bal.toLocaleString()} HTG sou wallet
@@ -148,7 +148,7 @@ export default function FeaturesUnlockPanel({ variant = 'banner', onUnlocked }: 
           <Lock size={18} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-slate-900 mb-1">Debloke kat, terminal & fakti</h3>
+          <h3 className="text-sm font-bold text-slate-900 mb-1">Debloke kat & fakti</h3>
           <p className="text-xs text-slate-600 mb-3 leading-relaxed">
             KYC ou apwouve. Peye <strong>{fee.toLocaleString()} HTG</strong> (dezyèm pati) pou kle a soti —
             montan an kalkile sou sèvè a.

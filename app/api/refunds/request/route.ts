@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { requireMoneySession } from '@/lib/security/require-money-session';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { resolveRefundFromBuyerTx } from '@/lib/refunds/resolve-from-buyer';
-import { sendRefundRequestMerchantEmail } from '@/lib/reservations/notify-refund';
+import { sendRefundRequestMerchantEmail } from '@/lib/refunds/notify-refund';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -155,18 +155,12 @@ export default function DepositPage() {
                     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                         
                         {/* Bouton Chwa Metòd yo */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <button 
                                 onClick={() => setMethod('MonCash')} 
-                                className={`p-5 rounded-2xl border transition-all font-bold text-sm flex items-center justify-center gap-2 ${method === 'MonCash' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 bg-white text-slate-600 hover:border-indigo-300'}`}
+                                className="p-5 rounded-2xl border border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm transition-all font-bold text-sm flex items-center justify-center gap-2"
                             >
-                                <Wallet size={18} className={method === 'MonCash' ? "text-indigo-600" : "text-slate-400"} /> MonCash
-                            </button>
-                            <button 
-                                onClick={() => setMethod('NatCash')} 
-                                className={`p-5 rounded-2xl border transition-all font-bold text-sm flex items-center justify-center gap-2 ${method === 'NatCash' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 bg-white text-slate-600 hover:border-indigo-300'}`}
-                            >
-                                <Wallet size={18} className={method === 'NatCash' ? "text-indigo-600" : "text-slate-400"} /> NatCash
+                                <Wallet size={18} className="text-indigo-600" /> MonCash
                             </button>
                         </div>
 

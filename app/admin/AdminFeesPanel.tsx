@@ -1,91 +1,87 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, Percent, RefreshCw, Search, Trash2, Save, Info } from 'lucide-react';
+import { Info, Loader2, Percent, RefreshCw, Save } from 'lucide-react';
 
-type FeeSetting = {
-  fee_key: string;
+type GatewayRow = {
+  key: string;
   label: string;
   value: number;
   unit: string;
   description?: string | null;
 };
 
-type LimitSetting = {
-  limit_key: string;
-  label: string;
-  value: number;
-  unit: string;
-  description?: string | null;
-};
-
-type OverrideRow = {
+type RevenueRow = {
   id: string;
-  user_id: string;
-  fee_key: string;
-  value: number;
-  note?: string | null;
-  profiles?: { full_name?: string; email?: string } | null;
+  purpose: string;
+  amount: number;
+  description: string | null;
+  created_at: string;
+  merchant_id: string;
 };
 
-const FEE_ORDER = [
-  'deposit_fee_percent',
-  'withdraw_fee_percent',
-  'agent_withdraw_fee_per_1000',
-  'transfer_fee_percent',
-  'agent_fee_per_1000',
-  'kyc_fee',
-  'enterprise_application_fee',
-  'api_fee_per_1000',
-  'card_activation_fee',
+const GROUPS: { title: string; keys: string[] }[] = [
+  {
+    title: 'Frè pasrèl (kliyan peye anplis)',
+    keys: [
+      'platform_fee_percent',
+      'platform_fee_min_htg',
+      'payout_fee_percent',
+      'payout_fee_min_htg',
+    ],
+  },
+  {
+    title: 'Limit tranzaksyon',
+    keys: [
+      'min_amount_per_tx_htg',
+      'max_amount_per_tx_htg',
+      'limit_individual_month_htg',
+      'limit_business_month_htg',
+      'payment_link_ttl_minutes',
+    ],
+  },
+  {
+    title: 'Plan abonnman ak kota jou',
+    keys: [
+      'plan_capacity_price_htg',
+      'plan_premium_price_htg',
+      'daily_limit_free_htg',
+      'daily_limit_capacity_htg',
+    ],
+  },
+  {
+    title: 'Konvèsyon',
+    keys: ['payout_usd_htg_rate'],
+  },
 ];
-
-const FEE_EXAMPLES: Record<string, (v: number) => string> = {
-  deposit_fee_percent: (v) =>
-    `Depo 10 000 HTG → kliyan peye ${(10000 + 10000 * (v / 100)).toLocaleString()} (frè ${(10000 * (v / 100)).toLocaleString()} HTG)`,
-  withdraw_fee_percent: (v) =>
-    `Retrè MonCash 10 000 → resevwa ${(10000 - 10000 * (v / 100)).toLocaleString()} HTG (frè ${(10000 * (v / 100)).toLocaleString()})`,
-  agent_withdraw_fee_per_1000: (v) =>
-    `Retrè ajan 10 000 kach → frè ${((10000 / 1000) * v).toLocaleString()} HTG (20% ajan / 80% Hatex)`,
-  transfer_fee_percent: (v) =>
-    `Echèl P2P: ${v}/5 × tablo MonCash. Egz. 1 000 HTG → baz 25 × ${(v / 5).toFixed(2)} = ${(25 * (v / 5)).toLocaleString()} HTG. 0 = gratis.`,
-  agent_fee_per_1000: (v) =>
-    `PRO 55 000 → frè ${Math.floor((55000 / 1000) * v).toLocaleString()} HTG · PREMIUM 110 000 → frè ${Math.floor((110000 / 1000) * v).toLocaleString()} HTG`,
-  kyc_fee: (v) => `Premye pati: ${v.toLocaleString()} HTG pou soumèt dokiman KYC (pwofi biznis)`,
-  enterprise_application_fee: (v) => `Pasaj antrepriz: ${v.toLocaleString()} HTG (ranbouse si rejte)`,
-  api_fee_per_1000: (v) =>
-    `API resevwa 10 000 → frè ${((10000 / 1000) * v).toLocaleString()} HTG, machann net ${(10000 - (10000 / 1000) * v).toLocaleString()}`,
-  card_activation_fee: (v) =>
-    `Dezyèm pati: ${v.toLocaleString()} HTG pou debloke kat, terminal ak fakti apre KYC apwouve`,
-};
 
 const UNIT_HINT: Record<string, string> = {
   percent: '%',
-  per_1000: 'HTG / 1 000',
-  flat: 'HTG (montan fiks)',
+  htg: 'HTG',
+  count: 'minit / konte',
 };
 
-/** Admin sèlman — frè global + frè espesyal pa kont (konekte ak baz). */
+function groupFor(key: string): string {
+  for (const g of GROUPS) {
+    if (g.keys.includes(key)) return g.title;
+  }
+  return 'Lòt';
+}
+
+/** Admin — frè ak kota nouvo pasrèl la (hatex_gateway_settings). */
 export default function AdminFeesPanel() {
-  const [settings, setSettings] = useState<FeeSetting[]>([]);
-  const [limits, setLimits] = useState<LimitSetting[]>([]);
-  const [limitDrafts, setLimitDrafts] = useState<Record<string, string>>({});
-  const [agentTiers, setAgentTiers] = useState<{ tier: string; capacity_htg: number; label: string }[]>([]);
-  const [overrides, setOverrides] = useState<OverrideRow[]>([]);
+  const [settings, setSettings] = useState<GatewayRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [callbacks, setCallbacks] = useState<{ alert: string; return: string } | null>(null);
+  const [revenue, setRevenue] = useState<{
+    platform_fees: number;
+    plan_fees: number;
+    recent: RevenueRow[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const [okMsg, setOkMsg] = useState('');
-
-  const [ovUserId, setOvUserId] = useState('');
-  const [ovFeeKey, setOvFeeKey] = useState('deposit_fee_percent');
-  const [ovValue, setOvValue] = useState('0');
-  const [ovNote, setOvNote] = useState('');
-  const [userQuery, setUserQuery] = useState('');
-  const [userHits, setUserHits] = useState<any[]>([]);
-  const [previewUser, setPreviewUser] = useState<{ id: string; name: string; email: string } | null>(null);
-  const [previewFees, setPreviewFees] = useState<Record<string, number> | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -93,452 +89,276 @@ export default function AdminFeesPanel() {
     try {
       const res = await fetch('/api/admin/fees');
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Pa ka chaje frè yo. Verifye migrasyon 20260750/52.');
-      const list = (data.settings || []) as FeeSetting[];
-      list.sort((a, b) => FEE_ORDER.indexOf(a.fee_key) - FEE_ORDER.indexOf(b.fee_key));
+      if (!res.ok) throw new Error(data.error || 'Pa ka chaje frè pasrèl yo.');
+      const list = (data.settings || []) as GatewayRow[];
       setSettings(list);
-      setOverrides(data.overrides || []);
-      setLimits(data.limits || []);
-      setAgentTiers(data.agent_tiers || []);
       const d: Record<string, string> = {};
       list.forEach((s) => {
-        d[s.fee_key] = String(s.value);
+        d[s.key] = String(s.value);
       });
       setDrafts(d);
-      const ld: Record<string, string> = {};
-      (data.limits || []).forEach((l: LimitSetting) => {
-        ld[l.limit_key] = String(l.value);
-      });
-      setLimitDrafts(ld);
-      if (list[0] && !list.find((s) => s.fee_key === ovFeeKey)) {
-        setOvFeeKey(list[0].fee_key);
-      }
-    } catch (e: any) {
-      setMsg(e.message);
+      setCallbacks(data.callbacks || null);
+      setRevenue(data.revenue || null);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : 'Erè.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
-  const saveGlobal = async (feeKey: string) => {
-    const value = Number(drafts[feeKey]);
-    if (!(value >= 0) || !Number.isFinite(value)) return alert('Montan pa valab.');
-    setBusy(feeKey);
+  const save = async (key: string) => {
+    const value = Number(drafts[key]);
+    if (value < 0 || !Number.isFinite(value)) {
+      alert('Montan pa valab.');
+      return;
+    }
+    setBusy(key);
     setOkMsg('');
     try {
       const res = await fetch('/api/admin/fees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_global', fee_key: feeKey, value }),
+        body: JSON.stringify({ action: 'update', key, value }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Echèk sove nan baz done.');
+      if (!res.ok) throw new Error(data.error || 'Echèk sove.');
       await load();
-      setOkMsg(`Frè « ${feeKey} » sove nan baz: ${value}. Nouvo tranzaksyon ap itilize l.`);
-    } catch (e: any) {
-      alert(e.message);
+      setOkMsg(`${key} sove: ${value}`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Echèk.');
     } finally {
       setBusy(null);
     }
   };
 
-  const saveLimit = async (limitKey: string) => {
-    const value = Number(limitDrafts[limitKey]);
-    if (!(value >= 0) || !Number.isFinite(value)) return alert('Montan pa valab.');
-    setBusy(`lim-${limitKey}`);
+  const settlePending = async () => {
+    setBusy('settle');
     setOkMsg('');
     try {
       const res = await fetch('/api/admin/fees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_limit', limit_key: limitKey, value }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Echèk sove limit.');
-      await load();
-      setOkMsg(`Limit « ${limitKey} » sove: ${value}.`);
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const saveTier = async (tier: string, capacity: number) => {
-    setBusy(`tier-${tier}`);
-    try {
-      const res = await fetch('/api/admin/fees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_agent_tier', tier, capacity_htg: capacity }),
+        body: JSON.stringify({ action: 'settle_pending' }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Echèk.');
-      await load();
-      setOkMsg(`Kapasite ajan ${tier.toUpperCase()} → ${capacity.toLocaleString()} HTG`);
-    } catch (e: any) {
-      alert(e.message);
+      setOkMsg(`Peman pending verifye: ${data.paid || 0} peye sou ${data.checked || 0}.`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Echèk.');
     } finally {
       setBusy(null);
     }
   };
 
-  const searchUsers = async () => {
-    const q = userQuery.trim();
-    if (q.length < 2) return;
-    setBusy('search');
-    setMsg('');
-    try {
-      const res = await fetch(`/api/admin/client-dossier?q=${encodeURIComponent(q)}`);
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data.matches)) {
-        setUserHits(data.matches.slice(0, 8));
-        if (data.matches.length === 0) setMsg('Pa jwenn kont.');
-      } else {
-        setUserHits([]);
-        setMsg(data.error || 'Pa jwenn kont.');
-      }
-    } catch {
-      setUserHits([]);
-    } finally {
-      setBusy(null);
-    }
-  };
+  const grouped = GROUPS.map((g) => ({
+    ...g,
+    rows: g.keys
+      .map((k) => settings.find((s) => s.key === k))
+      .filter((s): s is GatewayRow => Boolean(s)),
+  })).filter((g) => g.rows.length > 0);
 
-  const pickUser = async (u: any) => {
-    setOvUserId(u.id);
-    setUserQuery(u.email || u.full_name || u.id);
-    setUserHits([]);
-    setPreviewUser({ id: u.id, name: u.full_name || 'Kliyan', email: u.email || '' });
-    try {
-      const res = await fetch(`/api/admin/fees?user_id=${encodeURIComponent(u.id)}`);
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        const map: Record<string, number> = {};
-        (data.settings || []).forEach((s: FeeSetting) => {
-          map[s.fee_key] = Number(s.value);
-        });
-        (data.overrides || []).forEach((o: OverrideRow) => {
-          map[o.fee_key] = Number(o.value);
-        });
-        setPreviewFees(map);
-      }
-    } catch {
-      setPreviewFees(null);
-    }
-  };
-
-  const saveOverride = async () => {
-    if (!ovUserId || ovUserId.length < 30) return alert('Chwazi yon kont (UUID).');
-    const value = Number(ovValue);
-    if (!(value >= 0) || !Number.isFinite(value)) return alert('Montan pa valab (0 = san frè pou kont sa a).');
-    setBusy('override');
-    setOkMsg('');
-    try {
-      const res = await fetch('/api/admin/fees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set_override',
-          user_id: ovUserId,
-          fee_key: ovFeeKey,
-          value,
-          note: ovNote,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Echèk.');
-      setOvNote('');
-      await load();
-      if (previewUser?.id === ovUserId) await pickUser({ id: ovUserId, full_name: previewUser.name, email: previewUser.email });
-      setOkMsg(`Override sove pou kont lan: ${ovFeeKey} = ${value}`);
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const clearOverride = async (userId: string, feeKey: string) => {
-    if (!confirm('Retire frè espesyal sa a? Kont lan ap itilize frè global ankò.')) return;
-    setBusy(`del-${userId}-${feeKey}`);
-    try {
-      const res = await fetch('/api/admin/fees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear_override', user_id: userId, fee_key: feeKey }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Echèk.');
-      await load();
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setBusy(null);
-    }
-  };
+  const extra = settings.filter((s) => groupFor(s.key) === 'Lòt');
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-50 text-amber-700 rounded-xl"><Percent size={22} /></div>
+          <div className="p-2 bg-amber-50 text-amber-700 rounded-xl">
+            <Percent size={22} />
+          </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Frè Sistèm (menm jan sou app la)</h3>
+            <h3 className="text-lg font-bold text-slate-900">Frè ak kota pasrèl</h3>
             <p className="text-xs text-slate-500">
-              Chak chanjman sove dirèk nan baz done. Nouvo depo / retrè / P2P / ajan / API ap li yo.
+              Frè sou chak peman MonCash, pri abonnman, ak limit jou. Chanjman yo antre nan baz
+              done a touswit.
             </p>
           </div>
         </div>
-        <button type="button" onClick={load} className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+        <button type="button" onClick={() => void load()} className="text-xs font-bold text-indigo-600 flex items-center gap-1">
           <RefreshCw size={12} /> Rafrechi
         </button>
       </div>
 
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-xs text-indigo-900">
-        <Info size={16} className="shrink-0 mt-0.5" />
-        <div>
-          <p className="font-bold mb-1">Kijan li mache</p>
-          <p>1) Modifye frè global → Sove. 2) Oswa chwazi yon kont epi mete frè espesyal (0 = gratis pou kont sa a). 3) Kouri SQL <code className="bg-white px-1 rounded">20260752</code> si chanjman yo pa aplike nan tranzaksyon.</p>
+      {callbacks && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-xs text-indigo-900">
+          <Info size={16} className="shrink-0 mt-0.5" />
+          <div className="space-y-1 min-w-0">
+            <p className="font-bold">URL pou mete nan pòtay Digicel Business (sandbox + live)</p>
+            <p className="font-mono break-all">Alert: {callbacks.alert}</p>
+            <p className="font-mono break-all">Return: {callbacks.return}</p>
+            <p className="text-indigo-800/80">
+              Pa janm mete yon lyen vercel.app oswa localhost. Si yo mal, kliyan wè 404 apre peman
+              e plan an pa aktive.
+            </p>
+          </div>
         </div>
+      )}
+
+      {revenue && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+              Frè pasrèl kolekte
+            </p>
+            <p className="text-2xl font-black text-slate-900">
+              {Number(revenue.platform_fees).toLocaleString('fr-FR')}{' '}
+              <span className="text-sm font-semibold text-slate-500">HTG</span>
+            </p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+              Kob abonnman kolekte
+            </p>
+            <p className="text-2xl font-black text-indigo-700">
+              {Number(revenue.plan_fees).toLocaleString('fr-FR')}{' '}
+              <span className="text-sm font-semibold text-slate-500">HTG</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {revenue && revenue.recent.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm overflow-x-auto">
+          <p className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-4">
+            Dènye frè ak abonnman
+          </p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-500 border-b border-gray-100">
+                <th className="pb-2 pr-3 font-bold">Dat</th>
+                <th className="pb-2 pr-3 font-bold">Kalite</th>
+                <th className="pb-2 pr-3 font-bold">Deskripsyon</th>
+                <th className="pb-2 font-bold text-right">Montan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {revenue.recent.map((r) => (
+                <tr key={r.id} className="border-b border-gray-50">
+                  <td className="py-2 pr-3 text-slate-600 whitespace-nowrap">
+                    {new Date(r.created_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </td>
+                  <td className="py-2 pr-3 font-semibold text-slate-800">
+                    {r.purpose === 'plan_fee'
+                      ? 'Abonnman'
+                      : r.purpose === 'kyc_fee'
+                        ? 'KYC'
+                        : 'Frè pasrèl'}
+                  </td>
+                  <td className="py-2 pr-3 text-slate-600 max-w-[200px] truncate">
+                    {r.description || '—'}
+                  </td>
+                  <td className="py-2 font-bold text-slate-900 text-right whitespace-nowrap">
+                    {Number(r.amount).toLocaleString('fr-FR')} HTG
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-xs text-slate-600">
+          Si yon kliyan peye MonCash men kapasite a rete 25 000 HTG, verifye peman pending yo isit
+          la.
+        </p>
+        <button
+          type="button"
+          disabled={busy === 'settle'}
+          onClick={() => void settlePending()}
+          className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50 shrink-0"
+        >
+          {busy === 'settle' ? 'Ap verifye...' : 'Règle peman pending'}
+        </button>
       </div>
 
       {msg && <p className="text-xs text-rose-600 font-bold">{msg}</p>}
-      {okMsg && <p className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">{okMsg}</p>}
+      {okMsg && (
+        <p className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+          {okMsg}
+        </p>
+      )}
 
       {loading ? (
-        <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>
+        <div className="py-12 flex justify-center">
+          <Loader2 className="animate-spin text-indigo-600" />
+        </div>
       ) : (
         <>
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <p className="text-xs font-bold uppercase text-slate-500 tracking-wider">Frè global — jan yo ye sou sistèm nan</p>
-            {settings.length === 0 ? (
-              <p className="text-sm text-rose-600 font-bold">
-                Tablo frè vid. Kouri migrasyon 20260750 oswa 20260752 nan Supabase SQL Editor.
-              </p>
-            ) : (
-              settings.map((s) => {
-                const draftVal = Number(drafts[s.fee_key] ?? s.value);
-                const proCap = Number(agentTiers.find((t) => t.tier === 'pro')?.capacity_htg || 55000);
-                const premCap = Number(agentTiers.find((t) => t.tier === 'premium')?.capacity_htg || 110000);
-                const example =
-                  s.fee_key === 'agent_fee_per_1000'
-                    ? `PRO ${proCap.toLocaleString()} → frè ${Math.floor((proCap / 1000) * draftVal).toLocaleString()} HTG · PREMIUM ${premCap.toLocaleString()} → frè ${Math.floor((premCap / 1000) * draftVal).toLocaleString()} HTG`
-                    : FEE_EXAMPLES[s.fee_key]?.(Number.isFinite(draftVal) ? draftVal : Number(s.value));
-                return (
-                  <div key={s.fee_key} className="border border-slate-100 rounded-2xl p-4 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-900">{s.label}</p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {s.fee_key} · {UNIT_HINT[s.unit] || s.unit}
-                        </p>
-                        {example && (
-                          <p className="text-xs text-slate-600 mt-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
-                            {example}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={drafts[s.fee_key] ?? ''}
-                          onChange={(e) => setDrafts((prev) => ({ ...prev, [s.fee_key]: e.target.value }))}
-                          className="w-28 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
-                        />
-                        <button
-                          type="button"
-                          disabled={busy === s.fee_key}
-                          onClick={() => saveGlobal(s.fee_key)}
-                          className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1 min-w-[88px]"
-                        >
-                          {busy === s.fee_key ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                          Sove
-                        </button>
-                      </div>
-                    </div>
+          {grouped.map((g) => (
+            <div key={g.title} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4">
+              <p className="text-xs font-bold uppercase text-slate-500 tracking-wider">{g.title}</p>
+              {g.rows.map((s) => (
+                <div key={s.key} className="flex flex-col sm:flex-row sm:items-start gap-3 border border-slate-100 rounded-2xl p-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900">{s.label}</p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      {s.key} · {UNIT_HINT[s.unit] || s.unit}
+                    </p>
+                    {s.description && <p className="text-xs text-slate-600 mt-2">{s.description}</p>}
                   </div>
-                );
-              })
-            )}
-          </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={drafts[s.key] ?? ''}
+                      onChange={(e) => setDrafts((prev) => ({ ...prev, [s.key]: e.target.value }))}
+                      className="w-28 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy === s.key}
+                      onClick={() => void save(s.key)}
+                      className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1 min-w-[88px]"
+                    >
+                      {busy === s.key ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                      Sove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
 
-          <div className="bg-white border border-emerald-100 rounded-3xl p-6 shadow-sm space-y-4">
-            <p className="text-xs font-bold uppercase text-emerald-700 tracking-wider">Limit sistèm (baz done)</p>
-            {limits.length === 0 ? (
-              <p className="text-sm text-rose-600 font-bold">Kouri migrasyon 20260759 pou tablo platform_limit_settings.</p>
-            ) : (
-              limits.map((l) => (
-                <div key={l.limit_key} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-slate-100 rounded-2xl p-4">
+          {extra.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4">
+              <p className="text-xs font-bold uppercase text-slate-500 tracking-wider">Lòt</p>
+              {extra.map((s) => (
+                <div key={s.key} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-slate-100 rounded-2xl p-4">
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-slate-900">{l.label}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{l.limit_key}</p>
+                    <p className="text-sm font-bold text-slate-900">{s.label}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">{s.key}</p>
                   </div>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={limitDrafts[l.limit_key] ?? ''}
-                    onChange={(e) => setLimitDrafts((prev) => ({ ...prev, [l.limit_key]: e.target.value }))}
-                    className="w-32 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+                    value={drafts[s.key] ?? ''}
+                    onChange={(e) => setDrafts((prev) => ({ ...prev, [s.key]: e.target.value }))}
+                    className="w-28 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
                   />
                   <button
                     type="button"
-                    disabled={busy === `lim-${l.limit_key}`}
-                    onClick={() => saveLimit(l.limit_key)}
-                    className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase"
+                    disabled={busy === s.key}
+                    onClick={() => void save(s.key)}
+                    className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase"
                   >
-                    {busy === `lim-${l.limit_key}` ? '...' : 'Sove'}
+                    Sove
                   </button>
                 </div>
-              ))
-            )}
-            {agentTiers.length > 0 && (
-              <div className="pt-2 space-y-2">
-                <p className="text-xs font-bold text-slate-500 uppercase">Kapasite ajan (agent_tiers)</p>
-                {agentTiers.map((t) => (
-                  <div key={t.tier} className="flex items-center gap-3">
-                    <span className="text-sm font-bold w-24">{t.label || t.tier}</span>
-                    <input
-                      type="number"
-                      defaultValue={t.capacity_htg}
-                      id={`tier-cap-${t.tier}`}
-                      className="w-32 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
-                    />
-                    <button
-                      type="button"
-                      disabled={busy === `tier-${t.tier}`}
-                      onClick={() => {
-                        const el = document.getElementById(`tier-cap-${t.tier}`) as HTMLInputElement | null;
-                        saveTier(t.tier, Number(el?.value || t.capacity_htg));
-                      }}
-                      className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold"
-                    >
-                      Sove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white border border-amber-100 rounded-3xl p-6 shadow-sm space-y-4">
-            <p className="text-xs font-bold uppercase text-amber-700 tracking-wider">Frè espesyal pou yon kont</p>
-            <p className="text-xs text-slate-500">
-              Chwazi kont → chwazi kalite frè → mete valè (0 = san frè pou kont sa a sèlman).
-            </p>
-
-            <div className="flex gap-2">
-              <input
-                value={userQuery}
-                onChange={(e) => setUserQuery(e.target.value)}
-                placeholder="Chèche imèl oswa non..."
-                className="flex-1 bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-sm"
-              />
-              <button type="button" onClick={searchUsers} className="bg-slate-900 text-white px-4 rounded-xl text-xs font-bold uppercase flex items-center gap-1">
-                <Search size={12} /> Chèche
-              </button>
+              ))}
             </div>
-            {userHits.length > 0 && (
-              <div className="space-y-1">
-                {userHits.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => pickUser(u)}
-                    className="w-full text-left text-xs bg-slate-50 hover:bg-indigo-50 border border-gray-100 rounded-lg px-3 py-2"
-                  >
-                    <span className="font-bold">{u.full_name}</span> · {u.email}
-                    <span className="block font-mono text-[10px] text-slate-400">{u.id}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {previewUser && (
-              <div className="bg-amber-50/80 border border-amber-100 rounded-2xl p-3 text-xs">
-                <p className="font-bold text-amber-900">{previewUser.name} · {previewUser.email}</p>
-                {previewFees && (
-                  <p className="text-amber-800/80 mt-1">
-                    Frè aktif pou kont sa a: depo {previewFees.deposit_fee_percent ?? '—'}% ·
-                    retrè {previewFees.withdraw_fee_percent ?? '—'}% ·
-                    ajan {previewFees.agent_withdraw_fee_per_1000 ?? '—'}/1000 ·
-                    KYC {previewFees.kyc_fee ?? '—'} + debloke {previewFees.card_activation_fee ?? '—'} HTG
-                  </p>
-                )}
-              </div>
-            )}
-
-            <input
-              value={ovUserId}
-              onChange={(e) => setOvUserId(e.target.value.trim())}
-              placeholder="UUID kont"
-              className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono"
-            />
-            <div className="grid sm:grid-cols-3 gap-2">
-              <select
-                value={ovFeeKey}
-                onChange={(e) => setOvFeeKey(e.target.value)}
-                className="bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-sm"
-              >
-                {settings.map((s) => (
-                  <option key={s.fee_key} value={s.fee_key}>{s.label}</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={ovValue}
-                onChange={(e) => setOvValue(e.target.value)}
-                placeholder="Montan"
-                className="bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
-              />
-              <button
-                type="button"
-                disabled={busy === 'override'}
-                onClick={saveOverride}
-                className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase"
-              >
-                {busy === 'override' ? '...' : 'Aplike sou kont'}
-              </button>
-            </div>
-            <input
-              value={ovNote}
-              onChange={(e) => setOvNote(e.target.value)}
-              placeholder="Nòt (opsyonèl)"
-              className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-sm"
-            />
-
-            <div className="pt-2 space-y-2">
-              <p className="text-[10px] font-bold uppercase text-slate-400">Override aktif</p>
-              {overrides.length === 0 ? (
-                <p className="text-sm text-slate-400">Pa gen frè espesyal pou kounye a.</p>
-              ) : (
-                overrides.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between gap-2 text-xs bg-slate-50 rounded-xl px-3 py-2 border border-gray-100">
-                    <div>
-                      <p className="font-bold text-slate-800">{o.profiles?.full_name || o.user_id.slice(0, 8)}</p>
-                      <p className="text-slate-500">{o.profiles?.email} · {o.fee_key} = <strong>{o.value}</strong></p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => clearOverride(o.user_id, o.fee_key)}
-                      className="text-rose-600 p-2 hover:bg-rose-50 rounded-lg"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          )}
         </>
       )}
     </div>

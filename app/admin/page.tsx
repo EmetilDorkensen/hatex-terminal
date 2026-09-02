@@ -2,14 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Store, Lock, Briefcase, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, CreditCard, KeyRound, Building2 as Building2Icon, MinusCircle, Mail } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Lock, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, KeyRound, MinusCircle, Mail } from 'lucide-react';
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
-import AdminAgentRechargePanel from './AdminAgentRechargePanel';
 import AdminFeesPanel from './AdminFeesPanel';
+import AdminPayoutsPanel from './AdminPayoutsPanel';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
-import { openSafeUrl } from '@/lib/security/safe-url';
 
 export default function AdminSuperPage() {
     // ----------------------------------------------------
@@ -25,45 +24,20 @@ export default function AdminSuperPage() {
     // ETA POU DONE ADMIN YO (PANYEN AN)
     // ----------------------------------------------------
     const [allUsers, setAllUsers] = useState<any[]>([]);
-    const [deposits, setDeposits] = useState<any[]>([]);
-    const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [missingCards, setMissingCards] = useState<any[]>([]);
-    const [promoCodes, setPromoCodes] = useState<any[]>([]);
-    const [pendingAgents, setPendingAgents] = useState<any[]>([]);
-    const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
-    const [pendingEnterprises, setPendingEnterprises] = useState<any[]>([]);
-    const [enterpriseRejectionReason, setEnterpriseRejectionReason] = useState<{ [key: string]: string }>({});
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('support');
-    const [totalCardBal, setTotalCardBal] = useState(0);
-    const [newPromoCode, setNewPromoCode] = useState('');
-    const [promoReward, setPromoReward] = useState('250');
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'depo' | 'retre' | 'sispandi' | 'kyc' | 'kyc-survey' | 'promo' | 'ajan' | 'antrepriz' | 'ekip' | 'sekirite' | 'frais'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'sispandi' | 'kyc' | 'kyc-survey' | 'ekip' | 'sekirite' | 'frais' | 'payout'>('dashboard');
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
-    const [totalClientBal, setTotalClientBal] = useState(0);
-    const [totalBiznisProfit, setTotalBiznisProfit] = useState(0);
-    const [feesBreakdown, setFeesBreakdown] = useState({
-        depo: 0, retre: 0, transfe: 0, ajan: 0, antrepriz: 0, kat: 0, kyc: 0, api: 0,
-    });
-    const [agentFeeHistory, setAgentFeeHistory] = useState<any[]>([]);
-    const [enterpriseFeeHistory, setEnterpriseFeeHistory] = useState<any[]>([]);
-    const [cardActivationFeeHistory, setCardActivationFeeHistory] = useState<any[]>([]);
-    const [kycFeeHistory, setKycFeeHistory] = useState<any[]>([]);
-    const [unifiedFeeHistory, setUnifiedFeeHistory] = useState<any[]>([]);
-    const [bizProfitWithdrawn, setBizProfitWithdrawn] = useState(0);
     const [bizProfitAvailable, setBizProfitAvailable] = useState(0);
-    const [bizProfitRefunded, setBizProfitRefunded] = useState(0);
-    const [bizProfitGross, setBizProfitGross] = useState(0);
-    const [bizWithdrawHistory, setBizWithdrawHistory] = useState<any[]>([]);
     const [showBizWithdrawModal, setShowBizWithdrawModal] = useState(false);
     const [bizWithdrawAmount, setBizWithdrawAmount] = useState('');
     const [bizWithdrawNote, setBizWithdrawNote] = useState('');
@@ -71,6 +45,13 @@ export default function AdminSuperPage() {
     const [bizWithdrawLoading, setBizWithdrawLoading] = useState(false);
     const [bizWithdrawError, setBizWithdrawError] = useState('');
     const [flushConfirmLoading, setFlushConfirmLoading] = useState(false);
+    const [gateway, setGateway] = useState({
+        platform_fees: 0,
+        plan_fees: 0,
+        paid_count: 0,
+        paid_plans: 0,
+        recent: [] as any[],
+    });
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -143,14 +124,9 @@ export default function AdminSuperPage() {
             }
 
             setAllUsers(data.users || []);
-            setDeposits(data.deposits || []);
-            setWithdrawals(data.withdrawals || []);
             setSuspendedAccounts(data.suspendedAccounts || []);
             setPendingKyc(data.pendingKyc || []);
             setMissingCards(data.missingCards || []);
-            setPromoCodes(data.promoCodes || []);
-            setPendingAgents(data.pendingAgents || []);
-            setPendingEnterprises(data.pendingEnterprises || []);
             setStaffMembers(data.staffMembers || []);
 
             if (data.announcement) {
@@ -158,33 +134,18 @@ export default function AdminSuperPage() {
                 setAnonsActive(data.announcement.active !== false);
             }
 
-            setTotalClientBal(Number(data.totals?.clientBal || 0));
-            setTotalCardBal(Number(data.totals?.cardBal || 0));
-
             if (data.profit) {
-                setBizProfitGross(Number(data.profit.gross_htg || 0));
-                setBizProfitRefunded(Number(data.profit.refunded_htg || 0));
-                setTotalBiznisProfit(Number(data.profit.net_htg || 0));
-                setBizProfitWithdrawn(Number(data.profit.withdrawn_htg || 0));
                 setBizProfitAvailable(Number(data.profit.available_htg || 0));
-                const bn = data.profit.breakdown_net || {};
-                setFeesBreakdown({
-                    depo: Number(bn.depo || 0),
-                    retre: Number(bn.retre || 0),
-                    transfe: Number(bn.transfe || 0),
-                    ajan: Number(bn.ajan_aktivasyon || 0) + Number(bn.ajan_retrè_hatex || 0),
-                    antrepriz: Number(bn.antrepriz || 0),
-                    kat: Number(bn.kat || 0),
-                    kyc: Number(bn.kyc || 0),
-                    api: Number(bn.api || 0),
-                });
             }
 
-            if (data.feeHistory) {
-                setAgentFeeHistory(data.feeHistory.agent || []);
-                setEnterpriseFeeHistory(data.feeHistory.enterprise || []);
-                setCardActivationFeeHistory(data.feeHistory.card || []);
-                setKycFeeHistory(data.feeHistory.kyc || []);
+            if (data.gateway) {
+                setGateway({
+                    platform_fees: Number(data.gateway.platform_fees || 0),
+                    plan_fees: Number(data.gateway.plan_fees || 0),
+                    paid_count: Number(data.gateway.paid_count || 0),
+                    paid_plans: Number(data.gateway.paid_plans || 0),
+                    recent: data.gateway.recent || [],
+                });
             }
 
             // Istorik retrè pwofi + unified (deja nan business-withdrawal)
@@ -192,7 +153,6 @@ export default function AdminSuperPage() {
                 const profitRes = await fetch('/api/admin/business-withdrawal');
                 if (profitRes.ok) {
                     const s = await profitRes.json();
-                    if (Array.isArray(s.withdrawals)) setBizWithdrawHistory(s.withdrawals);
                     if (typeof s.available_htg === 'number') setBizProfitAvailable(s.available_htg);
                 }
             } catch { /* ignore */ }
@@ -264,52 +224,19 @@ export default function AdminSuperPage() {
         }
     };
 
-    const handleOpenDocument = async (ref: string) => {
-        if (!ref) { alert("Pa gen lyen pou dokiman sa a!"); return; }
-        if (ref.startsWith('http://') || ref.startsWith('https://')) {
-            // Toujou eseye API a (bucket prive ka gen URL piblik ki pa mache)
-            try {
-                const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
-                const data = await res.json();
-                if (res.ok && data.url && openSafeUrl(data.url)) {
-                    return;
-                }
-            } catch { /* fall through */ }
-            if (!openSafeUrl(ref)) alert('Lyèn dokiman an pa valab.');
-            return;
+    const handleOpenKycDocument = async (
+      userId: string,
+      doc: 'front' | 'back' | 'selfie' | 'business' | 'nif' | 'tax' | 'establishment' | 'address' | 'articles',
+      legacyValue?: string | null
+    ) => {
+        if (!legacyValue && !userId) {
+          alert('Pa gen dokiman sa a!');
+          return;
         }
         try {
-            const res = await fetch(`/api/admin/application-doc?ref=${encodeURIComponent(ref)}`);
-            const data = await res.json();
-            if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-            if (!openSafeUrl(data.url)) throw new Error('Lyèn dokiman an pa valab.');
-        } catch (e: any) {
-            alert(e.message || 'Pa t kapab louvri dokiman an.');
-        }
-    };
-
-    const handleOpenDepositProof = async (ref: string) => {
-        if (!ref) { alert("Pa gen lyen pou prèv sa a!"); return; }
-        try {
-            // redirect=1 → 302 signed URL (menm jan ak dokiman KYC) — evite blòk popup / openSafeUrl
-            const openUrl = `/api/admin/deposit-proof?ref=${encodeURIComponent(ref)}&redirect=1`;
+            // redirect=1 louvri signed URL dirèkteman (bucket prive kyc-documents-v2)
+            const openUrl = `/api/kyc/document?userId=${encodeURIComponent(userId)}&doc=${doc}&redirect=1`;
             window.open(openUrl, '_blank', 'noopener,noreferrer');
-        } catch (e: any) {
-            alert(e.message || 'Pa t kapab louvri prèv la.');
-        }
-    };
-
-    const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
-        if (!legacyValue) { alert("Pa gen dokiman sa a!"); return; }
-        if (legacyValue.startsWith('http://') || legacyValue.startsWith('https://')) {
-            if (!openSafeUrl(legacyValue)) alert('Lyèn dokiman an pa valab.');
-            return;
-        }
-        try {
-            const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
-            const data = await res.json();
-            if (!res.ok || !data.url) throw new Error(data.error || 'Erè');
-            if (!openSafeUrl(data.url)) throw new Error('Lyèn dokiman an pa valab.');
         } catch (e: any) {
             alert(e.message || 'Pa t kapab louvri dokiman an.');
         }
@@ -318,112 +245,6 @@ export default function AdminSuperPage() {
     const voyeEmailKliyan = async (email: string, non: string, mesaj: string, subject: string) => {
         if (!email) return;
         try { await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: email.trim(), subject, non, mesaj }), }); } catch (error) {}
-    };
-
-    const voyeTelegram = async (msg: string) => {
-        try { await fetch('/api/notifications/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel: 'admin', message: msg, parseMode: 'HTML' }) }); } catch (e) {}
-    };
-
-    // Jounal odit sèvè-a-sèvè pou chak aksyon sansib Sipè Admin fè (gade
-    // AdminAuditLog.tsx pou konsilte l nan tab "Sekirite").
-    const logAdminAudit = async (action: string, targetType?: string, targetId?: string, details?: Record<string, unknown>) => {
-        try { await fetch('/api/admin/audit-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, targetType, targetId, details }) }); } catch (e) {}
-    };
-
-    const deleteTranzaksyon = async (id: string, table: string) => {
-        if (!confirm("Èske ou vle efase istwa sa a nèt?")) return;
-        setProcessingId(id);
-        try {
-            await adminOps({ action: 'delete_row', table, id });
-            await logAdminAudit('TRANSACTION_DELETED', table, id);
-            alert("Efase nèt!");
-            raleDone();
-        } catch (err: any) {
-            alert(err.message);
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    const apwouveDepo = async (d: any) => {
-        const isModified = montanModifye[d.id] !== undefined;
-        const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
-        // Frè a rekalkile nan baz (admin_approve_deposit) — preview sèlman
-        let frePouBiznisLa = Number(d.fee || 0);
-        try {
-          const feeRes = await fetch('/api/fees/mine');
-          const feeData = await feeRes.json().catch(() => ({}));
-          const pct = Number(feeData?.fees?.deposit_fee_percent ?? 5);
-          frePouBiznisLa = Number((montanFinal * (pct / 100)).toFixed(2));
-        } catch { /* keep row fee */ }
-        const totalPeye = montanFinal + frePouBiznisLa;
-
-        if (!confirm(`TCHEKE DEPO SA BYEN:\n\n- Kliyan an ap resevwa: ${montanFinal} HTG\n- Frè pou Antrepriz la (Biznis): ${frePouBiznisLa} HTG\n- Total kliyan an te dwe voye sou Moncash la se: ${totalPeye} HTG\n\nÈske w wè ${totalPeye} HTG a sou telefòn ou? Si wi, konfime l.`)) return;
-        
-        setProcessingId(d.id);
-        try {
-            const p = allUsers.find((u) => u.id === d.user_id) || { full_name: '', email: '' };
-
-            const res = await fetch('/api/admin/finance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'approve_deposit',
-                deposit_id: d.id,
-                final_amount: montanFinal,
-                // fee ignored by RPC — recomputed from platform_fee_settings
-              }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.message || 'Apwobasyon echwe.');
-
-            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, depo ou a apwouve. Nou ajoute ${montanFinal} HTG sou balans ou.`, "DEPO APWOUVE");
-            await voyeTelegram(`<b>DEPO APWOUVE</b>\nKliyan: ${p?.full_name}\nMontan Kliyan: ${montanFinal} HTG\nFrè Biznis (Pwofi): ${frePouBiznisLa} HTG`);
-            await logAdminAudit('DEPOSIT_APPROVED', 'deposit', d.id, { amount: montanFinal, fee: frePouBiznisLa, user_id: d.user_id });
-            
-            alert("SIKSÈ! Depo a apwouve."); raleDone();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    const apwouveRetre = async (w: any) => {
-        if (!confirm(`Konfime retrè ${w.amount} HTG sa a?`)) return;
-        setProcessingId(w.id);
-        try {
-            const p = allUsers.find((u) => u.id === w.user_id) || { full_name: '', email: '' };
-            const res = await fetch('/api/admin/finance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'complete_withdrawal', withdrawal_id: w.id }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.message || 'Retrè echwe.');
-            
-            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, retrè ${w.amount} HTG ou a fin trete. Lajan an voye sou kont ou.`, "RETRÈ KONFIME");
-            await voyeTelegram(`<b>RETRÈ KONFIME</b>\nKliyan: ${p?.full_name}\nMontan: ${w.amount} HTG`);
-            await logAdminAudit('WITHDRAWAL_APPROVED', 'withdrawal', w.id, { amount: w.amount, user_id: w.user_id });
-            alert("RETRÈ FINI!"); raleDone();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    const anileTranzaksyon = async (item: any, table: string) => {
-        const rezon = prompt("Rezon anilasyon?");
-        if (!rezon) return;
-        setProcessingId(item.id);
-        try {
-            const p = allUsers.find((u) => u.id === item.user_id) || { full_name: '', email: '' };
-            const res = await fetch('/api/admin/finance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'reject', table, item_id: item.id, reason: rezon }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.message || 'Anilasyon echwe.');
-
-            await voyeEmailKliyan(p?.email, p?.full_name, `Bonjou ${p?.full_name}, tranzaksyon ${item.amount} HTG ou a anile. Rezon: ${rezon}`, "TRANZAKSYON ANILE");
-            await voyeTelegram(`<b>ANILE</b>\nKliyan: ${p?.full_name}\nRezon: ${rezon}`);
-            await logAdminAudit(`${table.toUpperCase()}_CANCELLED`, table, item.id, { reason: rezon, amount: item.amount, user_id: item.user_id });
-            alert("Anile!"); raleDone();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
     const deblokeKont = async (id: string, email: string) => {
@@ -514,7 +335,7 @@ export default function AdminSuperPage() {
     const jereKyc = async (id: string, full_name: string, email: string, aksyon: 'approved' | 'rejected') => {
         let rezonReje = "";
         if (aksyon === 'rejected') { const rep = prompt("Tanpri ekri rezon ki fè w rejte dokiman sa yo:"); if (!rep) return; rezonReje = rep; } 
-        else { if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}? Kat ak terminal ap kreye otomatikman.`)) return; }
+        else { if (!confirm(`Èske w sèten ou vle APWOUVE KYC pou ${full_name}? Si li te peye abonnman an, kapasite jou a ap aktive.`)) return; }
         setProcessingId(id);
         try {
             const res = await fetch('/api/admin/kyc-review', {
@@ -526,112 +347,18 @@ export default function AdminSuperPage() {
             if (!res.ok) throw new Error(data.error || 'Erè pandan revizyon KYC.');
 
             const mesajE = aksyon === 'approved'
-                ? `Felisitasyon ${full_name}! Dokiman w yo apwouve. Kat vityèl ou ak terminal ou aktive otomatikman.`
+                ? `Felisitasyon ${full_name}! Dokiman w yo apwouve. Si ou te peye abonnman Kapasite oswa Premyòm, kapasite jou ou ap ogmante.`
                 : `Bonjou ${full_name}. \n\nMalerezman, nou pa ka aksepte dokiman KYC ou te soumèt yo.\n\nREZON: ${rezonReje}`;
             if (aksyon !== 'approved' || data.fresh_approval !== false) {
                 await voyeEmailKliyan(email, full_name, mesajE, `VERIFIKASYON ID ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
             }
             if (aksyon === 'approved') {
-                alert(
-                    data.card_ok === false
-                        ? (data.message || 'KYC apwouve, men kat pa t kreye.')
-                        : (data.message || 'KYC apwouve — kat kreye otomatikman!')
-                );
+                alert(data.message || 'KYC apwouve.');
             } else {
                 alert('KYC rejte avèk siksè!');
             }
             raleDone();
         } catch (err: any) { alert("Erè: " + err.message); } finally { setProcessingId(null); }
-    };
-
-    const jereAjan = async (applicationId: string, userId: string, fullName: string, userEmail: string, aksyon: 'approved' | 'rejected') => {
-        let rezon = "";
-        if (aksyon === 'rejected') {
-            rezon = agentRejectionReason[applicationId] || "";
-            if (!rezon.trim()) return alert("Tanpri ekri yon rezon pou w ka rejte aplikasyon sa a.");
-        } else {
-            if (!confirm(`Èske w sèten ou vle APWOUVE aplikasyon ajan sa a pou ${fullName}?`)) return;
-        }
-
-        setProcessingId(applicationId);
-        try {
-            const res = await fetch('/api/admin/applications', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    kind: 'agent',
-                    action: aksyon,
-                    application_id: applicationId,
-                    user_id: userId,
-                    reason: aksyon === 'rejected' ? rezon : undefined,
-                }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                throw new Error(data.message || 'Echèk review ajan.');
-            }
-
-            const mesajE = aksyon === 'approved' 
-                ? `Felisitasyon ${fullName}! Aplikasyon w pou vin Ajan Hatexcard la apwouve. Ou ka vizite pòtay ajan w lan kounye a pou w jwenn kòd inik ou a epi kòmanse travay.` 
-                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon ajan w lan epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Tout garanti ou te depoze yo tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
-            
-            await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON AJAN ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            const feePart = Number(data.fee_refunded || 0);
-            alert(
-              aksyon === 'approved'
-                ? 'Aplikasyon an Apwouve avèk siksè!'
-                : `Aplikasyon an Rejte e Ranbouse! Wallet: +${Number(data.refund || 0).toLocaleString()} HTG` +
-                  (feePart > 0 ? ` (frè soti nan pwofi: ${feePart.toLocaleString()} HTG)` : '')
-            );
-            if (aksyon === 'rejected') setAgentRejectionReason(prev => ({...prev, [applicationId]: ''}));
-            raleDone();
-        } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
-    };
-
-    // ====================================================
-    // JERE APLIKASYON KONT ANTREPRIZ (Apwouve/Rejte)
-    // ====================================================
-    const jereAntrepriz = async (applicationId: string, userId: string, fullName: string, userEmail: string, aksyon: 'approved' | 'rejected') => {
-        let rezon = "";
-        if (aksyon === 'rejected') {
-            rezon = enterpriseRejectionReason[applicationId] || "";
-            if (!rezon.trim()) return alert("Tanpri ekri yon rezon pou w ka rejte aplikasyon sa a.");
-        } else {
-            if (!confirm(`Èske w sèten ou vle APWOUVE aplikasyon Antrepriz sa a pou ${fullName}?`)) return;
-        }
-
-        setProcessingId(applicationId);
-        try {
-            const res = await fetch('/api/admin/applications', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    kind: 'enterprise',
-                    action: aksyon,
-                    application_id: applicationId,
-                    user_id: userId,
-                    reason: aksyon === 'rejected' ? rezon : undefined,
-                }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                throw new Error(data.message || 'Echèk review antrepriz.');
-            }
-
-            const mesajE = aksyon === 'approved'
-                ? `Felisitasyon ${fullName}! Kont Antrepriz ou apwouve. Ou kounye a gen transfè/retrè ilimite, limit kat pi wo, epi yon kont Ajan PRO gratis si w pat genyen l deja.`
-                : `Bonjou ${fullName}. \n\nEkip nou an verifye aplikasyon Kont Antrepriz ou epi nou oblije rejte l pou rezon sa a:\n\n${rezon}\n\n(N.B: Frè ou te peye a tounen sou kont prensipal ou otomatikman).\n\nOu ka korije enfòmasyon yo epi soumèt yon nouvo demann.`;
-
-            await voyeEmailKliyan(userEmail, fullName, mesajE, `REZILTA APLIKASYON ANTREPRIZ ${aksyon === 'approved' ? 'APWOUVE' : 'REJTE'}`);
-            const feePart = Number(data.fee_refunded || data.refund || 0);
-            alert(
-              aksyon === 'approved'
-                ? 'Aplikasyon Antrepriz la Apwouve avèk siksè!'
-                : `Aplikasyon Antrepriz la Rejte e Ranbouse! Frè soti nan pwofi: ${feePart.toLocaleString()} HTG`
-            );
-            if (aksyon === 'rejected') setEnterpriseRejectionReason(prev => ({...prev, [applicationId]: ''}));
-            raleDone();
-        } catch (err: any) { alert("Erè nan pwosesis la: " + err.message); } finally { setProcessingId(null); }
     };
 
     const jereAnplwaye = async (e: React.FormEvent) => {
@@ -649,7 +376,7 @@ export default function AdminSuperPage() {
             const roleNames: Record<string, string> = {
                 'super_admin': 'Sipè Admin (CEO)',
                 'finance': 'Depatman Finans',
-                'compliance': 'Depatman Konfòmite (KYC & Ajan)',
+                'compliance': 'Depatman Konfòmite (KYC)',
                 'support': 'Sèvis Kliyan (Support)'
             };
             const staffName = allUsers.find(u => u.email?.toLowerCase() === inviteEmail.trim().toLowerCase())?.full_name || 'Anplwaye';
@@ -670,20 +397,6 @@ export default function AdminSuperPage() {
         try {
             await adminOps({ action: 'revoke_staff', id, target_email: email });
             alert(`Aksè a revoke nèt pou ${email}.`);
-            raleDone();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    const handleCreateCode = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setProcessingId('creating_promo');
-        const cleanCode = newPromoCode.trim().toUpperCase();
-        if (!cleanCode) { alert('Mete yon kòd valab.'); setProcessingId(null); return; }
-        try {
-            await adminOps({ action: 'create_promo', code: cleanCode, reward_amount: parseInt(promoReward) });
-            alert(`Kòd ${cleanCode} la kreye!`);
-            setNewPromoCode('');
-            setPromoReward('250');
             raleDone();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
@@ -774,24 +487,11 @@ export default function AdminSuperPage() {
                     <button onClick={() => { setDossierUserId(null); setView('dosye'); }} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'dosye' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         <FileText size={14} /> Dosye
                     </button>
-                    <button onClick={() => setView('depo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'depo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Depo ({deposits.filter(d => d.status === 'pending').length})</button>
-                    <button onClick={() => setView('retre')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'retre' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Retrè ({withdrawals.filter(w => w.status === 'pending').length})</button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     <button onClick={() => setView('kyc-survey')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc-survey' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kesyonman KYC</button>
-                    
-                    <button onClick={() => setView('ajan')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'ajan' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
-                        Ajan 
-                        {pendingAgents.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingAgents.length}</span>}
-                    </button>
-
-                    <button onClick={() => setView('antrepriz')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all relative ${view === 'antrepriz' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
-                        Antrepriz
-                        {pendingEnterprises.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] animate-pulse">{pendingEnterprises.length}</span>}
-                    </button>
-
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
-                    <button onClick={() => setView('promo')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'promo' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Pwomo</button>
                     <button onClick={() => setView('frais')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'frais' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Frè</button>
+                    <button onClick={() => setView('payout')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'payout' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Payout</button>
                     <button onClick={() => setView('sispandi')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'sispandi' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Sispandi</button>
                     <button onClick={() => setView('sekirite')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'sekirite' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         <Lock size={14}/> Sekirite
@@ -806,16 +506,13 @@ export default function AdminSuperPage() {
                         </div>
                     ) : view === 'dashboard' ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            
                             <div className="flex items-center gap-4 mb-6">
                                 <span className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 border border-indigo-100"><Activity size={28}/></span>
                                 <div>
-                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kès Global & Aktivite</h2>
-                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Aksè Rezève (Sipè Admin)</p>
+                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Pasrèl & Aktivite</h2>
+                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Kontwòl frè, KYC, ak abonnman</p>
                                 </div>
                             </div>
-
-                            <AdminAgentRechargePanel />
 
                             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>
@@ -830,13 +527,7 @@ export default function AdminSuperPage() {
                                     type="button"
                                     disabled={flushConfirmLoading}
                                     onClick={async () => {
-                                        if (
-                                            !confirm(
-                                                'Voye nouvo imèl konfimasyon bay TOUT itilizatè ki poko konfime? Sa ka pran kèk minit.'
-                                            )
-                                        ) {
-                                            return;
-                                        }
+                                        if (!confirm('Voye nouvo imèl konfimasyon bay TOUT itilizatè ki poko konfime? Sa ka pran kèk minit.')) return;
                                         setFlushConfirmLoading(true);
                                         try {
                                             const res = await fetch('/api/admin/resend-confirmations', {
@@ -849,9 +540,7 @@ export default function AdminSuperPage() {
                                                 alert(json.message || 'Echwe.');
                                                 return;
                                             }
-                                            alert(
-                                                `Fini: ${json.sent || 0} voye, ${json.failed || 0} echwe (sou ${json.pending_count || 0} ki te an atant).`
-                                            );
+                                            alert(`Fini: ${json.sent || 0} voye, ${json.failed || 0} echwe (sou ${json.pending_count || 0} ki te an atant).`);
                                         } catch {
                                             alert('Koneksyon echwe.');
                                         } finally {
@@ -860,301 +549,60 @@ export default function AdminSuperPage() {
                                     }}
                                     className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-60 shrink-0"
                                 >
-                                    {flushConfirmLoading ? (
-                                        <Loader2 size={14} className="animate-spin" />
-                                    ) : (
-                                        <Send size={14} />
-                                    )}
+                                    {flushConfirmLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                     Bat tout konfimasyon bloke
                                 </button>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
-                                    <div className="absolute top-0 right-0 p-6 opacity-5"><Users size={80} /></div>
-                                    <div className="relative z-10 mb-6">
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Kòb Kliyan Yo (Wallet)</p>
-                                        <h3 className="text-4xl font-bold text-slate-900 tracking-tight break-all">
-                                            {Number(totalClientBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-500">HTG</span>
-                                        </h3>
-                                    </div>
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
-                                        <span className="text-xs font-bold text-slate-500">Total Kliyan ki Enskri:</span>
-                                        <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">{allUsers.length} Moun</span>
-                                    </div>
+                                <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kliyan enskri</p>
+                                    <h3 className="text-4xl font-bold text-slate-900 tracking-tight">{allUsers.length}</h3>
+                                    <p className="text-xs text-slate-500 mt-3">KYC an atant: {pendingKyc.length}</p>
                                 </div>
-
-                                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
-                                    <div className="absolute top-0 right-0 p-6 opacity-5 text-emerald-600"><DollarSign size={80} /></div>
-                                    <div className="relative z-10 mb-6">
-                                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Total Frè HatexCard Kolèkte (Net)</p>
-                                        <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
-                                            {Number(totalBiznisProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-emerald-600">HTG</span>
-                                        </h3>
-                                        <p className="text-[11px] text-emerald-800/90 mt-2 font-medium space-y-0.5">
-                                            <span className="block">
-                                                Brut kolèkte:{' '}
-                                                <span className="font-bold">{Number(bizProfitGross).toLocaleString()} HTG</span>
-                                            </span>
-                                            <span className="block">
-                                                Ranbouse:{' '}
-                                                <span className="font-bold text-rose-600">-{Number(bizProfitRefunded).toLocaleString()} HTG</span>
-                                                {' · '}Ki rete (net):{' '}
-                                                <span className="font-bold">{Number(totalBiznisProfit).toLocaleString()} HTG</span>
-                                            </span>
-                                            <span className="block">
-                                                Disponib pou retrè:{' '}
-                                                <span className="font-bold">{Number(bizProfitAvailable).toLocaleString()} HTG</span>
-                                            </span>
-                                        </p>
-                                        <p className="text-[10px] text-emerald-700/70 mt-1">
-                                            Kont pwofi sekirize (ledger DB) — ajou an tan reyèl apre frè ak ranbousman
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setBizWithdrawError(''); setShowBizWithdrawModal(true); }}
-                                        className="mb-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm"
-                                    >
+                                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm">
+                                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Frè pasrèl kolèkte</p>
+                                    <h3 className="text-4xl font-bold text-emerald-700 tracking-tight break-all">
+                                        {Number(gateway.platform_fees).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm">HTG</span>
+                                    </h3>
+                                    <p className="text-xs text-emerald-800/80 mt-3">Abonnman: {Number(gateway.plan_fees).toLocaleString()} HTG · {gateway.paid_count} peman peye</p>
+                                    <button type="button" onClick={() => { setBizWithdrawError(''); setShowBizWithdrawModal(true); }} className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">
                                         <MinusCircle size={16} /> Retrè Pwofi Biznis
                                     </button>
-                                    <div className="grid grid-cols-2 gap-2 mt-auto">
-                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Ajan*</p>
-                                            <p className="font-bold text-emerald-800">{feesBreakdown.ajan.toLocaleString()}</p>
-                                        </div>
-                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè API</p>
-                                            <p className="font-bold text-emerald-800">{feesBreakdown.api.toLocaleString()}</p>
-                                        </div>
-                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè Antrepriz</p>
-                                            <p className="font-bold text-emerald-800">{feesBreakdown.antrepriz.toLocaleString()}</p>
-                                        </div>
-                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Frè KYC</p>
-                                            <p className="font-bold text-emerald-800">{feesBreakdown.kyc.toLocaleString()}</p>
-                                        </div>
-                                        <div className="bg-white/60 p-3 rounded-xl border border-emerald-200/50 col-span-2">
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase">Lòt (Depo / Retrè / P2P / Kat)</p>
-                                            <p className="font-bold text-emerald-800">{(feesBreakdown.depo + feesBreakdown.retre + feesBreakdown.transfe + feesBreakdown.kat).toLocaleString()}</p>
-                                        </div>
-                                    </div>
-                                    <p className="text-[9px] text-emerald-700/60 mt-2">* Aktivasyon ajan + 80% frè retrè ajan (pa 20% komisyon ajan). Kategori yo deja net apre ranbousman.</p>
+                                    <p className="text-[11px] text-emerald-800/80 mt-2">Disponib: {Number(bizProfitAvailable).toLocaleString()} HTG</p>
                                 </div>
-
-                                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-between">
-                                    <div className="absolute top-0 right-0 p-6 opacity-10 text-white"><CreditCard size={80} /></div>
-                                    <div className="relative z-10 mb-6">
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Lajan Kap Woule Sou Kat Yo</p>
-                                        <h3 className="text-4xl font-bold text-white tracking-tight break-all">
-                                            {Number(totalCardBal).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-400">HTG</span>
-                                        </h3>
-                                    </div>
-                                    <div className="bg-white/10 p-4 rounded-xl border border-white/5 flex items-center justify-between mt-auto backdrop-blur-sm">
-                                        <span className="text-xs font-medium text-slate-300">Kat Vityèl ki Kreye:</span>
-                                        <span className="text-sm font-bold text-white">{allUsers.filter(u => u.is_card_activated).length}</span>
-                                    </div>
+                                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl text-white">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Plan peye aktif</p>
+                                    <h3 className="text-4xl font-bold tracking-tight">{gateway.paid_plans}</h3>
+                                    <p className="text-xs text-slate-400 mt-3">Kapasite / Premyòm ki peye e aktif</p>
+                                    <button type="button" onClick={() => setView('frais')} className="mt-4 w-full bg-white/10 hover:bg-white/20 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">Jere frè ak kota</button>
                                 </div>
                             </div>
 
-                            <div className="bg-indigo-600 p-8 rounded-3xl shadow-sm mt-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                <div>
-                                    <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-2">GRAN TOTAL KI SIPOZE NAN BANK LA (Kliyan + Biznis)</p>
-                                    <p className="text-sm text-white font-medium">Sa se sòm Kòb Wallet yo ak Pwofi disponib konpayi an.</p>
-                                </div>
-                                <p className="text-3xl font-bold text-white tracking-tight">
-                                    {Number(totalClientBal + bizProfitAvailable).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
-                                </p>
-                            </div>
-
-                            {/* ISTORIK FRÈ AJAN — Chak fwa yon ajan aktive kont li oswa ogmante kapasite l,
-                                frè a antre otomatikman nan Kès Global la (anwo a) EPI parèt isit kòm mesaj istorik. */}
                             <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-slate-900">Istorik Frè Ajan (Kès Global)</h3>
-                                        <p className="text-xs text-slate-500 mt-1">Chak aktivasyon oswa ogmantasyon kapasite ajan ajoute otomatikman nan pwofi biznis la anwo a.</p>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg">
-                                        Total: {feesBreakdown.ajan.toLocaleString()} HTG
-                                    </span>
+                                <div className="p-6 border-b border-gray-100">
+                                    <h3 className="text-lg font-bold text-slate-900">Dènye peman pasrèl</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Frè HatexCard ak abonnman ki deja peye sou MonCash.</p>
                                 </div>
                                 <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
-                                    {agentFeeHistory.length === 0 ? (
-                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè ajan anrejistre pou kounye a.</p>
+                                    {gateway.recent.length === 0 ? (
+                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen peman peye pou kounye a.</p>
                                     ) : (
-                                        agentFeeHistory.map(item => (
-                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                                                        <DollarSign size={18} />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.agentName}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
-                                                    </div>
+                                        gateway.recent.map((item: any) => (
+                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-slate-900 truncate">{item.merchantName}</p>
+                                                    <p className="text-xs text-slate-500 truncate">{item.purpose === 'plan_fee' ? 'Abonnman' : 'Frè pasrèl'} · {item.description || item.email}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">{item.created_at ? new Date(item.created_at).toLocaleString('fr-HT') : ''}</p>
                                                 </div>
                                                 <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* ISTORIK FRÈ ANTREPRIZ — Se pwofi HatexCard, li PA ale sou kont ajan
-                                moun ki soumèt aplikasyon an. Kont ajan PRO yo bay otomatikman a se
-                                yon kont vid (0 HTG), pa yon transfè kòb sòti nan frè 49,000 HTG la. */}
-                            <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-slate-900">Istorik Frè Antrepriz (Kès Global)</h3>
-                                        <p className="text-xs text-slate-500 mt-1">Frè pasaj 49,000 HTG kont Antrepriz yo — se pwofi HatexCard, li pa antre sou kont ajan pèsonn.</p>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg">
-                                        Total: {feesBreakdown.antrepriz.toLocaleString()} HTG
-                                    </span>
-                                </div>
-                                <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
-                                    {enterpriseFeeHistory.length === 0 ? (
-                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè Antrepriz anrejistre pou kounye a.</p>
-                                    ) : (
-                                        enterpriseFeeHistory.map(item => (
-                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                                                        <Building2Icon size={18} />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.clientName}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
-                                                    </div>
-                                                </div>
-                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* ISTORIK FRÈ KYC — 1150 HTG (kat + verifikasyon enkli) */}
-                            <div className="bg-white border border-emerald-200 rounded-3xl shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-emerald-100 flex items-center justify-between bg-emerald-50/40">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-emerald-900">Istorik Frè KYC (Kès Global)</h3>
-                                        <p className="text-xs text-emerald-800/70 mt-1">Frè 1150 HTG (verifikasyon ID + kat vityèl enkli) — tout antre nan pwofi biznis la.</p>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase bg-emerald-600 text-white px-3 py-1.5 rounded-lg">
-                                        Total: {feesBreakdown.kyc.toLocaleString()} HTG
-                                    </span>
-                                </div>
-                                <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
-                                    {kycFeeHistory.length === 0 ? (
-                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè KYC anrejistre pou kounye a.</p>
-                                    ) : (
-                                        kycFeeHistory.map(item => (
-                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                                                        <ShieldCheck size={18} />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.clientName}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
-                                                    </div>
-                                                </div>
-                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* ISTORIK FRÈ KAT AKTIVASYON — 520 HTG (ansyen modèl, anvan KYC 1150)
-                                li a. Frè sa a te envizib nan Kès Global la anvan, kounye a li konte
-                                epi li gen pwòp istorik li tou (menm modèl ak Ajan/Antrepriz). */}
-                            <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-slate-900">Istorik Frè Kat Aktivasyon (Kès Global)</h3>
-                                        <p className="text-xs text-slate-500 mt-1">Frè 520 HTG chak fwa yon kliyan aktive kat vityèl li a — se pwofi HatexCard.</p>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg">
-                                        Total: {feesBreakdown.kat.toLocaleString()} HTG
-                                    </span>
-                                </div>
-                                <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
-                                    {cardActivationFeeHistory.length === 0 ? (
-                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn frè Kat anrejistre pou kounye a.</p>
-                                    ) : (
-                                        cardActivationFeeHistory.map(item => (
-                                            <div key={item.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                                                        <CreditCard size={18} />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.clientName}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
-                                                    </div>
-                                                </div>
-                                                <p className="text-sm font-bold text-emerald-600 shrink-0">+{Math.abs(Number(item.amount)).toLocaleString()} HTG</p>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 🔗 ISTORIK KONPLÈ KÈS GLOBAL — fusyone TOUT sous frè yo (Depo, Retrè,
-                                Transfè, Ajan, Antrepriz, Kat) nan YON SÈL lis kwonolojik pou Sipè
-                                Admin ka verifye TOUT mouvman kòb biznis la fè, nan yon sèl kote,
-                                san bezwen gade chak seksyon apa. */}
-                            <div className="bg-white border-2 border-indigo-200 rounded-3xl shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-indigo-100 bg-indigo-50/50 flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2"><Activity size={18}/> Istorik Konplè Kès Global</h3>
-                                        <p className="text-xs text-indigo-700/70 mt-1">TOUT sous frè yo fusyone (Depo, Retrè, Transfè, Ajan, Antrepriz, Kat) — triye pa dat, pi resan an anlè.</p>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase bg-indigo-600 text-white px-3 py-1.5 rounded-lg">
-                                        Disponib: {Number(bizProfitAvailable).toLocaleString()} HTG
-                                    </span>
-                                </div>
-                                <div className="max-h-[560px] overflow-y-auto divide-y divide-gray-100">
-                                    {unifiedFeeHistory.length === 0 ? (
-                                        <p className="text-center text-slate-400 text-xs font-bold uppercase py-10">Pa gen okenn mouvman frè anrejistre pou kounye a.</p>
-                                    ) : (
-                                        unifiedFeeHistory.map((item: any) => (
-                                            <div key={`${item.kalite}-${item.id}`} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg shrink-0 ${
-                                                        item.kalite === 'Ajan' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                                                        item.kalite === 'Antrepriz' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
-                                                        item.kalite === 'Kat' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
-                                                        item.kalite === 'KYC' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                                                        item.kalite === 'Depo' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                                        item.kalite === 'Retrè' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                        item.kalite === 'Retrè Bank' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                                        'bg-rose-50 text-rose-700 border border-rose-100'
-                                                    }`}>{item.kalite}</span>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-slate-900 truncate">{item.nonMoun || item.description}</p>
-                                                        {item.nonMoun && <p className="text-xs text-slate-500 truncate">{item.description}</p>}
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.created_at).toLocaleString('fr-HT')}</p>
-                                                    </div>
-                                                </div>
-                                                <p className={`text-sm font-bold shrink-0 ${Number(item.amount) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                    {Number(item.amount) < 0 ? '' : '+'}{Number(item.amount).toLocaleString()} HTG
-                                                </p>
                                             </div>
                                         ))
                                     )}
                                 </div>
                             </div>
                         </div>
+
                     ) : view === 'ekip' ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             
@@ -1195,7 +643,7 @@ export default function AdminSuperPage() {
                                             className="w-full bg-slate-50 border border-gray-200 py-3.5 px-4 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all"
                                         >
                                             <option value="support">🎧 Sèvis Kliyan</option>
-                                            <option value="compliance">🛡️ Konfòmite & Ajan</option>
+                                            <option value="compliance">🛡️ Konfòmite (KYC)</option>
                                             <option value="finance">💰 Finans (Kesye)</option>
                                             <option value="super_admin">👑 Sipè Admin</option>
                                         </select>
@@ -1389,10 +837,27 @@ export default function AdminSuperPage() {
                                             <p className="text-xs text-slate-500 mt-1 mb-4">{user.email}</p>
                                             <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                                                 {user.kyc_doc_type && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 font-bold uppercase">{user.kyc_doc_type}</span>}
+                                                {user.account_type && <span className="text-[10px] bg-slate-50 text-slate-700 px-2 py-1 rounded border border-gray-200 font-bold uppercase">{user.account_type}</span>}
                                                 {user.kyc_face_match_score != null && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 font-bold">Figi: {Number(user.kyc_face_match_score).toFixed(1)}%</span>}
+                                                {user.needs_manual_review && <span className="text-[10px] bg-amber-50 text-amber-800 px-2 py-1 rounded border border-amber-200 font-bold uppercase">Revizyon imen</span>}
+                                                {user.account_type === 'business' && (
+                                                  <div className="w-full text-left mt-3 bg-slate-50 border border-gray-100 rounded-xl p-3 space-y-1">
+                                                    {user.service_description && <p className="text-[11px] text-slate-700"><span className="font-bold">Sèvis:</span> {user.service_description}</p>}
+                                                    {user.business_nif && <p className="text-[11px] text-slate-700"><span className="font-bold">NIF:</span> {user.business_nif}</p>}
+                                                    {user.business_rccm && <p className="text-[11px] text-slate-700"><span className="font-bold">RCCM:</span> {user.business_rccm}</p>}
+                                                    <p className="text-[11px] text-slate-700"><span className="font-bold">Pati 1 WA/MC:</span> {user.party1_whatsapp || '—'} / {user.party1_moncash || '—'}</p>
+                                                    <p className="text-[11px] text-slate-700"><span className="font-bold">Pati 2:</span> {user.party2_full_name || '—'} ({user.party2_role || '—'}) · WA {user.party2_whatsapp || '—'} · MC {user.party2_moncash || '—'}</p>
+                                                  </div>
+                                                )}
                                                 {user.kyc_front && <button onClick={() => handleOpenKycDocument(user.id, 'front', user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
                                                 {user.kyc_back && <button onClick={() => handleOpenKycDocument(user.id, 'back', user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
                                                 {user.kyc_selfie && <button onClick={() => handleOpenKycDocument(user.id, 'selfie', user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
+                                                {user.business_registration && <button onClick={() => handleOpenKycDocument(user.id, 'business', user.business_registration)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant/RCCM</button>}
+                                                {user.business_nif_doc && <button onClick={() => handleOpenKycDocument(user.id, 'nif', user.business_nif_doc)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> NIF</button>}
+                                                {user.tax_clearance && <button onClick={() => handleOpenKycDocument(user.id, 'tax', user.tax_clearance)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kitan</button>}
+                                                {user.establishment_photo && <button onClick={() => handleOpenKycDocument(user.id, 'establishment', user.establishment_photo)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Lokal</button>}
+                                                {user.proof_of_address && <button onClick={() => handleOpenKycDocument(user.id, 'address', user.proof_of_address)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Adrès</button>}
+                                                {user.articles && <button onClick={() => handleOpenKycDocument(user.id, 'articles', user.articles)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Statu</button>}
                                                 {!user.kyc_front && !user.kyc_selfie && <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 font-bold uppercase tracking-wider">Okenn imaj sou sistèm nan</span>}
                                             </div>
                                         </div>
@@ -1410,220 +875,10 @@ export default function AdminSuperPage() {
                         )
                     ) : view === 'kyc-survey' ? (
                         <KycSurveyPanel mode="admin" />
-                    ) : view === 'ajan' ? (
-                        pendingAgents.length === 0 ? (
-                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
-                                <Store size={48} className="mx-auto mb-4 text-slate-300" />
-                                Pa gen okenn aplikasyon Ajan k ap tann
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {pendingAgents.map((agent) => (
-                                    <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
-                                        
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Store size={24} /></div>
-                                                <div>
-                                                    <h3 className="text-lg font-bold text-slate-900">{agent.profiles?.full_name || 'San Non'}</h3>
-                                                    <p className="text-xs text-slate-500 mt-1">{agent.profiles?.email}</p>
-                                                    <p className="text-[10px] text-slate-400 mt-1 font-mono">ID Kliyan: {agent.user_id}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase tracking-wider border border-indigo-100 mb-2">Plan: {agent.tier}</span>
-                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Depo Fèt: {Number(agent.metadata?.initial_deposit || 0).toLocaleString()} HTG</span>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman yo soumèt</p>
-                                            <div className="flex flex-wrap gap-3">
-                                                {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Pyès Idantite</button>}
-                                                {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Prèv Adrès</button>}
-                                                {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Foto Lokal</button>}
-                                                {agent.selfie_with_id_url && <button onClick={() => handleOpenDocument(agent.selfie_with_id_url)} className="text-[10px] bg-amber-50 px-4 py-2.5 rounded-lg text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie + ID</button>}
-                                                {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
-                                                {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
-                                                {agent.criminal_record_url && <button onClick={() => handleOpenDocument(agent.criminal_record_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kazye Jidisyè</button>}
-                                                {agent.bank_statement_url && <button onClick={() => handleOpenDocument(agent.bank_statement_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Relve Bankè</button>}
-                                                {agent.lease_doc_url && <button onClick={() => handleOpenDocument(agent.lease_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kontra Lokal</button>}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid sm:grid-cols-2 gap-4 bg-slate-50 border border-gray-100 rounded-2xl p-4">
-                                            <div>
-                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Dat Ekspirasyon ID</p>
-                                                <p className="text-sm font-bold text-slate-800">{agent.id_expiry_date ? new Date(agent.id_expiry_date).toLocaleDateString('fr-HT') : '—'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Dat Prèv Adrès</p>
-                                                <p className="text-sm font-bold text-slate-800">{agent.address_proof_date ? new Date(agent.address_proof_date).toLocaleDateString('fr-HT') : '—'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Referans</p>
-                                                <p className="text-sm font-bold text-slate-800">{agent.reference_name || '—'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Telefòn Referans</p>
-                                                <p className="text-sm font-bold text-slate-800">{agent.reference_phone || '—'}</p>
-                                            </div>
-                                            {agent.tier === 'premium' && (
-                                                <div className="sm:col-span-2">
-                                                    <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md border ${agent.confidentiality_accepted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                                                        {agent.confidentiality_accepted ? '✓ Angajman Konfidansyalite Siyen' : '✗ Angajman Konfidansyalite Poko Siyen'}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
-                                            <div className="w-full md:flex-1">
-                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la a (Lajan l ap retounen):</label>
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Egz: Foto lokal la pa klè..." 
-                                                    value={agentRejectionReason[agent.id] || ''}
-                                                    onChange={(e) => setAgentRejectionReason({...agentRejectionReason, [agent.id]: e.target.value})}
-                                                    className="w-full bg-slate-50 border border-gray-200 py-3 px-4 rounded-xl text-sm outline-none focus:border-rose-500 transition-colors"
-                                                />
-                                            </div>
-                                            <div className="flex gap-3 w-full md:w-auto shrink-0">
-                                                <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'rejected')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    <XCircle size={16} /> Rejte (Ranbouse l)
-                                                </button>
-                                                <button onClick={() => jereAjan(agent.id, agent.user_id, agent.profiles?.full_name, agent.profiles?.email, 'approved')} disabled={processingId === agent.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    {processingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                ))}
-                            </div>
-                        )
-                    ) : view === 'antrepriz' ? (
-                        pendingEnterprises.length === 0 ? (
-                            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">
-                                <Building2Icon size={48} className="mx-auto mb-4 text-slate-300" />
-                                Pa gen okenn aplikasyon Antrepriz kap tann
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {pendingEnterprises.map((app) => (
-                                    <div key={app.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col gap-6 transition-all hover:shadow-md">
-
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0 border border-indigo-100"><Building2Icon size={24} /></div>
-                                                <div>
-                                                    <h3 className="text-lg font-bold text-slate-900">{app.profiles?.full_name || 'San Non'}</h3>
-                                                    <p className="text-xs text-slate-500 mt-1">{app.profiles?.email}</p>
-                                                    <p className="text-[10px] text-slate-400 mt-1 font-mono">ID Kliyan: {app.user_id}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase tracking-wider border border-indigo-100 mb-2">{app.business_name || 'Biznis San Non'}</span>
-                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Frè Peye: {Number(app.metadata?.fee_paid || 0).toLocaleString()} HTG</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid sm:grid-cols-2 gap-4 bg-slate-50 border border-gray-100 rounded-2xl p-4">
-                                            <div>
-                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Nimewo Anrejistreman</p>
-                                                <p className="text-sm font-bold text-slate-800">{app.business_reg_number || '—'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Aktivite Biznis</p>
-                                                <p className="text-sm font-bold text-slate-800">{app.business_activity || '—'}</p>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dokiman yo soumèt</p>
-                                            <div className="flex flex-wrap gap-3">
-                                                {app.patente_url && <button onClick={() => handleOpenDocument(app.patente_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant</button>}
-                                                {app.cif_url && <button onClick={() => handleOpenDocument(app.cif_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> CIF</button>}
-                                                {app.business_registration_url && <button onClick={() => handleOpenDocument(app.business_registration_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Anrejistreman</button>}
-                                                {app.bank_statement_url && <button onClick={() => handleOpenDocument(app.bank_statement_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Relve Bankè</button>}
-                                                {app.lease_doc_url && <button onClick={() => handleOpenDocument(app.lease_doc_url)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kontra Lokal</button>}
-                                                {app.legal_rep_id_url && <button onClick={() => handleOpenDocument(app.legal_rep_id_url)} className="text-[10px] bg-amber-50 px-4 py-2.5 rounded-lg text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> ID Reprezantan</button>}
-                                            </div>
-                                        </div>
-
-                                        <div className="sm:col-span-2">
-                                            <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-md border ${app.confidentiality_accepted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                                                {app.confidentiality_accepted ? '✓ Angajman Konfidansyalite/Anti-Fwod Siyen' : '✗ Angajman Poko Siyen'}
-                                            </span>
-                                        </div>
-
-                                        <div className="mt-2 flex flex-col md:flex-row gap-4 items-start md:items-end border-t border-gray-100 pt-6">
-                                            <div className="w-full md:flex-1">
-                                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Si w ap rejte l, ekri rezon an la a (Frè a ap ranbouse):</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Egz: Dokiman patant lan pa klè..."
-                                                    value={enterpriseRejectionReason[app.id] || ''}
-                                                    onChange={(e) => setEnterpriseRejectionReason({...enterpriseRejectionReason, [app.id]: e.target.value})}
-                                                    className="w-full bg-slate-50 border border-gray-200 py-3 px-4 rounded-xl text-sm outline-none focus:border-rose-500 transition-colors"
-                                                />
-                                            </div>
-                                            <div className="flex gap-3 w-full md:w-auto shrink-0">
-                                                <button onClick={() => jereAntrepriz(app.id, app.user_id, app.profiles?.full_name, app.profiles?.email, 'rejected')} disabled={processingId === app.id} className="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    <XCircle size={16} /> Rejte (Ranbouse l)
-                                                </button>
-                                                <button onClick={() => jereAntrepriz(app.id, app.user_id, app.profiles?.full_name, app.profiles?.email, 'approved')} disabled={processingId === app.id} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                    {processingId === app.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                ))}
-                            </div>
-                        )
                     ) : view === 'frais' ? (
                         <AdminFeesPanel />
-                    ) : view === 'promo' ? (
-                        <div>
-                            <form onSubmit={handleCreateCode} className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-sm">
-                                <div className="flex-1 w-full space-y-2">
-                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Nouvo Kòd (Ex: IZO2026)</label>
-                                    <input type="text" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} placeholder="NON ATIS LA" className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold text-sm uppercase text-slate-900" required />
-                                </div>
-                                <div className="w-full md:w-48 space-y-2">
-                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Rediksyon (HTG)</label>
-                                    <input type="number" value={promoReward} onChange={(e) => setPromoReward(e.target.value)} className="w-full bg-slate-50 border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold text-sm text-slate-900" required min="0" />
-                                </div>
-                                <button type="submit" disabled={processingId === 'creating_promo'} className="w-full md:w-auto bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold uppercase tracking-wider active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2">
-                                    {processingId === 'creating_promo' ? <Loader2 size={18} className="animate-spin" /> : "Kreye Kòd La"}
-                                </button>
-                            </form>
-                            <div className="overflow-x-auto bg-white rounded-3xl border border-gray-200 shadow-sm">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-gray-100 bg-slate-50">
-                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider">Kòd Pwomo</th>
-                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider text-center">Rediksyon (HTG)</th>
-                                            <th className="p-5 text-xs font-bold uppercase text-slate-500 tracking-wider text-center">Moun Mennen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {promoCodes.length === 0 ? (
-                                            <tr><td colSpan={3} className="p-10 text-center text-sm font-bold uppercase text-slate-400 tracking-wider">Pa gen kòd kreye ankò.</td></tr>
-                                        ) : (
-                                            promoCodes.map((promo) => (
-                                                <tr key={promo.code} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                                                    <td className="p-5 font-bold text-indigo-600">{promo.code}</td>
-                                                    <td className="p-5 text-center font-bold text-slate-900">{promo.reward_amount} HTG</td>
-                                                    <td className="p-5 text-center"><span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg font-bold text-xs border border-emerald-100">{promo.usage_count}</span></td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                    ) : view === 'payout' ? (
+                        <AdminPayoutsPanel />
                     ) : view === 'sispandi' ? (
                         <div className="space-y-4">
                             {suspendedAccounts.length === 0 ? (
@@ -1650,67 +905,7 @@ export default function AdminSuperPage() {
                             <AdminMfaSettings supabase={supabase} />
                             <AdminAuditLog />
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {(view === 'depo' ? deposits : withdrawals).map((item) => {
-                                const isDepo = view === 'depo';
-                                const aficheMontan = isDepo && montanModifye[item.id] !== undefined ? montanModifye[item.id] : item.amount;
-                                
-                                return (
-                                    <div key={item.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 relative overflow-hidden shadow-sm hover:shadow-md transition-all">
-                                        {item.status !== 'pending' && <button onClick={() => deleteTranzaksyon(item.id, isDepo ? 'deposits' : 'withdrawals')} className="absolute top-6 right-6 text-rose-600 text-[10px] font-bold uppercase tracking-wider bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg hover:bg-rose-600 hover:text-white transition-colors">EFASE</button>}
-                                        
-                                        <div className="flex justify-between mb-6 pr-16 border-b border-gray-100 pb-4">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kliyan: {item.user_id?.slice(0,8)}...</span>
-                                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded w-fit border border-indigo-100">Metòd: {item.method}</span>
-                                            </div>
-                                            <span className={`text-[10px] h-fit px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider border ${item.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'approved' || item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                                                {item.status}
-                                            </span>
-                                        </div>
-                                        
-                                        <div className="mb-6">
-                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">MONTAN {isDepo ? 'KLIYAN AN DECLARE (SAN FRÈ)' : 'KLIYAN MANDE A'}:</p>
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-4xl font-bold tracking-tight text-slate-900">{aficheMontan} <span className="text-sm text-slate-500">HTG</span></p>
-                                                {isDepo && item.status === 'pending' && <button onClick={() => { const nouvoVal = prompt("Antre nouvo montan san frè a:", item.amount); if (nouvoVal && !isNaN(Number(nouvoVal))) setMontanModifye(prev => ({ ...prev, [item.id]: Number(nouvoVal) })); }} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-colors">MODIFYE</button>}
-                                            </div>
-
-                                            {isDepo && item.fee !== undefined && (
-                                                <div className="mt-6 space-y-2">
-                                                    <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                                                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Frè Biznis La (5%):</span>
-                                                        <span className="text-xs text-emerald-700 font-bold">+{item.fee} HTG</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                                                        <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Total Kliyan te dwe voye a:</span>
-                                                        <span className="text-sm text-indigo-700 font-bold">{montanModifye[item.id] ? (montanModifye[item.id] * 1.05).toFixed(2) : item.total_to_pay || (Number(item.amount) + Number(item.fee))} HTG</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                        
-                                        {item.status === 'pending' && (
-                                            <div className="space-y-4 pt-6 border-t border-gray-100">
-                                                <div className="flex gap-3">
-                                                    <button disabled={processingId === item.id} onClick={() => isDepo ? apwouveDepo(item) : apwouveRetre(item)} className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                        <CheckCircle2 size={16} /> Konfime Apwouve
-                                                    </button>
-                                                    <button disabled={processingId === item.id} onClick={() => anileTranzaksyon(item, isDepo ? 'deposits' : 'withdrawals')} className="bg-white text-rose-600 border border-rose-200 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                        <XCircle size={16} /> Anile
-                                                    </button>
-                                                </div>
-                                                {isDepo && item.proof_img_1 && (<button onClick={() => handleOpenDepositProof(item.proof_img_1)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 1</button>)}
-                                                {isDepo && item.proof_img_2 && (<button onClick={() => handleOpenDepositProof(item.proof_img_2)} className="w-full bg-slate-50 text-slate-700 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-gray-200 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><EyeOff size={14}/> Gade Foto Prèv 2</button>)}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                            {!loading && (view === 'depo' ? deposits : withdrawals).length === 0 && <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn {view} pou kounye a</div>}
-                        </div>
-                    )}
+                    ) : null}
                 </div>
             </div>
 

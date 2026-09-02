@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, QrCode, Code2, Repeat, Navigation, ArrowRightLeft, BarChart3, ChevronDown, CheckCircle2, ShieldCheck, Download, Smartphone, Globe, Lock, Mail, AlertTriangle, User } from 'lucide-react';
+import { FileText, Code2, Navigation, ArrowRightLeft, BarChart3, ChevronDown, CheckCircle2, ShieldCheck, Download, Smartphone, Globe, Lock, Mail, AlertTriangle, User } from 'lucide-react';
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
@@ -10,19 +10,6 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeNav, setActiveNav] = useState("");
-  const [depositFeePct, setDepositFeePct] = useState(5);
-  const [withdrawFeePct, setWithdrawFeePct] = useState(5);
-
-  useEffect(() => {
-    fetch('/api/public/fees')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.fees?.deposit_fee_percent != null) setDepositFeePct(Number(d.fees.deposit_fee_percent));
-        if (d?.fees?.withdraw_fee_percent != null) setWithdrawFeePct(Number(d.fees.withdraw_fee_percent));
-      })
-      .catch(() => {});
-  }, []);
-
   useEffect(() => {
     const handleMouse = (e: MouseEvent) => {
       setMousePos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
@@ -43,11 +30,9 @@ export default function LandingPage() {
     {
       label: "Pwodwi", href: "#pwodwi",
       sub: [
-        { label: "Kat Vityèl", desc: "Peye entènasyonal an Goud" },
+        { label: "Pasèl MonCash", desc: "Kliyan peye, machann resevwa" },
         { label: "Smart Invoice", desc: "Voye fakti pwofesyonèl" },
-        { label: "Peman QR Kòd", desc: "Resevwa peman an segonn" },
-        { label: "Abònman Otomatik", desc: "Kolekte peman regilye" },
-        { label: "Sèvis Taksi & Livrezon", desc: "Peman sou wout" },
+        { label: "API Peman", desc: "Entègre nan sit ou" },
       ]
     },
     {
@@ -55,7 +40,7 @@ export default function LandingPage() {
       sub: [
         { label: "API Referans", desc: "Dokimantasyon konplè" },
         { label: "Plugin WooCommerce", desc: "Entegrasyon 5 minit" },
-        { label: "Plugin Hostinger", desc: "Horizon v2.0" },
+        { label: "Plugin MonCash", desc: "WooCommerce v23.0" },
         { label: "Sandbox & Tès", desc: "Teste anvan lanse" },
       ]
     },
@@ -74,24 +59,24 @@ export default function LandingPage() {
   const faqs = [
     {
       q: "Kòman m entegre API Hatexcard nan sit entènèt oswa app mwen?",
-      a: "Nou gen yon API RESTful konplè ak dokimantasyon detaye. Pou WooCommerce ak Hostinger, nou gen yon plugin ki pran mwens pase 5 minit pou enstale. Kliyan w yo ap ka peye an Goud dirèkteman sou sit ou san yo pa kite paj la."
+      a: "Nou gen yon API RESTful konplè ak dokimantasyon detaye. Pou WooCommerce, nou gen yon plugin MonCash ki pran mwens pase 5 minit pou enstale. Kliyan w yo ap ka peye an Goud sou MonCash dirèkteman sou sit ou san yo pa kite paj la."
     },
     {
       q: "Kòman fonksyon Smart Invoice la mache pou moun ki pa gen sit entènèt?",
-      a: "Nan terminal Hatexcard ou, ou kreye yon fakti an kèk segonn. Sistèm nan jenere yon lyen peman sekirize epi voye l dirèkteman nan imèl kliyan ou. Kliyan an klike, li peye, ou resevwa notifikasyon imedyatman ak yon prèv tranzaksyon."
+      a: "Ak Hatexcard, ou kreye yon fakti an kèk segonn. Sistèm nan jenere yon lyen peman sekirize epi voye l dirèkteman nan imèl kliyan ou. Kliyan an klike, li peye, ou resevwa notifikasyon imedyatman ak yon prèv tranzaksyon."
     },
     {
-      q: "Kòman m ka depoze oswa retire lajan nan kont Hatexcard mwen?",
-      a: "Ou ka rechaje kont ou via MonCash, NatCash, oswa transfè labank dirèk (Unibank, BNC, ak lòt bank lokal). Tranzaksyon yo trete an kèk minit. Pou retrè, frè a se 25 HTG sèlman pou nenpòt montan 500 HTG ak plis."
+      q: "Kote lajan kliyan an ale?",
+      a: "Kliyan an peye sou MonCash (kont machann HatexCard). HatexCard pran yon ti frè pasèl, epi rès la ale otomatikman sou nimewo MonCash machann nan. HatexCard pa kenbe balans ni wallet pou ou."
     },
     {
-      q: "Èske tranzaksyon ant de itilizatè Hatexcard gen frè?",
-      a: "Non. Tout transfè P2P — swa ant de patikilye, swa ant kliyan ak machann — totalman gratis. Nou pa pran okenn komisyon sou tranzaksyon entèn yo."
+      q: "Konbyen frè pasèl la ye?",
+      a: "Kliyan an peye montan machann nan mande a, plis frè HatexCard (2%) ak frè transfè MonCash. Machann nan resevwa montan konplè li te mande a."
     },
   ];
 
   const stats = [
-    { val: "0 HTG", label: "Frè pou tranzaksyon P2P" },
+    { val: "2%", label: "Frè pasèl HatexCard" },
     { val: "< 10s", label: "Vitès mwayèn peman" },
     { val: "256-bit", label: "Nivo ankripsyon done" },
     { val: "24/7", label: "Siveyans tranzaksyon" },
@@ -105,22 +90,10 @@ export default function LandingPage() {
       tg: "MACHANN"
     },
     {
-      icon: <QrCode size={22} className="text-indigo-600" />,
-      ti: "Peman QR Kòd",
-      ds: "Kliyan skan QR kòd biznis ou ak telefòn yo epi peye montan egzak la nan yon segonn. Yon sèl aksyon — pa gen echanj, pa gen erè.",
-      tg: "RAPID"
-    },
-    {
       icon: <Code2 size={22} className="text-indigo-600" />,
       ti: "API & Plugin",
-      ds: "Intègre Hatexcard nan nenpòt sit wèb oswa app an mwens pase 5 minit. Plugin WooCommerce ak Hostinger v2.0 disponib. Kliyan peye an Goud dirèkteman.",
+      ds: "Intègre Hatexcard nan nenpòt sit wèb oswa app an mwens pase 5 minit. Plugin WooCommerce (MonCash) v23.0 disponib. Kliyan peye an Goud sou MonCash dirèkteman.",
       tg: "DEVLOPÈ"
-    },
-    {
-      icon: <Repeat size={22} className="text-indigo-600" />,
-      ti: "Abònman Otomatik",
-      ds: "Konfigire peman regilye pou kliyan fidèl ou yo. Sistèm nan kolekte chak mwa otomatikman — ou pa bezwen raple oswa swiv pèsonn.",
-      tg: "SÈVIS"
     },
     {
       icon: <Navigation size={22} className="text-indigo-600" />,
@@ -130,9 +103,9 @@ export default function LandingPage() {
     },
     {
       icon: <ArrowRightLeft size={22} className="text-indigo-600" />,
-      ti: "Transfè Sekirize",
-      ds: "Voye lajan bay nenpòt itilizatè Hatexcard gratis ak imedyatman. Istwa konplè chak tranzaksyon disponib nan kont ou an tout tan.",
-      tg: "GRATIS"
+      ti: "Payout MonCash",
+      ds: "Apre yon peman, rès la ale sou nimewo MonCash machann nan. HatexCard pa kenbe yon balans pou ou — nou se pasèl, pa yon bank.",
+      tg: "OTOMATIK"
     },
     {
       icon: <BarChart3 size={22} className="text-indigo-600" />,
@@ -253,7 +226,7 @@ export default function LandingPage() {
                 {link.sub.length > 0 && (
                   <div className="htx-dropdown" style={{ transform: "translateX(-50%) translateY(8px)" }}>
                     {link.sub.map(s => (
-                      <a key={s.label} href={s.label.includes('API') || s.label.includes('WooCommerce') || s.label.includes('Hostinger') ? '/developer/docs' : '/login'} className="htx-dropdown-item" style={{textDecoration: 'none'}}>
+                      <a key={s.label} href={s.label.includes('API') || s.label.includes('WooCommerce') || s.label.includes('MonCash') ? '/developer/docs' : '/login'} className="htx-dropdown-item" style={{textDecoration: 'none'}}>
                         <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", marginBottom: "2px" }}>{s.label}</div>
                         <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>{s.desc}</div>
                       </a>
@@ -328,7 +301,7 @@ export default function LandingPage() {
 
           {/* Subtitle */}
           <p className="a3" style={{ fontSize: "16px", color: "#64748b", maxWidth: "560px", margin: "0 auto 40px", lineHeight: 1.7, fontWeight: 500 }}>
-            Yon platfòm konplè pou machann, antreprenè, ak devlopè ki vle resevwa, voye, ak jere lajan an Goud — san frè kache, ak sekirite nivo bankè.
+            Yon pasèl peman pou machann Ayiti: kliyan peye sou MonCash, HatexCard pran yon ti frè, rès la ale sou nimewo MonCash biznis ou. Pa gen wallet, pa gen kat vityèl.
           </p>
 
           {/* CTA row */}
@@ -356,7 +329,7 @@ export default function LandingPage() {
 
           {/* Trust line */}
           <p className="a5" style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600, marginBottom: "60px", letterSpacing: "0.02em" }}>
-            Gratis pou kòmanse · Pa gen frè P2P · Kont pare nan 2 minit
+            Enskri, konfime imèl, pase KYC · Pa gen balans sou HatexCard
           </p>
         </div>
 
@@ -387,22 +360,22 @@ export default function LandingPage() {
                 </div>
               </div>
               <div style={{ padding: "6px 14px 12px" }}>
-                <div style={{ fontSize: "7px", color: "#94a3b8", fontWeight: 800, letterSpacing: "0.1em", marginBottom: "4px" }}>BALANS TOTAL</div>
+                <div style={{ fontSize: "7px", color: "#94a3b8", fontWeight: 800, letterSpacing: "0.1em", marginBottom: "4px" }}>DÈNYE PEMAN</div>
                 <div style={{ fontSize: "26px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.03em", lineHeight: 1 }}>
-                  3,200
+                  +2,500
                   <span style={{ fontSize: "11px", color: "#64748b", marginLeft: "4px", fontWeight: 700 }}>HTG</span>
                 </div>
-                <div style={{ fontSize: "9px", color: "#059669", fontWeight: 700, marginTop: "4px" }}>+1,500 HTG jodi a</div>
+                <div style={{ fontSize: "9px", color: "#059669", fontWeight: 700, marginTop: "4px" }}>sou MonCash ou</div>
               </div>
               <div style={{ padding: "0 12px 12px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
-                {[{ l: "Depo", bg: "#4f46e5", c: "#fff" }, { l: "Retrè", bg: "#f1f5f9", c: "#475569" }, { l: "QR Scan", bg: "#f1f5f9", c: "#475569" }].map(b => (
+                {[{ l: "Fakti", bg: "#4f46e5", c: "#fff" }, { l: "API", bg: "#f1f5f9", c: "#475569" }, { l: "Rezèv.", bg: "#f1f5f9", c: "#475569" }].map(b => (
                   <div key={b.l} style={{ background: b.bg, color: b.c, borderRadius: "8px", padding: "7px 4px", textAlign: "center", fontSize: "7px", fontWeight: 800, letterSpacing: "0.02em" }}>{b.l}</div>
                 ))}
               </div>
               <div style={{ padding: "0 12px 12px" }}>
                 <div style={{ background: "linear-gradient(135deg, #312e81, #4f46e5)", borderRadius: "12px", padding: "12px", position: "relative", overflow: "hidden", aspectRatio: "1.58/1", boxShadow: "0 4px 12px rgba(79,70,229,0.3)" }}>
                   <div style={{ position: "absolute", top: "-20%", right: "-10%", width: "70px", height: "70px", borderRadius: "50%", background: "rgba(255,255,255,0.1)" }}/>
-                  <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.6)", fontWeight: 800, letterSpacing: "0.1em", marginBottom: "12px" }}>KAT VITYÈL</div>
+                  <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.6)", fontWeight: 800, letterSpacing: "0.1em", marginBottom: "12px" }}>PASÈL HATEXCARD</div>
                   <div style={{ fontSize: "10px", fontFamily: "monospace", color: "#fff", letterSpacing: "0.1em", fontWeight: 700 }}>4550 **** **** 8273</div>
                 </div>
               </div>
@@ -475,7 +448,7 @@ export default function LandingPage() {
           {/* Stats right */}
           <div className="phone-anim" style={{ marginLeft: "36px", marginBottom: "80px", display: "flex", flexDirection: "column", gap: "12px" }}>
             {[
-              { label: "Frè Tranzaksyon P2P", val: "Gratis", sub: "Peman ant moun" },
+              { label: "Frè pasèl", val: "2%", sub: "Kliyan peye anplis" },
               { label: "Vitès Peman", val: "< 10 sek", sub: "Konfirmasyon imedyat" },
             
             ].map(s => (
@@ -495,7 +468,7 @@ export default function LandingPage() {
           Intègre ak platfòm sa yo
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "48px" }}>
-          {["MonCash", "NatCash", "Unibank", "BNC", "Hostinger", "WooCommerce"].map(n => (
+          {["MonCash", "NatCash", "Unibank", "BNC", "WooCommerce"].map(n => (
             <span key={n} className="htx-partner" style={{ fontSize: "15px", fontWeight: 800, color: "#cbd5e1" }}>{n}</span>
           ))}
         </div>
@@ -524,7 +497,7 @@ export default function LandingPage() {
               Tout sa yon biznis modèn<br />bezwen pou kòmanse.
             </h2>
             <p style={{ fontSize: "16px", color: "#64748b", maxWidth: "540px", margin: "0 auto", lineHeight: 1.6, fontWeight: 500 }}>
-              De yon machann solitè ak yon QR kòd jis yon devlopè k ap intègre yon API konplè — Hatexcard gen zouti w bezwen.
+              De yon machann solitè k ap voye fakti jis yon devlopè k ap intègre yon API konplè — Hatexcard gen zouti w bezwen.
             </p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "24px" }}>
@@ -618,14 +591,13 @@ export default function LandingPage() {
           <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "24px", overflow: "hidden", boxShadow: "0 10px 30px -10px rgba(0,0,0,0.05)" }}>
             <div style={{ padding: "10px 40px" }}>
               {[
-                { op: "Tranzaksyon P2P (ant itilizatè)", val: "Gratis", hi: true },
-                { op: "Peman bay machann ak kat", val: "Gratis", hi: true },
-                { op: "Rechaj kat vityèl", val: "Gratis", hi: true },
-                { op: "Depo", val: `${depositFeePct}%`, hi: false },
-                { op: "Retrè", val: `${withdrawFeePct}%`, hi: false },
-                { op: "Kreye kont ak verifikasyon KYC", val: "Gratis", hi: true },
-                { op: "Smart Invoice & QR Kòd", val: "Gratis", hi: true },
-                { op: "Aksè API & Plugin", val: "Gratis", hi: true },
+                { op: "Peman atravè pasèl MonCash", val: "2% + frè transfè", hi: false },
+                { op: "Machann resevwa montan li mande a", val: "Wi", hi: true },
+                { op: "Wallet / balans sou HatexCard", val: "Pa egziste", hi: true },
+                { op: "Kat vityèl", val: "Retire", hi: true },
+                { op: "Verifikasyon KYC (frè)", val: "1920 HTG", hi: false },
+                { op: "Smart Invoice & Rezèvasyon", val: "Enkli", hi: true },
+                { op: "Aksè API test + live", val: "Apre KYC", hi: true },
               ].map(row => (
                 <div key={row.op} className="price-row">
                   <span style={{ fontSize: "15px", color: "#475569", fontWeight: 600 }}>{row.op}</span>
@@ -747,10 +719,8 @@ export default function LandingPage() {
             <div style={{ flex: "1 1 140px" }}>
               <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "18px" }}>Pwodwi</div>
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Kat Vityèl</a></li>
+                <li><a href="/developer/docs" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">API Peman</a></li>
                 <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Smart Invoice</a></li>
-                <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Peman QR Kòd</a></li>
-                <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Abònman Otomatik</a></li>
                 <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Transfè Sekirize</a></li>
               </ul>
             </div>
@@ -760,8 +730,7 @@ export default function LandingPage() {
               <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "18px" }}>Devlopè</div>
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
                 <li><a href="/api-docs" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">API Referans</a></li>
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Plugin WooCommerce</a></li>
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Plugin Hostinger</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Plugin WooCommerce (MonCash)</a></li>
                 <li><a href="/sandbox" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Sandbox & Tès</a></li>
               </ul>
             </div>

@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildStoredApiKeyFields,
+  buildStoredPublishableKeyFields,
   generateApiKeyToken,
+  generatePublishableKeyToken,
   generateWebhookSecretToken,
   profileHasApiKey,
 } from '@/lib/security/api-key';
@@ -9,17 +11,20 @@ import {
 // ============================================================================
 // ELIJIBILITE & PWOVIZYON KREDANSYÈL API MACHANN
 // ============================================================================
-// Yon kont ka jwenn aksè API / terminal / fakti SÈLMAN si:
+// Yon kont ka jwenn aksè API / fakti SÈLMAN si:
 //   1. KYC apwouve (kyc_status === 'approved')
-//   2. Dezyèm frè 525 HTG peye → is_card_activated === true (features_unlock_paid)
 //
 // Kle API yo estoke HASH nan baz done (api_key_hash + api_key_prefix).
 // Kle an klè retounen SÈLMAN yon sèl fwa lè li fèk jenere oswa lè li rotate.
+// Chak machann gen DE kalite kle, menm jan ak Stripe:
+//   • Secret key (hx_live_...) — sèlman sou sèvè, janm ekspoze.
+//   • Publishable key (pk_live_...) — san danje, ka parèt nan frontend/checkout.
 // ============================================================================
 
 export type MerchantEligibility = {
   eligible: boolean;
   missingKyc: boolean;
+  /** @deprecated Toujou false — frè 525 retire */
   missingCardActivation: boolean;
 };
 
@@ -27,6 +32,9 @@ export type ProvisionResult = {
   /** Kle an klè — sèlman lè fèk jenere/rotate. */
   api_key: string | null;
   api_key_prefix: string | null;
+  /** Publishable key an klè — EKSPOZE (pk_...), san danje frontend. */
+  api_key_pk: string | null;
+  api_key_pk_prefix: string | null;
   is_merchant: boolean;
   webhook_secret: string | null;
   provisioned: boolean;
@@ -42,23 +50,26 @@ type MerchantProfileLike = {
   api_key?: string | null;
   api_key_hash?: string | null;
   api_key_prefix?: string | null;
+  api_key_pk?: string | null;
+  api_key_pk_hash?: string | null;
+  api_key_pk_prefix?: string | null;
   is_merchant?: boolean | null;
   webhook_secret?: string | null;
+  plan?: string | null;
 };
 
-/** Menm kondisyon ak Dashboard/Terminal: KYC apwouve + kat/opsyon debloke. */
+/** Menm kondisyon ak Dashboard: KYC apwouve = debloke. */
 export function canAccessTerminal(profile: MerchantProfileLike | null | undefined): boolean {
   return checkMerchantEligibility(profile).eligible;
 }
 
 export function checkMerchantEligibility(profile: MerchantProfileLike | null | undefined): MerchantEligibility {
   const kycOk = profile?.kyc_status === 'approved';
-  const cardOk =
-    profile?.is_card_activated === true || profile?.features_unlock_paid === true;
+  const hasPlan = profile?.plan === 'free' || profile?.plan === 'capacity' || profile?.plan === 'premium';
   return {
-    eligible: kycOk && cardOk,
+    eligible: hasPlan || kycOk,
     missingKyc: !kycOk,
-    missingCardActivation: !cardOk,
+    missingCardActivation: false,
   };
 }
 
@@ -78,6 +89,8 @@ export async function ensureMerchantApiCredentials(
   const baseResult = {
     api_key: null as string | null,
     api_key_prefix: profile.api_key_prefix || null,
+    api_key_pk: profile.api_key_pk || null,
+    api_key_pk_prefix: profile.api_key_pk_prefix || null,
     is_merchant: profile.is_merchant === true,
     webhook_secret: null as string | null, // reveal-once sèlman
     provisioned: false,
@@ -92,14 +105,16 @@ export async function ensureMerchantApiCredentials(
   const hasApiKey = profileHasApiKey(profile);
   const rotate = options?.rotateApiKey === true;
   const needsNewApiKey = rotate || !hasApiKey;
+  const needsPublishable = !profile.api_key_pk_hash;
   const needsWebhook = !profile.webhook_secret;
   const needsMerchantFlag = !profile.is_merchant;
 
-  if (!needsNewApiKey && !needsWebhook && !needsMerchantFlag) {
+  if (!needsNewApiKey && !needsPublishable && !needsWebhook && !needsMerchantFlag) {
     return baseResult;
   }
 
   const plainApiKey = needsNewApiKey ? generateApiKeyToken() : null;
+  const plainPublishableKey = needsPublishable ? generatePublishableKeyToken() : null;
   const webhookSecret = needsWebhook ? generateWebhookSecretToken() : profile.webhook_secret!;
 
   const updatePayload: Record<string, unknown> = {
@@ -114,6 +129,10 @@ export async function ensureMerchantApiCredentials(
     Object.assign(updatePayload, buildStoredApiKeyFields(plainApiKey));
   }
 
+  if (plainPublishableKey) {
+    Object.assign(updatePayload, buildStoredPublishableKeyFields(plainPublishableKey));
+  }
+
   const { error } = await supabase.from('profiles').update(updatePayload).eq('id', profile.id);
 
   if (error) {
@@ -123,9 +142,11 @@ export async function ensureMerchantApiCredentials(
   return {
     api_key: plainApiKey,
     api_key_prefix: plainApiKey ? plainApiKey.slice(0, 12) : profile.api_key_prefix || null,
+    api_key_pk: plainPublishableKey || profile.api_key_pk || null,
+    api_key_pk_prefix: plainPublishableKey ? plainPublishableKey.slice(0, 12) : profile.api_key_pk_prefix || null,
     is_merchant: true,
     webhook_secret: needsWebhook ? webhookSecret : null,
-    provisioned: needsNewApiKey || needsWebhook || needsMerchantFlag,
+    provisioned: needsNewApiKey || needsPublishable || needsWebhook || needsMerchantFlag,
     rotated: rotate && !!plainApiKey,
     eligibility,
   };

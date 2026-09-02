@@ -56,117 +56,118 @@ export async function GET() {
 
     const [
       usersRes,
-      depositsRes,
-      withdrawalsRes,
-      promoRes,
       agentsRes,
-      enterprisesRes,
       staffRes,
       anonsRes,
       profitSummary,
-      feeTxRes,
-      entFeeRes,
-      cardFeeRes,
-      kycFeeRes,
+      paymentsRes,
     ] = await Promise.all([
       db.from('profiles').select('*').order('created_at', { ascending: false }),
-      db.from('deposits').select('*').order('created_at', { ascending: false }),
-      db.from('withdrawals').select('*').order('created_at', { ascending: false }),
-      db.from('promo_codes').select('*').order('created_at', { ascending: false }),
-      db.from('agent_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
-      db.from('enterprise_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+      db.from('hatex_kyc_applications').select('*').eq('status', 'submitted').order('created_at', { ascending: false }),
       db.from('staff_users').select('*').order('created_at', { ascending: false }),
       db.from('global_settings').select('*').eq('id', 1).maybeSingle(),
       getBusinessProfitSummary(db),
       db
-        .from('transactions')
-        .select('id, user_id, amount, description, created_at, type, status')
-        .eq('type', 'FEE')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false })
-        .limit(40),
-      db
-        .from('transactions')
-        .select('id, user_id, amount, description, created_at')
-        .eq('type', 'ENTERPRISE_FEE')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false })
-        .limit(25),
-      db
-        .from('transactions')
-        .select('id, user_id, amount, description, created_at')
-        .eq('type', 'CARD_ACTIVATION')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false })
-        .limit(25),
-      db
-        .from('transactions')
-        .select('id, user_id, amount, description, created_at')
-        .eq('type', 'KYC_FEE')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false })
-        .limit(25),
+        .from('hatex_payments')
+        .select('id, merchant_id, purpose, status, platform_fee, client_total, paid_at, created_at, description')
+        .eq('status', 'paid')
+        .order('paid_at', { ascending: false })
+        .limit(80),
     ]);
 
     const users = (usersRes.data || []).map((u) => mapProfileForAdmin(u as Record<string, unknown>));
     const byId = new Map(users.map((u) => [String(u.id), u]));
 
-    const pendingKyc = users.filter(
-      (u) => u.kyc_status === 'pending' && (u.kyc_selfie || u.kyc_front || u.kyc_id_front)
-    );
-    const missingCards = users.filter(
-      (u) => u.kyc_status === 'approved' && !u.has_card
-    );
+    // KYC v2: dokiman yo nan hatex_kyc_applications (bucket kyc-documents-v2),
+    // pa nan profiles.kyc_front. Map pou UI admin ki atann kyc_front / selfie.
+    const v2Apps = (agentsRes.data || []) as Record<string, unknown>[];
+    const pendingKyc =
+      v2Apps.length > 0
+        ? v2Apps.map((app) => {
+            const profile = byId.get(String(app.user_id)) || {};
+            return {
+              id: String(app.user_id),
+              application_id: app.id,
+              full_name: app.full_name || (profile as any).full_name || 'San Non',
+              email: app.email || (profile as any).email || '',
+              account_type: app.account_type,
+              kyc_doc_type: app.id_document_type,
+              kyc_face_match_score: app.face_match_score,
+              kyc_front: app.id_front_path || null,
+              kyc_back: app.id_back_path || null,
+              kyc_selfie: app.selfie_path || null,
+              business_registration: app.business_registration_path || null,
+              tax_clearance: app.tax_clearance_path || null,
+              establishment_photo: app.establishment_photo_path || null,
+              proof_of_address: app.proof_of_address_path || null,
+              articles: app.articles_path || null,
+              business_nif_doc: app.business_nif_doc_path || null,
+              service_description: app.service_description || null,
+              business_nif: app.business_nif || null,
+              business_rccm: app.business_rccm || null,
+              party1_whatsapp: app.party1_whatsapp || null,
+              party1_moncash: app.party1_moncash || null,
+              party2_full_name: app.party2_full_name || null,
+              party2_role: app.party2_role || null,
+              party2_whatsapp: app.party2_whatsapp || null,
+              party2_moncash: app.party2_moncash || null,
+              needs_manual_review: app.needs_manual_review === true,
+              fee_paid: app.fee_paid === true,
+              submitted_at: app.submitted_at,
+              phone_primary: app.phone_primary,
+              payout_phone: app.payout_phone,
+              status: app.status,
+            };
+          })
+        : users.filter(
+            (u) =>
+              u.kyc_status === 'pending' &&
+              (u.kyc_selfie || u.kyc_front || u.kyc_id_front)
+          );
+    const missingCards: typeof users = [];
     const suspendedAccounts = users.filter((u) => u.account_status === 'suspended');
-
-    const pendingAgents = (agentsRes.data || []).map((agent) => ({
-      ...agent,
-      profiles: byId.get(agent.user_id) || {},
-    }));
-
-    const pendingEnterprises = (enterprisesRes.data || []).map((app) => ({
-      ...app,
-      profiles: byId.get(app.user_id) || {},
-    }));
 
     const staffMembers = (staffRes.data || []).map((s) => ({
       ...stripSecrets(s as Record<string, unknown>, STAFF_SECRET_KEYS),
       has_workspace_password: !!(s as any).workspace_password_hash,
     }));
 
-    const totalClientBal = users.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
-    const totalCardBal = users.reduce((acc, u) => acc + Number(u.card_balance || 0), 0);
+    const paid = paymentsRes.data || [];
+    let platformFees = 0;
+    let planFees = 0;
+    for (const row of paid) {
+      const amount = Number(row.platform_fee || row.client_total || 0);
+      if (row.purpose === 'plan_fee') planFees += amount;
+      else platformFees += Number(row.platform_fee || 0);
+    }
 
-    const enrich = (rows: any[], nameKey: string) =>
-      (rows || []).map((f) => ({
-        ...f,
-        [nameKey]: byId.get(f.user_id)?.full_name || 'Enkoni',
-        email: byId.get(f.user_id)?.email || '',
-        agentName: byId.get(f.user_id)?.full_name || 'Ajan Enkoni',
-        agentEmail: byId.get(f.user_id)?.email || '',
-        clientName: byId.get(f.user_id)?.full_name || 'Kliyan Enkoni',
-        clientEmail: byId.get(f.user_id)?.email || '',
-      }));
+    const recent = paid.slice(0, 25).map((p) => ({
+      id: p.id,
+      purpose: p.purpose,
+      amount: Number(p.platform_fee || p.client_total || 0),
+      client_total: Number(p.client_total || 0),
+      description: p.description,
+      created_at: p.paid_at || p.created_at,
+      merchantName: byId.get(String(p.merchant_id))?.full_name || 'Machann',
+      email: byId.get(String(p.merchant_id))?.email || '',
+    }));
+
+    const paidPlans = users.filter(
+      (u) =>
+        (u.plan === 'capacity' || u.plan === 'premium') &&
+        u.plan_status === 'active'
+    ).length;
 
     return NextResponse.json({
       success: true,
       users,
-      deposits: depositsRes.data || [],
-      withdrawals: withdrawalsRes.data || [],
       suspendedAccounts,
       pendingKyc,
       missingCards,
-      promoCodes: promoRes.data || [],
-      pendingAgents,
-      pendingEnterprises,
       staffMembers,
       announcement: {
         text: anonsRes.data?.announcement_text || '',
         active: anonsRes.data?.announcement_active ?? true,
-      },
-      totals: {
-        clientBal: totalClientBal,
-        cardBal: totalCardBal,
       },
       profit: {
         gross_htg: profitSummary.gross_htg,
@@ -174,13 +175,13 @@ export async function GET() {
         net_htg: profitSummary.net_htg,
         withdrawn_htg: profitSummary.withdrawn_htg,
         available_htg: profitSummary.available_htg,
-        breakdown_net: profitSummary.breakdown_net,
       },
-      feeHistory: {
-        agent: enrich(feeTxRes.data || [], 'agentName').slice(0, 25),
-        enterprise: enrich(entFeeRes.data || [], 'clientName').slice(0, 25),
-        card: enrich(cardFeeRes.data || [], 'clientName').slice(0, 25),
-        kyc: enrich(kycFeeRes.data || [], 'clientName').slice(0, 25),
+      gateway: {
+        platform_fees: platformFees,
+        plan_fees: planFees,
+        paid_count: paid.length,
+        paid_plans: paidPlans,
+        recent,
       },
     });
   } catch (err: unknown) {

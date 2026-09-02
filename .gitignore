@@ -31,3 +31,11 @@ supabase/schema-public-only.sql
 
 .vercel
 .env*
+
+# Backups lokal (achiv DB pwodiksyon)
+backups/
+# Log sèvè dev lokal
+.dev-server*.log
+dev-server*.log
+
+

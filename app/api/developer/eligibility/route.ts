@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
-import { maskApiKey, profileHasApiKey } from '@/lib/security/api-key';
+import { maskApiKey, maskPublishableKey, profileHasApiKey } from '@/lib/security/api-key';
 
 type EligibilityProfile = {
   id: string;
@@ -11,10 +11,14 @@ type EligibilityProfile = {
   api_key_hash?: string | null;
   api_key_prefix?: string | null;
   api_key?: string | null;
+  api_key_pk_hash?: string | null;
+  api_key_pk_prefix?: string | null;
+  api_key_pk?: string | null;
   card_last4?: string | null;
   card_number_hash?: string | null;
   account_type?: string | null;
   enterprise_status?: string | null;
+  api_key_mode?: 'test' | 'live' | null;
 };
 
 export async function GET() {
@@ -38,7 +42,7 @@ export async function GET() {
         const { data } = await supabaseAdmin
           .from('profiles')
           .select(
-            'id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, card_last4, card_number_hash, account_type, enterprise_status'
+            'id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, api_key_pk_hash, api_key_pk_prefix, api_key_pk, card_last4, card_number_hash, account_type, enterprise_status, plan, api_key_mode'
           )
           .eq('id', user.id)
           .single();
@@ -55,7 +59,7 @@ export async function GET() {
       const { data } = await supabaseSession
         .from('profiles')
         .select(
-          'id, kyc_status, is_card_activated, is_merchant, api_key_prefix, card_last4, account_type, enterprise_status'
+          'id, kyc_status, is_card_activated, is_merchant, api_key_prefix, api_key_pk_prefix, api_key_pk, card_last4, account_type, enterprise_status, plan, api_key_mode'
         )
         .eq('id', user.id)
         .single();
@@ -79,9 +83,13 @@ export async function GET() {
         has_api_key: profileHasApiKey(authoritative),
         api_key_prefix: authoritative.api_key_prefix || null,
         api_key_masked: maskApiKey(authoritative.api_key_prefix),
+        api_key_pk: authoritative.api_key_pk || null,
+        api_key_pk_prefix: authoritative.api_key_pk_prefix || null,
+        api_key_pk_masked: maskPublishableKey(authoritative.api_key_pk_prefix),
         has_card: !!(authoritative.card_last4 || authoritative.card_number_hash),
         account_type: authoritative.account_type || 'individual',
         enterprise_status: authoritative.enterprise_status || 'none',
+        api_key_mode: authoritative.api_key_mode || 'live',
       },
       source,
     });

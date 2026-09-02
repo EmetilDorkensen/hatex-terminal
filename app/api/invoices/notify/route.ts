@@ -29,12 +29,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'ID fakti manke.' }, { status: 400 });
     }
 
-    const { data: inv } = await supabase
-      .from('invoices')
-      .select('id, amount, client_email, owner_id, description')
-      .eq('id', invoiceId)
-      .eq('owner_id', user.id)
-      .maybeSingle();
+    const { fetchInvoiceById } = await import('@/lib/invoices/ref');
+    const rawInv = await fetchInvoiceById(
+      supabase,
+      invoiceId,
+      ['id', 'amount', 'currency', 'client_email', 'owner_id', 'description'],
+      { owner_id: user.id }
+    );
+    const inv = rawInv as
+      | (Record<string, unknown> & {
+          id: string;
+          amount: number;
+          currency: string | null;
+          client_email: string | null;
+          owner_id: string;
+          description: string | null;
+          share_token?: string | null;
+        })
+      | null;
 
     if (!inv?.client_email) {
       return NextResponse.json({ success: false, message: 'Fakti pa jwenn.' }, { status: 404 });
@@ -49,25 +61,44 @@ export async function POST(request: Request) {
     const business =
       profile?.business_name || profile?.full_name || 'HatexCard';
     const site = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
-    const payLink = `${site}/checkout-invoice/${inv.id}`;
+    const payLink = `${site}/checkout-invoice/${inv.share_token || inv.id}`;
+    const cur = inv.currency === 'USD' ? 'USD' : 'HTG';
+    const amountLabel = `${Number(inv.amount).toLocaleString()} ${cur}`;
 
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from: 'HatexCard <notifications@hatexcard.com>',
       to: [inv.client_email],
-      subject: `Invoice HatexCard: ${inv.amount} HTG — ${business}`,
+      subject: `Invoice HatexCard: ${amountLabel} — ${business}`,
       html: `
         <div style="font-family:sans-serif;max-width:500px;margin:auto">
           <h2>${business} voye yon fakti ba ou</h2>
-          <p style="font-size:28px;font-weight:bold">${Number(inv.amount).toLocaleString()} HTG</p>
+          <p style="font-size:28px;font-weight:bold">${amountLabel}</p>
           ${inv.description ? `<p>${inv.description}</p>` : ''}
+          <p style="color:#64748b;font-size:14px">Ou ka peye avèk MonCash (Visa / Natcash talè).</p>
           <a href="${payLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:bold">Peye kounye a</a>
         </div>
       `,
     });
 
     if (error) {
-      return NextResponse.json({ success: false, message: 'Imèl pa t ale.' }, { status: 502 });
+      const detail =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: unknown }).message || '')
+          : '';
+      console.error(
+        `[invoice/notify] Resend echwe pou ${inv.client_email} (fakti ${invoiceId}):`,
+        detail || error
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          message: detail
+            ? `Imèl pa t ale: ${detail.slice(0, 200)}`
+            : 'Imèl pa t ale.',
+        },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({ success: true, pay_link: payLink });

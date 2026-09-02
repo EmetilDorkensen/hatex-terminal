@@ -6,16 +6,13 @@ import { SESSION_TAG_COOKIE } from '@/lib/security/session-tag';
 const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 
 const PROTECTED_WALLET_PREFIXES = [
-  '/deposit',
-  '/withdraw',
-  '/transfert',
-  '/kat',
   '/kyc',
-  '/terminal',
+  '/plugin',
   '/invoice',
-  '/agent',
   '/enterprise',
   '/setting',
+  '/developer',
+  '/notifikasyon',
 ];
 
 export async function middleware(request: NextRequest) {
@@ -49,12 +46,15 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  let profile: { current_session_token?: string | null; plan?: string | null } | null = null;
+
   if (user && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/login')) {
-    const { data: profile } = await supabase
+    const { data } = await supabase
       .from('profiles')
-      .select('current_session_token')
+      .select('current_session_token, plan')
       .eq('id', user.id)
       .maybeSingle();
+    profile = data;
 
     const deviceTag = request.cookies.get(SESSION_TAG_COOKIE)?.value;
     if (profile?.current_session_token && profile.current_session_token !== deviceTag) {
@@ -80,15 +80,36 @@ export async function middleware(request: NextRequest) {
     user &&
     !url.pathname.startsWith('/login') &&
     !url.pathname.startsWith('/api') &&
+    !url.pathname.startsWith('/mfa-setup') &&
     (url.pathname.startsWith('/admin') ||
       url.pathname.startsWith('/dashboard') ||
+      url.pathname.startsWith('/notifikasyon') ||
       url.pathname.startsWith('/setting') ||
       url.pathname.startsWith('/workspace') ||
+      url.pathname.startsWith('/plan') ||
       needsWalletAuth)
   ) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
       return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    // MFA OBLIGATWA — si itilizatè a pa gen okenn TOTP factor verifye, fose
+    // paj /mfa-setup anvan li ka fè anyen sou aplikasyon an.
+    const { data: factorList } = await supabase.auth.mfa.listFactors();
+    const hasVerifiedTotp = (factorList?.totp || []).some((f) => f.status === 'verified');
+    if (!hasVerifiedTotp && user.email !== ADMIN_EMAIL) {
+      return NextResponse.redirect(new URL('/mfa-setup', request.url));
+    }
+
+    // Premye koneksyon: chwazi plan anvan dashboard
+    if (
+      user.email !== ADMIN_EMAIL &&
+      !profile?.plan &&
+      !url.pathname.startsWith('/plan') &&
+      !url.pathname.startsWith('/mfa-setup')
+    ) {
+      return NextResponse.redirect(new URL('/plan', request.url));
     }
   }
 
@@ -115,6 +136,10 @@ export async function middleware(request: NextRequest) {
     if (!verifyWorkspaceGateToken(gateToken, user.email)) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
+  }
+
+  if (url.pathname.startsWith('/plan') && !user) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (url.pathname.startsWith('/dashboard') && !user) {

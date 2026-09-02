@@ -79,8 +79,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ card: null });
     }
 
-    const unlocked =
-      profile.is_card_activated === true || profile.features_unlock_paid === true;
+    // Depi KYC apwouve, tout opsyon debloke otomatik — pa gen 525 HTG ankò.
+    const unlocked = profile.kyc_status === 'approved';
 
     // Kat deja nan baz — pa janm regeneré nimewo a
     if (hasStoredCard(profile)) {
@@ -180,16 +180,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Pa gen kat nan baz
-    if (!unlocked) {
-      return NextResponse.json({
-        locked: true,
-        card: null,
-        message: 'Peye frè debloke (525 HTG) pou aktive kat, terminal ak fakti.',
-      });
-    }
-
-    // Sèlman si debloke epi VRÈMAN pa gen kat: kreye YON fwa (idempotan), verifye erè
+    // KYC apwouve — kreye YON fwa (idempotan), verifye erè
     try {
       await provisionCardForUser(supabase, user.id, { activate: true });
     } catch (err: unknown) {

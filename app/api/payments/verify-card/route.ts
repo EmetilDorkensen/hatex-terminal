@@ -61,8 +61,8 @@ export async function POST(request: Request) {
     }
 
     // ⚠️ Pa janm retounen PII (non, imèl, balans, UUID) bay yon moun ki jis gen
-    // nimewo kat + CVV. Sa te yon "orak" ki te pèmèt enumerasyon/fwod. Peman
-    // abònman an pase pa /api/subscribe/pay kounye a ki fè tout bagay sou sèvè.
+    // nimewo kat + CVV. Sa te yon "orak" ki te pèmèt enumerasyon/fwod.
+    // Peman abònman (ansyen boutik anliy) retire — tout peman fèt sou sèvè a.
     return NextResponse.json({
       valid: true,
       is_activated: fullProfile.is_activated,

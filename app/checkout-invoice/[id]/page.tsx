@@ -1,48 +1,38 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
+import { useParams } from 'next/navigation';
 import {
-  Loader2, CreditCard, Receipt, Store, User,
-  AlertCircle, ShieldCheck, Ban, Lock, Info
+  Loader2, Receipt, Store, User,
+  AlertCircle, ShieldCheck, Ban, Info, Smartphone, CreditCard
 } from 'lucide-react';
 import SafeImg from '@/components/SafeImg';
+import { MonCashPhonePay } from '@/components/payments/MonCashPhonePay';
+
+type Quote = {
+  currency: 'HTG' | 'USD';
+  amountOriginal: number;
+  amountHtg: number;
+  usdRate: number | null;
+  platformFee: number;
+  payoutFee: number;
+  clientTotal: number;
+  receiveBlocked?: boolean;
+  receiveMessage?: string | null;
+  remainingHtg?: number | null;
+  dailyLimitHtg?: number | null;
+  paymentMethods: Array<{ id: string; label: string; available: boolean; soon?: boolean }>;
+};
 
 export default function InvoiceCheckout() {
   const { id } = useParams();
-  const router = useRouter();
 
   const [invoice, setInvoice] = useState<any>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
-  const [payLoading, setPayLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isOwner, setIsOwner] = useState(false);
-
-  const [cardInfo, setCardInfo] = useState({
-    cardNumber: '',
-    cardExpiry: '',
-    cardCvv: ''
-  });
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 2) {
-      value = value.substring(0, 2) + '/' + value.substring(2, 4);
-    }
-    setCardInfo({ ...cardInfo, cardExpiry: value.substring(0, 5) });
-  };
-
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '');
-    const formatted = value.match(/.{1,4}/g)?.join(' ') || '';
-    setCardInfo({ ...cardInfo, cardNumber: formatted.substring(0, 19) });
-  };
+  const [method, setMethod] = useState<'moncash' | 'natcash' | 'visa'>('moncash');
 
   useEffect(() => {
     async function getInvoice() {
@@ -57,8 +47,8 @@ export default function InvoiceCheckout() {
           return;
         }
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.id === data.invoice.owner_id) {
+        // Sèvè a idantifye pwopriyetè a (cookie sesyon) — li pa janm voye owner_id.
+        if (data.is_owner === true) {
           setIsOwner(true);
         }
 
@@ -66,6 +56,14 @@ export default function InvoiceCheckout() {
           ...data.invoice,
           profiles: data.merchant,
         });
+
+        if (data.quote) {
+          setQuote(data.quote);
+        } else {
+          const qRes = await fetch(`/api/checkout-invoice/${id}/pay-moncash`);
+          const qData = await qRes.json();
+          if (qRes.ok && qData.quote) setQuote(qData.quote);
+        }
       } catch {
         setMessage({ type: 'error', text: 'Erè pandan chajman fakti a.' });
       } finally {
@@ -74,39 +72,33 @@ export default function InvoiceCheckout() {
     }
 
     if (id) getInvoice();
-  }, [id, supabase]);
+  }, [id]);
 
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isOwner || invoice?.status === 'paid') return;
-
-    setPayLoading(true);
-    setMessage({ type: '', text: '' });
-
-    const cleanCardNumber = cardInfo.cardNumber.replace(/\s+/g, '');
-
+  const startPayment = async (phone: string) => {
+    if (isOwner || invoice?.status === 'paid') {
+      return { ok: false as const, message: 'Ou pa ka peye fakti sa a.' };
+    }
     try {
-      const response = await fetch(`/api/checkout-invoice/${id}/pay`, {
+      const response = await fetch(`/api/checkout-invoice/${id}/pay-moncash`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          card_number: cleanCardNumber,
-          card_cvv: cardInfo.cardCvv,
-          card_expiry: cardInfo.cardExpiry,
-        }),
+        body: JSON.stringify({ customer_phone: phone, flow: 'auto' }),
       });
-
       const result = await response.json();
-
-      if (result.success) {
-        router.push(`/checkout-invoice/success?id=${id}`);
-      } else {
-        setMessage({ type: 'error', text: result.message || 'Peman an echwe.' });
+      if (!response.ok || !result.ok) {
+        return {
+          ok: false as const,
+          message: result.message || 'Pa t kapab kòmanse peman an.',
+        };
       }
+      return {
+        ok: true as const,
+        checkout_mode: (result.checkout_mode as 'hosted' | 'ussd') || 'hosted',
+        checkout_url: result.checkout_url || null,
+        payment_id: result.payment_id,
+      };
     } catch {
-      setMessage({ type: 'error', text: 'Erè koneksyon ak tèminal peman an. Tcheke entènèt ou.' });
-    } finally {
-      setPayLoading(false);
+      return { ok: false as const, message: 'Erè koneksyon. Tcheke entènèt ou.' };
     }
   };
 
@@ -119,6 +111,8 @@ export default function InvoiceCheckout() {
 
   const merchantName = invoice?.profiles?.business_name || invoice?.profiles?.full_name || "Boutik Machann";
   const merchantLogo = invoice?.profiles?.avatar_url;
+  const currency = (invoice?.currency || quote?.currency || 'HTG') as string;
+  const amount = Number(invoice?.amount || quote?.amountOriginal || 0);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 flex items-center justify-center font-sans">
@@ -175,8 +169,11 @@ export default function InvoiceCheckout() {
             <>
               <div className="bg-slate-50 rounded-2xl p-5 mb-6 border border-slate-100">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Montan</span>
-                  <span className="text-2xl font-bold text-slate-900">{parseFloat(invoice.amount).toLocaleString()} <span className="text-sm font-medium text-slate-500">HTG</span></span>
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Montan fakti</span>
+                  <span className="text-2xl font-bold text-slate-900">
+                    {amount.toLocaleString()}{' '}
+                    <span className="text-sm font-medium text-slate-500">{currency}</span>
+                  </span>
                 </div>
                 {invoice.description && (
                   <p className="text-sm text-slate-600 border-t border-slate-200 pt-3">{invoice.description}</p>
@@ -186,50 +183,104 @@ export default function InvoiceCheckout() {
                 </p>
               </div>
 
-              <form onSubmit={handlePayment} className="space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CreditCard size={16} className="text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Kat HatexCard</span>
-                  <Lock size={12} className="text-slate-400 ml-auto" />
+              {quote?.receiveBlocked && (
+                <div className="mb-5 p-4 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-800">
+                  <p className="font-bold">
+                    {quote.receiveMessage || 'Kont machann nan pa elaji pou l resevwa lajan an.'}
+                  </p>
+                  <p className="text-xs mt-1 text-rose-700">
+                    Machann nan rive sou limit jou li. Li dwe elaji kont li pou ka resevwa peman sa a.
+                  </p>
                 </div>
+              )}
 
-                <input
-                  type="text"
-                  placeholder="4550 XXXX XXXX XXXX"
-                  value={cardInfo.cardNumber}
-                  onChange={handleCardNumberChange}
-                  className="w-full bg-white border border-gray-200 p-4 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none font-mono text-sm"
-                  required
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    placeholder="MM/YY"
-                    value={cardInfo.cardExpiry}
-                    onChange={handleExpiryChange}
-                    className="w-full bg-white border border-gray-200 p-4 rounded-xl focus:border-indigo-500 outline-none font-mono text-sm"
-                    required
-                  />
-                  <input
-                    type="password"
-                    placeholder="CVV"
-                    value={cardInfo.cardCvv}
-                    onChange={(e) => setCardInfo({ ...cardInfo, cardCvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                    className="w-full bg-white border border-gray-200 p-4 rounded-xl focus:border-indigo-500 outline-none font-mono text-sm"
-                    required
-                  />
-                </div>
-
+              {quote?.receiveBlocked ? null : (
+              <>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Kijan ou vle peye?
+              </p>
+              <div className="space-y-2 mb-5">
                 <button
-                  type="submit"
-                  disabled={payLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                  type="button"
+                  onClick={() => setMethod('moncash')}
+                  className={`w-full flex items-center gap-3 border rounded-xl px-4 py-3 text-left transition-colors ${
+                    method === 'moncash'
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-indigo-300'
+                  }`}
                 >
-                  {payLoading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
-                  {payLoading ? 'Peman an ap trete...' : `Peye ${parseFloat(invoice.amount).toLocaleString()} HTG`}
+                  <Smartphone size={18} className="text-indigo-600" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">MonCash</p>
+                    <p className="text-[11px] text-slate-500">Peye an HTG (+ frè sèvis)</p>
+                  </div>
                 </button>
-              </form>
+                <button
+                  type="button"
+                  disabled
+                  className="w-full flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3 text-left opacity-50 cursor-not-allowed"
+                >
+                  <Smartphone size={18} className="text-slate-400" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-600">Natcash</p>
+                    <p className="text-[11px] text-slate-400">Talè</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="w-full flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3 text-left opacity-50 cursor-not-allowed"
+                >
+                  <CreditCard size={18} className="text-slate-400" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-600">Visa / Mastercard</p>
+                    <p className="text-[11px] text-slate-400">Stripe — talè</p>
+                  </div>
+                </button>
+              </div>
+
+              {method === 'moncash' && quote && (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-4 text-xs space-y-1.5">
+                  {quote.currency === 'USD' && quote.usdRate && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>To ({quote.amountOriginal} USD × {quote.usdRate})</span>
+                      <span className="font-semibold">{quote.amountHtg.toLocaleString()} HTG</span>
+                    </div>
+                  )}
+                  {quote.currency === 'HTG' && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Montan</span>
+                      <span className="font-semibold">{quote.amountHtg.toLocaleString()} HTG</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-600">
+                    <span>Frè sèvis</span>
+                    <span className="font-semibold">
+                      {(quote.platformFee + quote.payoutFee).toLocaleString()} HTG
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-900 font-bold border-t border-slate-200 pt-2 mt-1">
+                    <span>Ou peye</span>
+                    <span>{quote.clientTotal.toLocaleString()} HTG</span>
+                  </div>
+                </div>
+              )}
+
+              {method === 'moncash' && quote && !isOwner && invoice?.status !== 'paid' && (
+                <>
+                  <MonCashPhonePay
+                    amount={quote.clientTotal}
+                    blocked={quote.receiveBlocked === true}
+                    startPayment={startPayment}
+                  />
+                  <p className="text-[10px] text-slate-400 text-center mt-3 leading-relaxed">
+                    Peman fèt ak MonCash: nou voye yon USSD sou telefòn ou pou konfime ak PIN ou.
+                    Apre konfimasyon, machann lan resevwa yon notifikasyon epi lajan an ale sou kont li.
+                  </p>
+                </>
+              )}
+              </>
+              )}
             </>
           )}
         </div>

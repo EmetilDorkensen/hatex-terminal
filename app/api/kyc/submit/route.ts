@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   if (!profile.kyc_fee_paid) {
     return NextResponse.json(
-      { error: 'Ou dwe peye frè KYC la (1150 HTG) anvan ou soumèt dokiman yo.', needs_payment: true },
+      { error: 'Ou dwe peye frè KYC la anvan ou soumèt dokiman yo.', needs_payment: true },
       { status: 402 }
     );
   }

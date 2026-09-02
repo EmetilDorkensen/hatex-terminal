@@ -1,7 +1,7 @@
 /** Premye pati: soumèt dokiman KYC → pwofi biznis. */
 export const KYC_SUBMIT_FEE_HTG = 525;
 
-/** Dezyèm pati: debloke kat + terminal + invoice apre apwobasyon. */
+/** Dezyèm pati: debloke kat + invoice + API machann apre apwobasyon. */
 export const KYC_UNLOCK_FEE_HTG = 525;
 
 /** @deprecated Itilize KYC_SUBMIT_FEE_HTG — total dezyèm pati apa. */

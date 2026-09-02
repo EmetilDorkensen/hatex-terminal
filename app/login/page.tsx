@@ -92,10 +92,28 @@ export default function Login() {
 
 
 
+  const goAfterLogin = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (!profile?.plan) {
+          window.location.href = '/plan';
+          return;
+        }
+      }
+    } catch {
+      /* ale sou dashboard kòm fallback */
+    }
+    window.location.href = '/dashboard';
+  };
+
   // ==========================================
-
   // TRACKING IP AK APARÈY
-
   // ==========================================
 
   const trackDeviceAndIP = async (userEmail: string) => {
@@ -241,7 +259,7 @@ export default function Login() {
       }
 
       await trackDeviceAndIP(email);
-      window.location.href = '/dashboard';
+      await goAfterLogin();
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Erè nan verifikasyon MFA.");
       setLoading(false);
@@ -386,7 +404,7 @@ export default function Login() {
 
           // Sèvi ak replace epi fose yon refresh pou Middleware la wè nouvo Cookie a
 
-          window.location.href = '/dashboard';
+          await goAfterLogin();
 
         }
 
@@ -445,7 +463,7 @@ export default function Login() {
         }
 
         await trackDeviceAndIP(email);
-        window.location.href = '/dashboard';
+        await goAfterLogin();
 
       }
 

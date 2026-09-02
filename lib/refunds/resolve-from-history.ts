@@ -164,7 +164,7 @@ export async function resolveRefundFromHistoryTx(
 
   return {
     ok: false,
-    message: 'Pa ka idantifye sous ranbousman pou mesaj sa a. Eseye nan Terminal → Rezèvasyon / Fakti.',
+    message: 'Pa ka idantifye sous ranbousman pou mesaj sa a. Eseye nan Dashboard → Fakti.',
   };
 }
 

@@ -38,7 +38,7 @@ export async function GET() {
     kyc_fee_paid: profile?.kyc_fee_paid === true,
     kyc_status: profile?.kyc_status,
     phase: 'submit',
-    note: 'Premye 525 HTG pou soumèt dokiman. Dezyèm 525 HTG apre apwobasyon pou debloke kat/terminal/fakti.',
+    note: 'Premye 525 HTG pou soumèt dokiman. Dezyèm 525 HTG apre apwobasyon pou debloke kat/fakti.',
   });
 }
 

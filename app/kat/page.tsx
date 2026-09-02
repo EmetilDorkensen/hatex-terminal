@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { ArrowLeft, Copy, Eye, EyeOff, ShieldCheck, Lock, IdCard, CheckCircle2, Plus, Loader2, Snowflake, Unlock } from 'lucide-react';
-import FeaturesUnlockPanel from '@/components/FeaturesUnlockPanel';
 
 export default function KatPage() {
   const router = useRouter();
@@ -131,7 +130,8 @@ export default function KatPage() {
   };
 
   const kycPending = userData?.kyc_status !== 'approved';
-  const cardFullyActive = userData?.kyc_status === 'approved' && userData?.is_card_activated;
+  // Depi KYC apwouve, kat, terminal, fakti tout debloke otomatik (pa gen 525 ankò)
+  const cardFullyActive = userData?.kyc_status === 'approved';
   const cardFrozen = userData?.is_card_frozen === true;
 
   const openFreezePrompt = (freeze: boolean) => {
@@ -232,19 +232,7 @@ export default function KatPage() {
           </div>
         )}
 
-        {userData?.kyc_status === 'approved' && !cardFullyActive && (
-          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-3xl bg-white/95 backdrop-blur-md p-6 text-center border border-indigo-200 shadow-sm mx-auto aspect-[1.58/1]">
-            <FeaturesUnlockPanel
-              variant="overlay"
-              onUnlocked={() => {
-                setUserData((prev: any) =>
-                  prev ? { ...prev, is_card_activated: true, features_unlock_paid: true } : prev
-                );
-                window.location.reload();
-              }}
-            />
-          </div>
-        )}
+        {/* Pa gen frè aktivasyon ankò — KYC apwouve = kat aktif otomatik */}
 
         {/* DESIGN KAT LA */}
         <div className={`relative bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-indigo-700/50 w-full aspect-[1.58/1] flex flex-col justify-between overflow-hidden transition-all duration-300`}>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
-import { maskApiKey } from '@/lib/security/api-key';
+import { maskApiKey, maskPublishableKey } from '@/lib/security/api-key';
 import { rateLimitMerchantIp } from '@/lib/security/merchant-api';
 
 export async function POST(request: Request) {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const loadProfile = async (client: ReturnType<typeof createSupabaseAdminClient>) =>
       client
         .from('profiles')
-        .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, webhook_secret')
+        .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret')
         .eq('id', user.id)
         .single();
 
@@ -56,6 +56,9 @@ export async function POST(request: Request) {
       api_key: result.api_key,
       api_key_prefix: result.api_key_prefix,
       api_key_masked: maskApiKey(result.api_key_prefix),
+      api_key_pk: result.api_key_pk,
+      api_key_pk_prefix: result.api_key_pk_prefix,
+      api_key_pk_masked: maskPublishableKey(result.api_key_pk_prefix),
       revealed_once: !!result.api_key,
       is_merchant: result.is_merchant,
       webhook_secret: result.webhook_secret,

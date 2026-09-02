@@ -3,9 +3,14 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
 import { logAdminAction } from '@/lib/admin/audit-log';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
+import { resetGatewaySettingsCache } from '@/lib/moncash/settings';
+import { monCashAlertUrl, monCashReturnUrl } from '@/lib/moncash/callbacks';
+import { settlePendingMonCashPayments } from '@/lib/moncash/settle';
 
-/** Admin sèlman: lis / modifye frè global + override pa kont. */
-export async function GET(request: Request) {
+const HIDDEN_KEYS = new Set(['kyc_fee_individual_htg', 'kyc_fee_business_htg']);
+
+/** Admin: frè / limit pasrèl (hatex_gateway_settings) + URL MonCash. */
+export async function GET() {
   const admin = await requireAdminUser();
   if (!admin) return NextResponse.json({ error: 'Aksè refize.' }, { status: 403 });
   if (!(await hasValidAdminGate())) {
@@ -13,23 +18,56 @@ export async function GET(request: Request) {
   }
 
   const db = createSupabaseAdminClient();
-  const userId = new URL(request.url).searchParams.get('user_id');
+  const { data: settings, error } = await db
+    .from('hatex_gateway_settings')
+    .select('key, label, value, unit, description, updated_at')
+    .order('key');
 
-  const [{ data: settings }, { data: overrides }, { data: limits }, { data: agentTiers }] = await Promise.all([
-    db.from('platform_fee_settings').select('*').order('fee_key'),
-    userId
-      ? db.from('account_fee_overrides').select('*').eq('user_id', userId)
-      : db.from('account_fee_overrides').select('*, profiles:user_id(full_name, email)').order('updated_at', { ascending: false }).limit(100),
-    db.from('platform_limit_settings').select('*').order('limit_key'),
-    db.from('agent_tiers').select('*').order('tier'),
-  ]);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const { data: paid } = await db
+    .from('hatex_payments')
+    .select('id, merchant_id, purpose, platform_fee, client_total, description, paid_at, created_at')
+    .eq('status', 'paid')
+    .order('paid_at', { ascending: false })
+    .limit(80);
+
+  let platformFees = 0;
+  let planFees = 0;
+  for (const row of paid || []) {
+    if (row.purpose === 'plan_fee') {
+      planFees += Number(row.client_total || row.platform_fee || 0);
+    } else {
+      platformFees += Number(row.platform_fee || 0);
+    }
+  }
+
+  const recent = (paid || []).slice(0, 20).map((p) => ({
+    id: p.id,
+    purpose: p.purpose,
+    amount:
+      p.purpose === 'plan_fee'
+        ? Number(p.client_total || 0)
+        : Number(p.platform_fee || 0),
+    description: p.description,
+    created_at: p.paid_at || p.created_at,
+    merchant_id: p.merchant_id,
+  }));
 
   return NextResponse.json({
     success: true,
-    settings: settings || [],
-    overrides: overrides || [],
-    limits: limits || [],
-    agent_tiers: agentTiers || [],
+    settings: (settings || []).filter((s) => !HIDDEN_KEYS.has(String(s.key))),
+    callbacks: {
+      alert: monCashAlertUrl(),
+      return: monCashReturnUrl(),
+    },
+    revenue: {
+      platform_fees: platformFees,
+      plan_fees: planFees,
+      recent,
+    },
   });
 }
 
@@ -49,197 +87,67 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = String(body.action || '');
   const db = createSupabaseAdminClient();
-  const email = admin.user.email!;
+  const email = admin.user.email || '';
+  const userId = admin.user.id;
 
-  if (action === 'update_global') {
-    const feeKey = String(body.fee_key || '');
+  if (action === 'settle_pending') {
+    const settled = await settlePendingMonCashPayments(db);
+    await logAdminAction(db, {
+      adminEmail: email,
+      action: 'MONCASH_SETTLE_PENDING',
+      targetType: 'hatex_payments',
+      details: settled,
+      ip,
+    });
+    return NextResponse.json({ success: true, ...settled });
+  }
+
+  if (action === 'update') {
+    const key = String(body.key || '');
     const value = Number(body.value);
-    if (!feeKey || !(value >= 0) || !Number.isFinite(value)) {
-      return NextResponse.json({ error: 'fee_key ak value ( >= 0 ) obligatwa.' }, { status: 400 });
+    if (!key || HIDDEN_KEYS.has(key) || !Number.isFinite(value) || value < 0) {
+      return NextResponse.json({ error: 'kle ak valè (>= 0) obligatwa.' }, { status: 400 });
     }
 
-    // Upsert: si liy lan pa egziste, kreye l
     const { data: existing } = await db
-      .from('platform_fee_settings')
-      .select('fee_key')
-      .eq('fee_key', feeKey)
+      .from('hatex_gateway_settings')
+      .select('key')
+      .eq('key', key)
       .maybeSingle();
 
-    let data;
+    const now = new Date().toISOString();
     let error;
     if (existing) {
       const upd = await db
-        .from('platform_fee_settings')
-        .update({ value, updated_at: new Date().toISOString(), updated_by: email })
-        .eq('fee_key', feeKey)
-        .select()
-        .single();
-      data = upd.data;
+        .from('hatex_gateway_settings')
+        .update({ value, updated_at: now, updated_by: userId })
+        .eq('key', key);
       error = upd.error;
     } else {
-      const ins = await db
-        .from('platform_fee_settings')
-        .insert({
-          fee_key: feeKey,
-          label: feeKey,
-          value,
-          unit: 'flat',
-          updated_by: email,
-        })
-        .select()
-        .single();
-      data = ins.data;
+      const ins = await db.from('hatex_gateway_settings').insert({
+        key,
+        label: key,
+        value,
+        unit: 'htg',
+        updated_at: now,
+        updated_by: userId,
+      });
       error = ins.error;
     }
+
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
+    resetGatewaySettingsCache();
     await logAdminAction(db, {
       adminEmail: email,
-      action: 'FEE_GLOBAL_UPDATE',
-      targetType: 'platform_fee_settings',
-      targetId: feeKey,
+      action: 'GATEWAY_SETTING_UPDATE',
+      targetType: 'hatex_gateway_settings',
+      targetId: key,
       details: { value },
       ip,
     });
-    return NextResponse.json({ success: true, setting: data });
+    return NextResponse.json({ success: true, key, value });
   }
 
-  if (action === 'update_limit') {
-    const limitKey = String(body.limit_key || '');
-    const value = Number(body.value);
-    if (!limitKey || !(value >= 0) || !Number.isFinite(value)) {
-      return NextResponse.json({ error: 'limit_key ak value (>= 0) obligatwa.' }, { status: 400 });
-    }
-    const { data, error } = await db
-      .from('platform_limit_settings')
-      .update({ value, updated_at: new Date().toISOString(), updated_by: email })
-      .eq('limit_key', limitKey)
-      .select()
-      .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    await logAdminAction(db, {
-      adminEmail: email,
-      action: 'LIMIT_GLOBAL_UPDATE',
-      targetType: 'platform_limit_settings',
-      targetId: limitKey,
-      details: { value },
-      ip,
-    });
-    return NextResponse.json({ success: true, limit: data });
-  }
-
-  if (action === 'update_agent_tier') {
-    const tier = String(body.tier || '').toLowerCase();
-    const capacity = Number(body.capacity_htg);
-    if (!tier || !(capacity > 0) || !Number.isFinite(capacity)) {
-      return NextResponse.json({ error: 'tier ak capacity_htg (> 0) obligatwa.' }, { status: 400 });
-    }
-    const { data, error } = await db
-      .from('agent_tiers')
-      .upsert({ tier, capacity_htg: capacity, label: tier.toUpperCase(), updated_at: new Date().toISOString() })
-      .select()
-      .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    // Sync matching platform_limit_settings keys
-    const limitKey = tier === 'premium' ? 'agent_premium_capacity' : tier === 'pro' ? 'agent_pro_capacity' : null;
-    if (limitKey) {
-      await db
-        .from('platform_limit_settings')
-        .update({ value: capacity, updated_at: new Date().toISOString(), updated_by: email })
-        .eq('limit_key', limitKey);
-    }
-
-    await logAdminAction(db, {
-      adminEmail: email,
-      action: 'AGENT_TIER_UPDATE',
-      targetType: 'agent_tiers',
-      targetId: tier,
-      details: { capacity_htg: capacity },
-      ip,
-    });
-    return NextResponse.json({ success: true, tier: data });
-  }
-
-  if (action === 'set_override') {
-    const userId = String(body.user_id || '');
-    const feeKey = String(body.fee_key || '');
-    const value = Number(body.value);
-    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : null;
-    if (!userId || !feeKey || !(value >= 0) || !Number.isFinite(value)) {
-      return NextResponse.json({ error: 'user_id, fee_key, value obligatwa.' }, { status: 400 });
-    }
-
-    const { data: profile } = await db.from('profiles').select('id').eq('id', userId).maybeSingle();
-    if (!profile) {
-      return NextResponse.json({ error: 'Kont (user_id) pa jwenn nan profiles.' }, { status: 404 });
-    }
-
-    // Asire fee_key egziste nan platform_fee_settings (FK)
-    const { data: feeRow } = await db
-      .from('platform_fee_settings')
-      .select('fee_key')
-      .eq('fee_key', feeKey)
-      .maybeSingle();
-    if (!feeRow) {
-      return NextResponse.json(
-        { error: `Frè « ${feeKey} » pa egziste. Kouri migrasyon 20260752.` },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await db
-      .from('account_fee_overrides')
-      .upsert(
-        {
-          user_id: userId,
-          fee_key: feeKey,
-          value,
-          note,
-          updated_at: new Date().toISOString(),
-          updated_by: email,
-        },
-        { onConflict: 'user_id,fee_key' }
-      )
-      .select()
-      .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    await logAdminAction(db, {
-      adminEmail: email,
-      action: 'FEE_OVERRIDE_SET',
-      targetType: 'account_fee_overrides',
-      targetId: userId,
-      details: { fee_key: feeKey, value, note },
-      ip,
-    });
-    return NextResponse.json({ success: true, override: data });
-  }
-
-  if (action === 'clear_override') {
-    const userId = String(body.user_id || '');
-    const feeKey = String(body.fee_key || '');
-    if (!userId || !feeKey) {
-      return NextResponse.json({ error: 'user_id ak fee_key obligatwa.' }, { status: 400 });
-    }
-    const { error } = await db
-      .from('account_fee_overrides')
-      .delete()
-      .eq('user_id', userId)
-      .eq('fee_key', feeKey);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    await logAdminAction(db, {
-      adminEmail: email,
-      action: 'FEE_OVERRIDE_CLEAR',
-      targetType: 'account_fee_overrides',
-      targetId: userId,
-      details: { fee_key: feeKey },
-      ip,
-    });
-    return NextResponse.json({ success: true });
-  }
-
-  return NextResponse.json({ error: 'Aksyon enkoni.' }, { status: 400 });
+  return NextResponse.json({ error: 'Aksyon pa rekonèt.' }, { status: 400 });
 }

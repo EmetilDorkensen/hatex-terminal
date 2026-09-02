@@ -12,6 +12,7 @@ function SuccessContent() {
   const transactionId = searchParams.get('id');
   const amountParam = searchParams.get('amount');
   const refParam = searchParams.get('ref');
+  const payId = searchParams.get('pay_id');
 
   const [transaction, setTransaction] = useState<any>(null);
   const [merchant, setMerchant] = useState<any>(null);
@@ -34,7 +35,7 @@ function SuccessContent() {
 
   useEffect(() => {
     async function loadTransaction() {
-      if (!transactionId && !refParam) {
+      if (!transactionId && !refParam && !payId) {
         // Pa gen ID — montre siksè jenerik pou evite kliyan peye 2 fwa
         setConfirmedWithoutDetail(true);
         setLoading(false);
@@ -42,6 +43,30 @@ function SuccessContent() {
       }
 
       try {
+        // Peman MonCash (QR checkout / plugin): hatex_payments by merchant_order_id
+        if (payId && !transactionId && !refParam) {
+          const { data: hp } = await supabase
+            .from('hatex_payments')
+            .select('id, merchant_order_id, client_total, status, return_url, created_at, merchant_id, profiles:merchant_id(business_name, full_name)')
+            .eq('merchant_order_id', payId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (hp) {
+            setTransaction({
+              id: hp.merchant_order_id,
+              amount: Number(hp.client_total),
+              created_at: hp.created_at,
+              status: hp.status,
+            });
+            const prof = (hp as any).profiles;
+            if (prof) setMerchant(prof);
+            setLoading(false);
+            return;
+          }
+        }
+
         let tx: any = null;
 
         if (transactionId) {
@@ -120,7 +145,7 @@ function SuccessContent() {
     }
 
     loadTransaction();
-  }, [transactionId, refParam, amountParam, supabase]);
+  }, [transactionId, refParam, payId, amountParam, supabase]);
 
   const downloadReceipt = async () => {
     if (!transaction) return;

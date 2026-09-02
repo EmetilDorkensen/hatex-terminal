@@ -122,7 +122,7 @@ export function getTransactionDescription(t: UserTransaction): string {
   }
   if (t.type === 'CARD_ACTIVATION' || t.type === 'FEATURES_UNLOCK') {
     return cleanPublicFeeDescription(
-      String(t.description || 'Frè debloke kat / terminal / fakti')
+      String(t.description || 'Frè debloke kat / fakti')
     );
   }
   return cleanPublicFeeDescription(String(t.description || t.type));

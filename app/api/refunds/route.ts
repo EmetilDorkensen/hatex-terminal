@@ -4,7 +4,7 @@ import { requireMoneySession } from '@/lib/security/require-money-session';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { authenticateMerchantApiKey } from '@/lib/security/api-key';
 import { isUntrustedBrowserRequest, merchantApiJson, parseBearerApiKey } from '@/lib/security/merchant-api';
-import { sendRefundEmails } from '@/lib/reservations/notify-refund';
+import { sendRefundEmails } from '@/lib/refunds/notify-refund';
 import {
   resolveRefundFromHistoryTx,
   stampHistoryTxRefunded,

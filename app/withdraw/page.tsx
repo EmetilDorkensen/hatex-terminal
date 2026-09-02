@@ -439,7 +439,6 @@ export default function WithdrawPage() {
                   >
                      <option value="Ajan">Kach nan Pwen Ajan Hatex</option>
                      <option value="MonCash">MonCash</option>
-                     <option value="NatCash">NatCash</option>
                   </select>
                 </div>
                 

@@ -1,23 +1,26 @@
 "use client";
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
 export default function AutoLogout() {
   const router = useRouter();
   const pathname = usePathname();
-  
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  const supabase = useMemo(
+    () =>
+      createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      ),
+    []
   );
 
   useEffect(() => {
     // Nou chwazi ki paj ki bezwen gadyen sa a (paj kote lajan ye yo)
-    const protectedRoutes = ['/dashboard', '/transfert', '/withdraw', '/kat', '/setting', '/admin', '/workspace', '/kyc', '/agent', '/enterprise'];
+    const protectedRoutes = ['/dashboard', '/setting', '/admin', '/workspace', '/kyc', '/enterprise', '/plugin', '/invoice', '/developer', '/transactions'];
     
-    // Si l pa sou paj sa yo (tankou login oswa signup), pa fè anyen
-    if (!protectedRoutes.includes(pathname)) return;
+    if (!protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) return;
 
     let timeoutId: NodeJS.Timeout;
 

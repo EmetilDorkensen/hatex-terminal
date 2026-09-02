@@ -24,8 +24,13 @@ import {
   releaseIdempotencyKey,
 } from '@/lib/security/merchant-api';
 import { getClientIp } from '@/lib/security/rate-limit';
+import { createMonCashPayment } from '@/lib/moncash/client';
+import { getMonCashConfigForGateway } from '@/lib/moncash/config';
+import { computeFees } from '@/lib/moncash/fees';
+import { getGatewaySettings } from '@/lib/moncash/settings';
 
 const API_BUILD_VERSION = '20260764-api-fee-0-limits';
+
 
 function jsonWithBuild(body: Record<string, unknown>, status = 200, extraHeaders?: Record<string, string>) {
   return merchantApiJson(
@@ -111,18 +116,132 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { amount, currency, order_id, card_info } = body;
+    const { amount, currency, order_id, card_info, payment_method } = body;
 
     const cleanCard = String(card_info?.number || '').replace(/\D/g, '');
     const cleanCvv = String(card_info?.cvv || '').replace(/\D/g, '');
     const rawExp = String(card_info?.exp || '').replace(/\D/g, '');
     const safeAmount = parseFloat(Number(amount).toFixed(2));
     const cleanOrderId = String(order_id || '').trim().substring(0, 50);
+    const method = String(payment_method || 'card').toLowerCase().trim();
+
+    // ============================================================
+    // MODE MONCASH — kliyan an peye sou MonCash, machann nan resevwa
+    // ============================================================
+    if (method === 'moncash') {
+      if (isNaN(safeAmount) || safeAmount <= 0) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: 'Kantite kòb la pa valab.' }, 400);
+      }
+
+      // Verifikasyon limit machann nan (menm pwoteksyon ak kat)
+      const apiFeePer1000 = await resolvePlatformFee(supabase, 'api_fee_per_1000', merchant.id);
+      const { fee: apiFee, net: merchantNet } = calcApiReceiveFee(safeAmount, apiFeePer1000);
+
+      const capCheck = checkBalanceCap(Number(merchant.wallet_balance || 0), merchant.account_type, merchantNet);
+      if (!capCheck.allowed) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: capCheck.message || 'Balans machann nan ta depase limit maksimòm otorize a.' }, 400);
+      }
+
+      const receiveCheck = await checkApiReceiveLimit(supabase, merchant.id, merchant.account_type, safeAmount);
+      if (!receiveCheck.allowed) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: receiveCheck.message || 'Limit resepsyon API depase.' }, 400);
+      }
+
+      const { checkMerchantDailyReceive } = await import('@/lib/billing/receive-limit');
+      const { PAYER_LIMIT_MESSAGE } = await import('@/lib/billing/plans');
+      const daily = await checkMerchantDailyReceive(supabase, merchant.id, safeAmount);
+      if (!daily.ok) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: PAYER_LIMIT_MESSAGE }, 409);
+      }
+
+      // Kalkile frè yo (kliyan an peye frè anplis)
+      const settings = await getGatewaySettings(supabase);
+      const fees = computeFees(safeAmount, {
+        platform_fee_percent: settings.platform_fee_percent,
+        platform_fee_min_htg: settings.platform_fee_min_htg,
+        payout_fee_percent: settings.payout_fee_percent,
+        payout_fee_min_htg: settings.payout_fee_min_htg,
+      });
+      if (!fees) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: 'Kantite kòb la pa valab.' }, 400);
+      }
+
+      // Kreye yon orderId inik pou MonCash
+      const monCashOrderId = `hx-${merchant.id.slice(0, 8)}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      // Kreye peman MonCash la
+      let cfg;
+      try {
+        cfg = getMonCashConfigForGateway(merchant.api_key_mode || 'test');
+      } catch (err) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: err instanceof Error ? err.message : 'Konfigirasyon MonCash manke.' }, 500);
+      }
+
+      const created = await createMonCashPayment(monCashOrderId, fees.clientTotal, cfg);
+      if (!created.ok) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: created.message || 'Pa kapab kreye peman MonCash.' }, 502);
+      }
+
+      // Sere peman an nan tab hatex_payments pou règleman an
+      const { data: paymentRow, error: paymentErr } = await supabase
+        .from('hatex_payments')
+        .insert({
+          merchant_id: merchant.id,
+          mode: merchant.api_key_mode || 'test',
+          status: 'pending',
+          purpose: 'merchant',
+          gateway_order_id: monCashOrderId,
+          merchant_amount: fees.merchantAmount,
+          platform_fee: fees.platformFee,
+          client_total: fees.clientTotal,
+          metadata: {
+            order_id: cleanOrderId || 'N/A',
+            api_fee: apiFee,
+            merchant_net: merchantNet,
+          },
+        })
+        .select('id')
+        .single();
+
+      if (paymentErr || !paymentRow) {
+        if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+        return jsonWithBuild({ error: 'Pa kapab sere peman an.' }, 500);
+      }
+
+      const monCashResponse = {
+        success: true,
+        message: 'Peman MonCash kreye. Kliyan an dwe peye sou MonCash.',
+        payment_method: 'moncash',
+        redirect_url: created.data.redirectUrl,
+        payment_token: created.data.token,
+        order_id: cleanOrderId || 'N/A',
+        gateway_order_id: monCashOrderId,
+        amount: safeAmount,
+        client_total: fees.clientTotal,
+        platform_fee: fees.platformFee,
+        payout_fee: fees.payoutFee,
+        currency: currency || 'HTG',
+      };
+
+      if (idempotencyKey) {
+        await finalizeIdempotencyKey(supabase, merchant.id, idempotencyKey, monCashResponse);
+      }
+
+      return jsonWithBuild(monCashResponse);
+    }
 
     if (cleanCard.length < 15 || cleanCvv.length < 3 || rawExp.length !== 4 || isNaN(safeAmount) || safeAmount <= 0) {
       if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: 'Fòma done yo pa bon. Tcheke kat la, CVV a, Dat la (MMYY), oswa kantite kòb la.' }, 400);
     }
+
 
     const cardRl = await rateLimitCardPaymentAttempts(cleanCard);
     if (!cardRl.allowed) {
@@ -208,6 +327,14 @@ export async function POST(request: Request) {
     if (!receiveCheck.allowed) {
       if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: receiveCheck.message || 'Limit resepsyon API depase.' }, 400);
+    }
+
+    const { checkMerchantDailyReceive } = await import('@/lib/billing/receive-limit');
+    const { PAYER_LIMIT_MESSAGE } = await import('@/lib/billing/plans');
+    const daily = await checkMerchantDailyReceive(supabase, merchant.id, safeAmount);
+    if (!daily.ok) {
+      if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
+      return jsonWithBuild({ error: PAYER_LIMIT_MESSAGE }, 409);
     }
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc('process_direct_card_payment', {

@@ -44,6 +44,9 @@ serve(async (req: Request) => {
 
     // --- KA 1: VOYE INVOICE (Tab: invoices) ---
     if (table === 'invoices') {
+      // Sèvi ak share_token opak (pa id uuid) nan lyen piblik la.
+      const ref = record.share_token || record.id
+      const payUrl = `https://hatexcard.com/checkout-invoice/${encodeURIComponent(ref)}`
       emailTo = record.client_email
       emailSubject = `Invoice HatexCard: ${record.amount} HTG pou ${record.business_name}`
       emailHtml = `
@@ -57,7 +60,7 @@ serve(async (req: Request) => {
             <div style="background-color: #f9f9f9; padding: 25px; border-radius: 15px; margin: 25px 0;">
               <h1 style="margin: 5px 0; font-size: 36px; color: #000;">${record.amount} HTG</h1>
             </div>
-            <a href="https://hatexcard.com/checkout?invoice_id=${record.id}" style="display: block; background-color: #dc2626; color: #ffffff; padding: 20px; border-radius: 12px; text-decoration: none; font-weight: 900;">KLIKE POU PEYE</a>
+            <a href="${payUrl}" style="display: block; background-color: #dc2626; color: #ffffff; padding: 20px; border-radius: 12px; text-decoration: none; font-weight: 900;">KLIKE POU PEYE</a>
           </div>
         </div>`
     } 

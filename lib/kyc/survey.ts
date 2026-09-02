@@ -7,7 +7,7 @@ export const KYC_SURVEY_FROM = 'HatexCard <notifications@hatexcard.com>';
 export const KYC_SURVEY_QUESTIONS = [
   {
     id: 'knows_kyc',
-    label: 'Èske ou konnen KYC (verifikasyon ID) obligatwa pou itilize kat, terminal, fakti ak retrè?',
+    label: 'Èske ou konnen KYC (verifikasyon ID) obligatwa pou itilize kat, fakti ak retrè?',
     type: 'single' as const,
     options: [
       { value: 'wi', label: 'Wi, mwen konnen' },
@@ -101,7 +101,7 @@ export function buildKycSurveyEmailHtml(opts: {
           <p style="margin:0 0 12px;font-size:16px;font-weight:700;">Bonjou ${name},</p>
           <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#475569;">
             Ou enskri sou HatexCard, men ou <strong>poko pase verifikasyon KYC</strong> ankò.
-            Nou vle konprann sa k ap bloke w pou nou ka ede w kòmanse itilize kat, terminal, fakti ak retrè.
+            Nou vle konprann sa k ap bloke w pou nou ka ede w kòmanse itilize kat, fakti ak retrè.
           </p>
           <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#334155;">Nou ta renmen konnen:</p>
           <ul style="margin:0 0 20px;padding-left:18px;color:#475569;font-size:13px;line-height:1.7;">

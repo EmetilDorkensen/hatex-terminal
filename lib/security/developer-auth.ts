@@ -13,7 +13,7 @@ export async function requireEligibleMerchant() {
   const supabaseAdmin = createSupabaseAdminClient();
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, webhook_secret')
+    .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret, api_key_mode')
     .eq('id', user.id)
     .single();
 
@@ -45,16 +45,22 @@ export type MerchantApiKeyView = {
   api_key_prefix: string | null;
   api_key_masked: string;
   has_api_key: boolean;
+  api_key_pk_prefix: string | null;
+  api_key_pk: string | null;
 };
 
 export function toApiKeyView(profile: {
   api_key_prefix?: string | null;
   api_key_hash?: string | null;
   api_key?: string | null;
+  api_key_pk_prefix?: string | null;
+  api_key_pk?: string | null;
 }): MerchantApiKeyView {
   return {
     api_key_prefix: profile.api_key_prefix || null,
     api_key_masked: maskApiKey(profile.api_key_prefix),
     has_api_key: profileHasApiKey(profile),
+    api_key_pk_prefix: profile.api_key_pk_prefix || null,
+    api_key_pk: profile.api_key_pk || null,
   };
 }

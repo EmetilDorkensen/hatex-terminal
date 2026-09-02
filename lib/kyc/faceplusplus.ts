@@ -11,7 +11,7 @@ const OCR_ID_URL = 'https://api-us.faceplusplus.com/cardpp/v1/ocridcard';
 const MIN_FACE_CONFIDENCE = 50;
 const REVIEW_FACE_CONFIDENCE = 30;
 /** Sèlman anba sa a nou rejte otomatikman (lè API a te bay yon nòt reyèl). */
-const HARD_REJECT_CONFIDENCE = 20;
+const HARD_REJECT_CONFIDENCE = 8;
 
 function getFaceCredentials() {
   const apiKey = process.env.FACEPLUSPLUS_API_KEY;

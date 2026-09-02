@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const API_KEY_PREFIX = 'hx_live_';
+export const PUBLISHABLE_KEY_PREFIX = 'pk_live_';
 const WEBHOOK_PREFIX = 'whsec_';
 export const API_KEY_PREFIX_DISPLAY_LEN = 12;
 
@@ -19,6 +20,11 @@ function getApiKeyPepper(): string {
 export function generateApiKeyToken(): string {
   const bytes = crypto.randomBytes(24);
   return API_KEY_PREFIX + bytes.toString('hex');
+}
+
+export function generatePublishableKeyToken(): string {
+  const bytes = crypto.randomBytes(24);
+  return PUBLISHABLE_KEY_PREFIX + bytes.toString('hex');
 }
 
 export function generateWebhookSecretToken(): string {
@@ -46,10 +52,13 @@ export type MerchantApiAuthRow = {
   account_status?: string | null;
   wallet_balance?: number | null;
   account_type?: string | null;
+  api_key_mode?: 'test' | 'live' | null;
+  api_key_pk_prefix?: string | null;
 };
 
 const MERCHANT_AUTH_SELECT =
-  'id, full_name, is_merchant, account_status, wallet_balance, account_type, api_key_hash, api_key_prefix, api_key';
+  'id, full_name, is_merchant, account_status, wallet_balance, account_type, api_key_mode, api_key_hash, api_key_prefix, api_key, api_key_pk_prefix';
+
 
 /** Mete hash + prefix epi efase kle an klè (migrasyon lazy). */
 export async function upgradePlainApiKeyToHash(
@@ -106,6 +115,26 @@ export function profileHasApiKey(profile: {
   api_key?: string | null;
 }): boolean {
   return !!(profile.api_key_hash || profile.api_key);
+}
+
+export type StoredPublishableKeyFields = {
+  api_key_pk_hash: string;
+  api_key_pk_prefix: string;
+  api_key_pk: string;
+};
+
+/** Publishable key a EKSPOZE (tankou Stripe pk_...) — li san danje nan frontend. */
+export function buildStoredPublishableKeyFields(plainKey: string): StoredPublishableKeyFields {
+  return {
+    api_key_pk_hash: hashApiKey(plainKey),
+    api_key_pk_prefix: apiKeyDisplayPrefix(plainKey),
+    api_key_pk: plainKey,
+  };
+}
+
+export function maskPublishableKey(prefix: string | null | undefined): string {
+  if (!prefix) return `${PUBLISHABLE_KEY_PREFIX}••••••••••••`;
+  return `${prefix}${'•'.repeat(24)}`;
 }
 
 export type StoredApiKeyFields = {
