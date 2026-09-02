@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
+import { NOTIFY_FROM } from '@/lib/notify/email';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
 
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     const actionLink = data.properties.action_link;
     const resend = new Resend(apiKey);
     const { error: sendErr } = await resend.emails.send({
-      from: 'Hatex <contact@hatexcard.com>',
+      from: NOTIFY_FROM,
       to: [email],
       subject: 'HatexCard — Chanje modpas ou',
       html: buildResetEmailHtml(escapeHtml(actionLink)),

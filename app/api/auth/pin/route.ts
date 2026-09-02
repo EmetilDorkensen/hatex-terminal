@@ -8,6 +8,17 @@ import {
   buildPinFailureUpdate,
   buildPinSuccessUpdate,
 } from '@/lib/security/pin-lockout';
+import { sendSecurityAlertEmail } from '@/lib/notify/email';
+
+/** Alèt sekirite (PIN) — pa janm bloke aksyon an si imèl la echwe. */
+async function notifyPinChange(email?: string | null, kind: 'pin_set' | 'pin_changed' = 'pin_changed') {
+  if (!email) return;
+  try {
+    await sendSecurityAlertEmail(email, kind);
+  } catch {
+    /* pa kraze aksyon PIN an */
+  }
+}
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -68,6 +79,8 @@ export async function POST(request: Request) {
       const updates = await buildPinSuccessUpdate(String(pin));
       await supabase.from('profiles').update(updates).eq('id', user.id);
 
+      await notifyPinChange(user.email, 'pin_set');
+
       return NextResponse.json({ success: true, message: 'PIN anrejistre avèk siksè.' });
     }
 
@@ -85,6 +98,9 @@ export async function POST(request: Request) {
 
       const updates = await buildPinSuccessUpdate(String(pin));
       await supabase.from('profiles').update(updates).eq('id', user.id);
+
+      await notifyPinChange(user.email, 'pin_changed');
+
       return NextResponse.json({ success: true, message: 'PIN chanje avèk siksè.' });
     }
 

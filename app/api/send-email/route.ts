@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
+import { NOTIFY_FROM } from '@/lib/notify/email';
 
 function escapeHtml(value: string): string {
   return value
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: 'Hatex <contact@hatexcard.com>',
+      from: NOTIFY_FROM,
       to: [to],
       subject,
       html: `<strong>Bonjou ${escapeHtml(non)},</strong><p>${escapeHtml(mesaj).replace(/\n/g, '<br/>')}</p>`,

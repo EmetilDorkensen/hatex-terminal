@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { assertFinanceOperatorWithGate } from '@/lib/admin/auth';
+import { notifyFinanceStatus } from '@/lib/notify/finance-emails';
 
 type Action = 'approve_deposit' | 'reject' | 'complete_withdrawal';
 
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
       if (!res?.success) {
         return NextResponse.json({ success: false, message: res?.message || 'Echèk.' }, { status: 400 });
       }
+      // Imèl depo apwouve (pa bloke repons lan).
+      await notifyFinanceStatus(supabase, 'deposits', depositId, 'approved');
       return NextResponse.json(res);
     }
 
@@ -82,6 +85,14 @@ export async function POST(request: Request) {
       if (!res?.success) {
         return NextResponse.json({ success: false, message: res?.message || 'Echèk.' }, { status: 400 });
       }
+      // Imèl rejè a bay kliyan an (depo oswa retrè).
+      await notifyFinanceStatus(
+        supabase,
+        table === 'withdrawals' ? 'withdrawals' : 'deposits',
+        itemId,
+        'rejected',
+        reason
+      );
       return NextResponse.json(res);
     }
 
@@ -100,6 +111,8 @@ export async function POST(request: Request) {
       if (!res?.success) {
         return NextResponse.json({ success: false, message: res?.message || 'Echèk.' }, { status: 400 });
       }
+      // Imèl retrè fèt.
+      await notifyFinanceStatus(supabase, 'withdrawals', withdrawalId, 'completed');
       return NextResponse.json(res);
     }
 

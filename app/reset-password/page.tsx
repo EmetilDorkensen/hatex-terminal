@@ -78,6 +78,18 @@ export default function ResetPassword() {
         setMsg({ type: 'error', text: error.message });
       } else {
         setMsg({ type: 'success', text: 'Modpas ou chanje ak siksè! Ou ka konekte kounye a.' });
+
+        // Alèt sekirite: voye imèl konfimasyon "modpas chanje" (pa bloke).
+        try {
+          await fetch('/api/auth/security-alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind: 'password_changed' }),
+          });
+        } catch {
+          /* pa kraze siksè chanje modpas la */
+        }
+
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);

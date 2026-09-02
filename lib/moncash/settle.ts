@@ -345,6 +345,13 @@ export async function settleMonCashPayment(
     };
   }
 
+  // PREMYE RÈGLEMAN (nou menm ki fè tranzisyon an): voye imèl konfimasyon yo.
+  // Se sèlman isit la — konsa rechaj/resettle pa janm voye doub imèl.
+  {
+    const { notifyPaymentPaid } = await import('@/lib/notify/sale-emails');
+    await notifyPaymentPaid(admin, payment);
+  }
+
   // Yon frè KYC pa gen payout — li debloke soumisyon dosye a olye
   if (payment.purpose === 'kyc_fee') {
     await submitKycApplicationForPayment(admin, payment);
