@@ -102,25 +102,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    if (action === 'delete_row') {
-      const table = String(body.table || '');
-      const id = String(body.id || '');
-      const allowed = new Set(['deposits', 'withdrawals', 'promo_codes']);
-      if (!allowed.has(table) || !id) {
-        return NextResponse.json({ error: 'Tablo oswa id pa valab.' }, { status: 400 });
-      }
-      const { error } = await db.from(table).delete().eq('id', id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      await logAdminAction(db, {
-        adminEmail: email,
-        action: 'ROW_DELETED',
-        targetType: table,
-        targetId: id,
-        ip,
-      });
-      return NextResponse.json({ success: true });
-    }
-
     if (action === 'invite_staff') {
       const inviteEmail = String(body.email || '')
         .trim()

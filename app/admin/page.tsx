@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Lock, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, KeyRound, MinusCircle, Mail } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Lock, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, KeyRound, Mail } from 'lucide-react';
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
@@ -37,13 +37,6 @@ export default function AdminSuperPage() {
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const [bizProfitAvailable, setBizProfitAvailable] = useState(0);
-    const [showBizWithdrawModal, setShowBizWithdrawModal] = useState(false);
-    const [bizWithdrawAmount, setBizWithdrawAmount] = useState('');
-    const [bizWithdrawNote, setBizWithdrawNote] = useState('');
-    const [bizWithdrawPassword, setBizWithdrawPassword] = useState('');
-    const [bizWithdrawLoading, setBizWithdrawLoading] = useState(false);
-    const [bizWithdrawError, setBizWithdrawError] = useState('');
     const [flushConfirmLoading, setFlushConfirmLoading] = useState(false);
     const [gateway, setGateway] = useState({
         platform_fees: 0,
@@ -134,10 +127,6 @@ export default function AdminSuperPage() {
                 setAnonsActive(data.announcement.active !== false);
             }
 
-            if (data.profit) {
-                setBizProfitAvailable(Number(data.profit.available_htg || 0));
-            }
-
             if (data.gateway) {
                 setGateway({
                     platform_fees: Number(data.gateway.platform_fees || 0),
@@ -147,15 +136,6 @@ export default function AdminSuperPage() {
                     recent: data.gateway.recent || [],
                 });
             }
-
-            // Istorik retrè pwofi + unified (deja nan business-withdrawal)
-            try {
-                const profitRes = await fetch('/api/admin/business-withdrawal');
-                if (profitRes.ok) {
-                    const s = await profitRes.json();
-                    if (typeof s.available_htg === 'number') setBizProfitAvailable(s.available_htg);
-                }
-            } catch { /* ignore */ }
 
         } catch (e: any) {
              console.error("Erè rale done:", e);
@@ -175,53 +155,6 @@ export default function AdminSuperPage() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.error) throw new Error(data.error || 'Aksyon echwe.');
         return data;
-    };
-
-    const handleBizProfitWithdraw = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setBizWithdrawLoading(true);
-        setBizWithdrawError('');
-
-        const montan = Number(bizWithdrawAmount);
-        if (!Number.isFinite(montan) || montan <= 0) {
-            setBizWithdrawError('Antre yon montan valab.');
-            setBizWithdrawLoading(false);
-            return;
-        }
-        if (!bizWithdrawPassword) {
-            setBizWithdrawError('Modpas admin obligatwa pou konfime.');
-            setBizWithdrawLoading(false);
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/admin/business-withdrawal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: montan,
-                    note: bizWithdrawNote.trim() || undefined,
-                    password: bizWithdrawPassword,
-                }),
-            });
-            const data = await res.json().catch(() => ({}));
-
-            if (!res.ok) {
-                setBizWithdrawError(data.error || 'Retrè a echwe.');
-                return;
-            }
-
-            setShowBizWithdrawModal(false);
-            setBizWithdrawAmount('');
-            setBizWithdrawNote('');
-            setBizWithdrawPassword('');
-            await raleDone();
-            alert(`Retrè ${montan.toLocaleString()} HTG anrejistre. Pwofi disponib: ${Number(data.available_htg || 0).toLocaleString()} HTG`);
-        } catch {
-            setBizWithdrawError('Erè koneksyon. Eseye ankò.');
-        } finally {
-            setBizWithdrawLoading(false);
-        }
     };
 
     const handleOpenKycDocument = async (
@@ -566,10 +499,6 @@ export default function AdminSuperPage() {
                                         {Number(gateway.platform_fees).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm">HTG</span>
                                     </h3>
                                     <p className="text-xs text-emerald-800/80 mt-3">Abonnman: {Number(gateway.plan_fees).toLocaleString()} HTG · {gateway.paid_count} peman peye</p>
-                                    <button type="button" onClick={() => { setBizWithdrawError(''); setShowBizWithdrawModal(true); }} className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider">
-                                        <MinusCircle size={16} /> Retrè Pwofi Biznis
-                                    </button>
-                                    <p className="text-[11px] text-emerald-800/80 mt-2">Disponib: {Number(bizProfitAvailable).toLocaleString()} HTG</p>
                                 </div>
                                 <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl text-white">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Plan peye aktif</p>
@@ -909,86 +838,6 @@ export default function AdminSuperPage() {
                 </div>
             </div>
 
-            {showBizWithdrawModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !bizWithdrawLoading && setShowBizWithdrawModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><MinusCircle size={22} /></div>
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-900">Retrè Pwofi Biznis</h3>
-                                <p className="text-xs text-slate-500">Lè ou retire lajan nan bank la, soustrè li isit pou kontwòl rete kòrèk.</p>
-                            </div>
-                        </div>
-
-                        <p className="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-4">
-                            Disponib: {Number(bizProfitAvailable).toLocaleString('en-US', { minimumFractionDigits: 2 })} HTG
-                        </p>
-
-                        <form onSubmit={handleBizProfitWithdraw} className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Montan (HTG)</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    step="0.01"
-                                    max={bizProfitAvailable}
-                                    value={bizWithdrawAmount}
-                                    onChange={(e) => setBizWithdrawAmount(e.target.value)}
-                                    placeholder="eg. 5000"
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Nòt (opsyonèl)</label>
-                                <input
-                                    type="text"
-                                    value={bizWithdrawNote}
-                                    onChange={(e) => setBizWithdrawNote(e.target.value)}
-                                    placeholder="eg. Retrè bank Moncash 06/07/2026"
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block flex items-center gap-1.5">
-                                    <KeyRound size={14} /> Modpas Admin (konfimasyon)
-                                </label>
-                                <input
-                                    type="password"
-                                    value={bizWithdrawPassword}
-                                    onChange={(e) => setBizWithdrawPassword(e.target.value)}
-                                    placeholder="Menm modpas Pòtay Admin lan"
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                                    required
-                                />
-                            </div>
-
-                            {bizWithdrawError && (
-                                <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">{bizWithdrawError}</p>
-                            )}
-
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    disabled={bizWithdrawLoading}
-                                    onClick={() => setShowBizWithdrawModal(false)}
-                                    className="flex-1 border border-gray-200 text-slate-600 py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-50 disabled:opacity-50"
-                                >
-                                    Anile
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={bizWithdrawLoading || bizProfitAvailable <= 0}
-                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {bizWithdrawLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                    Konfime Retrè
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

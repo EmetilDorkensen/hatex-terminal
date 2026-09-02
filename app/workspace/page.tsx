@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
     ShieldCheck, DollarSign, UserCheck as UserCheckIcon, Users, 
-    Search, Loader2, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, 
+    Search, Loader2, CheckCircle2, 
     XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
     Crown, MessageCircle, Activity, Radio, Mail
 } from 'lucide-react';
@@ -29,8 +29,6 @@ export default function WorkspacePage() {
     // Done pou divès depatman yo
     const [users, setUsers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [deposits, setDeposits] = useState<any[]>([]);
-    const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
     const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [pendingEnterprises, setPendingEnterprises] = useState<any[]>([]);
@@ -45,7 +43,6 @@ export default function WorkspacePage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
-    const [montanModifye, setMontanModifye] = useState<{ [key: string]: number }>({});
 
     // Views pou anplwaye yo (Support gen 'clients' oswa 'tickets')
     const [activeTab, setActiveTab] = useState('main');
@@ -146,11 +143,6 @@ export default function WorkspacePage() {
                 supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false })
                     .then(({ data }) => setTickets(data || []))
             );
-        }
-
-        if (canSeeFinance) {
-            setDeposits([]);
-            setWithdrawals([]);
         }
 
         if (canSeeCompliance) {
@@ -332,73 +324,6 @@ export default function WorkspacePage() {
     };
 
     // ==========================================
-    // FONKSYON POU FINANS
-    // ==========================================
-    const apwouveDepo = async (d: any) => {
-        const isModified = montanModifye[d.id] !== undefined;
-        const montanFinal = isModified ? montanModifye[d.id] : Number(d.amount);
-        let frePouBiznisLa = Number(d.fee || 0);
-        try {
-          const feeRes = await fetch('/api/fees/mine');
-          const feeData = await feeRes.json().catch(() => ({}));
-          const pct = Number(feeData?.fees?.deposit_fee_percent ?? 5);
-          frePouBiznisLa = Number((montanFinal * (pct / 100)).toFixed(2));
-        } catch { /* keep */ }
-
-        if (!confirm(`Konfime Depo: \nKliyan resevwa: ${montanFinal} HTG\nFrè (Biznis): ${frePouBiznisLa} HTG`)) return;
-        
-        setProcessingId(d.id);
-        try {
-            const res = await fetch('/api/admin/finance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'approve_deposit',
-                deposit_id: d.id,
-                final_amount: montanFinal,
-              }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.message || 'Apwobasyon echwe.');
-            await logActivity('DEPOSIT_APPROVED', 'deposit', d.id, { amount: montanFinal, fee: frePouBiznisLa, user_id: d.user_id });
-            alert("Depo apwouve!"); checkAuthAndFetchData();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    const anileTranzaksyon = async (item: any, table: string) => {
-        const rezon = prompt("Rezon anilasyon?");
-        if (!rezon) return;
-        setProcessingId(item.id);
-        try {
-            const res = await fetch('/api/admin/finance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'reject', table, item_id: item.id, reason: rezon }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.message || 'Anilasyon echwe.');
-            await logActivity(`${table.toUpperCase()}_CANCELLED`, table, item.id, { reason: rezon, amount: item.amount, user_id: item.user_id });
-            alert("Anile avèk siksè."); checkAuthAndFetchData();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    const apwouveRetre = async (w: any) => {
-        if (!confirm(`Konfime retrè ${w.amount} HTG sa a?`)) return;
-        setProcessingId(w.id);
-        try {
-            const res = await fetch('/api/admin/finance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'complete_withdrawal', withdrawal_id: w.id }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.message || 'Retrè echwe.');
-            await logActivity('WITHDRAWAL_APPROVED', 'withdrawal', w.id, { amount: w.amount, user_id: w.user_id });
-            alert("Retrè konfime!"); checkAuthAndFetchData();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    // ==========================================
     // FONKSYON POU KONFÒMITE (KYC & AJAN)
     // ==========================================
     const handleOpenDocument = async (ref: string) => {
@@ -575,7 +500,7 @@ export default function WorkspacePage() {
                         </button>
                     )}
                     {canSeeFinance && (
-                        <button onClick={() => { setActiveDept('finance'); setActiveTab('deposits'); }} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'finance' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <button onClick={() => { setActiveDept('finance'); setActiveTab('main'); }} className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeDept === 'finance' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
                             <DollarSign size={14} /> Finans
                         </button>
                     )}
