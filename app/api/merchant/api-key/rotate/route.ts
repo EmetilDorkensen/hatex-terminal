@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
  *   Authorization: Bearer <kle API machann aktyèl la>
  *
  * Itilize pa bouton "Rotate API Key" andedan plugin WooCommerce
- * (HatexCard MonCash v26.0+), ak pa telechajman ZIP la sou dashboard la.
+ * (HatexCard MonCash v26.1+), ak pa telechajman ZIP la sou dashboard la.
  *
  * - Verifye kle a (hash) → sispann si kont lan pa machann oswa suspendu.
  * - Jenere yon NOUVO kle epi mete hash/prefix nouvo a nan baz done.

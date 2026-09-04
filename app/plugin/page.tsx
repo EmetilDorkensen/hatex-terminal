@@ -218,7 +218,7 @@ export default function PluginPage() {
   };
 
   // ==========================================================================
-  // JENERE WOOCOMMERCE PLUGIN (v26.0 — MonCash + paj /success + rotate kle API)
+  // JENERE WOOCOMMERCE PLUGIN (v26.1 — MonCash + paj /success + rotate kle API + USD→HTG)
   // ==========================================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
@@ -238,7 +238,7 @@ export default function PluginPage() {
  * Plugin Name: HatexCard MonCash Gateway
  * Plugin URI: https://hatexcard.com
  * Description: Peman MonCash (HTG) pou WooCommerce. Kliyan peye sou MonCash dirèkteman; machann nan resevwa montan an sou kont li nan HatexCard.
- * Version: 26.0.0
+ * Version: 26.1.0
  * Author: Hatex Group
  */
 
@@ -247,7 +247,7 @@ if (!defined('ABSPATH')) exit;
 // ==========================================================================
 // KONSTANT — kle API a jenere FRA chak fwa machann nan telechaje zip la.
 // ==========================================================================
-if (!defined('HATEXCARD_PLUGIN_VERSION')) define('HATEXCARD_PLUGIN_VERSION', '26.0.0');
+if (!defined('HATEXCARD_PLUGIN_VERSION')) define('HATEXCARD_PLUGIN_VERSION', '26.1.0');
 if (!defined('HATEXCARD_EMBEDDED_API_KEY')) define('HATEXCARD_EMBEDDED_API_KEY', '${apiKey}');
 if (!defined('HATEXCARD_MONCASH_API_URL')) define('HATEXCARD_MONCASH_API_URL', 'https://hatexcard.com/api/moncash/payments');
 if (!defined('HATEXCARD_ROTATE_API_URL')) define('HATEXCARD_ROTATE_API_URL', 'https://hatexcard.com/api/merchant/api-key/rotate');
@@ -352,7 +352,7 @@ function hatexcard_ensure_gateway_available() {
             $this->id = 'hatexcard_moncash';
             $this->has_fields = false;
             $this->method_title = 'HatexCard MonCash';
-            $this->method_description = 'Kliyan peye ak MonCash (HTG). Peman an fet sou MonCash epi machann nan resevwa kob la sou kont li nan HatexCard.';
+            $this->method_description = 'Kliyan peye ak MonCash (HTG). Boutik la dwe an HTG oswa USD (ak to konvèsyon). Machann nan resevwa kob la sou kont li nan HatexCard.';
             $this->version = HATEXCARD_PLUGIN_VERSION;
 
             $this->init_form_fields();
@@ -389,12 +389,24 @@ function hatexcard_ensure_gateway_available() {
                     'type' => 'textarea',
                     'default' => 'Kliyan an konfime peman an ak yon USSD sou telefòn li (HTG).',
                 ),
+                'usd_rate' => array(
+                    'title' => __('To konvèsyon USD → HTG', 'hatexcard'),
+                    'type' => 'text',
+                    'description' => __('Itilize sèlman si monnen boutik la se USD. Chak 1 USD vin N Goud (HTG). Egzanp: 135 = 1 USD → 135 HTG. Lè boutik la an HTG, yo pa sèvi ak jaden sa a.', 'hatexcard'),
+                    'default' => '135',
+                ),
                 'hatexcard_key_row' => array(
                     'title' => __('Kle API (sekrè)', 'hatexcard'),
                     'type' => 'hatexcard_key_row',
                     'default' => '',
                 ),
             );
+        }
+
+        private function get_usd_rate() {
+            $raw = trim((string) $this->get_option('usd_rate', '135'));
+            $raw = str_replace(',', '.', $raw); // Aksepte '137,75' (vigil) kòm '137.75'.
+            return (float) $raw;
         }
 
         public function is_available() {
@@ -406,18 +418,24 @@ function hatexcard_ensure_gateway_available() {
             if ($key === '' || $key === '0') {
                 return false;
             }
-            if (function_exists('get_woocommerce_currency')) {
-                $currency = strtoupper((string) get_woocommerce_currency());
-                if ($currency !== '' && $currency !== 'HTG') {
-                    return false;
-                }
+            $currency = function_exists('get_woocommerce_currency') ? strtoupper((string) get_woocommerce_currency()) : 'HTG';
+            if ($currency === 'USD') {
+                return $this->get_usd_rate() > 0;
             }
-            return true;
+            return $currency === 'HTG';
         }
 
         public function admin_options() {
-            if (function_exists('get_woocommerce_currency') && strtoupper((string) get_woocommerce_currency()) !== 'HTG') {
-                echo '<div class="notice notice-warning inline"><p>' . esc_html__('Atansyon: monnen boutik la dwe HTG (Goud) pou peman MonCash parèt nan checkout.', 'hatexcard') . '</p></div>';
+            $currency = function_exists('get_woocommerce_currency') ? strtoupper((string) get_woocommerce_currency()) : 'HTG';
+            if ($currency !== 'HTG' && $currency !== 'USD') {
+                echo '<div class="notice notice-warning inline"><p>' . esc_html__('Atansyon: monnen boutik la dwe HTG (Goud) oswa USD. Pou lòt monnen, peman MonCash pa disponib nan checkout.', 'hatexcard') . '</p></div>';
+            } elseif ($currency === 'USD') {
+                $rate = $this->get_usd_rate();
+                if ($rate <= 0) {
+                    echo '<div class="notice notice-error inline"><p>' . esc_html__('Erè: monnen boutik la se USD, kidonk ou dwe mete yon to konvèsyon USD → HTG valab nan jaden ki anwo a pou gateway la parèt nan checkout.', 'hatexcard') . '</p></div>';
+                } else {
+                    echo '<div class="notice notice-info inline"><p>' . sprintf(esc_html__('Remak: boutik la an USD. Montan chak kòmand ap konvèti an HTG ak to a (%s) anvan yo voye l bay MonCash. Verifye to a regilyèman.', 'hatexcard'), esc_html(number_format_i18n($rate, 2))) . '</p></div>';
+                }
             }
             parent::admin_options();
         }
@@ -571,16 +589,28 @@ function hatexcard_ensure_gateway_available() {
             }
 
             $store_currency = function_exists('get_woocommerce_currency') ? strtoupper((string) get_woocommerce_currency()) : 'HTG';
-            if ($store_currency !== 'HTG') {
-                wc_add_notice('Peman MonCash mande monnen HTG (Goud). Chèche konfigirasyon ak machann nan.', 'error');
+            if ($store_currency === 'USD') {
+                $rate = $this->get_usd_rate();
+                if ($rate <= 0) {
+                    wc_add_notice('To konvèsyon USD → HTG pa konfigire. Machann nan dwe mete l nan WooCommerce → Peman → HatexCard MonCash.', 'error');
+                    return array('result' => 'failure');
+                }
+                $amount_htg = round((float) $order->get_total() * $rate);
+            } elseif ($store_currency === 'HTG') {
+                $amount_htg = round((float) $order->get_total());
+            } else {
+                wc_add_notice('Peman MonCash sipòte sèlman boutik an HTG oswa USD. Chèche konfigirasyon ak machann nan.', 'error');
+                return array('result' => 'failure');
+            }
+            if ($amount_htg <= 0) {
+                wc_add_notice('Montan peman an pa valid.', 'error');
                 return array('result' => 'failure');
             }
 
             $order_id_safe = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $order->get_order_number());
             $order_id_safe = $order_id_safe !== '' ? $order_id_safe : (string) $order->get_id();
 
-            // Ladrès: boutik la dwe mete lajan li an HTG (Goud).
-            $amount_htg = round((float) $order->get_total());
+            // Ladrès: si boutik la an USD, montan an konvèti an HTG (Goud) ak to machann nan anvan yo voye l bay MonCash.
 
             // PA GEN return_url ankò: lè peman an fini sou hosted MonCash la,
             // HatexCard montre paj konfimasyon li (/success) ki verifye baz done a.
@@ -674,7 +704,8 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 
 ## Enpòtan
 
-- **Monnen boutik la dwe HTG (Goud)** — montan yo voye dirèkteman an HTG.
+- **Monnen boutik la dwe HTG (Goud)** — oswa **USD** avèk yon to konvèsyon konfigire nan **WooCommerce → Retrete (Settings) → Peman → HatexCard MonCash** (jaden “To konvèsyon USD → HTG”). Default la se **135** (1 USD = 135 HTG) — verifye to reyèl la regilyèman.
+- Lè boutik la an **USD**, montan chak kòmand ap konvèti an **HTG** (ak to a) anvan yo voye l bay MonCash.
 - Machann nan dwe gen **yon nimewo MonCash pou payout** nan HatexCard (Konekte kont bank) pou resevwa lajan li.
 - Kle API a se yon sekrè — li rete sèlman bò sèvè a (WordPress), li pa janm ekspoze nan navigatè kliyan an.
 `;
@@ -747,9 +778,9 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 
           <p className="text-sm text-slate-600 mb-6 leading-relaxed">
             Fè sit ou a aksepte <span className="font-semibold text-slate-900">MonCash</span>{' '}
-            (HTG). Kliyan konfime peman an ak yon <span className="font-semibold">USSD</span>{' '}
-            sou telefòn li epi ou resevwa montan an sou kont ou nan HatexCard. Konfigirasyon an
-            gentan fèt nan ZIP la.
+            (HTG — konpatib ak boutik an HTG oswa USD). Kliyan konfime peman an ak yon{' '}
+            <span className="font-semibold">USSD</span> sou telefòn li epi ou resevwa montan an sou
+            kont ou nan HatexCard. Konfigirasyon an gentan fèt nan ZIP la.
           </p>
 
           <ul className="text-xs text-slate-600 space-y-2 mb-8">
@@ -774,7 +805,7 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-gray-100 pt-6">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Vèsyon: 26.0.0
+              Vèsyon: 26.1.0
             </div>
             <button
               type="button"
