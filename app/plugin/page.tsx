@@ -676,6 +676,55 @@ function hatexcard_bootstrap() {
 add_action('plugins_loaded', 'hatexcard_bootstrap', 20);
 add_action('woocommerce_loaded', 'hatexcard_bootstrap', 5);
 add_action('init', 'hatexcard_bootstrap', 5);
+
+// ==========================================================================
+// SOUTIEN CHECKOUT BLÒK (WooCommerce Cart & Checkout) — v26.1.0
+// Depi WC 8.3 paj checkout default la se yon blòk: WC pa rann fòm HTML
+// legacy a ankò; li sèvi ak Store API + yon rejis JS. Yon gateway dwe
+// ENSKRI yon metòd peman (wcBlocksRegistry.registerPaymentMethod) pou li
+// ka parèt. San sa, Store API a ka lis li (disponib) men blòk la pa janm
+// montre li vizyèlman. Fichye JS la: hatexcard-moncash-payment-method.js
+// ==========================================================================
+function hatexcard_enqueue_checkout_block_payment_method() {
+    if (is_admin() || !function_exists('is_checkout') || !is_checkout()) {
+        return;
+    }
+    if (!hatexcard_ensure_gateway_available()) {
+        return;
+    }
+    $post = get_post();
+    if (!$post || !has_block('woocommerce/checkout', $post)) {
+        return;
+    }
+    if (!wp_script_is('wc-blocks-registry', 'registered')) {
+        return;
+    }
+
+    wp_register_script(
+        'hatexcard-moncash-payment-method',
+        plugins_url('hatexcard-moncash-payment-method.js', __FILE__),
+        array('wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities'),
+        HATEXCARD_PLUGIN_VERSION,
+        true
+    );
+
+    $hx_settings = get_option('woocommerce_hatexcard_moncash_settings', array());
+    $hx_title = (!empty($hx_settings['title']) && is_string($hx_settings['title']))
+        ? $hx_settings['title']
+        : 'Peye ak MonCash';
+    $hx_description = (!empty($hx_settings['description']) && is_string($hx_settings['description']))
+        ? $hx_settings['description']
+        : 'Kliyan an konfime peman an ak yon USSD sou telefòn li (HTG).';
+
+    wp_localize_script('hatexcard-moncash-payment-method', 'hatexcardMonCashBlockData', array(
+        'title'       => $hx_title,
+        'description' => $hx_description,
+        'supports'    => array('products'),
+    ));
+
+    wp_enqueue_script('hatexcard-moncash-payment-method');
+}
+add_action('wp_enqueue_scripts', 'hatexcard_enqueue_checkout_block_payment_method', 50);
 ?>`;
 
       const readme = `# HatexCard MonCash — Plugin WooCommerce
@@ -701,6 +750,7 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 - Apre peman an, MonCash konfime epi **machann nan resevwa montan an sou kont li** nan HatexCard (payout otomatik).
 - Paj resi a montre estati peman an epi kòmand la vin **konplete** otomatikman lè MonCash konfime.
 - Apre yon peman hosted, onglet MonCash la tounen sou paj konfimasyon HatexCard (hatexcard.com/success) — se baz done a ki konfime peman an, pa paj la.
+- Paj checkout blòk WooCommerce la (Cart & Checkout, default depi WC 8.3) sipòte depi v26.1.0: **Peye ak MonCash** enskri otomatikman nan blòk la epi li parèt tankou lòt metòd peman.
 
 ## Enpòtan
 
@@ -710,7 +760,70 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 - Kle API a se yon sekrè — li rete sèlman bò sèvè a (WordPress), li pa janm ekspoze nan navigatè kliyan an.
 `;
 
+      // Entegrasyon paj checkout BLÒK (WooCommerce Cart & Checkout, WC 8.3+):
+      // blòk la sèvi ak Store API pou lis peman yo, men pou yon gateway ka
+      // PARET vizyèlman li dwe enskri yon metòd JS (wcBlocksRegistry).
+      // Sa se menm mekanism ak wc-payment-method-cod.js nan nwayo WooCommerce.
+      const checkoutBlockJs = `/**
+ * HatexCard MonCash - Enskripsyon peman pou paj checkout blòk la
+ * (WooCommerce Cart & Checkout, WC v8.3+). Vèsyon 26.1.0.
+ *
+ * San fichye sa a, gateway a ka dispo nan Store API (lis peman), men blòk
+ * la pa janm rann li vizyèlman paske li manke nan rejis JS la.
+ * 'name' dwe matche ak id gateway a: hatexcard_moncash.
+ */
+(function () {
+    'use strict';
+
+    var wc = window.wc;
+    if (!wc || !wc.wcBlocksRegistry || !wc.wcBlocksRegistry.registerPaymentMethod) {
+        return;
+    }
+    var wpElement = window.wp && window.wp.element;
+    var wpEntities = window.wp && window.wp.htmlEntities;
+    if (!wpElement || !wpElement.createElement) {
+        return;
+    }
+
+    var createElement = wpElement.createElement;
+    var decodeEntities = (wpEntities && typeof wpEntities.decodeEntities === 'function')
+        ? wpEntities.decodeEntities
+        : function (value) { return value || ''; };
+
+    var data = window.hatexcardMonCashBlockData || {};
+    var title = decodeEntities(data.title || 'Peye ak MonCash');
+    var description = data.description ? decodeEntities(String(data.description)) : '';
+    var features = (data.supports && data.supports.length) ? data.supports : ['products'];
+
+    function HatexCardLabel(props) {
+        var components = (props && props.components) ? props.components : {};
+        if (components.PaymentMethodLabel) {
+            return createElement(components.PaymentMethodLabel, { text: title });
+        }
+        return createElement('span', { className: 'wc-block-components-payment-method-label' }, title);
+    }
+
+    function HatexCardContent() {
+        if (!description) {
+            return null;
+        }
+        return createElement('p', { className: 'hatexcard-moncash-checkout-description' }, description);
+    }
+
+    wc.wcBlocksRegistry.registerPaymentMethod({
+        name: 'hatexcard_moncash',
+        label: createElement(HatexCardLabel),
+        ariaLabel: title,
+        content: createElement(HatexCardContent),
+        edit: createElement(HatexCardContent),
+        canMakePayment: function () { return true; },
+        supports: { features: features }
+    });
+})();
+`;
+
       pluginDir?.file('hatexcard-gateway.php', phpCode);
+      pluginDir?.file('hatexcard-moncash-payment-method.js', checkoutBlockJs);
       pluginDir?.file('README.md', readme);
       const blob = await zip.generateAsync({ type: 'blob' });
       saveAs(blob, 'hatexcard-woocommerce.zip');
