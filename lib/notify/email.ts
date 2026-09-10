@@ -3,13 +3,13 @@
  *
  * Env:
  *   BREVO_API_KEY          — obligatwa (oswa SENDINBLUE_API_KEY)
- *   BREVO_SENDER_EMAIL     — opsyonèl (default notifications@hatexcard.com)
+ *   BREVO_SENDER_EMAIL     — opsyonèl (default noreply@hatexcard.com)
  *   BREVO_SENDER_NAME      — opsyonèl (default HatexCard)
  *
  * Verifye adrès ekspeditè a nan Brevo → Senders, Domains & Dedicated IPs.
  */
 
-export const NOTIFY_FROM = 'HatexCard <notifications@hatexcard.com>';
+export const NOTIFY_FROM = 'HatexCard <noreply@hatexcard.com>';
 export const SITE_URL = (() => {
   const raw = (process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com').replace(/\/$/, '');
   // Pa mete lyen localhost nan imèl kliyan (menm si .env.local gen localhost).
@@ -31,7 +31,7 @@ export function isEmailConfigured(): boolean {
 
 export function parseSender(from?: string | null): { name: string; email: string } {
   const fallbackEmail =
-    process.env.BREVO_SENDER_EMAIL?.trim() || 'notifications@hatexcard.com';
+    process.env.BREVO_SENDER_EMAIL?.trim() || 'noreply@hatexcard.com';
   const fallbackName = process.env.BREVO_SENDER_NAME?.trim() || 'HatexCard';
   const raw = String(from || NOTIFY_FROM).trim();
   const m = /^(.+?)\s*<([^>]+)>$/.exec(raw);

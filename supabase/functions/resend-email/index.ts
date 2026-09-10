@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') || Deno.env.get('SENDINBLUE_API_KEY')
-const SENDER_EMAIL = Deno.env.get('BREVO_SENDER_EMAIL') || 'notifications@hatexcard.com'
+const SENDER_EMAIL = Deno.env.get('BREVO_SENDER_EMAIL') || 'noreply@hatexcard.com'
 const SENDER_NAME = Deno.env.get('BREVO_SENDER_NAME') || 'HatexCard'
 
 const corsHeaders = {

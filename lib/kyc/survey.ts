@@ -2,7 +2,7 @@
 
 export const KYC_SURVEY_WHATSAPP = '50937201241';
 export const KYC_SURVEY_WHATSAPP_URL = `https://wa.me/${KYC_SURVEY_WHATSAPP}`;
-export const KYC_SURVEY_FROM = 'HatexCard <notifications@hatexcard.com>';
+export const KYC_SURVEY_FROM = 'HatexCard <noreply@hatexcard.com>';
 
 export const KYC_SURVEY_QUESTIONS = [
   {
