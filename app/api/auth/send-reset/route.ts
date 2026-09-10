@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
-import { escapeHtml, isEmailConfigured, sendMail } from '@/lib/notify/email';
+import { isEmailConfigured, sendMail, untrackedUrlBlock } from '@/lib/notify/email';
 import { publicSiteUrl } from '@/lib/urls/public';
 
 const SITE_URL = publicSiteUrl();
@@ -15,12 +15,10 @@ function buildResetEmailHtml(actionLink: string): string {
     <div style="padding:36px; text-align:center; color:#111;">
       <p style="text-transform:uppercase; font-size:11px; letter-spacing:2px; color:#6b7280; font-weight:800; margin:0 0 8px;">Chanjman Modpas</p>
       <h2 style="margin:0 0 16px; font-size:20px;">Reyinisyalize modpas ou</h2>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6; margin:0 0 28px;">
-        Nou resevwa yon demann pou chanje modpas kont HatexCard ou a. Klike sou bouton anba a pou w chwazi yon nouvo modpas. Lyen sa a ap ekspire nan 1 èdtan.
+      <p style="color:#4b5563; font-size:14px; line-height:1.6; margin:0 0 8px;">
+        Nou resevwa yon demann pou chanje modpas kont HatexCard ou a. Louvri lyen anba a pou w chwazi yon nouvo modpas. Lyen sa a ap ekspire nan 1 èdtan.
       </p>
-      <a href="${actionLink}" style="display:inline-block; background:#dc2626; color:#fff; padding:16px 28px; border-radius:12px; text-decoration:none; font-weight:900; font-size:14px;">
-        CHANJE MODPAS MWEN
-      </a>
+      ${untrackedUrlBlock(actionLink, 'Chanje modpas ou — louvri lyen sa a')}
       <p style="color:#9ca3af; font-size:11px; line-height:1.6; margin:28px 0 0;">
         Si ou pa t mande sa, ou ka inyore imèl sa a — modpas ou p ap chanje.
       </p>
@@ -75,7 +73,7 @@ export async function POST(request: Request) {
     const result = await sendMail({
       to: email,
       subject: 'HatexCard — Chanje modpas ou',
-      html: buildResetEmailHtml(escapeHtml(actionLink)),
+      html: buildResetEmailHtml(actionLink),
       logLabel: 'auth-send-reset',
     });
 

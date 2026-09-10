@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { escapeHtml, isEmailConfigured, sendMail, SITE_URL } from '@/lib/notify/email';
+import { isEmailConfigured, sendMail, SITE_URL, untrackedUrlBlock } from '@/lib/notify/email';
 
 function buildConfirmEmailHtml(actionLink: string): string {
   return `
@@ -10,13 +10,11 @@ function buildConfirmEmailHtml(actionLink: string): string {
     <div style="padding:36px; text-align:center; color:#111;">
       <p style="text-transform:uppercase; font-size:11px; letter-spacing:2px; color:#6b7280; font-weight:800; margin:0 0 8px;">Konfimasyon Kont</p>
       <h2 style="margin:0 0 16px; font-size:20px;">Konfime enskripsyon ou</h2>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6; margin:0 0 28px;">
-        Mèsi paske w enskri sou HatexCard. Klike sou bouton anba a pou aktive kont ou.
+      <p style="color:#4b5563; font-size:14px; line-height:1.6; margin:0 0 8px;">
+        Mèsi paske w enskri sou HatexCard. Louvri lyen anba a pou aktive kont ou.
         Lyen sa a ekspire apre kèk èdtan.
       </p>
-      <a href="${actionLink}" style="display:inline-block; background:#4f46e5; color:#fff; padding:16px 28px; border-radius:12px; text-decoration:none; font-weight:900; font-size:14px;">
-        KONFIME IMÈL MWEN
-      </a>
+      ${untrackedUrlBlock(actionLink, 'Konfime imèl ou — louvri lyen sa a')}
       <p style="color:#9ca3af; font-size:11px; line-height:1.6; margin:28px 0 0;">
         Si ou pa t kreye kont sa a, ou ka inyore imèl sa a.
       </p>
@@ -63,7 +61,7 @@ export async function sendSignupConfirmEmail(
   const result = await sendMail({
     to: email,
     subject: 'HatexCard — Konfime enskripsyon ou',
-    html: buildConfirmEmailHtml(escapeHtml(actionLink)),
+    html: buildConfirmEmailHtml(actionLink),
     logLabel: 'signup-confirm',
   });
 

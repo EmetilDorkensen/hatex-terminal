@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
-import { isEmailConfigured, sendMail } from '@/lib/notify/email';
+import { isEmailConfigured, sendMail, untrackedUrlBlock } from '@/lib/notify/email';
 import { CANONICAL_SITE_URL, invoicePublicUrl } from '@/lib/urls/public';
 
 /** Voye imèl fakti — sèlman pwopriyetè fakti a (sesyon), via Brevo sèvè. */
@@ -81,14 +81,7 @@ export async function POST(request: Request) {
             <p style="font-size:28px;font-weight:bold;margin:0 0 12px">${amountLabel}</p>
             ${inv.description ? `<p style="color:#475569">${String(inv.description)}</p>` : ''}
             <p style="color:#64748b;font-size:14px">Ou ka peye avèk HatexCard / MonCash — san kite sit la.</p>
-            <p style="margin:18px 0 8px">
-              <a href="${payLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:bold">Peye kounye a</a>
-            </p>
-            <p style="margin:16px 0 0;font-size:12px;color:#64748b;line-height:1.5">
-              Si bouton an montre « connexion non privée », louvri sit la dirèkteman:<br/>
-              <a href="${payLink}" style="color:#4f46e5;word-break:break-all;font-weight:600">${payLink}</a>
-            </p>
-            <p style="margin:10px 0 0;font-size:11px;color:#94a3b8">Kopi lyen an epi kole l nan Chrome / Safari (dwe kòmanse ak https://hatexcard.com).</p>
+            ${untrackedUrlBlock(payLink, 'Peye kounye a — louvri lyen sa a')}
           </div>
         </div>
       `,

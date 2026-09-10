@@ -58,6 +58,25 @@ export function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Bouton / lyen SAN <a href>.
+ * Brevo reekri tout href atravè mail./noreply. (SSL souvan kraze → "connexion non privée").
+ * Nou montre URL a an tèks; Gmail/Outlook ap fè l klikab dirèk sou hatexcard.com.
+ */
+export function untrackedUrlBlock(url: string, title: string): string {
+  const safeUrl = escapeHtml(url);
+  const safeTitle = escapeHtml(title);
+  return `
+    <div style="margin:18px 0;padding:16px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;text-align:center;">
+      <p style="margin:0 0 10px;font-size:15px;font-weight:800;color:#312e81;">${safeTitle}</p>
+      <p style="margin:0;word-break:break-all;font-size:14px;line-height:1.5;color:#4338ca;font-weight:700;">${safeUrl}</p>
+      <p style="margin:12px 0 0;font-size:12px;color:#64748b;line-height:1.45;">
+        Klike sou lyen ble a, oswa <strong>kopi</strong> li epi kole l nan Chrome / Safari.
+        Li dwe kòmanse ak <strong>https://hatexcard.com</strong>.
+      </p>
+    </div>`;
+}
+
 /** Eksteryè a (brand) pou tout imèl notifikasyon — menm stil ak paj yo. */
 export function shellHtml(kicker: string, innerHtml: string): string {
   return `
@@ -71,8 +90,7 @@ export function shellHtml(kicker: string, innerHtml: string): string {
     </div>
     <div style="padding:20px 32px; border-top:1px solid #f1f5f9; background:#fafafa;">
       <p style="color:#94a3b8; font-size:11px; line-height:1.6; margin:0;">
-        HatexCard — Peman, Wallet & Machann. Si ou pa t fè operasyon sa a, kontakte
-        <a href="${SITE_URL}/kontakte" style="color:#dc2626;">sipò HatexCard</a> imedyatman.
+        HatexCard — Peman, Wallet & Machann. Sipò: WhatsApp +509 3720 1241 · ${escapeHtml(SITE_URL)}
       </p>
     </div>
   </div>`;
