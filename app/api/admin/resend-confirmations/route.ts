@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       failed += 1;
       results.push({ email: row.email, ok: false, message: result.message });
     }
-    // Pa satije Resend — ti pause
+    // Pa satije Brevo — ti pause
     await new Promise((r) => setTimeout(r, 350));
   }
 

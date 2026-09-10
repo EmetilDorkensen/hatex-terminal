@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { escapeHtml, KYC_SURVEY_FROM } from '@/lib/kyc/survey';
+import { isEmailConfigured, sendMail } from '@/lib/notify/email';
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -17,8 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Aksè refize.' }, { status: 403 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!isEmailConfigured()) {
     return NextResponse.json({ error: 'Sèvis imèl pa konfigire.' }, { status: 500 });
   }
 
@@ -51,18 +50,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Imèl kliyan pa jwenn.' }, { status: 404 });
   }
 
-  const resend = new Resend(apiKey);
-  const { error: mailErr } = await resend.emails.send({
-    from: KYC_SURVEY_FROM,
+  const result = await sendMail({
     to: profile.email,
+    from: KYC_SURVEY_FROM,
     subject: 'HatexCard Sipò — Repons sou kesyonman KYC ou',
     html: `<p><strong>Bonjou ${escapeHtml(profile.full_name || 'Kliyan')},</strong></p>
 <p>${escapeHtml(message).replace(/\n/g, '<br/>')}</p>
 <p style="color:#64748b;font-size:12px;margin-top:24px;">Ekip Sipò HatexCard · WhatsApp +509 3720 1241</p>`,
+    logLabel: 'kyc-survey-reply-admin',
   });
 
-  if (mailErr) {
-    console.error('kyc-survey reply:', mailErr);
+  if (!result.ok) {
+    console.error('kyc-survey reply:', result.message);
     return NextResponse.json({ error: 'Pa t kapab voye imèl la.' }, { status: 502 });
   }
 

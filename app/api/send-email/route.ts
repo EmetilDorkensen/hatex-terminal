@@ -1,17 +1,7 @@
-import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
-import { NOTIFY_FROM } from '@/lib/notify/email';
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml, isEmailConfigured, sendMail } from '@/lib/notify/email';
 
 export async function POST(req: Request) {
   const ip = getClientIp(req);
@@ -28,9 +18,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Aksè refize.' }, { status: 403 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.error('RESEND_API_KEY pa konfigire.');
+  if (!isEmailConfigured()) {
+    console.error('BREVO_API_KEY pa konfigire.');
     return NextResponse.json({ error: 'Sèvis imèl pa konfigire.' }, { status: 500 });
   }
 
@@ -45,16 +34,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Imèl destinatè manke.' }, { status: 400 });
     }
 
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: NOTIFY_FROM,
-      to: [to],
+    const result = await sendMail({
+      to,
       subject,
       html: `<strong>Bonjou ${escapeHtml(non)},</strong><p>${escapeHtml(mesaj).replace(/\n/g, '<br/>')}</p>`,
+      logLabel: 'admin-send-email',
     });
 
-    if (error) {
-      console.error('Erè Resend:', error);
+    if (!result.ok) {
+      console.error('Erè Brevo:', result.message);
       return NextResponse.json({ error: 'Pa t kapab voye imèl la.' }, { status: 502 });
     }
 

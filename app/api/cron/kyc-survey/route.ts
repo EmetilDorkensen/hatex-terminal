@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
 import { verifyCronSecret } from '@/lib/security/cron-auth';
 import { KYC_STATUS } from '@/lib/kyc/status';
-import {
-  buildKycSurveyEmailHtml,
-  KYC_SURVEY_FROM,
-} from '@/lib/kyc/survey';
+import { buildKycSurveyEmailHtml, KYC_SURVEY_FROM } from '@/lib/kyc/survey';
 import { generateSurveyToken } from '@/lib/kyc/survey-token';
+import { isEmailConfigured, sendMail } from '@/lib/notify/email';
 
 const BATCH_LIMIT = 80;
 const TOKEN_TTL_DAYS = 14;
@@ -26,16 +23,14 @@ export async function GET(req: Request) {
       return new Response('Ou pa gen otorizasyon pou deklanche robo sa a.', { status: 401 });
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'RESEND_API_KEY manke.' }, { status: 500 });
+    if (!isEmailConfigured()) {
+      return NextResponse.json({ error: 'BREVO_API_KEY manke.' }, { status: 500 });
     }
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    const resend = new Resend(apiKey);
     const origin = appOrigin();
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -100,15 +95,16 @@ export async function GET(req: Request) {
       });
 
       try {
-        const { data: mailData, error: mailErr } = await resend.emails.send({
-          from: KYC_SURVEY_FROM,
+        const result = await sendMail({
           to: String(profile.email).trim(),
+          from: KYC_SURVEY_FROM,
           subject: 'HatexCard — Poukisa ou poko pase KYC? Nou la pou ede w',
           html,
+          logLabel: 'kyc-survey-cron',
         });
 
-        if (mailErr) {
-          console.error('kyc-survey mail:', mailErr);
+        if (!result.ok) {
+          console.error('kyc-survey mail:', result.message);
           failed += 1;
           continue;
         }
@@ -116,7 +112,7 @@ export async function GET(req: Request) {
         await supabase.from('kyc_survey_sends').insert({
           user_id: profile.id,
           email_to: String(profile.email).trim(),
-          resend_id: mailData?.id || null,
+          resend_id: result.id || null,
         });
         sent += 1;
       } catch (e) {

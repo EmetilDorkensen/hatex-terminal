@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
 import { KYC_STATUS } from '@/lib/kyc/status';
 import { buildKycSurveyEmailHtml, KYC_SURVEY_FROM } from '@/lib/kyc/survey';
 import { generateSurveyToken } from '@/lib/kyc/survey-token';
+import { isEmailConfigured, sendMail } from '@/lib/notify/email';
 
 const TOKEN_TTL_DAYS = 14;
 
@@ -27,8 +27,7 @@ export async function sendKycSurveyToUser(
   userId: string,
   options?: { force?: boolean }
 ): Promise<SendSurveyResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!isEmailConfigured()) {
     return { success: false, error: 'Sèvis imèl pa konfigire.', status: 500 };
   }
 
@@ -104,24 +103,26 @@ export async function sendKycSurveyToUser(
     appOrigin: origin,
   });
 
-  const resend = new Resend(apiKey);
-  const { data: mailData, error: mailErr } = await resend.emails.send({
-    from: KYC_SURVEY_FROM,
+  const result = await sendMail({
     to: email,
+    from: KYC_SURVEY_FROM,
     subject: 'HatexCard — Poukisa ou poko pase KYC? Nou la pou ede w',
     html,
+    logLabel: 'kyc-survey',
   });
 
-  if (mailErr) {
-    console.error('send survey mail:', mailErr);
+  if (!result.ok) {
+    console.error('send survey mail:', result.message);
     return { success: false, error: 'Pa t kapab voye imèl la.', status: 502 };
   }
+
+  const messageId = result.id || null;
 
   await db.from('kyc_survey_sends').insert({
     user_id: userId,
     email_to: email,
-    resend_id: mailData?.id || null,
+    resend_id: messageId,
   });
 
-  return { success: true, email, resend_id: mailData?.id || null };
+  return { success: true, email, resend_id: messageId };
 }

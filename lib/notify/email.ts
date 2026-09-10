@@ -1,15 +1,46 @@
-import { Resend } from 'resend';
-
 /**
- * Modil santral pou voye imèl notifikasyon atravè Resend.
+ * Modil santral pou voye imèl notifikasyon atravè Brevo (Sendinblue).
  *
- * Tout imèl kliyan yo soti nan menm adrès la (notifications@hatexcard.com) —
- * adrès sa a se youn ki deja verifye / ap mache pou fakti yo nan Resend.
- * Api key la li nan anviwònman Vercel (RESEND_API_KEY).
+ * Env:
+ *   BREVO_API_KEY          — obligatwa (oswa SENDINBLUE_API_KEY)
+ *   BREVO_SENDER_EMAIL     — opsyonèl (default notifications@hatexcard.com)
+ *   BREVO_SENDER_NAME      — opsyonèl (default HatexCard)
+ *
+ * Verifye adrès ekspeditè a nan Brevo → Senders, Domains & Dedicated IPs.
  */
 
 export const NOTIFY_FROM = 'HatexCard <notifications@hatexcard.com>';
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
+
+export function getBrevoApiKey(): string | null {
+  const key =
+    process.env.BREVO_API_KEY?.trim() ||
+    process.env.SENDINBLUE_API_KEY?.trim() ||
+    '';
+  return key || null;
+}
+
+export function isEmailConfigured(): boolean {
+  return !!getBrevoApiKey();
+}
+
+export function parseSender(from?: string | null): { name: string; email: string } {
+  const fallbackEmail =
+    process.env.BREVO_SENDER_EMAIL?.trim() || 'notifications@hatexcard.com';
+  const fallbackName = process.env.BREVO_SENDER_NAME?.trim() || 'HatexCard';
+  const raw = String(from || NOTIFY_FROM).trim();
+  const m = /^(.+?)\s*<([^>]+)>$/.exec(raw);
+  if (m) {
+    return {
+      name: m[1].trim().replace(/^["']|["']$/g, '') || fallbackName,
+      email: m[2].trim() || fallbackEmail,
+    };
+  }
+  if (raw.includes('@')) {
+    return { name: fallbackName, email: raw };
+  }
+  return { name: fallbackName, email: fallbackEmail };
+}
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -40,49 +71,73 @@ export function shellHtml(kicker: string, innerHtml: string): string {
   </div>`;
 }
 
-export type SendMailResult = { ok: true } | { ok: false; message: string };
+export type SendMailResult =
+  | { ok: true; id?: string | null }
+  | { ok: false; message: string };
 
 /**
- * Voye yon imèl atravè Resend. Pa janm jete — tout erè yo loje.
- * Retounen { ok } pou kòd ki rele a ka deside si l bezwen reyaji.
+ * Voye yon imèl atravè Brevo Transactional API.
+ * Pa janm jete — tout erè yo loje.
  */
 export async function sendMail(opts: {
   to: string;
   subject: string;
   html: string;
+  from?: string;
   logLabel?: string;
 }): Promise<SendMailResult> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = getBrevoApiKey();
   if (!apiKey) {
-    console.warn(`[email] ${opts.logLabel || 'sendMail'}: RESEND_API_KEY pa konfigire — imèl pa voye.`);
-    return { ok: false, message: 'RESEND_API_KEY pa konfigire.' };
+    console.warn(
+      `[email] ${opts.logLabel || 'sendMail'}: BREVO_API_KEY pa konfigire — imèl pa voye.`
+    );
+    return { ok: false, message: 'BREVO_API_KEY pa konfigire.' };
   }
 
-  const to = String(opts.to || '').trim().toLowerCase();
+  const to = String(opts.to || '')
+    .trim()
+    .toLowerCase();
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     console.warn(`[email] ${opts.logLabel || 'sendMail'}: adrès pa valab — ${to || '(vid)'}`);
     return { ok: false, message: 'Adrès imèl pa valab.' };
   }
 
+  const sender = parseSender(opts.from);
+
   try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: NOTIFY_FROM,
-      to: [to],
-      subject: String(opts.subject).slice(0, 180),
-      html: opts.html,
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: to }],
+        subject: String(opts.subject).slice(0, 180),
+        htmlContent: opts.html,
+      }),
     });
 
-    if (error) {
-      const detail =
-        error && typeof error === 'object' && 'message' in error
-          ? String((error as { message?: unknown }).message || '')
-          : '';
-      console.error(`[email] ${opts.logLabel || 'sendMail'} echwe pou ${to}:`, detail || error);
-      return { ok: false, message: detail || 'Resend te refize imèl la.' };
+    const raw = await res.text();
+    let parsed: { messageId?: string; message?: string } | null = null;
+    try {
+      parsed = raw ? (JSON.parse(raw) as { messageId?: string; message?: string }) : null;
+    } catch {
+      parsed = null;
     }
 
-    return { ok: true };
+    if (!res.ok) {
+      const detail =
+        (parsed && (parsed.message || JSON.stringify(parsed))) ||
+        raw ||
+        `HTTP ${res.status}`;
+      console.error(`[email] ${opts.logLabel || 'sendMail'} echwe pou ${to}:`, detail);
+      return { ok: false, message: String(detail).slice(0, 300) || 'Brevo te refize imèl la.' };
+    }
+
+    return { ok: true, id: parsed?.messageId || null };
   } catch (err: unknown) {
     console.error(
       `[email] ${opts.logLabel || 'sendMail'} eksepsyon pou ${to}:`,

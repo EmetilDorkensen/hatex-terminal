@@ -1,7 +1,7 @@
-import { Resend } from 'resend';
+import { isEmailConfigured, sendMail, escapeHtml } from '@/lib/notify/email';
 
 /**
- * Imèl ranbousman — sa a se yon modil pataje (se pa yon fonksyonalite rezèrvasyon).
+ * Imèl ranbousman — sa a se yon modil pataje (se pa yon fonksyonalite rezèvasyon).
  * Te sitye nan lib/reservations/notify-refund.ts; yo deplase li isit la pandan
  * netwayaj boutik anliy paske refunds yo sèvi ak li pou tout sous peman.
  */
@@ -15,10 +15,7 @@ export async function sendRefundEmails(opts: {
   title: string;
   reason?: string | null;
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
-  const resend = new Resend(apiKey);
-  const from = 'HatexCard <notifications@hatexcard.com>';
+  if (!isEmailConfigured()) return;
   const amount = Number(opts.amount || 0).toLocaleString();
   const title = escapeHtml(opts.title || 'Tranzaksyon');
   const reason = escapeHtml(opts.reason || 'Pa presize');
@@ -27,8 +24,7 @@ export async function sendRefundEmails(opts: {
   const jobs: Promise<unknown>[] = [];
   if (opts.buyerEmail) {
     jobs.push(
-      resend.emails.send({
-        from,
+      sendMail({
         to: opts.buyerEmail,
         subject: `Ranbousman: ${amount} HTG`,
         html: `
@@ -39,13 +35,13 @@ export async function sendRefundEmails(opts: {
           <p>Machann: ${merchant}</p>
           <p>Lajan an retounen sou balans HatexCard ou (kat/wallet) — san frè.</p>
         `,
+        logLabel: 'refund-buyer',
       })
     );
   }
   if (opts.merchantEmail) {
     jobs.push(
-      resend.emails.send({
-        from,
+      sendMail({
         to: opts.merchantEmail,
         subject: `Ranbousman fèt: ${amount} HTG`,
         html: `
@@ -54,6 +50,7 @@ export async function sendRefundEmails(opts: {
           <p><b>${amount} HTG</b> pou « ${title} » debite nan wallet ou.</p>
           <p>Rezon: ${reason}</p>
         `,
+        logLabel: 'refund-merchant',
       })
     );
   }
@@ -70,16 +67,13 @@ export async function sendRefundRequestMerchantEmail(opts: {
   title: string;
   reason: string;
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || !opts.merchantEmail) return;
-  const resend = new Resend(apiKey);
+  if (!isEmailConfigured() || !opts.merchantEmail) return;
   const amount = Number(opts.amount || 0).toLocaleString();
   const buyer = escapeHtml(opts.buyerName || 'Yon kliyan');
   const title = escapeHtml(opts.title || 'sèvis');
   const reason = escapeHtml(opts.reason);
 
-  await resend.emails.send({
-    from: 'HatexCard <notifications@hatexcard.com>',
+  await sendMail({
     to: opts.merchantEmail,
     subject: `Demann ranbousman: ${buyer} — ${amount} HTG`,
     html: `
@@ -92,13 +86,6 @@ export async function sendRefundRequestMerchantEmail(opts: {
       pou retounen kob la sou kat kliyan an (san frè).</p>
       <p>— Ekip HatexCard</p>
     `,
+    logLabel: 'refund-request-merchant',
   });
-}
-
-function escapeHtml(s: string): string {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

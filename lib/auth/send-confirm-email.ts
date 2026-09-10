@@ -1,16 +1,5 @@
-import { Resend } from 'resend';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml, isEmailConfigured, sendMail, SITE_URL } from '@/lib/notify/email';
 
 function buildConfirmEmailHtml(actionLink: string): string {
   return `
@@ -40,7 +29,7 @@ export type SendConfirmResult =
   | { ok: false; message: string; status?: number };
 
 /**
- * Voye imèl konfimasyon atravè Resend (pa SMTP Supabase ki rate-limit).
+ * Voye imèl konfimasyon atravè Brevo (pa SMTP Supabase ki rate-limit).
  * Itilize magiclink hashed_token → /auth/confirm sou sit la.
  */
 export async function sendSignupConfirmEmail(
@@ -52,9 +41,8 @@ export async function sendSignupConfirmEmail(
     return { ok: false, message: 'Imèl pa valab.', status: 400 };
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.error('RESEND_API_KEY pa konfigire.');
+  if (!isEmailConfigured()) {
+    console.error('BREVO_API_KEY pa konfigire.');
     return { ok: false, message: 'Sèvis imèl pa konfigire.', status: 500 };
   }
 
@@ -72,16 +60,15 @@ export async function sendSignupConfirmEmail(
 
   const actionLink = `${SITE_URL}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
 
-  const resend = new Resend(apiKey);
-  const { error: sendErr } = await resend.emails.send({
-    from: 'HatexCard <notifications@hatexcard.com>',
-    to: [email],
+  const result = await sendMail({
+    to: email,
     subject: 'HatexCard — Konfime enskripsyon ou',
     html: buildConfirmEmailHtml(escapeHtml(actionLink)),
+    logLabel: 'signup-confirm',
   });
 
-  if (sendErr) {
-    console.error('Erè Resend (confirm):', sendErr);
+  if (!result.ok) {
+    console.error('Erè Brevo (confirm):', result.message);
     return { ok: false, message: 'Pa t kapab voye imèl la. Eseye ankò.', status: 502 };
   }
 

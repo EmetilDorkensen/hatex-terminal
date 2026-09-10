@@ -4,7 +4,7 @@ import { escapeHtml, sendMail, shellHtml, SITE_URL } from './email';
 /**
  * Imèl "konfimasyon vant" — yo voye apre yon peman regle (hatex_payments →
  * settle). Machann lan resevwa notifikasyon peman an; kliyan an resevwa yon
- * resi lè nou gen adrès li. Yo sèvi ak menm RESEND_API_KEY Vercel la.
+ * resi lè nou gen adrès li. Yo sèvi ak menm BREVO_API_KEY Vercel la.
  */
 
 type SettledPaymentInfo = {

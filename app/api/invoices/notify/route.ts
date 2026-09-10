@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { isEmailConfigured, sendMail } from '@/lib/notify/email';
 
-/** Voye imèl fakti — sèlman pwopriyetè fakti a (sesyon), via Resend sèvè. */
+/** Voye imèl fakti — sèlman pwopriyetè fakti a (sesyon), via Brevo sèvè. */
 export async function POST(request: Request) {
   const ip = getClientIp(request);
   const rl = await rateLimit(`invoice-notify:${ip}`, 20, 300);
@@ -11,14 +11,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: 'Twòp demann.' }, { status: 429 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!isEmailConfigured()) {
     return NextResponse.json({ success: false, message: 'Sèvis imèl pa konfigire.' }, { status: 503 });
   }
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ success: false, message: 'Ou dwe konekte.' }, { status: 401 });
     }
@@ -58,17 +59,14 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single();
 
-    const business =
-      profile?.business_name || profile?.full_name || 'HatexCard';
+    const business = profile?.business_name || profile?.full_name || 'HatexCard';
     const site = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
     const payLink = `${site}/checkout-invoice/${inv.share_token || inv.id}`;
     const cur = inv.currency === 'USD' ? 'USD' : 'HTG';
     const amountLabel = `${Number(inv.amount).toLocaleString()} ${cur}`;
 
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: 'HatexCard <notifications@hatexcard.com>',
-      to: [inv.client_email],
+    const result = await sendMail({
+      to: inv.client_email,
       subject: `Invoice HatexCard: ${amountLabel} — ${business}`,
       html: `
         <div style="font-family:sans-serif;max-width:500px;margin:auto">
@@ -79,30 +77,17 @@ export async function POST(request: Request) {
           <a href="${payLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:bold">Peye kounye a</a>
         </div>
       `,
+      logLabel: 'invoice-notify',
     });
 
-    if (error) {
-      const detail =
-        error && typeof error === 'object' && 'message' in error
-          ? String((error as { message?: unknown }).message || '')
-          : '';
-      console.error(
-        `[invoice/notify] Resend echwe pou ${inv.client_email} (fakti ${invoiceId}):`,
-        detail || error
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          message: detail
-            ? `Imèl pa t ale: ${detail.slice(0, 200)}`
-            : 'Imèl pa t ale.',
-        },
-        { status: 502 }
-      );
+    if (!result.ok) {
+      console.error('invoice notify Brevo:', result.message);
+      return NextResponse.json({ success: false, message: 'Pa t kapab voye imèl la.' }, { status: 502 });
     }
 
     return NextResponse.json({ success: true, pay_link: payLink });
-  } catch {
+  } catch (e: unknown) {
+    console.error('invoice notify:', e instanceof Error ? e.message : e);
     return NextResponse.json({ success: false, message: 'Erè sèvè.' }, { status: 500 });
   }
 }

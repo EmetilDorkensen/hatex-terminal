@@ -1,10 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') || Deno.env.get('SENDINBLUE_API_KEY')
+const SENDER_EMAIL = Deno.env.get('BREVO_SENDER_EMAIL') || 'notifications@hatexcard.com'
+const SENDER_NAME = Deno.env.get('BREVO_SENDER_NAME') || 'HatexCard'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+async function sendBrevoEmail(opts: { to: string; subject: string; html: string }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      'api-key': BREVO_API_KEY!,
+    },
+    body: JSON.stringify({
+      sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+      to: [{ email: opts.to }],
+      subject: opts.subject,
+      htmlContent: opts.html,
+    }),
+  })
+  return res
 }
 
 serve(async (req: Request) => {
@@ -17,8 +37,8 @@ serve(async (req: Request) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const hasServiceBearer = !!serviceKey && authHeader === `Bearer ${serviceKey}`
     const hasWebhookSecret =
-      !!Deno.env.get('RESEND_WEBHOOK_SECRET') &&
-      req.headers.get('x-hatex-webhook-secret') === Deno.env.get('RESEND_WEBHOOK_SECRET')
+      !!Deno.env.get('BREVO_WEBHOOK_SECRET') &&
+      req.headers.get('x-hatex-webhook-secret') === Deno.env.get('BREVO_WEBHOOK_SECRET')
 
     if (!hasServiceBearer && !hasWebhookSecret) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -27,8 +47,8 @@ serve(async (req: Request) => {
       })
     }
 
-    if (!RESEND_API_KEY) {
-      return new Response(JSON.stringify({ error: 'RESEND_API_KEY manke' }), {
+    if (!BREVO_API_KEY) {
+      return new Response(JSON.stringify({ error: 'BREVO_API_KEY manke' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -122,50 +142,32 @@ serve(async (req: Request) => {
         </div>`;
 
       // 1. Voye bay Machann nan
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
-        body: JSON.stringify({
-          from: 'HatexCard <notifications@hatexcard.com>',
-          to: record.sdk.merchant_email || "notifikasyon@hatexcard.com",
-          subject: `Livrezon Nesesè (${record.sdk.platform}): ${record.sdk.product_name}`,
-          html: merchantHtml
-        }),
-      });
+      await sendBrevoEmail({
+        to: record.sdk.merchant_email || 'notifikasyon@hatexcard.com',
+        subject: `Livrezon Nesesè (${record.sdk.platform}): ${record.sdk.product_name}`,
+        html: merchantHtml,
+      })
 
       // 2. Voye bay Kliyan an
       if (record.sdk.customer_email) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
-          body: JSON.stringify({
-            from: 'HatexCard <notifications@hatexcard.com>',
-            to: record.sdk.customer_email,
-            subject: `Acha reyisi nan ${record.business_name}`,
-            html: customerHtml
-          }),
-        });
+        await sendBrevoEmail({
+          to: record.sdk.customer_email,
+          subject: `Acha reyisi nan ${record.business_name}`,
+          html: customerHtml,
+        })
       }
       
-      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders, status: 200 });
+      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders, status: 200 })
     }
     else {
       return new Response(JSON.stringify({ message: "Ignore: Event not supported" }), { headers: corsHeaders, status: 200 })
     }
 
     // Ekzekisyon pou KA 1 ak KA 2
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: 'HatexCard <notifications@hatexcard.com>',
-        to: emailTo || "notifikasyon@hatexcard.com",
-        subject: emailSubject,
-        html: emailHtml,
-      }),
+    const res = await sendBrevoEmail({
+      to: emailTo || 'notifikasyon@hatexcard.com',
+      subject: emailSubject,
+      html: emailHtml,
     })
 
     const data = await res.json()

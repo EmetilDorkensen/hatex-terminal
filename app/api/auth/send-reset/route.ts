@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
-import { NOTIFY_FROM } from '@/lib/notify/email';
+import { escapeHtml, isEmailConfigured, sendMail } from '@/lib/notify/email';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function buildResetEmailHtml(actionLink: string): string {
   return `
@@ -61,9 +51,8 @@ export async function POST(request: Request) {
     return genericOk;
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.error('RESEND_API_KEY pa konfigire.');
+  if (!isEmailConfigured()) {
+    console.error('BREVO_API_KEY pa konfigire.');
     return NextResponse.json({ success: false, message: 'Sèvis imèl pa konfigire.' }, { status: 500 });
   }
 
@@ -82,16 +71,15 @@ export async function POST(request: Request) {
     }
 
     const actionLink = data.properties.action_link;
-    const resend = new Resend(apiKey);
-    const { error: sendErr } = await resend.emails.send({
-      from: NOTIFY_FROM,
-      to: [email],
+    const result = await sendMail({
+      to: email,
       subject: 'HatexCard — Chanje modpas ou',
       html: buildResetEmailHtml(escapeHtml(actionLink)),
+      logLabel: 'auth-send-reset',
     });
 
-    if (sendErr) {
-      console.error('Erè Resend (reset):', sendErr);
+    if (!result.ok) {
+      console.error('Erè Brevo (reset):', result.message);
       return NextResponse.json(
         { success: false, message: 'Pa t kapab voye imèl la. Eseye ankò.' },
         { status: 502 }
