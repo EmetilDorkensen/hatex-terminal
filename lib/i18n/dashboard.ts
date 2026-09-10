@@ -183,7 +183,9 @@ const dict = {
   },
 } as const;
 
-export type DashCopy = (typeof dict)['ht'];
+export type DashCopy = {
+  [K in keyof (typeof dict)['ht']]: string;
+};
 
 export function getDashCopy(lang: DashLang): DashCopy {
   return dict[lang] || dict.ht;
