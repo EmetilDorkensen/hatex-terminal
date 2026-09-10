@@ -20,7 +20,6 @@ import {
 } from '@/lib/i18n/dashboard';
 import {
   AlertCircle,
-  ArrowUpRight,
   Bell,
   Briefcase,
   CheckCircle2,
@@ -78,7 +77,7 @@ async function confirmAndLoadBilling(): Promise<unknown> {
   try {
     await fetch('/api/billing/confirm', { method: 'POST' });
   } catch {
-    /* peman pending ka poko konfime */
+    /* ignore */
   }
   try {
     const bRes = await fetch('/api/billing/plan');
@@ -305,7 +304,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F6FA] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-[#1d4ed8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -363,8 +362,7 @@ export default function Dashboard() {
       href: '/plan',
       cta: t.expandPlan,
     });
-  }
-  if (effectivePlan === 'free' && !nearLimit) {
+  } else if (effectivePlan === 'free') {
     tasks.push({
       id: 'free',
       tone: 'info',
@@ -376,45 +374,16 @@ export default function Dashboard() {
   }
 
   const quickActions = [
-    {
-      href: '/dashboard/products/new',
-      title: t.qaAccept,
-      desc: t.qaAcceptDesc,
-      icon: CreditCard,
-      tone: 'primary' as const,
-    },
-    {
-      href: '/transactions',
-      title: t.qaFind,
-      desc: t.qaFindDesc,
-      icon: Search,
-      tone: 'default' as const,
-    },
-    {
-      href: '/invoice',
-      title: t.qaInvoice,
-      desc: t.qaInvoiceDesc,
-      icon: Receipt,
-      tone: 'default' as const,
-    },
-    {
-      href: '/transactions',
-      title: t.qaReports,
-      desc: t.qaReportsDesc,
-      icon: BarChart3,
-      tone: 'default' as const,
-    },
+    { href: '/dashboard/products/new', title: t.qaAccept, desc: t.qaAcceptDesc, icon: CreditCard },
+    { href: '/transactions', title: t.qaFind, desc: t.qaFindDesc, icon: Search },
+    { href: '/invoice', title: t.qaInvoice, desc: t.qaInvoiceDesc, icon: Receipt },
+    { href: '/transactions', title: t.qaReports, desc: t.qaReportsDesc, icon: BarChart3 },
   ];
 
-  const toneBorder = {
-    danger: 'border-rose-200 bg-rose-50',
-    warn: 'border-amber-200 bg-amber-50',
-    info: 'border-indigo-100 bg-indigo-50/70',
-  };
-  const toneText = {
-    danger: 'text-rose-900',
-    warn: 'text-amber-900',
-    info: 'text-indigo-950',
+  const toneDot = {
+    danger: 'bg-rose-500',
+    warn: 'bg-amber-500',
+    info: 'bg-[#1d4ed8]',
   };
 
   return (
@@ -432,11 +401,70 @@ export default function Dashboard() {
       }}
       onOpenAdmin={antreNanAdmin}
     >
-      <main className="flex-grow w-full max-w-6xl mx-auto px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-8 lg:pb-14">
-        {/* Header — Authorize.net style welcome + tools */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7 lg:mb-9">
-          <div className="flex items-center gap-3 min-w-0">
-            <label htmlFor="avatarUpload" className="relative shrink-0 cursor-pointer group">
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 pt-14 pb-28 sm:px-6 lg:px-8 lg:pt-8 lg:pb-12">
+        {/* Top bar */}
+        <header className="flex items-start sm:items-center justify-between gap-3 mb-6 lg:mb-8">
+          <div className="min-w-0 pl-11 lg:pl-0">
+            <p className="text-[13px] text-slate-500">
+              {t.hello}, <span className="font-semibold text-slate-800">{firstName}</span>
+            </p>
+            <h1 className="text-[22px] sm:text-[26px] font-bold text-slate-900 tracking-tight mt-0.5">
+              {t.welcome}
+            </h1>
+            <p className="text-[13px] text-slate-500 mt-1 max-w-xl leading-relaxed">{t.subtitle}</p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setLangOpen((v) => !v)}
+                className="h-9 px-2.5 rounded-lg bg-white border border-gray-200 flex items-center gap-1.5 text-slate-600 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] text-xs font-semibold"
+                aria-label={t.translate}
+              >
+                <Languages size={15} />
+                {DASH_LANGS.find((l) => l.code === lang)?.short || 'HT'}
+              </button>
+              {langOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-[150]"
+                    aria-label="Close"
+                    onClick={() => setLangOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 z-[160] w-36 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    {DASH_LANGS.map((l) => (
+                      <button
+                        key={l.code}
+                        type="button"
+                        onClick={() => changeLang(l.code)}
+                        className={`w-full text-left px-3 py-2.5 text-xs font-semibold ${
+                          lang === l.code ? 'bg-[#eff6ff] text-[#1d4ed8]' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <Link
+              href="/notifikasyon"
+              className="relative w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-slate-600 hover:text-[#1d4ed8] hover:border-[#1d4ed8]/40"
+              aria-label={t.notifications}
+            >
+              <Bell size={16} />
+              {unreadNotifs > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadNotifs > 9 ? '9+' : unreadNotifs}
+                </span>
+              )}
+            </Link>
+
+            <label htmlFor="avatarUpload" className="hidden sm:block cursor-pointer">
               <input
                 type="file"
                 id="avatarUpload"
@@ -462,128 +490,96 @@ export default function Dashboard() {
                   }
                 }}
               />
-              <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-full border-2 border-white shadow-sm overflow-hidden bg-indigo-50 ring-1 ring-indigo-100">
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-[#eff6ff] border border-gray-200 flex items-center justify-center text-[#1d4ed8] text-sm font-bold">
                 {userData?.avatar_url ? (
-                  <SafeImg src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  <SafeImg src={userData.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#1d4ed8] text-lg font-bold">
-                    {firstName.charAt(0).toUpperCase()}
-                  </div>
+                  firstName.charAt(0).toUpperCase()
                 )}
               </div>
             </label>
-            <div className="min-w-0">
-              <p className="text-[11px] lg:text-xs text-slate-500 font-medium">
-                {t.hello}, <span className="font-semibold text-slate-700">{firstName}</span>
-              </p>
-              <h1 className="text-lg lg:text-2xl font-bold text-slate-900 truncate tracking-tight">
-                {t.welcome}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-            {/* Language switcher */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setLangOpen((v) => !v)}
-                className="h-10 lg:h-11 px-3 rounded-xl bg-white border border-gray-200 flex items-center gap-2 text-slate-700 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] transition-colors text-xs font-bold"
-                aria-label={t.translate}
-              >
-                <Languages size={16} strokeWidth={1.75} />
-                <span>{DASH_LANGS.find((l) => l.code === lang)?.short || 'HT'}</span>
-              </button>
-              {langOpen && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-[150]"
-                    aria-label="Close"
-                    onClick={() => setLangOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-1.5 z-[160] w-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                    {DASH_LANGS.map((l) => (
-                      <button
-                        key={l.code}
-                        type="button"
-                        onClick={() => changeLang(l.code)}
-                        className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold transition-colors ${
-                          lang === l.code
-                            ? 'bg-indigo-50 text-[#1d4ed8]'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {l.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <Link
-              href="/notifikasyon"
-              className="relative w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-700 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] transition-colors"
-              aria-label={t.notifications}
-            >
-              <Bell size={18} strokeWidth={1.75} />
-              {unreadNotifs > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  {unreadNotifs > 9 ? '9+' : unreadNotifs}
-                </span>
-              )}
-            </Link>
-            <Link
-              href="/support"
-              className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-700 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] transition-colors"
-              aria-label={t.support}
-            >
-              <Headset size={18} strokeWidth={1.75} />
-            </Link>
           </div>
         </header>
 
-        {/* Wallet-full critical banner */}
         {walletFull.length > 0 && (
-          <div className="mb-6 bg-rose-600 text-white rounded-2xl p-5 lg:p-6 shadow-lg">
-            <p className="text-sm font-black uppercase tracking-wide leading-snug">{t.taskWallet}</p>
-            <p className="text-xs mt-2 text-rose-50 leading-relaxed">{t.taskWalletBody}</p>
-            <p className="text-[11px] mt-3 font-semibold text-rose-100">
-              {walletFull.length} · {Number(walletFull[0]?.amount || 0).toLocaleString('fr-FR')} HTG
-            </p>
+          <div className="mb-5 rounded-xl bg-rose-600 text-white px-4 py-3.5 sm:px-5">
+            <p className="text-sm font-bold">{t.taskWallet}</p>
+            <p className="text-xs text-rose-100 mt-1 leading-relaxed">{t.taskWalletBody}</p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 items-start">
-          {/* LEFT COLUMN */}
-          <div className="xl:col-span-8 space-y-6 lg:space-y-8">
-            {/* Tasks */}
-            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-900">{t.tasks}</h2>
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  {tasks.length}
+        {/* Tab kontwòl — anwo aksyon rapid yo */}
+        {userData?.id && (
+          <div className="mb-6 lg:mb-8">
+            <LiveTransactionsPanel userId={userData.id} gate={gate} />
+          </div>
+        )}
+
+        {/* Quick Actions — Authorize.net style primary block */}
+        <section className="mb-6 lg:mb-8">
+          <h2 className="text-[15px] font-bold text-slate-900 mb-3">{t.quickActions}</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {quickActions.map((qa) => (
+              <Link
+                key={qa.title}
+                href={gate ?? qa.href}
+                className="group bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:border-[#1d4ed8]/40 hover:shadow-sm transition-all"
+              >
+                <span className="w-11 h-11 rounded-xl bg-[#eff6ff] text-[#1d4ed8] flex items-center justify-center mb-3 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
+                  <qa.icon size={20} strokeWidth={1.75} />
                 </span>
+                <p className="text-[13px] sm:text-sm font-bold text-slate-900 leading-snug">{qa.title}</p>
+                <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">{qa.desc}</p>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-col sm:flex-row gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowBankModal(true)}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-[13px] font-semibold py-3 px-4 transition-colors"
+            >
+              <Globe2 size={16} />
+              {t.connectBank}
+            </button>
+            <Link
+              href="/plugin"
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-gray-200 hover:border-[#1d4ed8]/35 text-slate-800 text-[13px] font-semibold py-3 px-4 transition-colors"
+            >
+              <Plug size={16} className="text-[#1d4ed8]" />
+              {t.plugin}
+            </Link>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
+          <div className="lg:col-span-8 space-y-5 lg:space-y-6">
+            {/* Tasks */}
+            <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-[15px] font-bold text-slate-900">{t.tasks}</h2>
+                {tasks.length > 0 && (
+                  <span className="text-[11px] font-semibold text-slate-400">{tasks.length}</span>
+                )}
               </div>
               {tasks.length === 0 ? (
-                <div className="px-5 py-8 flex items-start gap-3">
-                  <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+                <div className="px-4 sm:px-5 py-6 flex items-start gap-3">
+                  <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
                   <p className="text-sm text-slate-600">{t.tasksEmpty}</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {tasks.map((task) => (
-                    <li key={task.id} className={`px-5 py-4 ${toneBorder[task.tone]}`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-                        <div className="min-w-0">
-                          <p className={`text-sm font-bold ${toneText[task.tone]}`}>{task.title}</p>
-                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{task.body}</p>
-                        </div>
+                    <li key={task.id} className="px-4 sm:px-5 py-4 flex gap-3 items-start">
+                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${toneDot[task.tone]}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{task.body}</p>
                         {task.href ? (
                           <Link
                             href={task.href}
-                            className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#1d4ed8] hover:underline"
+                            className="inline-flex items-center gap-1 mt-2.5 text-[12px] font-semibold text-[#1d4ed8] hover:underline"
                           >
                             {task.cta} <ChevronRight size={14} />
                           </Link>
@@ -591,7 +587,7 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={task.action}
-                            className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#1d4ed8] hover:underline"
+                            className="inline-flex items-center gap-1 mt-2.5 text-[12px] font-semibold text-[#1d4ed8] hover:underline"
                           >
                             {task.cta} <ChevronRight size={14} />
                           </button>
@@ -603,98 +599,26 @@ export default function Dashboard() {
               )}
             </section>
 
-            {/* Quick Actions — Authorize.net style 2x2 */}
+            {/* Business insights */}
             <section>
-              <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-3 px-0.5">
-                {t.quickActions}
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {quickActions.map((qa) => (
-                  <Link
-                    key={qa.title + qa.href}
-                    href={gate ?? qa.href}
-                    className={`group rounded-2xl border p-5 flex items-start gap-4 transition-all ${
-                      qa.tone === 'primary'
-                        ? 'bg-[#1d4ed8] border-[#1d4ed8] text-white hover:bg-[#1e40af] shadow-md shadow-blue-600/15'
-                        : 'bg-white border-gray-200 hover:border-[#1d4ed8]/35 hover:shadow-sm'
-                    }`}
-                  >
-                    <span
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                        qa.tone === 'primary'
-                          ? 'bg-white/15 text-white'
-                          : 'bg-indigo-50 text-[#1d4ed8]'
-                      }`}
-                    >
-                      <qa.icon size={20} strokeWidth={1.75} />
-                    </span>
-                    <div className="min-w-0">
-                      <p
-                        className={`text-sm font-bold ${
-                          qa.tone === 'primary' ? 'text-white' : 'text-slate-900'
-                        }`}
-                      >
-                        {qa.title}
-                      </p>
-                      <p
-                        className={`text-xs mt-1 leading-relaxed ${
-                          qa.tone === 'primary' ? 'text-blue-100' : 'text-slate-500'
-                        }`}
-                      >
-                        {qa.desc}
-                      </p>
-                    </div>
-                    <ArrowUpRight
-                      size={16}
-                      className={`ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity ${
-                        qa.tone === 'primary' ? 'text-white' : 'text-slate-400'
-                      }`}
-                    />
-                  </Link>
-                ))}
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowBankModal(true)}
-                  className="w-full bg-white border border-slate-900/70 rounded-2xl py-3.5 px-4 flex items-center justify-center gap-2.5 font-bold text-sm text-slate-900 hover:bg-slate-50 transition-colors"
-                >
-                  <Globe2 size={18} className="text-[#1d4ed8]" />
-                  {t.connectBank}
-                </button>
-                <Link
-                  href="/plugin"
-                  className="w-full bg-white border border-gray-200 rounded-2xl py-3.5 px-4 flex items-center justify-center gap-2.5 font-bold text-sm text-slate-800 hover:border-[#1d4ed8]/30 hover:bg-indigo-50/40 transition-colors"
-                >
-                  <Plug size={16} className="text-[#1d4ed8]" />
-                  {t.plugin}
-                </Link>
-              </div>
-            </section>
-
-            {/* Business Insights */}
-            <section>
-              <div className="flex items-center justify-between mb-3 px-0.5">
-                <h2 className="text-base lg:text-lg font-bold text-slate-900">{t.businessInsights}</h2>
-              </div>
+              <h2 className="text-[15px] font-bold text-slate-900 mb-3">{t.businessInsights}</h2>
 
               {usage && (
-                <div className="mb-3 bg-white border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="mb-3 bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                       {t.planUsage} · {effectivePlan}
                     </p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5">
+                    <p className="text-sm font-bold text-slate-900 mt-1">
                       {Number(usage.used || 0).toLocaleString('fr-FR')} HTG
                       {usage.limit != null
                         ? ` / ${Number(usage.limit).toLocaleString('fr-FR')} HTG`
                         : ` · ${t.noLimit}`}
                     </p>
                     {usage.limit != null && (
-                      <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="mt-2.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${nearLimit ? 'bg-amber-500' : 'bg-[#1d4ed8]'}`}
+                          className={`h-full rounded-full ${nearLimit ? 'bg-amber-500' : 'bg-[#1d4ed8]'}`}
                           style={{
                             width: `${Math.min(
                               100,
@@ -707,46 +631,36 @@ export default function Dashboard() {
                   </div>
                   <Link
                     href="/plan"
-                    className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#1d4ed8] border border-indigo-200 rounded-xl px-3 py-2 hover:bg-indigo-50"
+                    className="shrink-0 text-[12px] font-semibold text-[#1d4ed8] border border-blue-200 rounded-lg px-3 py-2 hover:bg-[#eff6ff]"
                   >
                     {t.expandPlan}
                   </Link>
                 </div>
               )}
-
-              {userData?.id && <LiveTransactionsPanel userId={userData.id} gate={gate} />}
             </section>
 
             {/* Recent activity */}
             <section>
-              <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-3 px-0.5">
-                {t.recentHistory}
-              </h2>
+              <h2 className="text-[15px] font-bold text-slate-900 mb-3">{t.recentHistory}</h2>
               {recentHistory.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 text-xs text-slate-500">
+                <div className="bg-white border border-gray-200 rounded-xl px-4 py-5 text-sm text-slate-500">
                   {t.historyEmpty}
                 </div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
                   {recentHistory.map((h) => (
-                    <li
-                      key={h.id}
-                      className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-start justify-between gap-3"
-                    >
+                    <li key={h.id} className="px-4 py-3.5 flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{h.title}</p>
+                        <p className="text-sm font-semibold text-slate-900 truncate">{h.title}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{h.body}</p>
                       </div>
-                      <p className="text-[10px] text-slate-400 shrink-0">
-                        {new Date(h.created_at).toLocaleString(
-                          lang === 'en' ? 'en-US' : 'fr-FR',
-                          {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }
-                        )}
+                      <p className="text-[10px] text-slate-400 shrink-0 pt-0.5">
+                        {new Date(h.created_at).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </p>
                     </li>
                   ))}
@@ -755,75 +669,55 @@ export default function Dashboard() {
             </section>
           </div>
 
-          {/* RIGHT COLUMN — News + Help */}
-          <aside className="xl:col-span-4 space-y-6">
-            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="text-base font-bold text-slate-900">{t.newsCenter}</h2>
+          {/* Right column */}
+          <aside className="lg:col-span-4 space-y-4 lg:space-y-5">
+            <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-gray-100">
+                <h2 className="text-[15px] font-bold text-slate-900">{t.newsCenter}</h2>
               </div>
-              <div className="p-5 flex gap-4">
-                <div className="flex-1 min-w-0">
-                  {announcement.active && announcement.text ? (
-                    <>
-                      <p className="text-sm font-bold text-slate-900 mb-1.5">{t.announcement}</p>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
-                        {announcement.text}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-bold text-slate-900 mb-1.5">{t.newsDefaultTitle}</p>
-                      <p className="text-xs text-slate-600 leading-relaxed">{t.newsDefaultBody}</p>
-                    </>
-                  )}
-                </div>
-                <div className="w-16 shrink-0 flex items-start justify-center">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1d4ed8] to-indigo-500 flex items-center justify-center shadow-md">
-                    <img
-                      src="https://i.imgur.com/xDk58Xk.png"
-                      alt="Hatexcard"
-                      className="w-9 h-9 rounded-lg object-cover border border-white/30"
-                    />
-                  </div>
-                </div>
+              <div className="p-4">
+                {announcement.active && announcement.text ? (
+                  <>
+                    <p className="text-sm font-semibold text-slate-900 mb-1.5">{t.announcement}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                      {announcement.text}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-slate-900 mb-1.5">{t.newsDefaultTitle}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{t.newsDefaultBody}</p>
+                  </>
+                )}
               </div>
             </section>
 
-            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="text-base font-bold text-slate-900">{t.needHelp}</h2>
+            <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-gray-100">
+                <h2 className="text-[15px] font-bold text-slate-900">{t.moreTools}</h2>
               </div>
-              <div className="p-3 space-y-1">
-                <Link
-                  href="/support"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
-                >
-                  <Headset size={18} className="text-[#1d4ed8]" /> {t.support}
-                </Link>
-                <Link
-                  href="/developer/docs"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
-                >
-                  <FileText size={18} className="text-[#1d4ed8]" /> {t.docs}
-                </Link>
-                <Link
-                  href="/dashboard/products"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
-                >
-                  <Package size={18} className="text-[#1d4ed8]" /> {t.products}
-                </Link>
-                <Link
-                  href="/plugin"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
-                >
-                  <Plug size={18} className="text-[#1d4ed8]" /> {t.plugin}
-                </Link>
+              <div className="p-2">
+                {[
+                  { href: '/dashboard/products', label: t.products, icon: Package },
+                  { href: '/plugin', label: t.plugin, icon: Plug },
+                  { href: '/developer/docs', label: t.docs, icon: FileText },
+                  { href: '/support', label: t.support, icon: Headset },
+                ].map((item) => (
+                  <Link
+                    key={item.href + item.label}
+                    href={item.href}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-slate-700 hover:bg-[#eff6ff] hover:text-[#1d4ed8] transition-colors"
+                  >
+                    <item.icon size={16} className="text-[#1d4ed8]" />
+                    {item.label}
+                  </Link>
+                ))}
               </div>
             </section>
 
             {kycOk && (
-              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
-                <CheckCircle2 size={14} className="shrink-0" />
+              <div className="flex items-start gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
+                <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
                 {t.kycOk}
               </div>
             )}
@@ -833,7 +727,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={antreNanAdmin}
                 disabled={isLoggingAdmin}
-                className="w-full bg-rose-50 border border-rose-200 text-rose-700 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full bg-rose-50 border border-rose-200 text-rose-700 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isLoggingAdmin ? <Loader2 size={14} className="animate-spin" /> : <Briefcase size={14} />}
                 {t.superAdmin}
@@ -846,8 +740,8 @@ export default function Dashboard() {
       {showBankModal && <ConnectBankModal onClose={() => setShowBankModal(false)} />}
 
       {showWorkspaceModal && (
-        <div className="fixed inset-0 z-[400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative">
+        <div className="fixed inset-0 z-[400] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 relative">
             <button
               type="button"
               onClick={() => setShowWorkspaceModal(false)}
@@ -855,17 +749,15 @@ export default function Dashboard() {
             >
               ✕
             </button>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-[#1d4ed8] text-white rounded-xl flex items-center justify-center shadow-md">
-                <Lock size={22} />
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 bg-[#1d4ed8] text-white rounded-xl flex items-center justify-center">
+                <Lock size={20} />
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  {isFirstTimeWorkspaceSetup ? t.workspaceCreate : t.workspaceTitle}
-                </h2>
-              </div>
+              <h2 className="text-lg font-bold text-slate-900">
+                {isFirstTimeWorkspaceSetup ? t.workspaceCreate : t.workspaceTitle}
+              </h2>
             </div>
-            <form onSubmit={handleWorkspaceSubmit} className="space-y-4">
+            <form onSubmit={handleWorkspaceSubmit} className="space-y-3">
               <input
                 type="password"
                 required
@@ -873,7 +765,7 @@ export default function Dashboard() {
                 value={workspacePassword}
                 onChange={(e) => setWorkspacePassword(e.target.value)}
                 placeholder="••••••••••"
-                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-[#1d4ed8]"
+                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#1d4ed8]"
               />
               {isFirstTimeWorkspaceSetup && (
                 <input
@@ -882,19 +774,19 @@ export default function Dashboard() {
                   value={workspacePasswordConfirm}
                   onChange={(e) => setWorkspacePasswordConfirm(e.target.value)}
                   placeholder={t.workspaceConfirm}
-                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-[#1d4ed8]"
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#1d4ed8]"
                 />
               )}
               {workspaceError && (
-                <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex items-start gap-2.5">
+                <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <p className="text-rose-700 text-xs font-bold">{workspaceError}</p>
+                  <p className="text-rose-700 text-xs font-semibold">{workspaceError}</p>
                 </div>
               )}
               <button
                 type="submit"
                 disabled={workspaceLoading}
-                className="w-full bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-indigo-400 text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
+                className="w-full bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-indigo-400 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
               >
                 {workspaceLoading ? <Loader2 size={16} className="animate-spin" /> : t.enter}
               </button>

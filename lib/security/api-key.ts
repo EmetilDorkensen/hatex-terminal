@@ -91,7 +91,11 @@ export async function authenticateMerchantApiKey(
     .eq('api_key_hash', hash)
     .maybeSingle();
 
-  if (hashedRow?.is_merchant) {
+  if (hashedRow) {
+    if (!hashedRow.is_merchant) {
+      await supabase.from('profiles').update({ is_merchant: true }).eq('id', hashedRow.id);
+      return { ...hashedRow, is_merchant: true };
+    }
     return hashedRow;
   }
 
@@ -102,9 +106,12 @@ export async function authenticateMerchantApiKey(
     .eq('api_key', trimmed)
     .maybeSingle();
 
-  if (legacyRow?.is_merchant) {
+  if (legacyRow) {
     await upgradePlainApiKeyToHash(supabase, legacyRow.id, trimmed);
-    return legacyRow;
+    if (!legacyRow.is_merchant) {
+      await supabase.from('profiles').update({ is_merchant: true }).eq('id', legacyRow.id);
+    }
+    return { ...legacyRow, is_merchant: true };
   }
 
   return null;

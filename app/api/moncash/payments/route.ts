@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   if (!merchant || !merchant.is_merchant) {
     return jsonError(403, 'Kle API sa a pa valab oswa kont lan pa otorize pou resevwa peman.');
   }
-  if (merchant.account_status !== 'active') {
+  if (merchant.account_status && merchant.account_status !== 'active') {
     return jsonError(403, 'Kont machann sa a pa aktif. Tranzaksyon an anile.');
   }
 
