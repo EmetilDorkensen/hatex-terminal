@@ -230,7 +230,7 @@ export function MerchantShell({
         <>
           {/* Desktop: nav orizontal pwofesyonèl */}
           <header className="hidden lg:block bg-white/90 backdrop-blur border-b border-gray-200 sticky top-0 z-[100]">
-            <div className="max-w-5xl xl:max-w-6xl mx-auto px-6 flex items-center justify-between h-14 gap-4">
+            <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-14 gap-4">
               <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
                 <img
                   src="https://i.imgur.com/xDk58Xk.png"

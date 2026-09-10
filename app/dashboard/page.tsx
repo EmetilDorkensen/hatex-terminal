@@ -11,42 +11,57 @@ import { LiveTransactionsPanel } from '@/components/dashboard/LiveTransactionsPa
 import { ConnectBankModal } from '@/components/dashboard/ConnectBankModal';
 import SafeImg from '@/components/SafeImg';
 import {
+  DASH_LANGS,
+  getDashCopy,
+  loadDashLang,
+  saveDashLang,
+  type DashCopy,
+  type DashLang,
+} from '@/lib/i18n/dashboard';
+import {
   AlertCircle,
   ArrowUpRight,
   Bell,
   Briefcase,
   CheckCircle2,
-  Code2,
+  ChevronRight,
+  CreditCard,
+  FileText,
   Globe2,
   Headset,
+  Languages,
   Loader2,
   Lock,
   Package,
   Plug,
   Receipt,
-  ShieldCheck,
+  Search,
+  BarChart3,
 } from 'lucide-react';
 
-function transferHistoryBody(status: string): string {
-  if (status === 'success') return 'Depoze sou nimewo sa a';
-  if (status === 'wallet_full') return 'Kont MonCash plen — an atant';
-  return 'Transfè pa t pase';
+function transferHistoryBody(status: string, t: DashCopy): string {
+  if (status === 'success') return t.transferOk;
+  if (status === 'wallet_full') return t.transferFull;
+  return t.transferFail;
 }
 
 type HistoryItem = { id: string; title: string; body: string; created_at: string };
 
-function mapRecentHistory(data: {
-  notifications?: { id: string; title: string; body: string | null; created_at: string }[];
-  transfers?: { id: string; amount: number; phone: string; status: string; created_at: string }[];
-}): HistoryItem[] {
+function mapRecentHistory(
+  data: {
+    notifications?: { id: string; title: string; body: string | null; created_at: string }[];
+    transfers?: { id: string; amount: number; phone: string; status: string; created_at: string }[];
+  },
+  t: DashCopy
+): HistoryItem[] {
   const transfers = Array.isArray(data.transfers) ? data.transfers : [];
   const notifs = Array.isArray(data.notifications) ? data.notifications : [];
   const items: HistoryItem[] = [
-    ...transfers.map((t) => ({
-      id: `t-${t.id}`,
-      title: `${Number(t.amount || 0).toLocaleString('fr-FR')} HTG · ${t.phone}`,
-      body: transferHistoryBody(t.status),
-      created_at: t.created_at,
+    ...transfers.map((tr) => ({
+      id: `t-${tr.id}`,
+      title: `${Number(tr.amount || 0).toLocaleString('fr-FR')} HTG · ${tr.phone}`,
+      body: transferHistoryBody(tr.status, t),
+      created_at: tr.created_at,
     })),
     ...notifs.map((n) => ({
       id: `n-${n.id}`,
@@ -74,7 +89,7 @@ async function confirmAndLoadBilling(): Promise<unknown> {
   return null;
 }
 
-async function loadNotifsAndHistory(): Promise<{ unread: number; history: HistoryItem[] }> {
+async function loadNotifsAndHistory(t: DashCopy): Promise<{ unread: number; history: HistoryItem[] }> {
   try {
     const [notifRes, histRes] = await Promise.all([
       fetch('/api/v2/notifications'),
@@ -82,15 +97,21 @@ async function loadNotifsAndHistory(): Promise<{ unread: number; history: Histor
     ]);
     const data = await notifRes.json();
     const histData = histRes.ok ? await histRes.json() : { transactions: [] };
-    const fromNotifs = mapRecentHistory(data);
-    const fromTx = ((histData.transactions || []) as { id: string; description: string; amount: number; created_at: string; type: string }[]).map(
-      (t) => ({
-        id: `h-${t.id}`,
-        title: t.description,
-        body: `${t.amount > 0 ? '+' : ''}${Math.abs(t.amount).toLocaleString('fr-FR')} HTG · ${t.type}`,
-        created_at: t.created_at,
-      })
-    );
+    const fromNotifs = mapRecentHistory(data, t);
+    const fromTx = (
+      (histData.transactions || []) as {
+        id: string;
+        description: string;
+        amount: number;
+        created_at: string;
+        type: string;
+      }[]
+    ).map((tx) => ({
+      id: `h-${tx.id}`,
+      title: tx.description,
+      body: `${tx.amount > 0 ? '+' : ''}${Math.abs(tx.amount).toLocaleString('fr-FR')} HTG · ${tx.type}`,
+      created_at: tx.created_at,
+    }));
     const merged = [...fromNotifs, ...fromTx];
     merged.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
     return {
@@ -101,13 +122,6 @@ async function loadNotifsAndHistory(): Promise<{ unread: number; history: Histor
     return { unread: 0, history: [] };
   }
 }
-
-const SHORTCUTS = [
-  { href: '/plugin', label: 'Plugin', icon: Plug },
-  { href: '/invoice', label: 'Fakti', icon: Receipt },
-  { href: '/dashboard/products', label: 'Pwodwi', icon: Package },
-  { href: '/developer', label: 'API', icon: Code2 },
-] as const;
 
 export default function Dashboard() {
   const router = useRouter();
@@ -120,6 +134,10 @@ export default function Dashboard() {
     []
   );
 
+  const [lang, setLang] = useState<DashLang>('ht');
+  const [langOpen, setLangOpen] = useState(false);
+  const t = useMemo(() => getDashCopy(lang), [lang]);
+
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [announcement, setAnnouncement] = useState<{ text: string; active: boolean }>({
@@ -131,14 +149,16 @@ export default function Dashboard() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [billing, setBilling] = useState<any>(null);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
-  const [recentHistory, setRecentHistory] = useState<
-    { id: string; title: string; body: string; created_at: string }[]
-  >([]);
+  const [recentHistory, setRecentHistory] = useState<HistoryItem[]>([]);
   const [workspacePassword, setWorkspacePassword] = useState('');
   const [workspacePasswordConfirm, setWorkspacePasswordConfirm] = useState('');
   const [workspaceError, setWorkspaceError] = useState('');
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [isLoggingAdmin, setIsLoggingAdmin] = useState(false);
+
+  useEffect(() => {
+    setLang(loadDashLang());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -181,7 +201,7 @@ export default function Dashboard() {
 
         const [billingData, notifPack] = await Promise.all([
           confirmAndLoadBilling(),
-          loadNotifsAndHistory(),
+          loadNotifsAndHistory(getDashCopy(loadDashLang())),
         ]);
         if (cancelled) return;
         if (billingData) setBilling(billingData);
@@ -213,6 +233,12 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [supabase, router]);
+
+  const changeLang = (code: DashLang) => {
+    setLang(code);
+    saveDashLang(code);
+    setLangOpen(false);
+  };
 
   const antreNanAdmin = async () => {
     const pass = prompt('Antre Modpas Sipè Admin lan pou w ka konekte:');
@@ -280,7 +306,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F6FA] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-[#1d4ed8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -295,6 +321,101 @@ export default function Dashboard() {
   const effectivePlan = billing?.profile?.effective_plan || userData?.plan || 'free';
   const nearLimit =
     usage?.limit != null && usage.limit > 0 && usage.used / usage.limit >= 0.7;
+  const needsKyc = !kycOk;
+
+  type Task = {
+    id: string;
+    tone: 'danger' | 'warn' | 'info';
+    title: string;
+    body: string;
+    href?: string;
+    action?: () => void;
+    cta: string;
+  };
+
+  const tasks: Task[] = [];
+  if (walletFull.length > 0) {
+    tasks.push({
+      id: 'wallet',
+      tone: 'danger',
+      title: t.taskWallet,
+      body: t.taskWalletBody,
+      action: () => setShowBankModal(true),
+      cta: t.connectBank,
+    });
+  }
+  if (needsKyc) {
+    tasks.push({
+      id: 'kyc',
+      tone: 'warn',
+      title: kycPending ? t.taskKycPending : t.taskKyc,
+      body: t.taskKycBody,
+      href: '/kyc/v2',
+      cta: kycPending ? t.viewKyc : t.startKyc,
+    });
+  }
+  if (nearLimit) {
+    tasks.push({
+      id: 'limit',
+      tone: 'warn',
+      title: t.taskLimit,
+      body: t.taskLimitBody,
+      href: '/plan',
+      cta: t.expandPlan,
+    });
+  }
+  if (effectivePlan === 'free' && !nearLimit) {
+    tasks.push({
+      id: 'free',
+      tone: 'info',
+      title: t.taskFree,
+      body: t.taskFreeBody,
+      href: '/plan',
+      cta: t.expandPlan,
+    });
+  }
+
+  const quickActions = [
+    {
+      href: '/dashboard/products/new',
+      title: t.qaAccept,
+      desc: t.qaAcceptDesc,
+      icon: CreditCard,
+      tone: 'primary' as const,
+    },
+    {
+      href: '/transactions',
+      title: t.qaFind,
+      desc: t.qaFindDesc,
+      icon: Search,
+      tone: 'default' as const,
+    },
+    {
+      href: '/invoice',
+      title: t.qaInvoice,
+      desc: t.qaInvoiceDesc,
+      icon: Receipt,
+      tone: 'default' as const,
+    },
+    {
+      href: '/transactions',
+      title: t.qaReports,
+      desc: t.qaReportsDesc,
+      icon: BarChart3,
+      tone: 'default' as const,
+    },
+  ];
+
+  const toneBorder = {
+    danger: 'border-rose-200 bg-rose-50',
+    warn: 'border-amber-200 bg-amber-50',
+    info: 'border-indigo-100 bg-indigo-50/70',
+  };
+  const toneText = {
+    danger: 'text-rose-900',
+    warn: 'text-amber-900',
+    info: 'text-indigo-950',
+  };
 
   return (
     <MerchantShell
@@ -311,9 +432,9 @@ export default function Dashboard() {
       }}
       onOpenAdmin={antreNanAdmin}
     >
-      <main className="flex-grow w-full max-w-lg mx-auto px-4 pt-4 pb-28 sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl lg:px-6 lg:pt-6 lg:pb-12">
-        {/* Header Meru-style: avatar + non + 3 ikòn */}
-        <header className="flex items-center justify-between gap-3 mb-6 lg:mb-8">
+      <main className="flex-grow w-full max-w-6xl mx-auto px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-8 lg:pb-14">
+        {/* Header — Authorize.net style welcome + tools */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7 lg:mb-9">
           <div className="flex items-center gap-3 min-w-0">
             <label htmlFor="avatarUpload" className="relative shrink-0 cursor-pointer group">
               <input
@@ -345,23 +466,66 @@ export default function Dashboard() {
                 {userData?.avatar_url ? (
                   <SafeImg src={userData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-indigo-600 text-lg font-bold">
+                  <div className="w-full h-full flex items-center justify-center text-[#1d4ed8] text-lg font-bold">
                     {firstName.charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
             </label>
             <div className="min-w-0">
-              <p className="text-[11px] lg:text-xs text-slate-500 font-medium">Bonjou</p>
-              <h1 className="text-lg lg:text-2xl font-bold text-slate-900 truncate">{firstName}</h1>
+              <p className="text-[11px] lg:text-xs text-slate-500 font-medium">
+                {t.hello}, <span className="font-semibold text-slate-700">{firstName}</span>
+              </p>
+              <h1 className="text-lg lg:text-2xl font-bold text-slate-900 truncate tracking-tight">
+                {t.welcome}
+              </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 lg:gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            {/* Language switcher */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setLangOpen((v) => !v)}
+                className="h-10 lg:h-11 px-3 rounded-xl bg-white border border-gray-200 flex items-center gap-2 text-slate-700 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] transition-colors text-xs font-bold"
+                aria-label={t.translate}
+              >
+                <Languages size={16} strokeWidth={1.75} />
+                <span>{DASH_LANGS.find((l) => l.code === lang)?.short || 'HT'}</span>
+              </button>
+              {langOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-[150]"
+                    aria-label="Close"
+                    onClick={() => setLangOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 z-[160] w-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    {DASH_LANGS.map((l) => (
+                      <button
+                        key={l.code}
+                        type="button"
+                        onClick={() => changeLang(l.code)}
+                        className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold transition-colors ${
+                          lang === l.code
+                            ? 'bg-indigo-50 text-[#1d4ed8]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             <Link
               href="/notifikasyon"
-              className="relative w-10 h-10 lg:w-11 lg:h-11 rounded-full bg-white border border-gray-200 flex items-center justify-center text-slate-700 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
-              aria-label="Notifikasyon"
+              className="relative w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-700 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] transition-colors"
+              aria-label={t.notifications}
             >
               <Bell size={18} strokeWidth={1.75} />
               {unreadNotifs > 0 && (
@@ -372,162 +536,311 @@ export default function Dashboard() {
             </Link>
             <Link
               href="/support"
-              className="w-10 h-10 lg:w-11 lg:h-11 rounded-full bg-white border border-gray-200 flex items-center justify-center text-slate-700 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
-              aria-label="Sipò"
+              className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-700 hover:border-[#1d4ed8]/40 hover:text-[#1d4ed8] transition-colors"
+              aria-label={t.support}
             >
               <Headset size={18} strokeWidth={1.75} />
             </Link>
           </div>
         </header>
 
-        <DashboardAlerts
-          walletFull={walletFull}
-          usage={usage}
-          effectivePlan={effectivePlan}
-          nearLimit={nearLimit}
-          kycOk={kycOk}
-          kycPending={kycPending}
-          intendedPlan={userData?.intended_plan || billing?.profile?.intended_plan}
-        />
-
-        {/* Layout: sou gwo ekran, tab live ak aksyon kote a kote */}
-        <div className="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start mb-7">
-          <div className="lg:col-span-3 order-2 lg:order-1">
-            {userData?.id && <LiveTransactionsPanel userId={userData.id} gate={gate} />}
+        {/* Wallet-full critical banner */}
+        {walletFull.length > 0 && (
+          <div className="mb-6 bg-rose-600 text-white rounded-2xl p-5 lg:p-6 shadow-lg">
+            <p className="text-sm font-black uppercase tracking-wide leading-snug">{t.taskWallet}</p>
+            <p className="text-xs mt-2 text-rose-50 leading-relaxed">{t.taskWalletBody}</p>
+            <p className="text-[11px] mt-3 font-semibold text-rose-100">
+              {walletFull.length} · {Number(walletFull[0]?.amount || 0).toLocaleString('fr-FR')} HTG
+            </p>
           </div>
+        )}
 
-          <div className="lg:col-span-2 order-1 lg:order-2 space-y-3 mb-5 lg:mb-0">
-            {/* Bank anvan Kreye peman / Fakti */}
-            <button
-              type="button"
-              onClick={() => setShowBankModal(true)}
-              className="w-full bg-white border border-slate-900/80 rounded-2xl py-3.5 lg:py-4 px-4 flex items-center justify-center gap-2.5 font-bold text-sm text-slate-900 hover:bg-slate-50 transition-colors"
-            >
-              <Globe2 size={18} className="text-indigo-600" />
-              KONEKTE KONT BANK OU
-            </button>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Link
-                href="/dashboard/products/new"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl py-3.5 lg:py-4 px-3 sm:px-4 flex items-center justify-center gap-2 font-bold text-sm shadow-sm transition-colors"
-              >
-                <ArrowUpRight size={16} /> Kreye yon pwodwi
-              </Link>
-              <Link
-                href="/plugin"
-                className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-900/80 rounded-2xl py-3.5 lg:py-4 px-3 sm:px-4 flex items-center justify-center gap-2 font-bold text-sm transition-colors"
-              >
-                <Plug size={16} /> Plugin
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Rakoursi — orizontal sou mobil, griy sou desktop */}
-        <section className="mb-8">
-          <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-4">Rakoursi ou yo</h2>
-          <div className="flex flex-nowrap gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none sm:grid sm:grid-cols-3 md:grid-cols-6 sm:overflow-visible sm:mx-0 sm:px-0">
-            {SHORTCUTS.map((item) => (
-              <Link
-                key={item.href}
-                href={gate ?? item.href}
-                className="flex flex-col items-center gap-2 shrink-0 w-[72px] sm:w-auto sm:py-3 sm:px-2 sm:rounded-2xl sm:hover:bg-white sm:border sm:border-transparent sm:hover:border-gray-200 sm:transition-colors"
-              >
-                <span className="w-14 h-14 lg:w-16 lg:h-16 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
-                  <item.icon size={22} strokeWidth={1.75} />
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 items-start">
+          {/* LEFT COLUMN */}
+          <div className="xl:col-span-8 space-y-6 lg:space-y-8">
+            {/* Tasks */}
+            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-900">{t.tasks}</h2>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  {tasks.length}
                 </span>
-                <span className="text-[11px] lg:text-xs font-semibold text-slate-700 text-center leading-tight px-0.5">
-                  {item.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-3">5 dènye mesaj istorik</h2>
-          {recentHistory.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 text-xs text-slate-500">
-              Lè sistèm nan depoze yon kòb sou MonCash ou, 5 dènye mesaj yo ap parèt isit la.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {recentHistory.map((h) => (
-                <li
-                  key={h.id}
-                  className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{h.title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{h.body}</p>
-                  </div>
-                  <p className="text-[10px] text-slate-400 shrink-0">
-                    {new Date(h.created_at).toLocaleString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Anons */}
-        <section className="mb-8">
-          <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-3">Avèk HatexCard ou kapab!</h2>
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 lg:p-6 shadow-sm flex gap-4 overflow-hidden relative max-w-3xl">
-            <div className="flex-1 min-w-0 z-10">
-              {announcement.active && announcement.text ? (
-                <>
-                  <p className="text-sm font-bold text-slate-900 mb-1.5">Anons HatexCard</p>
-                  <p className="text-xs lg:text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                    {announcement.text}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-bold text-slate-900 mb-1.5">Pasèl MonCash pou machann</p>
-                  <p className="text-xs lg:text-sm text-slate-600 leading-relaxed">
-                    Kliyan peye, HatexCard pran yon ti frè, rès la ale sou nimewo MonCash ou. Pa gen
-                    wallet — ou se machann, nou se pasèl.
-                  </p>
-                </>
-              )}
-            </div>
-            <div className="w-24 shrink-0 flex items-center justify-center">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shadow-md">
-                <img
-                  src="https://i.imgur.com/xDk58Xk.png"
-                  alt="Hatexcard"
-                  className="w-12 h-12 rounded-xl object-cover border border-white/30"
-                />
               </div>
-            </div>
-          </div>
-        </section>
+              {tasks.length === 0 ? (
+                <div className="px-5 py-8 flex items-start gap-3">
+                  <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+                  <p className="text-sm text-slate-600">{t.tasksEmpty}</p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {tasks.map((task) => (
+                    <li key={task.id} className={`px-5 py-4 ${toneBorder[task.tone]}`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                        <div className="min-w-0">
+                          <p className={`text-sm font-bold ${toneText[task.tone]}`}>{task.title}</p>
+                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{task.body}</p>
+                        </div>
+                        {task.href ? (
+                          <Link
+                            href={task.href}
+                            className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#1d4ed8] hover:underline"
+                          >
+                            {task.cta} <ChevronRight size={14} />
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={task.action}
+                            className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#1d4ed8] hover:underline"
+                          >
+                            {task.cta} <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
-        {kycOk && (
-          <div className="mt-4 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
-            <CheckCircle2 size={14} className="shrink-0" />
-            Kont machann aktif — peman ale sou MonCash ou.
-          </div>
-        )}
+            {/* Quick Actions — Authorize.net style 2x2 */}
+            <section>
+              <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-3 px-0.5">
+                {t.quickActions}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {quickActions.map((qa) => (
+                  <Link
+                    key={qa.title + qa.href}
+                    href={gate ?? qa.href}
+                    className={`group rounded-2xl border p-5 flex items-start gap-4 transition-all ${
+                      qa.tone === 'primary'
+                        ? 'bg-[#1d4ed8] border-[#1d4ed8] text-white hover:bg-[#1e40af] shadow-md shadow-blue-600/15'
+                        : 'bg-white border-gray-200 hover:border-[#1d4ed8]/35 hover:shadow-sm'
+                    }`}
+                  >
+                    <span
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                        qa.tone === 'primary'
+                          ? 'bg-white/15 text-white'
+                          : 'bg-indigo-50 text-[#1d4ed8]'
+                      }`}
+                    >
+                      <qa.icon size={20} strokeWidth={1.75} />
+                    </span>
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-bold ${
+                          qa.tone === 'primary' ? 'text-white' : 'text-slate-900'
+                        }`}
+                      >
+                        {qa.title}
+                      </p>
+                      <p
+                        className={`text-xs mt-1 leading-relaxed ${
+                          qa.tone === 'primary' ? 'text-blue-100' : 'text-slate-500'
+                        }`}
+                      >
+                        {qa.desc}
+                      </p>
+                    </div>
+                    <ArrowUpRight
+                      size={16}
+                      className={`ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity ${
+                        qa.tone === 'primary' ? 'text-white' : 'text-slate-400'
+                      }`}
+                    />
+                  </Link>
+                ))}
+              </div>
 
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={antreNanAdmin}
-            disabled={isLoggingAdmin}
-            className="mt-6 w-full bg-rose-50 border border-rose-200 text-rose-700 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isLoggingAdmin ? <Loader2 size={14} className="animate-spin" /> : <Briefcase size={14} />}
-            Sipè Admin
-          </button>
-        )}
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBankModal(true)}
+                  className="w-full bg-white border border-slate-900/70 rounded-2xl py-3.5 px-4 flex items-center justify-center gap-2.5 font-bold text-sm text-slate-900 hover:bg-slate-50 transition-colors"
+                >
+                  <Globe2 size={18} className="text-[#1d4ed8]" />
+                  {t.connectBank}
+                </button>
+                <Link
+                  href="/plugin"
+                  className="w-full bg-white border border-gray-200 rounded-2xl py-3.5 px-4 flex items-center justify-center gap-2.5 font-bold text-sm text-slate-800 hover:border-[#1d4ed8]/30 hover:bg-indigo-50/40 transition-colors"
+                >
+                  <Plug size={16} className="text-[#1d4ed8]" />
+                  {t.plugin}
+                </Link>
+              </div>
+            </section>
+
+            {/* Business Insights */}
+            <section>
+              <div className="flex items-center justify-between mb-3 px-0.5">
+                <h2 className="text-base lg:text-lg font-bold text-slate-900">{t.businessInsights}</h2>
+              </div>
+
+              {usage && (
+                <div className="mb-3 bg-white border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      {t.planUsage} · {effectivePlan}
+                    </p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">
+                      {Number(usage.used || 0).toLocaleString('fr-FR')} HTG
+                      {usage.limit != null
+                        ? ` / ${Number(usage.limit).toLocaleString('fr-FR')} HTG`
+                        : ` · ${t.noLimit}`}
+                    </p>
+                    {usage.limit != null && (
+                      <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${nearLimit ? 'bg-amber-500' : 'bg-[#1d4ed8]'}`}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.round((Number(usage.used || 0) / usage.limit) * 100)
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    href="/plan"
+                    className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#1d4ed8] border border-indigo-200 rounded-xl px-3 py-2 hover:bg-indigo-50"
+                  >
+                    {t.expandPlan}
+                  </Link>
+                </div>
+              )}
+
+              {userData?.id && <LiveTransactionsPanel userId={userData.id} gate={gate} />}
+            </section>
+
+            {/* Recent activity */}
+            <section>
+              <h2 className="text-base lg:text-lg font-bold text-slate-900 mb-3 px-0.5">
+                {t.recentHistory}
+              </h2>
+              {recentHistory.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 text-xs text-slate-500">
+                  {t.historyEmpty}
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {recentHistory.map((h) => (
+                    <li
+                      key={h.id}
+                      className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-start justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{h.title}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{h.body}</p>
+                      </div>
+                      <p className="text-[10px] text-slate-400 shrink-0">
+                        {new Date(h.created_at).toLocaleString(
+                          lang === 'en' ? 'en-US' : 'fr-FR',
+                          {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }
+                        )}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          {/* RIGHT COLUMN — News + Help */}
+          <aside className="xl:col-span-4 space-y-6">
+            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="text-base font-bold text-slate-900">{t.newsCenter}</h2>
+              </div>
+              <div className="p-5 flex gap-4">
+                <div className="flex-1 min-w-0">
+                  {announcement.active && announcement.text ? (
+                    <>
+                      <p className="text-sm font-bold text-slate-900 mb-1.5">{t.announcement}</p>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                        {announcement.text}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-slate-900 mb-1.5">{t.newsDefaultTitle}</p>
+                      <p className="text-xs text-slate-600 leading-relaxed">{t.newsDefaultBody}</p>
+                    </>
+                  )}
+                </div>
+                <div className="w-16 shrink-0 flex items-start justify-center">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1d4ed8] to-indigo-500 flex items-center justify-center shadow-md">
+                    <img
+                      src="https://i.imgur.com/xDk58Xk.png"
+                      alt="Hatexcard"
+                      className="w-9 h-9 rounded-lg object-cover border border-white/30"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="text-base font-bold text-slate-900">{t.needHelp}</h2>
+              </div>
+              <div className="p-3 space-y-1">
+                <Link
+                  href="/support"
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
+                >
+                  <Headset size={18} className="text-[#1d4ed8]" /> {t.support}
+                </Link>
+                <Link
+                  href="/developer/docs"
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
+                >
+                  <FileText size={18} className="text-[#1d4ed8]" /> {t.docs}
+                </Link>
+                <Link
+                  href="/dashboard/products"
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
+                >
+                  <Package size={18} className="text-[#1d4ed8]" /> {t.products}
+                </Link>
+                <Link
+                  href="/plugin"
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-[#1d4ed8] transition-colors"
+                >
+                  <Plug size={18} className="text-[#1d4ed8]" /> {t.plugin}
+                </Link>
+              </div>
+            </section>
+
+            {kycOk && (
+              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
+                <CheckCircle2 size={14} className="shrink-0" />
+                {t.kycOk}
+              </div>
+            )}
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={antreNanAdmin}
+                disabled={isLoggingAdmin}
+                className="w-full bg-rose-50 border border-rose-200 text-rose-700 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoggingAdmin ? <Loader2 size={14} className="animate-spin" /> : <Briefcase size={14} />}
+                {t.superAdmin}
+              </button>
+            )}
+          </aside>
+        </div>
       </main>
 
       {showBankModal && <ConnectBankModal onClose={() => setShowBankModal(false)} />}
@@ -543,12 +856,12 @@ export default function Dashboard() {
               ✕
             </button>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md">
+              <div className="w-12 h-12 bg-[#1d4ed8] text-white rounded-xl flex items-center justify-center shadow-md">
                 <Lock size={22} />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
-                  {isFirstTimeWorkspaceSetup ? 'Kreye Modpas Espas Travay' : 'Aksè Espas Travay'}
+                  {isFirstTimeWorkspaceSetup ? t.workspaceCreate : t.workspaceTitle}
                 </h2>
               </div>
             </div>
@@ -560,7 +873,7 @@ export default function Dashboard() {
                 value={workspacePassword}
                 onChange={(e) => setWorkspacePassword(e.target.value)}
                 placeholder="••••••••••"
-                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-[#1d4ed8]"
               />
               {isFirstTimeWorkspaceSetup && (
                 <input
@@ -568,8 +881,8 @@ export default function Dashboard() {
                   required
                   value={workspacePasswordConfirm}
                   onChange={(e) => setWorkspacePasswordConfirm(e.target.value)}
-                  placeholder="Konfime modpas"
-                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-indigo-500"
+                  placeholder={t.workspaceConfirm}
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-[#1d4ed8]"
                 />
               )}
               {workspaceError && (
@@ -581,110 +894,14 @@ export default function Dashboard() {
               <button
                 type="submit"
                 disabled={workspaceLoading}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
+                className="w-full bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-indigo-400 text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
               >
-                {workspaceLoading ? <Loader2 size={16} className="animate-spin" /> : 'Antre'}
+                {workspaceLoading ? <Loader2 size={16} className="animate-spin" /> : t.enter}
               </button>
             </form>
           </div>
         </div>
       )}
     </MerchantShell>
-  );
-}
-
-function DashboardAlerts({
-  walletFull,
-  usage,
-  effectivePlan,
-  nearLimit,
-  kycOk,
-  kycPending,
-  intendedPlan,
-}: Readonly<{
-  walletFull: { amount?: number }[];
-  usage?: { used?: number; limit?: number | null } | null;
-  effectivePlan: string;
-  nearLimit: boolean;
-  kycOk: boolean;
-  kycPending: boolean;
-  intendedPlan?: string | null;
-}>) {
-  const needsKyc =
-    !kycOk && (intendedPlan === 'capacity' || intendedPlan === 'premium');
-  return (
-    <>
-      {walletFull.length > 0 && (
-        <div className="mb-5 lg:mb-6 bg-rose-600 text-white rounded-3xl p-5 lg:p-6 shadow-lg">
-          <p className="text-sm font-black uppercase tracking-wide leading-snug">
-            Sistèm nan ap eseye depoze yon kòb sou kont ou men sanble kont MonCash ou plen
-          </p>
-          <p className="text-xs mt-2 text-rose-50 leading-relaxed">
-            Fè retrè pi rapid ke posib. Si kòb la fè 10 jou nan sistèm nan san nou pa ka depoze l
-            sou kont pèsonèl ou, kòb sa a ap konsidere kòm lajan pèdi. Mete yon dezyèm nimewo
-            MonCash nan « Konekte kont bank ou » — sistèm nan ap eseye yo youn pa youn.
-          </p>
-          <p className="text-[11px] mt-3 font-semibold text-rose-100">
-            {walletFull.length} transfè an atant · {Number(walletFull[0]?.amount || 0).toLocaleString('fr-FR')} HTG
-          </p>
-        </div>
-      )}
-
-      {usage && (
-        <div className="mb-5 bg-white border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Kota jodi a · Plan {effectivePlan}
-            </p>
-            <p className="text-sm font-bold text-slate-900 mt-0.5">
-              {Number(usage.used || 0).toLocaleString('fr-FR')} HTG
-              {usage.limit != null ? ` / ${Number(usage.limit).toLocaleString('fr-FR')} HTG` : ' · san limit'}
-            </p>
-            {usage.limit != null && (
-              <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${nearLimit ? 'bg-amber-500' : 'bg-indigo-600'}`}
-                  style={{ width: `${Math.min(100, Math.round((Number(usage.used || 0) / usage.limit) * 100))}%` }}
-                />
-              </div>
-            )}
-          </div>
-          <Link
-            href="/plan"
-            className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-indigo-600 border border-indigo-200 rounded-xl px-3 py-2 hover:bg-indigo-50"
-          >
-            Elaji kont ou
-          </Link>
-        </div>
-      )}
-
-      {effectivePlan === 'free' && (
-        <div className="mb-5 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-xs text-indigo-900 leading-relaxed">
-          <strong>Elaji kont ou</strong> — sou plan Gratis ou ka resevwa 25 000 HTG/jou sou tout
-          chanèl (API, fakti, lyen, vann sèvis). Lè kota a rive, kliyan yo wè:{' '}
-          « Kont machann nan pa elaji pou l resevwa lajan an. »
-        </div>
-      )}
-
-      {needsKyc && (
-        <div className="mb-5 lg:mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 lg:p-5 flex items-start gap-3">
-          <ShieldCheck className="text-amber-600 shrink-0 mt-0.5" size={20} />
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-amber-900">
-              {kycPending ? 'Dokiman KYC ou nan revizyon' : 'KYC obligatwa pou plan peye'}
-            </p>
-            <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-              Ou ka itilize sistèm nan ak limit 25 000 HTG/jou pandan w ap fini KYC.
-            </p>
-            <Link
-              href="/kyc/v2"
-              className="mt-2 inline-block text-[11px] font-bold uppercase tracking-wider text-amber-900 underline"
-            >
-              {kycPending ? 'Gade dosye a' : 'Kòmanse KYC'}
-            </Link>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
