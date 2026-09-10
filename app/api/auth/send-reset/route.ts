@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { escapeHtml, isEmailConfigured, sendMail } from '@/lib/notify/email';
+import { publicSiteUrl } from '@/lib/urls/public';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
+const SITE_URL = publicSiteUrl();
 
 function buildResetEmailHtml(actionLink: string): string {
   return `

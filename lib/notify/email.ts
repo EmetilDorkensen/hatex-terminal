@@ -1,3 +1,5 @@
+import { CANONICAL_SITE_URL, publicSiteUrl } from '@/lib/urls/public';
+
 /**
  * Modil santral pou voye imèl notifikasyon atravè Brevo (Sendinblue).
  *
@@ -7,15 +9,15 @@
  *   BREVO_SENDER_NAME      — opsyonèl (default HatexCard)
  *
  * Verifye adrès ekspeditè a nan Brevo → Senders, Domains & Dedicated IPs.
+ *
+ * NÒT: Brevo ka reekri lyen atravè noreply.hatexcard.com (lien de marque).
+ * Si SSL sou sous-domèn sa a pa bon, navigatè a di "connexion non privée".
+ * Nou toujou mete URL kanonik https://hatexcard.com + vèsyon tèks pou kopi.
  */
 
 export const NOTIFY_FROM = 'HatexCard <noreply@hatexcard.com>';
-export const SITE_URL = (() => {
-  const raw = (process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com').replace(/\/$/, '');
-  // Pa mete lyen localhost nan imèl kliyan (menm si .env.local gen localhost).
-  if (/localhost|127\.0\.0\.1/i.test(raw)) return 'https://hatexcard.com';
-  return raw;
-})();
+/** Toujou URL piblik HTTPS ofisyèl — pa localhost / vercel.app. */
+export const SITE_URL = publicSiteUrl() || CANONICAL_SITE_URL;
 
 export function getBrevoApiKey(): string | null {
   const key =
@@ -109,6 +111,19 @@ export async function sendMail(opts: {
 
   const sender = parseSender(opts.from);
 
+  // Vèsyon tèks: kèk kliyan imèl montre sa a dirèkteman (san tracking Brevo).
+  const hrefs = Array.from(opts.html.matchAll(/href=["'](https?:\/\/[^"']+)["']/gi)).map(
+    (m) => m[1]
+  );
+  const uniqueHrefs = Array.from(new Set(hrefs));
+  const textContent = [
+    String(opts.subject || '').replace(/\s+/g, ' ').trim(),
+    '',
+    ...uniqueHrefs.map((u) => `Lyen: ${u}`),
+    '',
+    'Si bouton an pa louvri, kopi lyen https://hatexcard.com la nan navigatè ou.',
+  ].join('\n');
+
   try {
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -122,6 +137,7 @@ export async function sendMail(opts: {
         to: [{ email: to }],
         subject: String(opts.subject).slice(0, 180),
         htmlContent: opts.html,
+        textContent,
       }),
     });
 

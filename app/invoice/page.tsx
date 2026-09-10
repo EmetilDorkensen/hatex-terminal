@@ -9,6 +9,7 @@ import {
   RefreshCw, Smartphone
 } from 'lucide-react';
 import { checkSpendingLimit, INDIVIDUAL_INVOICE_DAILY_LIMIT, isEnterpriseAccount } from '@/lib/security/spending-limits';
+import { CANONICAL_SITE_URL, invoicePublicUrl } from '@/lib/urls/public';
 
 type BankAccount = {
   id: string;
@@ -203,9 +204,10 @@ export default function InvoicePage() {
 
       if (invErr) throw invErr;
 
-      const payLink = `${window.location.origin}/checkout-invoice/${
-        inv.share_token || inv.id
-      }`;
+      const payLink = invoicePublicUrl(CANONICAL_SITE_URL, {
+        id: inv.id,
+        share_token: inv.share_token || null,
+      });
 
       let copied = false;
       try {
@@ -244,9 +246,10 @@ export default function InvoicePage() {
   };
 
   const handleCopyLink = async (inv: { id: string; share_token?: string | null }) => {
-    const payLink = `${window.location.origin}/checkout-invoice/${
-      inv.share_token || inv.id
-    }`;
+    const payLink = invoicePublicUrl(CANONICAL_SITE_URL, {
+      id: inv.id,
+      share_token: inv.share_token || null,
+    });
     try {
       await navigator.clipboard.writeText(payLink);
       setCopiedId(inv.id);

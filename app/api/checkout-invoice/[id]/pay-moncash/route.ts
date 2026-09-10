@@ -6,10 +6,9 @@ import {
   quoteInvoiceMonCash,
   startInvoiceMonCashPayment,
 } from '@/lib/invoices/moncash-pay';
+import { publicSiteUrl } from '@/lib/urls/public';
 
 export const dynamic = 'force-dynamic';
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
 
 /** Ref piblik yon fakti: share_token opak si disponib, sinon paramèt la. */
 async function invoicePublicRef(id: string): Promise<string> {
@@ -87,7 +86,7 @@ export async function POST(
   }
 
   const ref = await invoicePublicRef(id);
-  const returnUrl = `${SITE_URL}/checkout-invoice/success?id=${encodeURIComponent(ref)}`;
+  const returnUrl = `${publicSiteUrl()}/checkout-invoice/success?id=${encodeURIComponent(ref)}`;
   const started = await startInvoiceMonCashPayment(admin, invoiceId, returnUrl, {
     customerPhone,
     flow,

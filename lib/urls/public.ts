@@ -1,5 +1,5 @@
 /**
- * URL piblik ofisyèl — pa janm vercel.app preview ni localhost pou MonCash.
+ * URL piblik ofisyèl — pa janm vercel.app preview, localhost, ni noreply.* (Brevo tracking).
  * Alert/Return nan pòtay Digicel dwe: https://hatexcard.com/api/moncash/alert
  * ak https://hatexcard.com/api/moncash/return
  */
@@ -11,7 +11,10 @@ function isUnusableHost(hostname: string): boolean {
     h === 'localhost' ||
     h === '127.0.0.1' ||
     h.endsWith('.vercel.app') ||
-    h.endsWith('.vercel.sh')
+    h.endsWith('.vercel.sh') ||
+    h.startsWith('noreply.') ||
+    h.includes('brevosend.com') ||
+    h.includes('sendibt')
   );
 }
 
@@ -24,9 +27,12 @@ export function publicSiteUrl(): string {
 
   try {
     const url = new URL(raw.includes('://') ? raw : `https://${raw}`);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return CANONICAL_SITE_URL;
     if (isUnusableHost(url.hostname)) return CANONICAL_SITE_URL;
-    return `${url.protocol}//${url.host}`;
+    // Toujou HTTPS pou lyen kliyan (evite "connexion non privée").
+    const host = url.hostname.replace(/^www\./, '');
+    if (host === 'hatexcard.com') return CANONICAL_SITE_URL;
+    if (url.protocol !== 'https:') return CANONICAL_SITE_URL;
+    return `https://${url.host}`;
   } catch {
     return CANONICAL_SITE_URL;
   }
@@ -72,10 +78,23 @@ export function invoicePayPath(invoice: PublicLinkRow): string {
 
 /** URL konplè paj peman pwodwi (dashboard / kopi lyen). */
 export function productPublicUrl(origin: string, product: PublicLinkRow): string {
-  return `${origin.replace(/\/$/, '')}${productPayPath(product)}`;
+  const base = isPreviewOrLocalUrl(origin) ? CANONICAL_SITE_URL : publicSiteUrl();
+  return `${base.replace(/\/$/, '')}${productPayPath(product)}`;
 }
 
 /** URL konplè paj fakti (kopi lyen / e-mail / WhatsApp). */
-export function invoicePublicUrl(origin: string, invoice: PublicLinkRow): string {
-  return `${origin.replace(/\/$/, '')}${invoicePayPath(invoice)}`;
+export function invoicePublicUrl(origin: string | null | undefined, invoice: PublicLinkRow): string {
+  try {
+    if (origin) {
+      const u = new URL(origin);
+      if (u.hostname.replace(/^www\./, '') === 'hatexcard.com') {
+        return `${CANONICAL_SITE_URL}${invoicePayPath(invoice)}`;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  const base =
+    !origin || isPreviewOrLocalUrl(origin) ? CANONICAL_SITE_URL : publicSiteUrl();
+  return `${base.replace(/\/$/, '')}${invoicePayPath(invoice)}`;
 }
