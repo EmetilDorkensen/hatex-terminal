@@ -58,18 +58,12 @@ function resolveCreds(mode: MonCashMode): Creds | null {
     return { clientId: scoped.clientId.trim(), secretKey: scoped.secretKey.trim() };
   }
 
-  const unscopedId = process.env.MONCASH_CLIENT_ID?.trim();
-  const unscopedSecret = process.env.MONCASH_SECRET_KEY?.trim();
-
-  // Ansyen varyab: sèvi pou mòd default platfòm nan.
-  if (mode === getMonCashMode() && unscopedId && unscopedSecret) {
-    return { clientId: unscopedId, secretKey: unscopedSecret };
-  }
-
-  // Live: si MONCASH_LIVE_* manke, aksepte MONCASH_CLIENT_ID / SECRET kòm dènye chans.
-  // (NEXT_PUBLIC_MONCASH_MODE=sandbox te anpeche sa — epi plugin live te kraze.)
-  if (mode === 'live' && unscopedId && unscopedSecret) {
-    return { clientId: unscopedId, secretKey: unscopedSecret };
+  // Ansyen varyab: sèvi pou mòd default platfòm nan sèlman
+  // (pa melanje kle sandbox ak host live Digicel).
+  if (mode === getMonCashMode()) {
+    const clientId = process.env.MONCASH_CLIENT_ID?.trim();
+    const secretKey = process.env.MONCASH_SECRET_KEY?.trim();
+    if (clientId && secretKey) return { clientId, secretKey };
   }
 
   return null;
