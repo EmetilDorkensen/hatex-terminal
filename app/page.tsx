@@ -1,774 +1,789 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Code2, Navigation, ArrowRightLeft, BarChart3, ChevronDown, CheckCircle2, ShieldCheck, Download, Smartphone, Globe, Lock, Mail, AlertTriangle, User } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  Code2,
+  FileText,
+  Globe2,
+  Lock,
+  Package,
+  Plug,
+  ShieldCheck,
+  Smartphone,
+  Zap,
+} from "lucide-react";
+
+/**
+ * Landing page piblik Hatexcard — stil maketing (Authorize.net homepage),
+ * PA dashboard machann. Kontni a baze sou pwodwi aktyèl: pasèl MonCash/NatCash,
+ * fakti, pwodwi, plugin WooCommerce, API, plan, KYC.
+ */
+
+const NAV = [
+  {
+    label: "Pwodwi",
+    href: "#pwodwi",
+    sub: [
+      { label: "Pasèl MonCash / NatCash", desc: "Kliyan peye, ou resevwa", href: "#kijan" },
+      { label: "Smart Invoice", desc: "Voye fakti ak lyen peman", href: "#pwodwi" },
+      { label: "Pwodwi & lyen", desc: "Vann sou WhatsApp / Instagram", href: "#pwodwi" },
+      { label: "Plugin WooCommerce", desc: "Checkout MonCash nan sit ou", href: "#dev" },
+    ],
+  },
+  {
+    label: "Devlopè",
+    href: "#dev",
+    sub: [
+      { label: "API Peman", desc: "REST + webhooks", href: "/developer/docs" },
+      { label: "Plugin WooCommerce", desc: "ZIP pre-konfigire", href: "/plugin" },
+      { label: "Dokimantasyon", desc: "Quick start & egzanp", href: "/developer/docs" },
+    ],
+  },
+  { label: "Pri", href: "#pri", sub: [] },
+  { label: "Sekirite", href: "#sekirite", sub: [] },
+  { label: "Sou Nou", href: "/sou-nou", sub: [] },
+];
+
+const CHANNELS = [
+  {
+    icon: FileText,
+    title: "Fakti (Smart Invoice)",
+    desc: "Kreye yon fakti, jenere yon lyen peman sekirize, epi voye l bay kliyan pa imèl. Li peye sou MonCash — ou resevwa otomatikman sou MonCash oswa NatCash.",
+  },
+  {
+    icon: Package,
+    title: "Pwodwi & lyen piblik",
+    desc: "Kreye yon pwodwi ak pri, jwenn lyen /p/... epi pataje l sou WhatsApp oswa Instagram. Kliyan peye san kont Hatexcard.",
+  },
+  {
+    icon: Plug,
+    title: "WooCommerce",
+    desc: "Telechaje plugin MonCash la (ZIP ak kle API). Kliyan checkout sou sit ou an HTG oswa USD — ou resevwa sou MonCash oswa NatCash.",
+  },
+  {
+    icon: Code2,
+    title: "API & Webhooks",
+    desc: "Entègre nan app oswa sit ou. Kle API, mod live/test, webhooks payment.success, Idempotency-Key — dokiman konplè.",
+  },
+  {
+    icon: Smartphone,
+    title: "App Android",
+    desc: "Jere kont machann ou sou telefòn: notifikasyon, istorik, fakti, epi konekte MonCash oswa NatCash pou payout.",
+  },
+  {
+    icon: Globe2,
+    title: "Payout otomatik",
+    desc: "Apre yon peman, rès la ale otomatikman sou nimewo MonCash oswa NatCash (oswa kont bank) ou. Hatexcard pa kenbe yon wallet pou ou.",
+  },
+];
+
+const STEPS = [
+  {
+    n: "01",
+    title: "Ouvri kont + KYC",
+    desc: "Enskri gratis, konfime imèl, epi pase verifikasyon KYC — obligatwa pou tout plan.",
+  },
+  {
+    n: "02",
+    title: "Konekte MonCash / NatCash",
+    desc: "Mare nimewo MonCash oswa NatCash biznis ou pou sistèm nan ka depoze lajan ou otomatikman.",
+  },
+  {
+    n: "03",
+    title: "Aksepte peman",
+    desc: "Voye fakti, pataje lyen pwodwi, oswa enstale plugin WooCommerce.",
+  },
+  {
+    n: "04",
+    title: "Resevwa otomatik",
+    desc: "Kliyan peye. Hatexcard pran 2%. Ou resevwa montan ou te mande a sou MonCash oswa NatCash.",
+  },
+];
+
+const PLANS = [
+  {
+    id: "free",
+    name: "Gratis",
+    price: "0",
+    tag: "Kòmanse jodi a",
+    bullets: [
+      "API, fakti, lyen piblik",
+      "25 000 HTG / jou",
+      "KYC obligatwa",
+    ],
+    featured: false,
+  },
+  {
+    id: "capacity",
+    name: "Kapasite",
+    price: "599",
+    tag: "Pou biznis k ap grandi",
+    bullets: [
+      "150 000 HTG / jou",
+      "Tout chanèl peman",
+      "KYC obligatwa",
+    ],
+    featured: true,
+  },
+  {
+    id: "premium",
+    name: "Premyòm",
+    price: "999",
+    tag: "Pou gwo biznis",
+    bullets: [
+      "San limit jou",
+      "Plizyè nimewo MonCash / NatCash",
+      "KYC obligatwa",
+    ],
+    featured: false,
+  },
+];
+
+/** Yon sèl foto demo — retire 3 lòt yo */
+const DEMO = {
+  img: "/img/hx-demo-payout.png",
+  title: "Pasèl MonCash / NatCash pou machann",
+  desc: "Kliyan peye an Goud. Ou resevwa otomatikman sou nimewo MonCash oswa NatCash biznis ou — san wallet, san kat vityèl.",
+};
+
+const FAQS = [
+  {
+    q: "Kote lajan kliyan an ale?",
+    a: "Kliyan an peye sou MonCash. Hatexcard pran frè pasèl la (2%), epi rès la ale otomatikman sou nimewo MonCash oswa NatCash (oswa kont bank) machann nan. Hatexcard pa kenbe yon wallet pou ou.",
+  },
+  {
+    q: "Kòman m entegre nan sit WooCommerce mwen?",
+    a: "Apre KYC, ale nan Plugin, telechaje ZIP la. Kle API a gentan entegre. Enstale nan WordPress → aktive HatexCard MonCash nan WooCommerce → Peman. Checkout sipòte HTG ak USD (ak to konvèsyon). Ou resevwa sou MonCash oswa NatCash.",
+  },
+  {
+    q: "Eske m bezwen yon sit entènèt?",
+    a: "Non. Ou ka voye fakti pa imèl oswa pataje yon lyen pwodwi sou WhatsApp / Instagram. WooCommerce ak API yo opsyonèl pou moun ki gen sit oswa app.",
+  },
+  {
+    q: "Konbyen frè a ye?",
+    a: "Frè Hatexcard se 2% sou montan machann nan. Gen tou frè transfè MonCash / NatCash (estime ~1%, min 5 HTG). Kliyan an peye frè yo anplis — ou resevwa montan ou te mande a.",
+  },
+];
+
+/** Foto ak logo Hatexcard anwo agòch (logo ofisyèl) */
+function BrandPhoto({
+  src,
+  alt,
+  className = "",
+}: Readonly<{ src: string; alt: string; className?: string }>) {
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      <img src={src} alt={alt} className="w-full h-full object-cover" />
+      <div className="absolute top-3 left-3 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-lg pl-1.5 pr-2.5 py-1 shadow-sm">
+        <img src="/img/hatexcard-logo.png" alt="" className="w-7 h-7 rounded-md object-cover" />
+        <span className="text-[12px] font-extrabold tracking-tight text-slate-900">
+          Hatex<span className="text-[#1d4ed8]">card</span>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
-  const [email, setEmail] = useState("");
-  const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
-  const [activeFaq, setActiveFaq] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [activeNav, setActiveNav] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(0);
+
   useEffect(() => {
-    const handleMouse = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
-    };
-    const handleScroll = () => setScrolled(window.scrollY > 30);
-    window.addEventListener("mousemove", handleMouse);
-    window.addEventListener("scroll", handleScroll);
-    return () => {
-      window.removeEventListener("mousemove", handleMouse);
-      window.removeEventListener("scroll", handleScroll);
-    };
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const cardTiltX = (mousePos.y - 0.5) * 12;
-  const cardTiltY = (mousePos.x - 0.5) * -12;
-
-  const navLinks = [
-    {
-      label: "Pwodwi", href: "#pwodwi",
-      sub: [
-        { label: "Pasèl MonCash", desc: "Kliyan peye, machann resevwa" },
-        { label: "Smart Invoice", desc: "Voye fakti pwofesyonèl" },
-        { label: "API Peman", desc: "Entègre nan sit ou" },
-      ]
-    },
-    {
-      label: "Devlopè", href: "#api",
-      sub: [
-        { label: "API Referans", desc: "Dokimantasyon konplè" },
-        { label: "Plugin WooCommerce", desc: "Entegrasyon 5 minit" },
-        { label: "Plugin MonCash", desc: "WooCommerce v23.0" },
-        { label: "Sandbox & Tès", desc: "Teste anvan lanse" },
-      ]
-    },
-    {
-      label: "Sekirite", href: "#sekirite",
-      sub: [
-        { label: "KYC & Verifikasyon", desc: "Platfòm san fwòd" },
-        { label: "Ankripsyon 256-bit", desc: "Done ou an sekirite" },
-        { label: "Kontwòl Tranzaksyon", desc: "Istwa konplè an tan reyèl" },
-      ]
-    },
-    { label: "Pri", href: "#pri", sub: [] },
-    { label: "Sou Nou", href: "#sou-nou", sub: [] },
-  ];
-
-  const faqs = [
-    {
-      q: "Kòman m entegre API Hatexcard nan sit entènèt oswa app mwen?",
-      a: "Nou gen yon API RESTful konplè ak dokimantasyon detaye. Pou WooCommerce, nou gen yon plugin MonCash ki pran mwens pase 5 minit pou enstale. Kliyan w yo ap ka peye an Goud sou MonCash dirèkteman sou sit ou san yo pa kite paj la."
-    },
-    {
-      q: "Kòman fonksyon Smart Invoice la mache pou moun ki pa gen sit entènèt?",
-      a: "Ak Hatexcard, ou kreye yon fakti an kèk segonn. Sistèm nan jenere yon lyen peman sekirize epi voye l dirèkteman nan imèl kliyan ou. Kliyan an klike, li peye, ou resevwa notifikasyon imedyatman ak yon prèv tranzaksyon."
-    },
-    {
-      q: "Kote lajan kliyan an ale?",
-      a: "Kliyan an peye sou MonCash (kont machann HatexCard). HatexCard pran yon ti frè pasèl, epi rès la ale otomatikman sou nimewo MonCash machann nan. HatexCard pa kenbe balans ni wallet pou ou."
-    },
-    {
-      q: "Konbyen frè pasèl la ye?",
-      a: "Kliyan an peye montan machann nan mande a, plis frè HatexCard (2%) ak frè transfè MonCash. Machann nan resevwa montan konplè li te mande a."
-    },
-  ];
-
-  const stats = [
-    { val: "2%", label: "Frè pasèl HatexCard" },
-    { val: "< 10s", label: "Vitès mwayèn peman" },
-    { val: "256-bit", label: "Nivo ankripsyon done" },
-    { val: "24/7", label: "Siveyans tranzaksyon" },
-  ];
-
-  const features = [
-    {
-      icon: <FileText size={22} className="text-indigo-600" />,
-      ti: "Smart Invoice",
-      ds: "Jenere yon fakti pwofesyonèl ak yon lyen peman sekirize. Voye l bay kliyan pa imèl. Li peye, ou resevwa notifikasyon imedyatman ak prèv.",
-      tg: "MACHANN"
-    },
-    {
-      icon: <Code2 size={22} className="text-indigo-600" />,
-      ti: "API & Plugin",
-      ds: "Intègre Hatexcard nan nenpòt sit wèb oswa app an mwens pase 5 minit. Plugin WooCommerce (MonCash) v23.0 disponib. Kliyan peye an Goud sou MonCash dirèkteman.",
-      tg: "DEVLOPÈ"
-    },
-    {
-      icon: <Navigation size={22} className="text-indigo-600" />,
-      ti: "Sèvis Taksi & Livrezon",
-      ds: "Chauffeur ak livrè resevwa peman dirèkteman sou telefòn yo. Pa gen pwoblèm chanj egzak — kliyan mete montan la, ou resevwa nan segonn.",
-      tg: "MOBILITE"
-    },
-    {
-      icon: <ArrowRightLeft size={22} className="text-indigo-600" />,
-      ti: "Payout MonCash",
-      ds: "Apre yon peman, rès la ale sou nimewo MonCash machann nan. HatexCard pa kenbe yon balans pou ou — nou se pasèl, pa yon bank.",
-      tg: "OTOMATIK"
-    },
-    {
-      icon: <BarChart3 size={22} className="text-indigo-600" />,
-      ti: "Kontwòl Lajan Konplè",
-      ds: "Tableau de bò an tan reyèl pou wè tout antre ak soti. Rapò detaye, filtre pa dat ak tip tranzaksyon — ou konnen egzakteman kote lajan w ale.",
-      tg: "BIZNIS"
-    },
-  ];
-
   return (
-    <div
-      className="min-h-screen text-slate-900 overflow-x-hidden font-sans bg-slate-50"
-      style={{ WebkitFontSmoothing: "antialiased" }}
-    >
-      {/* ═══ BACKGROUND (Light Version) ═══ */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-slate-50">
-        <div className="absolute inset-0 bg-white" />
-        <div className="absolute" style={{ top: "0%", left: "50%", transform: "translateX(-50%)", width: "1000px", height: "500px", background: "radial-gradient(ellipse, rgba(79, 70, 229, 0.08) 0%, transparent 75%)", filter: "blur(80px)" }} />
-        <div className="absolute" style={{ top: "25%", right: "-8%", width: "450px", height: "450px", background: "radial-gradient(ellipse, rgba(59, 130, 246, 0.05) 0%, transparent 70%)", filter: "blur(90px)" }} />
-        <div className="absolute" style={{ top: "35%", left: "-8%", width: "380px", height: "380px", background: "radial-gradient(ellipse, rgba(99, 102, 241, 0.05) 0%, transparent 70%)", filter: "blur(80px)" }} />
-        
-        {/* Subtle grid */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
-          backgroundSize: "80px 80px",
-          maskImage: "radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 100%)",
-          WebkitMaskImage: "radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 100%)"
-        }} />
-      </div>
-
+    <div className="landing min-h-screen bg-[#F7F8FA] text-slate-900 overflow-x-hidden">
       <style>{`
-        @keyframes htx-float {
-          0%,100%{transform:perspective(1200px) rotateX(var(--tx,0deg)) rotateY(var(--ty,0deg)) translateY(0px)}
-          50%{transform:perspective(1200px) rotateX(var(--tx,0deg)) rotateY(var(--ty,0deg)) translateY(-12px)}
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap');
+        .landing { font-family: 'Outfit', system-ui, sans-serif; }
+        .landing .display { font-family: 'Source Serif 4', Georgia, serif; }
+        @keyframes land-up {
+          from { opacity: 0; transform: translateY(28px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes htx-glow { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
-        @keyframes htx-up { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes htx-fade { from{opacity:0} to{opacity:1} }
-        @keyframes htx-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.95)} }
-        @keyframes htx-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        
-        .htx-card-float { animation: htx-float 6s ease-in-out infinite; }
-        .a1{animation:htx-up 0.8s cubic-bezier(0.16,1,0.3,1) both}
-        .a2{animation:htx-up 0.8s 0.1s cubic-bezier(0.16,1,0.3,1) both}
-        .a3{animation:htx-up 0.8s 0.2s cubic-bezier(0.16,1,0.3,1) both}
-        .a4{animation:htx-up 0.8s 0.3s cubic-bezier(0.16,1,0.3,1) both}
-        .a5{animation:htx-fade 1s 0.5s both}
-        .phone-anim{animation:htx-up 1s 0.15s cubic-bezier(0.16,1,0.3,1) both}
-        
-        .htx-nav-link { position:relative; color:#475569; font-size:13px; font-weight:600; transition:color 0.2s; cursor:pointer; padding:8px 0; }
-        .htx-nav-link:hover { color:#111827; }
-        .htx-nav-link:hover .htx-dropdown { opacity:1; pointer-events:auto; transform:translateY(0); }
-        
-        .htx-dropdown { position:absolute; top:calc(100% + 12px); left:50%; transform:translateX(-50%) translateY(8px); background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; padding:8px; min-width:220px; opacity:0; pointer-events:none; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); z-index:100; box-shadow:0 20px 40px rgba(0,0,0,0.08); }
-        .htx-dropdown-item { display:block; padding:10px 12px; border-radius:10px; transition:background 0.15s; cursor:pointer; }
-        .htx-dropdown-item:hover { background:#f8fafc; }
-        
-        .htx-feat-card { background:#ffffff; border:1px solid #e2e8f0; border-radius:20px; padding:28px 24px; transition:all 0.3s cubic-bezier(0.16,1,0.3,1); box-shadow:0 4px 6px rgba(0,0,0,0.02); }
-        .htx-feat-card:hover { border-color:#a5b4fc; transform:translateY(-3px); box-shadow:0 12px 24px rgba(79,70,229,0.08); }
-        
-        .htx-stat { border-right:1px solid #e2e8f0; }
-        .htx-stat:last-child { border-right:none; }
-        
-        .htx-faq { background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:22px 26px; cursor:pointer; transition:all 0.25s ease; box-shadow:0 2px 4px rgba(0,0,0,0.02); }
-        .htx-faq:hover { border-color:#a5b4fc; }
-        .htx-faq.open { background:#f8fafc; border-color:#818cf8; }
-        
-        .htx-partner { font-size:13px; font-weight:700; color:#94a3b8; letter-spacing:0.08em; transition:color 0.2s; }
-        .htx-partner:hover { color:#475569; }
-        
-        .htx-btn-primary { display:inline-flex; align-items:center; gap:8px; padding:13px 26px; border-radius:10px; font-size:14px; font-weight:700; background:#4f46e5; color:#fff; border:none; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 12px rgba(79,70,229,0.25); text-decoration: none;}
-        .htx-btn-primary:hover { transform:translateY(-1px); background:#4338ca; box-shadow:0 6px 16px rgba(79,70,229,0.35); }
-        
-        .htx-btn-secondary { display:inline-flex; align-items:center; gap:8px; padding:13px 26px; border-radius:10px; font-size:14px; font-weight:700; background:#ffffff; color:#334155; border:1px solid #cbd5e1; cursor:pointer; transition:all 0.2s; box-shadow:0 2px 4px rgba(0,0,0,0.02); text-decoration: none;}
-        .htx-btn-secondary:hover { background:#f8fafc; border-color:#94a3b8; color:#0f172a; }
-        
-        .price-row { display:flex; justify-content:space-between; align-items:center; padding:16px 0; border-bottom:1px solid #f1f5f9; }
-        .price-row:last-child { border-bottom:none; }
-        
-        @media(max-width:768px){
-          .htx-mobile-hide { display:none!important; }
-          .htx-mobile-menu { display:flex!important; }
+        @keyframes land-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
+        .land-a1 { animation: land-up 0.85s cubic-bezier(0.16,1,0.3,1) both; }
+        .land-a2 { animation: land-up 0.85s 0.12s cubic-bezier(0.16,1,0.3,1) both; }
+        .land-a3 { animation: land-up 0.85s 0.22s cubic-bezier(0.16,1,0.3,1) both; }
+        .land-a4 { animation: land-up 0.9s 0.32s cubic-bezier(0.16,1,0.3,1) both; }
+        .nav-drop { opacity: 0; pointer-events: none; transform: translateY(8px); transition: all 0.2s ease; }
+        .nav-item:hover .nav-drop { opacity: 1; pointer-events: auto; transform: translateY(0); }
       `}</style>
 
-      {/* ═══ NAVBAR ═══ */}
-      <nav
+      {/* ═══ NAV (maketing — pa sidebar dashboard) ═══ */}
+      <header
         className="fixed top-0 inset-x-0 z-50 transition-all duration-300"
         style={{
-          background: scrolled ? "rgba(255,255,255,0.95)" : "transparent",
-          borderBottom: scrolled ? "1px solid #e2e8f0" : "1px solid transparent",
-          backdropFilter: scrolled ? "blur(12px)" : "none",
+          background: scrolled ? "rgba(255,255,255,0.94)" : "transparent",
+          borderBottom: scrolled ? "1px solid #e5e7eb" : "1px solid transparent",
+          backdropFilter: scrolled ? "blur(14px)" : "none",
         }}
       >
-        <div className="max-w-7xl mx-auto px-6 py-0 flex items-center" style={{ height: "68px" }}>
-          {/* LOGO ZONE */}
-          <div className="flex items-center gap-2 flex-shrink-0" style={{ marginRight: "48px" }}>
-            <div style={{
-              width: "32px", height: "32px", borderRadius: "8px",
-              overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", background: "#fff"
-            }}>
-              <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" style={{ width: "100%", height: "100%", objectFit: "cover", padding: "2px" }} />
-            </div>
-            <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.02em", color: "#0f172a" }}>
-              Hatex<span style={{ color: "#4f46e5" }}>card</span>
+        <div className="max-w-6xl mx-auto px-5 h-[68px] flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-2.5 shrink-0">
+            <img
+              src="/img/hatexcard-logo.png"
+              alt="Hatexcard"
+              className="w-9 h-9 rounded-lg object-cover border border-slate-200 bg-white"
+            />
+            <span className="text-[19px] font-extrabold tracking-tight text-slate-900">
+              Hatex<span className="text-[#1d4ed8]">card</span>
             </span>
-          </div>
+          </Link>
 
-          {/* Desktop nav links */}
-          <div className="htx-mobile-hide flex items-center gap-1 flex-1">
-            {navLinks.map(link => (
-              <div key={link.label} className="htx-nav-link relative" style={{ padding: "8px 14px" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <nav className="hidden lg:flex items-center gap-1 flex-1">
+            {NAV.map((link) => (
+              <div key={link.label} className="nav-item relative px-3 py-2">
+                <a
+                  href={link.href}
+                  className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-600 hover:text-slate-900"
+                >
                   {link.label}
-                  {link.sub.length > 0 && <ChevronDown size={12} />}
-                </span>
+                  {link.sub.length > 0 && <ChevronDown size={13} />}
+                </a>
                 {link.sub.length > 0 && (
-                  <div className="htx-dropdown" style={{ transform: "translateX(-50%) translateY(8px)" }}>
-                    {link.sub.map(s => (
-                      <a key={s.label} href={s.label.includes('API') || s.label.includes('WooCommerce') || s.label.includes('MonCash') ? '/developer/docs' : '/login'} className="htx-dropdown-item" style={{textDecoration: 'none'}}>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", marginBottom: "2px" }}>{s.label}</div>
-                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>{s.desc}</div>
+                  <div className="nav-drop absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-2 z-50">
+                    {link.sub.map((s) => (
+                      <a
+                        key={s.label}
+                        href={s.href}
+                        className="block px-3 py-2.5 rounded-lg hover:bg-slate-50"
+                      >
+                        <div className="text-[13px] font-bold text-slate-900">{s.label}</div>
+                        <div className="text-[11px] text-slate-500 font-medium">{s.desc}</div>
                       </a>
                     ))}
                   </div>
                 )}
               </div>
             ))}
-          </div>
+          </nav>
 
-          {/* Right side */}
-          <div className="htx-mobile-hide flex items-center gap-3 ml-auto">
-            <Link href="/login" style={{ fontSize: "13px", fontWeight: 700, color: "#475569", padding: "8px 14px", transition: "color 0.2s", textDecoration: 'none' }} className="hover:text-indigo-600">
+          <div className="hidden lg:flex items-center gap-2 ml-auto">
+            <Link
+              href="/login"
+              className="text-[13px] font-bold text-slate-600 hover:text-[#1d4ed8] px-3 py-2"
+            >
               Konekte
             </Link>
-            <Link href="/signup" className="htx-btn-primary" style={{ padding: "10px 20px", fontSize: "13px", borderRadius: "8px" }}>
-              Ouvri Kont Gratis
+            <Link
+              href="/signup"
+              className="text-[13px] font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] px-4 py-2.5 rounded-lg shadow-sm transition-colors"
+            >
+              Kòmanse gratis
             </Link>
           </div>
 
-          {/* Mobile hamburger */}
           <button
-            className="ml-auto flex flex-col gap-1.5 p-2"
-            style={{ display: "none" }}
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Menu"
+            type="button"
+            className="lg:hidden ml-auto p-2 text-slate-700"
+            aria-label="Meni"
+            onClick={() => setMenuOpen((v) => !v)}
           >
-            <span style={{ width: "22px", height: "2px", background: "#0f172a", borderRadius: "2px", transition: "all 0.2s", transform: menuOpen ? "rotate(45deg) translate(3px,3px)" : "none" }}/>
-            <span style={{ width: "22px", height: "2px", background: "#0f172a", borderRadius: "2px", transition: "all 0.2s", opacity: menuOpen ? 0 : 1 }}/>
-            <span style={{ width: "22px", height: "2px", background: "#0f172a", borderRadius: "2px", transition: "all 0.2s", transform: menuOpen ? "rotate(-45deg) translate(3px,-3px)" : "none" }}/>
+            <span className="block w-5 h-0.5 bg-slate-800 mb-1.5" />
+            <span className="block w-5 h-0.5 bg-slate-800 mb-1.5" />
+            <span className="block w-5 h-0.5 bg-slate-800" />
           </button>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
-          <div style={{ background: "#ffffff", borderTop: "1px solid #e2e8f0", padding: "16px 24px 24px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.05)" }}>
-            {navLinks.map(link => (
-              <a key={link.label} href={link.href} style={{ display: "block", padding: "12px 0", fontSize: "15px", fontWeight: 700, color: "#334155", borderBottom: "1px solid #f1f5f9", textDecoration: "none" }}>
+          <div className="lg:hidden bg-white border-t border-slate-200 px-5 py-4 space-y-1">
+            {NAV.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className="block py-3 text-[15px] font-bold text-slate-700 border-b border-slate-100"
+              >
                 {link.label}
               </a>
             ))}
-            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <Link href="/login" className="htx-btn-secondary" style={{ justifyContent: "center" }}>Konekte</Link>
-              <Link href="/signup" className="htx-btn-primary" style={{ justifyContent: "center" }}>Ouvri Kont Gratis</Link>
+            <div className="pt-4 flex flex-col gap-2">
+              <Link href="/login" className="text-center py-3 border border-slate-200 rounded-lg font-bold text-sm">
+                Konekte
+              </Link>
+              <Link href="/signup" className="text-center py-3 bg-[#1d4ed8] text-white rounded-lg font-bold text-sm">
+                Kòmanse gratis
+              </Link>
             </div>
           </div>
         )}
-      </nav>
+      </header>
 
-      {/* ═══ HERO ═══ */}
-      <section className="relative z-10" style={{ paddingTop: "140px", paddingBottom: "0", paddingLeft: "24px", paddingRight: "24px" }}>
-        <div className="max-w-5xl mx-auto text-center">
+      {/* ═══ HERO — yon sèl konpozisyon, brand + headline + CTA + imaj ═══ */}
+      <section className="relative pt-[88px] pb-0 overflow-hidden">
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(ellipse 90% 60% at 70% 20%, rgba(29,78,216,0.12), transparent 55%), linear-gradient(180deg, #eef2ff 0%, #F7F8FA 55%, #F7F8FA 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 -z-10 opacity-40"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(15,23,42,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.04) 1px, transparent 1px)",
+            backgroundSize: "72px 72px",
+            maskImage: "radial-gradient(ellipse 70% 50% at 50% 0%, black, transparent)",
+          }}
+        />
 
-          {/* Status badge */}
-          <div className="a1" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "6px 14px 6px 8px", borderRadius: "100px", background: "#eff6ff", border: "1px solid #bfdbfe", marginBottom: "32px" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#dbeafe", padding: "3px 10px", borderRadius: "100px", fontSize: "10px", fontWeight: 800, color: "#4f46e5", letterSpacing: "0.1em" }}>
-              NOUVOTE
+        <div className="max-w-6xl mx-auto px-5 pt-10 lg:pt-16 pb-12 lg:pb-0">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+            <div>
+              <p className="land-a1 text-[12px] font-bold uppercase tracking-[0.16em] text-[#1d4ed8] mb-4">
+                Hatexcard
+              </p>
+              <h1 className="land-a2 display text-[clamp(2.4rem,5.5vw,3.75rem)] font-bold leading-[1.08] tracking-tight text-slate-900 mb-5">
+                Resevwa peman MonCash / NatCash.{" "}
+                <span className="text-[#1d4ed8]">Faster pou biznis ou.</span>
+              </h1>
+              <p className="land-a3 text-[16px] lg:text-[17px] text-slate-600 leading-relaxed max-w-md mb-8 font-medium">
+                Pasèl peman pou machann Ayiti — fakti, lyen pwodwi, WooCommerce ak API.
+                Kliyan peye an Goud; ou resevwa otomatikman sou MonCash oswa NatCash.
+              </p>
+              <div className="land-a4 flex flex-wrap items-center gap-3">
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-[14px] font-bold px-6 py-3.5 rounded-lg shadow-md shadow-blue-600/20 transition-colors"
+                >
+                  Kòmanse gratis <ArrowRight size={16} />
+                </Link>
+                <a
+                  href="#demo"
+                  className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-800 text-[14px] font-bold px-6 py-3.5 rounded-lg border border-slate-200 transition-colors"
+                >
+                  Wè demonstrasyon
+                </a>
+              </div>
+              <p className="land-a4 mt-5 text-[12px] text-slate-500 font-semibold">
+                Kont gratis · KYC obligatwa · 2% frè pasèl · Pa gen wallet
+              </p>
+            </div>
+
+            <div className="land-a4 relative">
+              <div className="absolute -inset-4 bg-[#1d4ed8]/10 blur-3xl rounded-full" />
+              <BrandPhoto
+                src="/img/hx-hero-gateway.png"
+                alt="Hatexcard dashboard machann — peman MonCash / NatCash an tan reyèl"
+                className="relative w-full rounded-2xl shadow-2xl shadow-slate-900/15 border border-white/60 aspect-[16/10]"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ TRUST STRIP ═══ */}
+      <div className="border-y border-slate-200 bg-white">
+        <div className="max-w-6xl mx-auto px-5 py-8 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            Resevwa sou
+          </span>
+          {["MonCash", "NatCash", "WooCommerce", "API REST"].map((n) => (
+            <span key={n} className="text-[14px] font-extrabold text-slate-300 tracking-wide">
+              {n}
             </span>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e40af" }}>
-              Plugin WooCommerce v3.0 disponib kounye a
-            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ KIJAN LI MACHE ═══ */}
+      <section id="kijan" className="py-20 lg:py-24 px-5">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-2xl mb-12">
+            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#1d4ed8] mb-3">
+              Kijan li mache
+            </p>
+            <h2 className="display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-tight text-slate-900 mb-3">
+              De enskripsyon rive nan kob sou MonCash / NatCash ou
+            </h2>
+            <p className="text-[15px] text-slate-600 font-medium leading-relaxed">
+              Hatexcard se yon pasèl — pa yon bank. Ou resevwa otomatikman sou MonCash oswa NatCash.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {STEPS.map((s) => (
+              <div key={s.n} className="relative">
+                <span className="display text-[2.5rem] font-bold text-[#1d4ed8]/15 leading-none">
+                  {s.n}
+                </span>
+                <h3 className="text-[16px] font-bold text-slate-900 mt-2 mb-1.5">{s.title}</h3>
+                <p className="text-[13px] text-slate-600 leading-relaxed font-medium">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ CHANÈL PEMAN (tankou Authorize.net “Make payments a growth engine”) ═══ */}
+      <section id="pwodwi" className="py-20 lg:py-24 px-5 bg-white border-y border-slate-200">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-2xl mb-12">
+            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#1d4ed8] mb-3">
+              Tout fason pou resevwa
+            </p>
+            <h2 className="display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-tight text-slate-900 mb-3">
+              Fè peman vin yon motè kwasans pou biznis ou
+            </h2>
+            <p className="text-[15px] text-slate-600 font-medium leading-relaxed">
+              Chak chanèl konekte ak menm pasèl MonCash / NatCash la — yon sèl kont, plizyè fason pou vann.
+            </p>
           </div>
 
-          {/* Heading */}
-          <h1 className="a2" style={{ fontSize: "clamp(40px,7.5vw,76px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-0.04em", marginBottom: "24px", color: "#0f172a" }}>
-            Sistèm Peman
-            <br />
-            <span style={{ color: "#4f46e5" }}>100% an Goud</span>
-            <br />
-            pou Ayiti.
-          </h1>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
+            {CHANNELS.map((c) => (
+              <div key={c.title} className="flex gap-4">
+                <div className="w-11 h-11 rounded-xl bg-[#eff6ff] text-[#1d4ed8] flex items-center justify-center shrink-0">
+                  <c.icon size={20} strokeWidth={1.85} />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-slate-900 mb-1.5">{c.title}</h3>
+                  <p className="text-[13px] text-slate-600 leading-relaxed font-medium">{c.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          {/* Subtitle */}
-          <p className="a3" style={{ fontSize: "16px", color: "#64748b", maxWidth: "560px", margin: "0 auto 40px", lineHeight: 1.7, fontWeight: 500 }}>
-            Yon pasèl peman pou machann Ayiti: kliyan peye sou MonCash, HatexCard pran yon ti frè, rès la ale sou nimewo MonCash biznis ou. Pa gen wallet, pa gen kat vityèl.
-          </p>
+      {/* ═══ DEMO FOTO — yon sèl foto (retire 3 lòt yo) ═══ */}
+      <section id="demo" className="py-20 lg:py-24 px-5">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#1d4ed8] mb-3">
+              Demonstrasyon
+            </p>
+            <h2 className="display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-tight text-slate-900 mb-3">
+              Wè sa platfòm nan fè
+            </h2>
+            <p className="text-[15px] text-slate-600 font-medium">
+              Kliyan peye — ou resevwa otomatikman sou MonCash oswa NatCash.
+            </p>
+          </div>
 
-          {/* CTA row */}
-          <div className="a4" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "64px" }}>
-            <div style={{
-              display: "flex", alignItems: "center",
-              background: "#ffffff",
-              border: "1px solid #cbd5e1",
-              borderRadius: "12px",
-              overflow: "hidden",
-              boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)"
-            }}>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="Adrès imèl ou..."
-                style={{ background: "transparent", border: "none", outline: "none", padding: "14px 18px", fontSize: "14px", color: "#0f172a", width: "240px" }}
-              />
-              <Link href="/signup" className="htx-btn-primary" style={{ margin: "5px", borderRadius: "8px", fontSize: "13px", padding: "10px 18px", boxShadow: "none" }}>
-                Kòmanse
+          <figure className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <BrandPhoto
+              src={DEMO.img}
+              alt={DEMO.title}
+              className="w-full aspect-[16/9]"
+            />
+            <figcaption className="p-5 sm:p-6 border-t border-slate-100">
+              <h3 className="text-[16px] font-bold text-slate-900">{DEMO.title}</h3>
+              <p className="text-[13px] text-slate-600 mt-1.5 font-medium leading-relaxed">{DEMO.desc}</p>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      {/* ═══ DEV / PLUGIN ═══ */}
+      <section id="dev" className="py-20 lg:py-24 px-5 bg-[#0b1220] text-white">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-blue-300 mb-3">
+              Pou devlopè & boutik
+            </p>
+            <h2 className="display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-tight mb-4">
+              Plugin WooCommerce + API ki pare pou pwodiksyon
+            </h2>
+            <p className="text-[15px] text-slate-300 leading-relaxed font-medium mb-6">
+              Enstale plugin MonCash nan 5 minit, oswa entegre API REST ak webhooks.
+              Kle API hash, rotate, MFA, ak mod live/test.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                "ZIP WooCommerce ak kle API entegre",
+                "Checkout blòk WooCommerce (WC 8.3+)",
+                "HTG oswa USD → HTG ak to konvèsyon",
+                "Webhooks payment.success (HMAC)",
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2.5 text-[13px] font-medium text-slate-200">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/developer/docs"
+                className="inline-flex items-center gap-2 bg-white text-slate-900 text-[13px] font-bold px-5 py-3 rounded-lg hover:bg-slate-100"
+              >
+                Dokimantasyon API
+              </Link>
+              <Link
+                href="/plugin"
+                className="inline-flex items-center gap-2 border border-white/25 text-white text-[13px] font-bold px-5 py-3 rounded-lg hover:bg-white/10"
+              >
+                Plugin WooCommerce
               </Link>
             </div>
           </div>
+          <div className="relative max-w-md mx-auto">
+            <BrandPhoto
+              src="/img/hx-demo-woocommerce.png"
+              alt="Plugin WooCommerce Hatexcard — Peye ak MonCash, resevwa sou MonCash / NatCash"
+              className="w-full rounded-2xl border border-white/10 shadow-2xl aspect-square"
+            />
+          </div>
+        </div>
+      </section>
 
-          {/* Trust line */}
-          <p className="a5" style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600, marginBottom: "60px", letterSpacing: "0.02em" }}>
-            Enskri, konfime imèl, pase KYC · Pa gen balans sou HatexCard
+      {/* ═══ PRI ═══ */}
+      <section id="pri" className="py-20 lg:py-24 px-5 bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#1d4ed8] mb-3">
+              Pri transparan
+            </p>
+            <h2 className="display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-tight text-slate-900 mb-3">
+              Frè ki klè. Plan ki senp.
+            </h2>
+            <p className="text-[15px] text-slate-600 font-medium">
+              2% frè pasèl sou chak peman. Kliyan peye frè yo anplis — ou resevwa montan ou mande a.
+              Apre sa, chwazi yon plan selon limit jou ou bezwen.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5 max-w-4xl mx-auto">
+            {PLANS.map((p) => (
+              <div
+                key={p.id}
+                className={`rounded-2xl p-6 border ${
+                  p.featured
+                    ? "bg-[#1d4ed8] text-white border-[#1d4ed8] shadow-xl shadow-blue-600/20 scale-[1.02]"
+                    : "bg-[#F7F8FA] border-slate-200 text-slate-900"
+                }`}
+              >
+                <p className={`text-[11px] font-bold uppercase tracking-widest mb-2 ${p.featured ? "text-blue-100" : "text-slate-500"}`}>
+                  {p.tag}
+                </p>
+                <h3 className="text-[20px] font-extrabold mb-1">{p.name}</h3>
+                <p className="mb-5">
+                  <span className="text-[2rem] font-extrabold">{p.price}</span>
+                  <span className={`text-[13px] font-semibold ml-1 ${p.featured ? "text-blue-100" : "text-slate-500"}`}>
+                    HTG / mwa
+                  </span>
+                </p>
+                <ul className="space-y-2.5 mb-6">
+                  {p.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2 text-[13px] font-medium">
+                      <CheckCircle2
+                        size={15}
+                        className={`shrink-0 mt-0.5 ${p.featured ? "text-blue-100" : "text-[#1d4ed8]"}`}
+                      />
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/signup"
+                  className={`block text-center text-[13px] font-bold py-3 rounded-lg transition-colors ${
+                    p.featured
+                      ? "bg-white text-[#1d4ed8] hover:bg-blue-50"
+                      : "bg-[#1d4ed8] text-white hover:bg-[#1e40af]"
+                  }`}
+                >
+                  Chwazi {p.name}
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-[12px] text-slate-500 font-medium mt-8 max-w-lg mx-auto">
+            Anplis: frè transfè MonCash / NatCash (estime ~1%, min 5 HTG) ajoute sou bò kliyan an.
+            Pa gen frè kache sou kont gratis la.
           </p>
         </div>
-
-        {/* ═══ HERO VISUAL: CARD + PHONE ═══ */}
-        <div style={{ position: "relative", maxWidth: "1100px", margin: "0 auto", display: "flex", alignItems: "flex-end", justifyContent: "center", minHeight: "500px", gap: "0" }}>
-
-          {/* Phone left */}
-          <div className="phone-anim" style={{ position: "relative", zIndex: 15, marginRight: "-28px", marginBottom: "0", flexShrink: 0 }}>
-            <div style={{
-              width: "210px",
-              background: "#ffffff",
-              borderRadius: "36px",
-              border: "6px solid #f1f5f9",
-              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px #e2e8f0",
-              overflow: "hidden",
-              transform: "perspective(900px) rotateY(10deg) rotateX(2deg)"
-            }}>
-              <div style={{ height: "20px", background: "#ffffff", display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: "4px" }}>
-                <div style={{ width: "60px", height: "6px", background: "#e2e8f0", borderRadius: "4px" }}/>
-              </div>
-              <div style={{ padding: "10px 14px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: "7px", color: "#94a3b8", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" }}>Dashboard</div>
-                  <div style={{ fontSize: "12px", color: "#0f172a", fontWeight: 800, letterSpacing: "-0.02em" }}>Hatexcard</div>
-                </div>
-                <div style={{ width: "26px", height: "26px", background: "#e0e7ff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <User size={12} className="text-indigo-600" />
-                </div>
-              </div>
-              <div style={{ padding: "6px 14px 12px" }}>
-                <div style={{ fontSize: "7px", color: "#94a3b8", fontWeight: 800, letterSpacing: "0.1em", marginBottom: "4px" }}>DÈNYE PEMAN</div>
-                <div style={{ fontSize: "26px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.03em", lineHeight: 1 }}>
-                  +2,500
-                  <span style={{ fontSize: "11px", color: "#64748b", marginLeft: "4px", fontWeight: 700 }}>HTG</span>
-                </div>
-                <div style={{ fontSize: "9px", color: "#059669", fontWeight: 700, marginTop: "4px" }}>sou MonCash ou</div>
-              </div>
-              <div style={{ padding: "0 12px 12px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
-                {[{ l: "Fakti", bg: "#4f46e5", c: "#fff" }, { l: "API", bg: "#f1f5f9", c: "#475569" }, { l: "Rezèv.", bg: "#f1f5f9", c: "#475569" }].map(b => (
-                  <div key={b.l} style={{ background: b.bg, color: b.c, borderRadius: "8px", padding: "7px 4px", textAlign: "center", fontSize: "7px", fontWeight: 800, letterSpacing: "0.02em" }}>{b.l}</div>
-                ))}
-              </div>
-              <div style={{ padding: "0 12px 12px" }}>
-                <div style={{ background: "linear-gradient(135deg, #312e81, #4f46e5)", borderRadius: "12px", padding: "12px", position: "relative", overflow: "hidden", aspectRatio: "1.58/1", boxShadow: "0 4px 12px rgba(79,70,229,0.3)" }}>
-                  <div style={{ position: "absolute", top: "-20%", right: "-10%", width: "70px", height: "70px", borderRadius: "50%", background: "rgba(255,255,255,0.1)" }}/>
-                  <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.6)", fontWeight: 800, letterSpacing: "0.1em", marginBottom: "12px" }}>PASÈL HATEXCARD</div>
-                  <div style={{ fontSize: "10px", fontFamily: "monospace", color: "#fff", letterSpacing: "0.1em", fontWeight: 700 }}>4550 **** **** 8273</div>
-                </div>
-              </div>
-              <div style={{ padding: "0 12px 14px", background: "#f8fafc", borderTop: "1px solid #f1f5f9", height: "100%" }}>
-                <div style={{ fontSize: "7px", fontWeight: 800, color: "#94a3b8", letterSpacing: "0.1em", marginBottom: "8px", paddingTop: "8px" }}>DÈNYE AKTIVITE</div>
-                {[{ lb: "SMART INVOICE", am: "+1 500 HTG", c: "#059669", t: "Jodi a, 11:32" }, { lb: "NETFLIX ABÒNMAN", am: "−850 HTG", c: "#0f172a", t: "Yè, 9:15" }].map((item, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px", background: "#ffffff", borderRadius: "8px", marginBottom: "6px", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
-                    <div>
-                      <div style={{ fontSize: "7px", color: "#475569", fontWeight: 800, marginBottom: "2px" }}>{item.lb}</div>
-                      <div style={{ fontSize: "6px", color: "#94a3b8", fontWeight: 600 }}>{item.t}</div>
-                    </div>
-                    <span style={{ fontSize: "8px", fontWeight: 800, color: item.c }}>{item.am}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Card center */}
-          <div className="a4" style={{ position: "relative", zIndex: 20, display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
-            <div style={{ position: "absolute", bottom: "-40px", left: "50%", transform: "translateX(-50%)", width: "420px", height: "80px", background: "radial-gradient(ellipse, rgba(79,70,229,0.3) 0%, transparent 70%)", filter: "blur(24px)", animation: "htx-glow 4s ease-in-out infinite" }}/>
-            <div
-              className="htx-card-float"
-              style={{
-                "--tx": `${cardTiltX}deg`,
-                "--ty": `${cardTiltY}deg`,
-                width: "360px",
-                aspectRatio: "1.586/1",
-                borderRadius: "22px",
-                background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 42%, #4338ca 80%, #4f46e5 100%)",
-                boxShadow: "0 25px 50px -12px rgba(49,46,129,0.5), inset 0 1px 0 rgba(255,255,255,0.2)",
-                padding: "26px 30px",
-                position: "relative",
-                overflow: "hidden",
-                transformStyle: "preserve-3d",
-                border: "1px solid rgba(255,255,255,0.1)"
-              } as React.CSSProperties}
-            >
-              <div style={{ position: "absolute", top: "-35%", right: "-15%", width: "300px", height: "300px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)" }}/>
-              <div style={{ position: "absolute", top: "-20%", right: "-5%", width: "200px", height: "200px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.08)" }}/>
-              <div style={{ position: "absolute", bottom: "-20%", left: "-10%", width: "180px", height: "180px", borderRadius: "50%", background: "rgba(255,255,255,0.03)" }}/>
-              
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "30px", position: "relative", zIndex: 2 }}>
-                {/* Chip */}
-                <div style={{ width: "44px", height: "34px", background: "linear-gradient(135deg, #fbbf24, #d97706)", borderRadius: "6px", boxShadow: "inset 0 1px 2px rgba(255,255,255,0.5)" }}/>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#fff", letterSpacing: "0.15em" }}>HATEXCARD</div>
-                  <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.7)", fontWeight: 600, marginTop: "2px", letterSpacing: "0.1em" }}>BUSINESS</div>
-                </div>
-              </div>
-              <div style={{ fontSize: "21px", fontFamily: "monospace", color: "#fff", letterSpacing: "0.2em", marginBottom: "26px", fontWeight: 500, textShadow: "0 2px 4px rgba(0,0,0,0.2)", position: "relative", zIndex: 2 }}>
-                4550 &nbsp;****&nbsp; **** &nbsp;8273
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", position: "relative", zIndex: 2 }}>
-                <div>
-                  <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.1em", marginBottom: "4px" }}>TITILÈ</div>
-                  <div style={{ fontSize: "13px", color: "#fff", fontWeight: 600, letterSpacing: "0.05em" }}>HATEX USER</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.5)", fontWeight: 700, letterSpacing: "0.1em", marginBottom: "4px" }}>EXP</div>
-                  <div style={{ fontSize: "13px", color: "#fff", fontWeight: 600 }}>01/30</div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Reflection shadow */}
-            <div style={{ width: "340px", aspectRatio: "1.586/1", borderRadius: "22px", background: "linear-gradient(to bottom, rgba(79,70,229,0.15) 0%, transparent 100%)", transform: "scaleY(-0.2) translateY(-20px)", transformOrigin: "top center", filter: "blur(8px)" }}/>
-          </div>
-
-          {/* Stats right */}
-          <div className="phone-anim" style={{ marginLeft: "36px", marginBottom: "80px", display: "flex", flexDirection: "column", gap: "12px" }}>
-            {[
-              { label: "Frè pasèl", val: "2%", sub: "Kliyan peye anplis" },
-              { label: "Vitès Peman", val: "< 10 sek", sub: "Konfirmasyon imedyat" },
-            
-            ].map(s => (
-              <div key={s.label} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "16px 20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", minWidth: "190px" }}>
-                <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "6px", textTransform: "uppercase" }}>{s.label}</div>
-                <div style={{ fontSize: "18px", color: "#0f172a", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>{s.val}</div>
-                <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500, marginTop: "4px" }}>{s.sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
 
-      {/* ═══ PARTNERS BAR ═══ */}
-      <div className="a5" style={{ paddingTop: "48px", paddingBottom: "48px", textAlign: "center", position: "relative", zIndex: 10, background: "#ffffff", borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0" }}>
-        <p style={{ fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.15em", marginBottom: "24px", textTransform: "uppercase" }}>
-          Intègre ak platfòm sa yo
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "48px" }}>
-          {["MonCash", "NatCash", "Unibank", "BNC", "WooCommerce"].map(n => (
-            <span key={n} className="htx-partner" style={{ fontSize: "15px", fontWeight: 800, color: "#cbd5e1" }}>{n}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* ═══ STATS BAND ═══ */}
-      <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", position: "relative", zIndex: 10 }}>
-        <div style={{ maxWidth: "900px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-          {stats.map((s) => (
-            <div key={s.label} className="htx-stat" style={{ padding: "40px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: "clamp(24px,3.5vw,36px)", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.03em", lineHeight: 1 }}>{s.val}</div>
-              <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginTop: "8px", lineHeight: 1.4 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ═══ FEATURES ═══ */}
-      <section id="pwodwi" style={{ padding: "100px 24px", position: "relative", zIndex: 10, background: "#ffffff" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: "64px" }}>
-            <div style={{ display: "inline-block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.15em", color: "#4f46e5", textTransform: "uppercase", marginBottom: "16px", background: "#e0e7ff", padding: "6px 16px", borderRadius: "100px" }}>
-              Sèvis ak Fonksyon
-            </div>
-            <h2 style={{ fontSize: "clamp(32px,5vw,48px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, color: "#0f172a", marginBottom: "16px" }}>
-              Tout sa yon biznis modèn<br />bezwen pou kòmanse.
-            </h2>
-            <p style={{ fontSize: "16px", color: "#64748b", maxWidth: "540px", margin: "0 auto", lineHeight: 1.6, fontWeight: 500 }}>
-              De yon machann solitè k ap voye fakti jis yon devlopè k ap intègre yon API konplè — Hatexcard gen zouti w bezwen.
+      {/* ═══ SEKIRITE ═══ */}
+      <section id="sekirite" className="py-20 lg:py-24 px-5">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#1d4ed8] mb-3">
+              Sekirite
             </p>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "24px" }}>
-            {features.map(f => (
-              <div key={f.ti} className="htx-feat-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
-                  <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "#eef2ff", border: "1px solid #e0e7ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {f.icon}
-                  </div>
-                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "4px 10px", borderRadius: "100px", background: "#f1f5f9", color: "#64748b", letterSpacing: "0.05em" }}>{f.tg}</span>
-                </div>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", marginBottom: "10px", letterSpacing: "-0.01em" }}>{f.ti}</h3>
-                <p style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.6, margin: 0, fontWeight: 500 }}>{f.ds}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ SECURITY SECTION ═══ */}
-      <section id="sekirite" style={{ padding: "100px 24px", position: "relative", zIndex: 10, background: "#f8fafc" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 40px -15px rgba(0,0,0,0.05)" }}>
-          <div style={{ display: "flex", flexWrap: "wrap" }}>
-            {/* Left content */}
-            <div style={{ flex: "1 1 360px", padding: "64px 48px" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "6px 14px", borderRadius: "100px", background: "#ecfdf5", border: "1px solid #d1fae5", color: "#059669", fontSize: "12px", fontWeight: 700, marginBottom: "24px" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", animation: "htx-pulse 2s ease-in-out infinite" }}/>
-                Sekirite Aktif
-              </div>
-              <h2 style={{ fontSize: "clamp(28px,4vw,42px)", fontWeight: 800, lineHeight: 1.1, marginBottom: "20px", letterSpacing: "-0.03em", color: "#0f172a" }}>
-                Nou pa konpwomèt<br />sou <span style={{ color: "#4f46e5" }}>sekirite lajan w.</span>
-              </h2>
-              <p style={{ fontSize: "15px", color: "#64748b", lineHeight: 1.6, marginBottom: "40px", fontWeight: 500 }}>
-                Sistèm Hatexcard konstwi avèk menm nivo pwoteksyon ak enstitisyon finansyè entènasyonal yo. Chak tranzaksyon siveyé an tan reyèl.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-                {[
-                  { t: "Verifikasyon KYC Obligatwa", d: "Chak itilizatè dwe verifye idantite yo anvan yo ka resevwa peman. Sa elimine risk koken ak fwòd sou platfòm nan." },
-                  { t: "Ankripsyon SSL 256-bit", d: "Tout done bankè ak pèsonèl ou yo pase nan yon tiyo ankripte nivo bankè. Okenn enfòmasyon sansib pa janm transmèt an klè." },
-                  { t: "Siveyans Tranzaksyon 24/7", d: "Sistèm nou an monitoré chak mouvman lajan an tan reyèl. Aktivite etranj deklanche yon alèt imedyat epi blokaj otomatik." },
-                ].map(item => (
-                  <div key={item.t} style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
-                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#e0e7ff", border: "1px solid #c7d2fe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "2px" }}>
-                      <CheckCircle2 size={14} className="text-indigo-600" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "4px" }}>{item.t}</div>
-                      <div style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.5, fontWeight: 500 }}>{item.d}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Right visual */}
-            <div style={{ flex: "0 0 380px", background: "#f8fafc", borderLeft: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", padding: "48px", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(79,70,229,0.05) 0%, transparent 70%)" }} />
-              <div style={{ position: "relative", width: "220px", height: "220px" }}>
-                <div style={{ position: "absolute", inset: "12px", border: "2px solid #e2e8f0", borderRadius: "50%", animation: "htx-spin 25s linear infinite" }}/>
-                <div style={{ position: "absolute", inset: "32px", border: "2px dashed #cbd5e1", borderRadius: "50%", animation: "htx-spin 18s linear infinite reverse" }}/>
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff", borderRadius: "50%", width: "100px", height: "100px", margin: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.05)" }}>
-                  <ShieldCheck size={40} className="text-indigo-600" />
-                </div>
-                {/* Floating badges */}
-                {[
-                  { label: "KYC", top: "5%", left: "75%", delay: "0s" },
-                  { label: "SSL", top: "80%", left: "70%", delay: "0.3s" },
-                  { label: "2FA", top: "45%", left: "-15%", delay: "0.6s" },
-                ].map(b => (
-                  <div key={b.label} style={{ position: "absolute", top: b.top, left: b.left, background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "8px 14px", fontSize: "11px", fontWeight: 700, color: "#334155", letterSpacing: "0.05em", boxShadow: "0 4px 6px rgba(0,0,0,0.02)", animation: `htx-float ${3 + parseFloat(b.delay)}s ease-in-out infinite`, animationDelay: b.delay }}>
-                    {b.label}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ PRICING ═══ */}
-      <section id="pri" style={{ padding: "100px 24px", position: "relative", zIndex: 10, background: "#ffffff" }}>
-        <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: "64px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.15em", color: "#4f46e5", textTransform: "uppercase", marginBottom: "16px", background: "#e0e7ff", padding: "6px 16px", borderRadius: "100px", display: "inline-block" }}>Transparent & San Sipriz</div>
-            <h2 style={{ fontSize: "clamp(30px,4.5vw,46px)", fontWeight: 800, letterSpacing: "-0.03em", color: "#0f172a", marginBottom: "16px", lineHeight: 1.1 }}>
-              Frè ki klè, pri ki jis.
+            <h2 className="display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-tight text-slate-900 mb-4">
+              Pwoteksyon ki konte pou lajan w
             </h2>
-            <p style={{ fontSize: "16px", color: "#64748b", lineHeight: 1.6, maxWidth: "480px", margin: "0 auto", fontWeight: 500 }}>
-              Majòrite fonksyon yo gratis. Nou fè lajan sèlman lè sèvis la kreye valè reyèl pou biznis ou.
+            <p className="text-[15px] text-slate-600 font-medium leading-relaxed mb-8">
+              KYC obligatwa pou tout plan (Gratis, Kapasite, Premyòm). Nou verifye idantite anvan ou resevwa lajan.
             </p>
-          </div>
-          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "24px", overflow: "hidden", boxShadow: "0 10px 30px -10px rgba(0,0,0,0.05)" }}>
-            <div style={{ padding: "10px 40px" }}>
+            <div className="space-y-5">
               {[
-                { op: "Peman atravè pasèl MonCash", val: "2% + frè transfè", hi: false },
-                { op: "Machann resevwa montan li mande a", val: "Wi", hi: true },
-                { op: "Wallet / balans sou HatexCard", val: "Pa egziste", hi: true },
-                { op: "Kat vityèl", val: "Retire", hi: true },
-                { op: "Verifikasyon KYC (frè)", val: "1920 HTG", hi: false },
-                { op: "Smart Invoice & Rezèvasyon", val: "Enkli", hi: true },
-                { op: "Aksè API test + live", val: "Apre KYC", hi: true },
-              ].map(row => (
-                <div key={row.op} className="price-row">
-                  <span style={{ fontSize: "15px", color: "#475569", fontWeight: 600 }}>{row.op}</span>
-                  <span style={{ fontSize: "15px", fontWeight: 700, color: row.hi ? "#059669" : "#0f172a" }}>{row.val}</span>
+                {
+                  icon: ShieldCheck,
+                  t: "KYC obligatwa (tout plan)",
+                  d: "Dokiman ID, selfie ak liveness — menm sou plan Gratis. Sa redwi fwòd sou platfòm nan.",
+                },
+                {
+                  icon: Lock,
+                  t: "Kle API + MFA",
+                  d: "Kle sekrè hash, rotate, ak MFA (TOTP) pou aksè API. Webhooks siyen ak HMAC.",
+                },
+                {
+                  icon: Zap,
+                  t: "Limit jou & kontwòl",
+                  d: "Plan Gratis / Kapasite / Premyòm kontwole konbyen ou ka resevwa chak jou.",
+                },
+              ].map((item) => (
+                <div key={item.t} className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                    <item.icon size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-[14px] font-bold text-slate-900">{item.t}</h3>
+                    <p className="text-[13px] text-slate-600 font-medium leading-relaxed mt-0.5">{item.d}</p>
+                  </div>
                 </div>
               ))}
             </div>
-            <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0", padding: "24px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-              <span style={{ fontSize: "14px", color: "#475569", fontWeight: 600 }}>Kont gratis. Pare nan 2 minit. Pa gen frè kache.</span>
-              <Link href="/signup" className="htx-btn-primary" style={{ fontSize: "14px", padding: "12px 24px", borderRadius: "10px", textDecoration: "none" }}>
-                Kòmanse Gratis
-              </Link>
-            </div>
+          </div>
+          <div>
+            <BrandPhoto
+              src="/img/hx-demo-kyc.png"
+              alt="KYC obligatwa, SSL 256-bit, MFA — sekirite Hatexcard"
+              className="w-full rounded-2xl border border-slate-200 shadow-lg aspect-square"
+            />
           </div>
         </div>
       </section>
 
       {/* ═══ FAQ ═══ */}
-      <section style={{ padding: "100px 24px", position: "relative", zIndex: 10, background: "#f8fafc" }}>
-        <div style={{ maxWidth: "760px", margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: "56px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.15em", color: "#4f46e5", textTransform: "uppercase", marginBottom: "16px", background: "#e0e7ff", padding: "6px 16px", borderRadius: "100px", display: "inline-block" }}>Support</div>
-            <h2 style={{ fontSize: "clamp(28px,4vw,44px)", fontWeight: 800, letterSpacing: "-0.03em", color: "#0f172a", marginBottom: "16px" }}>
-              Kesyon yo poze souvan.
-            </h2>
-            <p style={{ fontSize: "16px", color: "#64748b", fontWeight: 500 }}>Pa jwenn repons ou a? Kontakte ekip nou dirèkteman.</p>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {faqs.map((faq, index) => (
-              <div
-                key={index}
-                className={`htx-faq${activeFaq === index ? " open" : ""}`}
-                onClick={() => setActiveFaq(activeFaq === index ? null : index)}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
-                  <h4 style={{ fontSize: "15px", fontWeight: 700, color: activeFaq === index ? "#3b82f6" : "#1e293b", margin: 0, lineHeight: 1.4 }}>{faq.q}</h4>
-                  <div style={{ transform: activeFaq === index ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.25s", flexShrink: 0 }}>
-                    <ChevronDown size={20} className={activeFaq === index ? "text-indigo-500" : "text-slate-400"} />
+      <section className="py-20 px-5 bg-white border-y border-slate-200">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="display text-center text-[clamp(1.6rem,3vw,2.2rem)] font-bold tracking-tight text-slate-900 mb-8">
+            Kesyon yo poze souvan
+          </h2>
+          <div className="space-y-2">
+            {FAQS.map((faq, i) => {
+              const open = activeFaq === i;
+              return (
+                <button
+                  key={faq.q}
+                  type="button"
+                  onClick={() => setActiveFaq(open ? null : i)}
+                  className={`w-full text-left border rounded-xl px-5 py-4 transition-colors ${
+                    open ? "border-blue-200 bg-blue-50/40" : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`text-[14px] font-bold ${open ? "text-[#1d4ed8]" : "text-slate-900"}`}>
+                      {faq.q}
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      className={`shrink-0 transition-transform ${open ? "rotate-180 text-[#1d4ed8]" : "text-slate-400"}`}
+                    />
                   </div>
-                </div>
-                <div style={{ maxHeight: activeFaq === index ? "300px" : "0", overflow: "hidden", transition: "max-height 0.3s ease", opacity: activeFaq === index ? 1 : 0 }}>
-                  <p style={{ paddingTop: "16px", margin: 0, fontSize: "14px", color: "#64748b", lineHeight: 1.6, fontWeight: 500 }}>
-                    {faq.a}
-                  </p>
-                </div>
-              </div>
-            ))}
+                  {open && (
+                    <p className="mt-3 text-[13px] text-slate-600 font-medium leading-relaxed">{faq.a}</p>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section style={{ padding: "80px 24px 100px", position: "relative", zIndex: 10, background: "#ffffff" }}>
-        <div style={{ maxWidth: "900px", margin: "0 auto", background: "linear-gradient(135deg, #e0e7ff, #f8fafc)", border: "1px solid #c7d2fe", borderRadius: "32px", padding: "80px 48px", textAlign: "center", position: "relative", overflow: "hidden", boxShadow: "0 20px 40px -15px rgba(79,70,229,0.15)" }}>
-          <div style={{ position: "relative", zIndex: 2 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "6px 16px", borderRadius: "100px", background: "#ffffff", border: "1px solid #e2e8f0", marginBottom: "24px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-              <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", animation: "htx-pulse 2s ease-in-out infinite" }}/>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", letterSpacing: "0.1em" }}>PLATFÒM OPERASYONÈL</span>
-            </div>
-            <h2 style={{ fontSize: "clamp(32px,5vw,56px)", fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: "20px", color: "#0f172a" }}>
-              Kòmanse resevwa<br />lajan <span style={{ color: "#4f46e5" }}>jodi a menm.</span>
+      <section className="py-20 lg:py-24 px-5">
+        <div className="max-w-4xl mx-auto text-center bg-[#0b1220] rounded-3xl px-6 py-14 lg:py-16 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(29,78,216,0.35),transparent_55%)]" />
+          <div className="relative z-10">
+            <h2 className="display text-[clamp(1.8rem,4vw,2.75rem)] font-bold text-white tracking-tight mb-4">
+              Pare pou resevwa peman an Goud?
             </h2>
-            <p style={{ fontSize: "16px", color: "#475569", marginBottom: "40px", lineHeight: 1.6, maxWidth: "520px", margin: "0 auto 40px", fontWeight: 500 }}>
-              Kont gratis. Konfirmasyon KYC nan 2 a 60 minit. Premye tranzaksyon ou pare imedyatman apre verifikasyon.
+            <p className="text-[15px] text-slate-300 font-medium max-w-lg mx-auto mb-8">
+              Ouvri yon kont gratis, pase KYC, konekte MonCash oswa NatCash, epi voye premye fakti ou oswa enstale plugin la.
             </p>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "16px" }}>
-              <Link href="/signup" className="htx-btn-primary" style={{ fontSize: "15px", padding: "16px 32px", borderRadius: "12px", textDecoration: "none" }}>
-                Ouvri Kont Gratis
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-[14px] font-bold px-6 py-3.5 rounded-lg"
+              >
+                Ouvri kont gratis
               </Link>
-              <Link href="/login" className="htx-btn-secondary" style={{ fontSize: "15px", padding: "16px 32px", borderRadius: "12px", background: "#ffffff", borderColor: "#cbd5e1", textDecoration: "none" }}>
-                Konekte nan Kont Ou
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 border border-white/20 text-white text-[14px] font-bold px-6 py-3.5 rounded-lg hover:bg-white/10"
+              >
+                Konekte
               </Link>
-              <a href="/HatexCard.apk" download="HatexCard_v1.0.apk" className="htx-btn-secondary" style={{ fontSize: "15px", padding: "16px 32px", borderRadius: "12px", background: "#ffffff", borderColor: "#cbd5e1", textDecoration: "none" }}>
-                <Smartphone size={18} className="text-indigo-600" /> Telechaje App Android
+              <a
+                href="/HatexCard.apk"
+                download="HatexCard_v1.0.apk"
+                className="inline-flex items-center gap-2 border border-white/20 text-white text-[14px] font-bold px-6 py-3.5 rounded-lg hover:bg-white/10"
+              >
+                <Smartphone size={16} /> App Android
               </a>
             </div>
           </div>
-          <div style={{ position: "absolute", top: "0%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "200px", background: "radial-gradient(ellipse, rgba(79,70,229,0.1) 0%, transparent 70%)", filter: "blur(40px)", zIndex: 1 }}/>
         </div>
       </section>
 
       {/* ═══ FOOTER ═══ */}
-      <footer style={{ background: "#ffffff", borderTop: "1px solid #e2e8f0", position: "relative", zIndex: 10 }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "80px 24px 40px" }}>
-          
-          {/* Top row */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "60px", marginBottom: "60px" }}>
-            
-            {/* Brand col */}
-            <div style={{ flex: "0 0 280px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "8px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #e2e8f0", background: "#fff" }}>
-                  <img src="https://i.imgur.com/xDk58Xk.png" alt="Hatexcard Logo" style={{ width: "100%", height: "100%", objectFit: "cover", padding: "2px" }} />
-                </div>
-                <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.02em", color: "#0f172a" }}>Hatex<span style={{ color: "#4f46e5" }}>card</span></span>
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="max-w-6xl mx-auto px-5 py-14">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
+            <div className="lg:col-span-2">
+              <div className="flex items-center gap-2.5 mb-4">
+                <img src="/img/hatexcard-logo.png" alt="" className="w-8 h-8 rounded-lg border border-slate-200" />
+                <span className="font-extrabold text-[17px]">
+                  Hatex<span className="text-[#1d4ed8]">card</span>
+                </span>
               </div>
-              <p style={{ fontSize: "14px", color: "#64748b", lineHeight: 1.6, margin: "0 0 24px", fontWeight: 500 }}>
-                Platfòm peman digital 100% an Goud. Fèt pou Ayiti, konstwi pou rès la.
+              <p className="text-[13px] text-slate-600 font-medium leading-relaxed max-w-xs">
+                Pasèl peman MonCash / NatCash pou machann Ayiti. Fakti, lyen pwodwi, WooCommerce, ak API — 100% an Goud.
               </p>
-              <div style={{ display: "flex", gap: "12px" }}>
-                <a href="https://twitter.com/hatexcard" target="_blank" rel="noopener noreferrer" style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", transition: "all 0.2s" }} className="hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.766l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                </a>
-                <a href="https://facebook.com/hatexcard" target="_blank" rel="noopener noreferrer" style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", transition: "all 0.2s" }} className="hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </a>
-                <a href="https://wa.me/50937201241" target="_blank" rel="noopener noreferrer" style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", transition: "all 0.2s" }} className="hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                </a>
-                <a href="https://tiktok.com/@hatexcard" target="_blank" rel="noopener noreferrer" style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", transition: "all 0.2s" }} className="hover:text-black hover:border-gray-300 hover:bg-gray-100">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 2.23-.9 4.45-2.35 6.15-1.46 1.7-3.64 2.8-5.91 3.01-2.26.22-4.63-.15-6.55-1.42-1.91-1.27-3.23-3.32-3.62-5.55-.38-2.23.01-4.61 1.25-6.54 1.25-1.92 3.32-3.27 5.56-3.66.45-.07.9-.11 1.35-.11v4.02c-1.39.02-2.73.54-3.79 1.45-1.07.92-1.74 2.3-1.85 3.73-.12 1.43.32 2.87 1.21 4.02.89 1.15 2.24 1.9 3.71 2.06 1.47.15 2.96-.13 4.22-.84 1.26-.71 2.22-1.92 2.65-3.31.25-.83.33-1.71.32-2.58V.02h-3.41z"/>
-                  </svg>
-                </a>
-              </div>
             </div>
-
-            {/* Pwodwi */}
-            <div style={{ flex: "1 1 140px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "18px" }}>Pwodwi</div>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li><a href="/developer/docs" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">API Peman</a></li>
-                <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Smart Invoice</a></li>
-                <li><a href="/login" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Transfè Sekirize</a></li>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-900 mb-3">Pwodwi</p>
+              <ul className="space-y-2 text-[13px] font-medium text-slate-600">
+                <li><a href="#pwodwi" className="hover:text-[#1d4ed8]">Fakti</a></li>
+                <li><a href="#pwodwi" className="hover:text-[#1d4ed8]">Pwodwi & lyen</a></li>
+                <li><Link href="/plugin" className="hover:text-[#1d4ed8]">Plugin WooCommerce</Link></li>
+                <li><Link href="/developer" className="hover:text-[#1d4ed8]">API</Link></li>
               </ul>
             </div>
-
-            {/* Devlopè */}
-            <div style={{ flex: "1 1 140px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "18px" }}>Devlopè</div>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li><a href="/api-docs" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">API Referans</a></li>
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Plugin WooCommerce (MonCash)</a></li>
-                <li><a href="/sandbox" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Sandbox & Tès</a></li>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-900 mb-3">Konpayi</p>
+              <ul className="space-y-2 text-[13px] font-medium text-slate-600">
+                <li><Link href="/sou-nou" className="hover:text-[#1d4ed8]">Sou Nou</Link></li>
+                <li><Link href="/support" className="hover:text-[#1d4ed8]">Sipò</Link></li>
+                <li><Link href="/blog" className="hover:text-[#1d4ed8]">Blog</Link></li>
+                <li><a href="mailto:support@hatexcard.com" className="hover:text-[#1d4ed8]">Kontakte</a></li>
               </ul>
             </div>
-
-            {/* Konpayi */}
-            <div style={{ flex: "1 1 140px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "18px" }}>Konpayi</div>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li><a href="/sou-nou" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Sou Nou</a></li>
-                <li><a href="/blog" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Blog</a></li>
-                <li><a href="mailto:support@hatexcard.com" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Kontakte Nou</a></li>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-900 mb-3">Legal</p>
+              <ul className="space-y-2 text-[13px] font-medium text-slate-600">
+                <li><Link href="/terms" className="hover:text-[#1d4ed8]">Kondisyon / Akò Sèvis</Link></li>
+                <li><Link href="/politik" className="hover:text-[#1d4ed8]">Konfidansyalite</Link></li>
+                <li><Link href="/terms#s7" className="hover:text-[#1d4ed8]">KYC & AML</Link></li>
               </ul>
-            </div>
-
-            {/* Legal */}
-            <div style={{ flex: "1 1 140px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "18px" }}>Legal</div>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li><a href="/politik" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Kondisyon Itilizasyon</a></li>
-                <li><a href="/politik" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Konfidansyalite</a></li>
-                <li><a href="/politik" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Politik KYC & AML</a></li>
-                <li><a href="/politik" style={{ fontSize: "14px", color: "#64748b", fontWeight: 500, transition: "color 0.15s", textDecoration: "none" }} className="hover:text-indigo-600">Sekirite</a></li>
-              </ul>
-            </div>
-
-          </div>
-
-          {/* Bottom bar */}
-          <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "24px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
-            <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 500 }}>
-              © {new Date().getFullYear()} Hatexcard. Tout dwa rezève. Platfòm peman an Goud pou Ayiti.
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f8fafc", padding: "6px 14px", borderRadius: "100px", border: "1px solid #e2e8f0" }}>
-              <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", animation: "htx-pulse 2.5s ease-in-out infinite" }}/>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>Tout sistèm operasyonèl</span>
             </div>
           </div>
-
+          <div className="pt-6 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[12px] text-slate-500 font-medium">
+              © {new Date().getFullYear()} Hatexcard. Tout dwa rezève.
+            </p>
+            <p className="text-[11px] font-bold text-slate-500 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Platfòm operasyonèl · MonCash & NatCash
+            </p>
+          </div>
         </div>
       </footer>
     </div>

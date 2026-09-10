@@ -18,6 +18,7 @@ function SignupForm() {
   const [password, setPassword] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
   useEffect(() => {
@@ -35,6 +36,15 @@ function SignupForm() {
     e.preventDefault();
     setLoading(true);
     setMsg({ type: '', text: '' });
+
+    if (!acceptTerms) {
+      setMsg({
+        type: 'error',
+        text: 'Ou dwe aksepte Akò Sèvis ak Kondisyon Itilizasyon HatexCard anvan ou kreye kont.',
+      });
+      setLoading(false);
+      return;
+    }
 
     const cleanPromo = promoCode.trim().toUpperCase();
     let finalDiscountAmount = 0; 
@@ -234,6 +244,28 @@ function SignupForm() {
             />
           </div>
         </div>
+
+        {/* AKÒ SÈVIS */}
+        <label className="flex items-start gap-3 text-left cursor-pointer select-none mt-2">
+          <input
+            type="checkbox"
+            checked={acceptTerms}
+            onChange={(e) => setAcceptTerms(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            required
+          />
+          <span className="text-[11px] text-slate-600 font-medium leading-relaxed">
+            Mwen li epi mwen aksepte{' '}
+            <Link href="/terms" target="_blank" className="text-indigo-600 font-bold hover:underline">
+              Akò Sèvis ak Kondisyon Itilizasyon
+            </Link>{' '}
+            ak{' '}
+            <Link href="/politik" target="_blank" className="text-indigo-600 font-bold hover:underline">
+              Politik Konfidansyalite
+            </Link>{' '}
+            HatexCard. Mwen konprann HatexCard se yon pasèl (pa yon bank / wallet).
+          </span>
+        </label>
 
         {/* MESSAGES */}
         {msg.text && (

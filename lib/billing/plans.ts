@@ -1,7 +1,7 @@
 /**
  * Plan abonnman HatexCard.
  *
- *  - free:      25 000 HTG / jou, san KYC
+ *  - free:      25 000 HTG / jou, KYC obligatwa
  *  - capacity: 150 000 HTG / jou, 599 HTG / mwa, KYC obligatwa
  *  - premium:  san limit jou, 999 HTG / mwa, KYC + plizyè nimewo MonCash
  */
@@ -35,12 +35,12 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     tagline: 'Kòmanse vann jodi a',
     dailyLimitHtg: 25_000,
     monthlyPriceHtg: 0,
-    kycRequired: false,
+    kycRequired: true,
     multiMoncash: false,
     bullets: [
       'Aksè ak API, fakti, lyen piblik, vann sèvis',
       '25 000 HTG / jou sou TOUT kòb ou resevwa',
-      'Pa bezwen KYC',
+      'KYC obligatwa',
     ],
   },
   capacity: {

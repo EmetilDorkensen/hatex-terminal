@@ -44,11 +44,18 @@ export default function PolitikPage() {
       <div className="max-w-4xl mx-auto p-5 md:p-8 pb-32">
         <div className="mb-12">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-4">
-            Politik Hatexcard <span className="text-indigo-600 font-semibold">— Dokiman Ofisyèl</span>
+            Politik Konfidansyalite <span className="text-indigo-600 font-semibold">Hatexcard</span>
           </h1>
-          <p className="text-slate-500 font-semibold tracking-wider uppercase text-xs border-l-4 border-indigo-500 pl-4 py-1">
-            Dènye mizajou : Jen 2026
+          <p className="text-slate-500 font-semibold tracking-wider uppercase text-xs border-l-4 border-indigo-500 pl-4 py-1 mb-4">
+            Dènye mizajou : Septanm 2026
           </p>
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900 font-medium leading-relaxed">
+            Pou <strong>Akò Sèvis ak Kondisyon Itilizasyon</strong> (pasèl / gateway,
+            absans wallet, ranbousman, API, KYC) — gade dokiman ofisyèl la:{' '}
+            <a href="/terms" className="font-bold underline text-indigo-700">
+              hatexcard.com/terms
+            </a>
+          </div>
         </div>
 
         <div className="space-y-10 text-sm md:text-base text-slate-600 leading-relaxed">

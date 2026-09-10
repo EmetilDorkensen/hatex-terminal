@@ -630,7 +630,9 @@ function hatexcard_ensure_gateway_available() {
 
             if (is_wp_error($response)) {
                 wc_add_notice('Sèvè HatexCard pa reponn. Eseye ankò.', 'error');
-                return;
+                // NÒT v26.1.0: PA janm retounen null — Store API (blòk checkout) fè
+                // array_merge sou rezilta a epi yon null bay yon fatal TypeError.
+                return array('result' => 'failure');
             }
 
             $body = json_decode(wp_remote_retrieve_body($response), true);
@@ -656,7 +658,7 @@ function hatexcard_ensure_gateway_available() {
 
             $msg = isset($body['message']) ? $body['message'] : 'Peman refize.';
             wc_add_notice('HatexCard: ' . esc_html($msg), 'error');
-            return;
+            return array('result' => 'failure');
         }
     }
     return true;
