@@ -218,7 +218,7 @@ export default function PluginPage() {
   };
 
   // ==========================================================================
-  // JENERE WOOCOMMERCE PLUGIN (v26.1 — MonCash + paj /success + rotate kle API + USD→HTG)
+  // JENERE WOOCOMMERCE PLUGIN (v26.2 — Blocks AbstractPaymentMethodType + Store API fix)
   // ==========================================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
@@ -238,7 +238,7 @@ export default function PluginPage() {
  * Plugin Name: HatexCard MonCash Gateway
  * Plugin URI: https://hatexcard.com
  * Description: Peman MonCash (HTG) pou WooCommerce. Kliyan peye sou MonCash dirèkteman; machann nan resevwa montan an sou kont li nan HatexCard.
- * Version: 26.1.0
+ * Version: 26.2.0
  * Author: Hatex Group
  */
 
@@ -247,7 +247,7 @@ if (!defined('ABSPATH')) exit;
 // ==========================================================================
 // KONSTANT — kle API a jenere FRA chak fwa machann nan telechaje zip la.
 // ==========================================================================
-if (!defined('HATEXCARD_PLUGIN_VERSION')) define('HATEXCARD_PLUGIN_VERSION', '26.1.0');
+if (!defined('HATEXCARD_PLUGIN_VERSION')) define('HATEXCARD_PLUGIN_VERSION', '26.2.0');
 if (!defined('HATEXCARD_EMBEDDED_API_KEY')) define('HATEXCARD_EMBEDDED_API_KEY', '${apiKey}');
 if (!defined('HATEXCARD_MONCASH_API_URL')) define('HATEXCARD_MONCASH_API_URL', 'https://hatexcard.com/api/moncash/payments');
 if (!defined('HATEXCARD_ROTATE_API_URL')) define('HATEXCARD_ROTATE_API_URL', 'https://hatexcard.com/api/merchant/api-key/rotate');
@@ -362,6 +362,7 @@ function hatexcard_ensure_gateway_available() {
             $this->description = $this->get_option('description');
             $this->merchant_api_key = hatexcard_merchant_api_key();
             $this->api_base_url = HATEXCARD_MONCASH_API_URL;
+            $this->supports = array('products');
 
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
             add_action('woocommerce_thankyou_' . $this->id, array($this, 'custom_thankyou_page'));
@@ -630,7 +631,7 @@ function hatexcard_ensure_gateway_available() {
 
             if (is_wp_error($response)) {
                 wc_add_notice('Sèvè HatexCard pa reponn. Eseye ankò.', 'error');
-                // NÒT v26.1.0: PA janm retounen null — Store API (blòk checkout) fè
+                // NÒT v26.2.0: PA janm retounen null — Store API (blòk checkout) fè
                 // array_merge sou rezilta a epi yon null bay yon fatal TypeError.
                 return array('result' => 'failure');
             }
@@ -680,53 +681,77 @@ add_action('woocommerce_loaded', 'hatexcard_bootstrap', 5);
 add_action('init', 'hatexcard_bootstrap', 5);
 
 // ==========================================================================
-// SOUTIEN CHECKOUT BLÒK (WooCommerce Cart & Checkout) — v26.1.0
-// Depi WC 8.3 paj checkout default la se yon blòk: WC pa rann fòm HTML
-// legacy a ankò; li sèvi ak Store API + yon rejis JS. Yon gateway dwe
-// ENSKRI yon metòd peman (wcBlocksRegistry.registerPaymentMethod) pou li
-// ka parèt. San sa, Store API a ka lis li (disponib) men blòk la pa janm
-// montre li vizyèlman. Fichye JS la: hatexcard-moncash-payment-method.js
+// SOUTIEN CHECKOUT BLÒK (WooCommerce Cart & Checkout) — v26.2.0
+// Entegrasyon OFISYÈL: AbstractPaymentMethodType + PaymentMethodRegistry.
+// Sa asire script la chaje ak Checkout block la (FSE/template OK), epi Store API
+// resevwa payment_method=hatexcard_moncash (evite "No payment method provided.").
 // ==========================================================================
-function hatexcard_enqueue_checkout_block_payment_method() {
-    if (is_admin() || !function_exists('is_checkout') || !is_checkout()) {
-        return;
+add_action('before_woocommerce_init', function () {
+    if (class_exists('\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil')) {
+        \\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::declare_compatibility('cart_checkout_blocks', __FILE__, true);
     }
-    if (!hatexcard_ensure_gateway_available()) {
-        return;
-    }
-    $post = get_post();
-    if (!$post || !has_block('woocommerce/checkout', $post)) {
-        return;
-    }
-    if (!wp_script_is('wc-blocks-registry', 'registered')) {
+});
+
+add_action('woocommerce_blocks_loaded', function () {
+    if (!class_exists('\\Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType')) {
         return;
     }
 
-    wp_register_script(
-        'hatexcard-moncash-payment-method',
-        plugins_url('hatexcard-moncash-payment-method.js', __FILE__),
-        array('wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities'),
-        HATEXCARD_PLUGIN_VERSION,
-        true
+    if (!class_exists('HatexCard_MonCash_Blocks_Support', false)) {
+        class HatexCard_MonCash_Blocks_Support extends \\Automattic\\WooCommerce\\Blocks\\Payments\\Integrations\\AbstractPaymentMethodType {
+            protected $name = 'hatexcard_moncash';
+
+            public function initialize() {
+                $this->settings = get_option('woocommerce_hatexcard_moncash_settings', array());
+            }
+
+            public function is_active() {
+                $enabled = isset($this->settings['enabled']) ? $this->settings['enabled'] : 'no';
+                if ($enabled !== 'yes') {
+                    return false;
+                }
+                if (!function_exists('WC') || !WC()->payment_gateways()) {
+                    return true;
+                }
+                $gateways = WC()->payment_gateways()->payment_gateways();
+                if (isset($gateways[$this->name]) && is_object($gateways[$this->name])) {
+                    return (bool) $gateways[$this->name]->is_available();
+                }
+                return true;
+            }
+
+            public function get_payment_method_script_handles() {
+                wp_register_script(
+                    'hatexcard-moncash-payment-method',
+                    plugins_url('hatexcard-moncash-payment-method.js', __FILE__),
+                    array('wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n'),
+                    HATEXCARD_PLUGIN_VERSION,
+                    true
+                );
+                return array('hatexcard-moncash-payment-method');
+            }
+
+            public function get_payment_method_script_handles_for_admin() {
+                return $this->get_payment_method_script_handles();
+            }
+
+            public function get_payment_method_data() {
+                return array(
+                    'title'       => $this->get_setting('title', 'Peye ak MonCash'),
+                    'description' => $this->get_setting('description', 'Kliyan an konfime peman an ak yon USSD sou telefòn li (HTG).'),
+                    'supports'    => $this->get_supported_features(),
+                );
+            }
+        }
+    }
+
+    add_action(
+        'woocommerce_blocks_payment_method_type_registration',
+        function ($payment_method_registry) {
+            $payment_method_registry->register(new HatexCard_MonCash_Blocks_Support());
+        }
     );
-
-    $hx_settings = get_option('woocommerce_hatexcard_moncash_settings', array());
-    $hx_title = (!empty($hx_settings['title']) && is_string($hx_settings['title']))
-        ? $hx_settings['title']
-        : 'Peye ak MonCash';
-    $hx_description = (!empty($hx_settings['description']) && is_string($hx_settings['description']))
-        ? $hx_settings['description']
-        : 'Kliyan an konfime peman an ak yon USSD sou telefòn li (HTG).';
-
-    wp_localize_script('hatexcard-moncash-payment-method', 'hatexcardMonCashBlockData', array(
-        'title'       => $hx_title,
-        'description' => $hx_description,
-        'supports'    => array('products'),
-    ));
-
-    wp_enqueue_script('hatexcard-moncash-payment-method');
-}
-add_action('wp_enqueue_scripts', 'hatexcard_enqueue_checkout_block_payment_method', 50);
+});
 ?>`;
 
       const readme = `# HatexCard MonCash — Plugin WooCommerce
@@ -744,15 +769,14 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 
 - Chak fwa ou telechaje ZIP sa a depi HatexCard, yo jenere yon **nouvo kle API**; ansyen kle a sispann mache imedyatman.
 - Kle a kenbe an sekrè nan baz WordPress la (option \`hatexcard_moncash_api_key\`). Li pa janm parèt nan kòd HTML sit ou a.
-- Si w sispèk li fuit: ale nan **WooCommerce → Retrete (Settings) → Peman → HatexCard MonCash** epi klike **Rotate API Key** (nouvo nan v26.0). Ansyen kle a mouri imedyatman.
+- Si w sispèk li fuit: ale nan **WooCommerce → Retrete (Settings) → Peman → HatexCard MonCash** epi klike **Rotate API Key**. Ansyen kle a mouri imedyatman.
 
 ## Kòman li fonksyone
 
 - Kliyan an valide kòmand li → klike **"Passe komanda"** → li redireksyon sou **MonCash** pou konplete peman an (HTG).
 - Apre peman an, MonCash konfime epi **machann nan resevwa montan an sou kont li** nan HatexCard (payout otomatik).
 - Paj resi a montre estati peman an epi kòmand la vin **konplete** otomatikman lè MonCash konfime.
-- Apre yon peman hosted, onglet MonCash la tounen sou paj konfimasyon HatexCard (hatexcard.com/success) — se baz done a ki konfime peman an, pa paj la.
-- Paj checkout blòk WooCommerce la (Cart & Checkout, default depi WC 8.3) sipòte depi v26.1.0: **Peye ak MonCash** enskri otomatikman nan blòk la epi li parèt tankou lòt metòd peman.
+- Paj checkout blòk WooCommerce la (Cart & Checkout) sipòte depi v26.2.0 ak entegrasyon ofisyèl Blocks (\`AbstractPaymentMethodType\`) — Store API resevwa \`payment_method=hatexcard_moncash\`.
 
 ## Enpòtan
 
@@ -762,28 +786,22 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 - Kle API a se yon sekrè — li rete sèlman bò sèvè a (WordPress), li pa janm ekspoze nan navigatè kliyan an.
 `;
 
-      // Entegrasyon paj checkout BLÒK (WooCommerce Cart & Checkout, WC 8.3+):
-      // blòk la sèvi ak Store API pou lis peman yo, men pou yon gateway ka
-      // PARET vizyèlman li dwe enskri yon metòd JS (wcBlocksRegistry).
-      // Sa se menm mekanism ak wc-payment-method-cod.js nan nwayo WooCommerce.
+      // Entegrasyon paj checkout BLÒK — li settings nan wcSettings (hatexcard_moncash_data)
+      // ke AbstractPaymentMethodType ekspoze. name / paymentMethodId = hatexcard_moncash.
       const checkoutBlockJs = `/**
- * HatexCard MonCash - Enskripsyon peman pou paj checkout blòk la
- * (WooCommerce Cart & Checkout, WC v8.3+). Vèsyon 26.1.0.
- *
- * San fichye sa a, gateway a ka dispo nan Store API (lis peman), men blòk
- * la pa janm rann li vizyèlman paske li manke nan rejis JS la.
- * 'name' dwe matche ak id gateway a: hatexcard_moncash.
+ * HatexCard MonCash — Blocks Checkout registration (v26.2.0)
+ * name dwe matche gateway id + Store API payment_method.
  */
 (function () {
     'use strict';
 
     var wc = window.wc;
-    if (!wc || !wc.wcBlocksRegistry || !wc.wcBlocksRegistry.registerPaymentMethod) {
+    if (!wc || !wc.wcBlocksRegistry || typeof wc.wcBlocksRegistry.registerPaymentMethod !== 'function') {
         return;
     }
     var wpElement = window.wp && window.wp.element;
     var wpEntities = window.wp && window.wp.htmlEntities;
-    if (!wpElement || !wpElement.createElement) {
+    if (!wpElement || typeof wpElement.createElement !== 'function') {
         return;
     }
 
@@ -792,7 +810,14 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
         ? wpEntities.decodeEntities
         : function (value) { return value || ''; };
 
-    var data = window.hatexcardMonCashBlockData || {};
+    var getSetting = wc.wcSettings && typeof wc.wcSettings.getSetting === 'function'
+        ? wc.wcSettings.getSetting
+        : null;
+    var data = getSetting ? getSetting('hatexcard_moncash_data', {}) : {};
+    if (!data || typeof data !== 'object') {
+        data = {};
+    }
+
     var title = decodeEntities(data.title || 'Peye ak MonCash');
     var description = data.description ? decodeEntities(String(data.description)) : '';
     var features = (data.supports && data.supports.length) ? data.supports : ['products'];
@@ -809,17 +834,24 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
         if (!description) {
             return null;
         }
-        return createElement('p', { className: 'hatexcard-moncash-checkout-description' }, description);
+        return createElement('div', { className: 'hatexcard-moncash-checkout-description' },
+            createElement('p', null, description)
+        );
     }
 
     wc.wcBlocksRegistry.registerPaymentMethod({
         name: 'hatexcard_moncash',
+        paymentMethodId: 'hatexcard_moncash',
         label: createElement(HatexCardLabel),
         ariaLabel: title,
         content: createElement(HatexCardContent),
         edit: createElement(HatexCardContent),
         canMakePayment: function () { return true; },
-        supports: { features: features }
+        supports: {
+            features: features,
+            showSavedCards: false,
+            showSaveOption: false
+        }
     });
 })();
 `;
@@ -920,7 +952,7 @@ Pake sa a jenere pou: **${profile.business_name || 'HATEX Merchant'}**
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-gray-100 pt-6">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Vèsyon: 26.1.0
+              Vèsyon: 26.2.0
             </div>
             <button
               type="button"

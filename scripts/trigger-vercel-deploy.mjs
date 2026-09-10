@@ -6,11 +6,13 @@ const hook = process.env.VERCEL_DEPLOY_HOOK;
 
 if (!hook) {
   console.error(`
-[ERÈ] VERCEL_DEPLOY_HOOK pa mete nan .env.local — sit la PA deplwaye.
+[ERÈ] VERCEL_DEPLOY_HOOK pa mete nan .env.local — deploy hook pa disponib.
 
-Push GitHub ka reyisi, MEN Vercel pa resevwa okenn lòd deploy.
+NÒT: Si Vercel gen Git integration (oto-deploy sou push main), ou PA bezwen
+hook sa a — fè jis: npm run live (git push). Hook la sèvi SÈLMAN si ou
+deplwaye san Git integration.
 
-Fè sa kounye a:
+Pou ajoute hook la (opsyonèl):
 1. Vercel → pwojè hatexcard → Settings → Git → Deploy Hooks
 2. Kreye yon hook (non: main, branch: main)
 3. Kopiye URL hook la nan .env.local:
@@ -18,8 +20,6 @@ Fè sa kounye a:
 
 4. Oswa Redeploy manyèl:
    Vercel → Deployments → Redeploy (branch main)
-
-5. Apre sa: npm run live
 `);
   process.exit(1);
 }
