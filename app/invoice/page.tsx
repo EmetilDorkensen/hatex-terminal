@@ -221,14 +221,14 @@ export default function InvoicePage() {
       if (emailIssue) {
         setMessage({
           type: 'warning',
-          text: `Fakti a kreye. Men ${emailIssue}${copied ? '' : ` Lyen: ${payLink}`}`,
+          text: `Fakti a kreye, men imèl la pa t ale: ${emailIssue}${copied ? '' : ` Lyen: ${payLink}`}`,
         });
       } else {
         setMessage({
           type: 'success',
           text: copied
-            ? 'Fakti a kreye! Lyen peman an kopye nan clipboard ou.'
-            : `Fakti a kreye! Lyen: ${payLink}`,
+            ? 'Fakti a kreye epi imèl la voye bay kliyan an! Lyen peman an kopye nan clipboard ou.'
+            : `Fakti a kreye epi imèl la voye! Lyen: ${payLink}`,
         });
       }
 

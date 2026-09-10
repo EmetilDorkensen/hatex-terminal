@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
-import { isEmailConfigured, sendMail } from '@/lib/notify/email';
+import { isEmailConfigured, sendMail, SITE_URL } from '@/lib/notify/email';
 
 /** Voye imèl fakti — sèlman pwopriyetè fakti a (sesyon), via Brevo sèvè. */
 export async function POST(request: Request) {
@@ -60,21 +60,26 @@ export async function POST(request: Request) {
       .single();
 
     const business = profile?.business_name || profile?.full_name || 'HatexCard';
-    const site = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
+    const site = SITE_URL;
     const payLink = `${site}/checkout-invoice/${inv.share_token || inv.id}`;
     const cur = inv.currency === 'USD' ? 'USD' : 'HTG';
     const amountLabel = `${Number(inv.amount).toLocaleString()} ${cur}`;
 
     const result = await sendMail({
-      to: inv.client_email,
+      to: String(inv.client_email),
       subject: `Invoice HatexCard: ${amountLabel} — ${business}`,
       html: `
-        <div style="font-family:sans-serif;max-width:500px;margin:auto">
-          <h2>${business} voye yon fakti ba ou</h2>
-          <p style="font-size:28px;font-weight:bold">${amountLabel}</p>
-          ${inv.description ? `<p>${inv.description}</p>` : ''}
-          <p style="color:#64748b;font-size:14px">Ou ka peye avèk MonCash (Visa / Natcash talè).</p>
-          <a href="${payLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:bold">Peye kounye a</a>
+        <div style="font-family:sans-serif;max-width:500px;margin:auto;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+          <div style="background:#000;padding:20px 24px">
+            <h1 style="color:#fff;margin:0;font-style:italic;font-size:20px">HATEX<span style="color:#dc2626">CARD</span></h1>
+          </div>
+          <div style="padding:28px">
+            <h2 style="margin:0 0 12px;font-size:18px">${business} voye yon fakti ba ou</h2>
+            <p style="font-size:28px;font-weight:bold;margin:0 0 12px">${amountLabel}</p>
+            ${inv.description ? `<p style="color:#475569">${String(inv.description)}</p>` : ''}
+            <p style="color:#64748b;font-size:14px">Ou ka peye avèk HatexCard / MonCash — san kite sit la.</p>
+            <a href="${payLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:bold;margin-top:8px">Peye kounye a</a>
+          </div>
         </div>
       `,
       logLabel: 'invoice-notify',
@@ -82,7 +87,16 @@ export async function POST(request: Request) {
 
     if (!result.ok) {
       console.error('invoice notify Brevo:', result.message);
-      return NextResponse.json({ success: false, message: 'Pa t kapab voye imèl la.' }, { status: 502 });
+      const detail = String(result.message || '').slice(0, 220);
+      return NextResponse.json(
+        {
+          success: false,
+          message: detail
+            ? `Imèl pa t ale (Brevo): ${detail}`
+            : 'Pa t kapab voye imèl la.',
+        },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({ success: true, pay_link: payLink });

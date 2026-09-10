@@ -10,7 +10,12 @@
  */
 
 export const NOTIFY_FROM = 'HatexCard <notifications@hatexcard.com>';
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com';
+export const SITE_URL = (() => {
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || 'https://hatexcard.com').replace(/\/$/, '');
+  // Pa mete lyen localhost nan imèl kliyan (menm si .env.local gen localhost).
+  if (/localhost|127\.0\.0\.1/i.test(raw)) return 'https://hatexcard.com';
+  return raw;
+})();
 
 export function getBrevoApiKey(): string | null {
   const key =
