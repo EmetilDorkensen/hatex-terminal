@@ -54,14 +54,22 @@ function resolveCreds(mode: MonCashMode): Creds | null {
           secretKey: process.env.MONCASH_LIVE_SECRET_KEY,
         };
 
-  if (scoped.clientId && scoped.secretKey) {
-    return { clientId: scoped.clientId, secretKey: scoped.secretKey };
+  if (scoped.clientId?.trim() && scoped.secretKey?.trim()) {
+    return { clientId: scoped.clientId.trim(), secretKey: scoped.secretKey.trim() };
   }
 
-  if (mode === getMonCashMode()) {
-    const clientId = process.env.MONCASH_CLIENT_ID;
-    const secretKey = process.env.MONCASH_SECRET_KEY;
-    if (clientId && secretKey) return { clientId, secretKey };
+  const unscopedId = process.env.MONCASH_CLIENT_ID?.trim();
+  const unscopedSecret = process.env.MONCASH_SECRET_KEY?.trim();
+
+  // Ansyen varyab: sèvi pou mòd default platfòm nan.
+  if (mode === getMonCashMode() && unscopedId && unscopedSecret) {
+    return { clientId: unscopedId, secretKey: unscopedSecret };
+  }
+
+  // Live: si MONCASH_LIVE_* manke, aksepte MONCASH_CLIENT_ID / SECRET kòm dènye chans.
+  // (NEXT_PUBLIC_MONCASH_MODE=sandbox te anpeche sa — epi plugin live te kraze.)
+  if (mode === 'live' && unscopedId && unscopedSecret) {
+    return { clientId: unscopedId, secretKey: unscopedSecret };
   }
 
   return null;
@@ -93,7 +101,15 @@ export function getMonCashConfig(mode: MonCashMode = getMonCashMode()): MonCashC
 
 /** Konfigirasyon ki koresponn ak mòd yon kle API machann. */
 export function getMonCashConfigForGateway(mode: GatewayMode): MonCashConfig {
-  return getMonCashConfig(monCashModeForGateway(mode));
+  const desired = monCashModeForGateway(mode);
+  if (resolveCreds(desired)) {
+    return getMonCashConfig(desired);
+  }
+  // Si kle Digicel live manke men sandbox la la: pa kraze checkout (dev / setup).
+  if (desired === 'live' && resolveCreds('sandbox')) {
+    return getMonCashConfig('sandbox');
+  }
+  return getMonCashConfig(desired);
 }
 
 export function isMonCashConfigured(mode: MonCashMode = getMonCashMode()): boolean {

@@ -225,7 +225,7 @@ export default function PluginPage() {
   };
 
   // ==========================================================================
-  // JENERE WOOCOMMERCE PLUGIN (v26.5 — HatexCard Plugin + USSD san redireksyon)
+  // JENERE WOOCOMMERCE PLUGIN (v26.6 — UI Peye ak Hatexcard + USSD)
   // ==========================================================================
   const generateWooCommercePlugin = async () => {
     if (!profile?.id) return;
@@ -274,13 +274,13 @@ export default function PluginPage() {
  * Plugin Name: HatexCard Plugin
  * Plugin URI: https://hatexcard.com
  * Description: Peman HatexCard pou WooCommerce. Kliyan peye san redireksyon; machann nan resevwa sou kont li.
- * Version: 26.5.0
+ * Version: 26.6.0
  * Author: Hatex Group
  */
 
 if (!defined('ABSPATH')) exit;
 
-if (!defined('HATEXCARD_PLUGIN_VERSION')) define('HATEXCARD_PLUGIN_VERSION', '26.5.0');
+if (!defined('HATEXCARD_PLUGIN_VERSION')) define('HATEXCARD_PLUGIN_VERSION', '26.6.0');
 if (!defined('HATEXCARD_EMBEDDED_B64')) define('HATEXCARD_EMBEDDED_B64', '${embeddedB64}');
 if (!defined('HATEXCARD_API_ORIGIN')) define('HATEXCARD_API_ORIGIN', '${apiOrigin}');
 
@@ -647,18 +647,41 @@ function hatexcard_ensure_gateway_available() {
         }
 
         public function payment_fields() {
-            if ($this->description) {
-                echo wpautop(wp_kses_post($this->description));
-            }
             $prefill = '';
             if (function_exists('WC') && WC()->customer) {
                 $prefill = (string) WC()->customer->get_billing_phone();
             }
-            echo '<p class="form-row form-row-wide">';
-            echo '<label for="hatexcard_moncash_phone">' . esc_html__('Nimewo telefòn (HatexCard)', 'hatexcard') . ' <span class="required">*</span></label>';
-            echo '<input id="hatexcard_moncash_phone" name="hatexcard_moncash_phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="37XX XXXX" value="' . esc_attr($prefill) . '" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;" />';
-            echo '<span class="description">' . esc_html__('Nou pral voye yon demann PIN sou telefòn sa a. Pa gen redireksyon.', 'hatexcard') . '</span>';
-            echo '</p>';
+            $uid = 'hxpay_' . wp_generate_password(6, false, false);
+            ?>
+            <div class="hatexcard-pay-ui" style="margin:6px 0 2px;max-width:420px;">
+              <button type="button" id="<?php echo esc_attr($uid); ?>_cta" class="hatexcard-pay-cta" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:#4f46e5;color:#fff;font-weight:700;font-size:15px;border:none;border-radius:16px;padding:16px 20px;box-shadow:0 10px 24px rgba(79,70,229,0.28);cursor:pointer;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                <span>Peye ak Hatexcard</span>
+              </button>
+              <p id="<?php echo esc_attr($uid); ?>_hint" style="text-align:center;font-size:12px;color:#94a3b8;margin:10px 0 0;line-height:1.4;">Peman fèt ak HatexCard: nou voye yon USSD sou telefòn ou pou konfime PIN ou.</p>
+              <div id="<?php echo esc_attr($uid); ?>_panel" style="display:none;margin-top:12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:16px;padding:16px;">
+                <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#0f172a;">Antre nimewo MonCash ou</p>
+                <p style="margin:0 0 12px;font-size:12px;color:#64748b;line-height:1.5;">HatexCard ap voye yon <strong>USSD</strong> sou telefòn ou pou konfime peman an ak PIN ou — san ou pa bezwen peye sou yon lòt sit.</p>
+                <input id="hatexcard_moncash_phone" name="hatexcard_moncash_phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="509 12 34 5678" value="<?php echo esc_attr($prefill); ?>" style="width:100%;box-sizing:border-box;background:#fff;border:1.5px solid #a5b4fc;border-radius:12px;padding:14px 16px;font-size:16px;font-weight:600;color:#0f172a;outline:none;" />
+                <p style="margin:10px 0 0;font-size:11px;color:#64748b;">Apre sa, klike <strong>Place order</strong> — n ap voye USSD la epi ou konfime PIN sou telefòn ou.</p>
+              </div>
+            </div>
+            <script>
+            (function(){
+              var cta=document.getElementById(<?php echo wp_json_encode($uid . '_cta'); ?>);
+              var panel=document.getElementById(<?php echo wp_json_encode($uid . '_panel'); ?>);
+              var hint=document.getElementById(<?php echo wp_json_encode($uid . '_hint'); ?>);
+              if(!cta||!panel) return;
+              cta.addEventListener('click', function(){
+                cta.style.display='none';
+                if(hint) hint.style.display='none';
+                panel.style.display='block';
+                var input=panel.querySelector('input');
+                if(input) input.focus();
+              });
+            })();
+            </script>
+            <?php
         }
 
         public function validate_fields() {
@@ -883,7 +906,7 @@ add_action('woocommerce_loaded', 'hatexcard_bootstrap', 5);
 add_action('init', 'hatexcard_bootstrap', 5);
 
 // ==========================================================================
-// SOUTIEN CHECKOUT BLÒK — v26.5.0
+// SOUTIEN CHECKOUT BLÒK — v26.6.0
 // Fichye aparte + auto-enable + fallback enqueue (evite "no payment methods").
 // ==========================================================================
 add_action('before_woocommerce_init', function () {
@@ -973,7 +996,7 @@ final class HatexCard_MonCash_Blocks_Support extends AbstractPaymentMethodType {
             'hatexcard-moncash-payment-method',
             plugins_url('hatexcard-moncash-payment-method.js', $gateway_file),
             array('wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n'),
-            defined('HATEXCARD_PLUGIN_VERSION') ? HATEXCARD_PLUGIN_VERSION : '26.5.0',
+            defined('HATEXCARD_PLUGIN_VERSION') ? HATEXCARD_PLUGIN_VERSION : '26.6.0',
             true
         );
         return array('hatexcard-moncash-payment-method');
@@ -1016,11 +1039,11 @@ API: \`${apiOrigin}\`
 
 ## Checkout
 
-Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (USSD) — san redireksyon. Menm eksperyans ak checkout pwodwi HatexCard.
+Chwazi **Peye ak Hatexcard** → antre nimewo MonCash → Place order → konfime PIN sou telefòn (USSD), san redireksyon.
 `;
 
       const checkoutBlockJs = `/**
- * HatexCard Plugin — Blocks Checkout (v26.5.0)
+ * HatexCard Plugin — Blocks Checkout (v26.6.0)
  * Pa gen kle API / URL sekrè nan fichye sa a.
  */
 (function () {
@@ -1050,10 +1073,27 @@ Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (US
     if (!data || typeof data !== 'object') data = {};
 
     var title = decodeEntities(data.title || 'Peye ak Hatexcard');
-    var description = data.description
-        ? decodeEntities(String(data.description))
-        : 'Antre nimewo telefòn ou epi konfime PIN — san redireksyon.';
     var features = (data.supports && data.supports.length) ? data.supports : ['products'];
+
+    function PhoneIcon(props) {
+        var size = (props && props.size) || 20;
+        return createElement(
+            'svg',
+            {
+                width: size,
+                height: size,
+                viewBox: '0 0 24 24',
+                fill: 'none',
+                stroke: 'currentColor',
+                strokeWidth: '2',
+                strokeLinecap: 'round',
+                strokeLinejoin: 'round',
+                'aria-hidden': 'true'
+            },
+            createElement('rect', { x: '5', y: '2', width: '14', height: '20', rx: '2', ry: '2' }),
+            createElement('line', { x1: '12', y1: '18', x2: '12.01', y2: '18' })
+        );
+    }
 
     function HatexCardLabel(props) {
         var components = (props && props.components) ? props.components : {};
@@ -1064,6 +1104,9 @@ Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (US
     }
 
     function HatexCardContent(props) {
+        var stageState = useState('idle');
+        var stage = stageState[0];
+        var setStage = stageState[1];
         var phoneState = useState('');
         var phone = phoneState[0];
         var setPhone = phoneState[1];
@@ -1077,9 +1120,10 @@ Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (US
             var unsubscribe = eventRegistration.onPaymentSetup(function () {
                 var cleaned = String(phone || '').replace(/\\D+/g, '');
                 if (cleaned.length < 8) {
+                    setStage('phone');
                     return {
                         type: emitResponse.responseTypes.ERROR,
-                        message: 'Antre yon nimewo telefòn valab pou peye ak Hatexcard.'
+                        message: 'Antre yon nimewo MonCash valab pou peye ak Hatexcard.'
                     };
                 }
                 return {
@@ -1096,41 +1140,142 @@ Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (US
             };
         }, [phone, eventRegistration, emitResponse]);
 
+        if (stage === 'idle') {
+            return createElement(
+                'div',
+                { className: 'hatexcard-plugin-checkout', style: { marginTop: '8px', maxWidth: '420px' } },
+                createElement(
+                    'button',
+                    {
+                        type: 'button',
+                        onClick: function () { setStage('phone'); },
+                        style: {
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            background: '#4f46e5',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: '15px',
+                            border: 'none',
+                            borderRadius: '16px',
+                            padding: '16px 20px',
+                            boxShadow: '0 10px 24px rgba(79,70,229,0.28)',
+                            cursor: 'pointer'
+                        }
+                    },
+                    createElement(PhoneIcon, { size: 20 }),
+                    createElement('span', null, 'Peye ak Hatexcard')
+                ),
+                createElement(
+                    'p',
+                    {
+                        style: {
+                            textAlign: 'center',
+                            fontSize: '12px',
+                            color: '#94a3b8',
+                            margin: '10px 0 0',
+                            lineHeight: 1.4
+                        }
+                    },
+                    'Peman fèt ak HatexCard: nou voye yon USSD sou telefòn ou pou konfime PIN ou.'
+                )
+            );
+        }
+
         return createElement(
             'div',
-            { className: 'hatexcard-plugin-checkout', style: { marginTop: '8px' } },
-            description
-                ? createElement('p', { style: { margin: '0 0 10px', fontSize: '14px', color: '#475569' } }, description)
-                : null,
+            {
+                className: 'hatexcard-plugin-checkout',
+                style: {
+                    marginTop: '8px',
+                    maxWidth: '420px',
+                    background: '#eef2ff',
+                    border: '1px solid #c7d2fe',
+                    borderRadius: '16px',
+                    padding: '16px'
+                }
+            },
             createElement(
-                'label',
-                {
-                    htmlFor: 'hatexcard_moncash_phone_blocks',
-                    style: { display: 'block', fontWeight: 600, fontSize: '13px', marginBottom: '6px' }
-                },
-                'Nimewo telefòn *'
+                'p',
+                { style: { margin: '0 0 4px', fontSize: '14px', fontWeight: 700, color: '#0f172a' } },
+                'Antre nimewo MonCash ou'
+            ),
+            createElement(
+                'p',
+                { style: { margin: '0 0 12px', fontSize: '12px', color: '#64748b', lineHeight: 1.5 } },
+                'HatexCard ap voye yon ',
+                createElement('strong', null, 'USSD'),
+                ' sou telefòn ou pou konfime peman an ak PIN ou — san ou pa bezwen peye sou yon lòt sit.'
             ),
             createElement('input', {
                 id: 'hatexcard_moncash_phone_blocks',
                 type: 'tel',
                 inputMode: 'numeric',
                 autoComplete: 'tel',
-                placeholder: '37XX XXXX',
+                placeholder: '509 12 34 5678',
                 value: phone,
                 onChange: function (e) { setPhone(e.target.value); },
                 style: {
                     width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    background: '#fff',
+                    border: '1.5px solid #a5b4fc',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    outline: 'none'
                 }
             }),
             createElement(
-                'p',
-                { style: { margin: '8px 0 0', fontSize: '12px', color: '#64748b' } },
-                'Apre ou pase kòmand lan, konfime PIN sou telefòn ou. Pa gen redireksyon.'
+                'div',
+                { style: { display: 'flex', gap: '8px', marginTop: '12px' } },
+                createElement(
+                    'button',
+                    {
+                        type: 'button',
+                        onClick: function () { /* phone already captured for Place order */ },
+                        style: {
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            background: '#4f46e5',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            border: 'none',
+                            borderRadius: '12px',
+                            padding: '12px 14px',
+                            cursor: 'pointer'
+                        }
+                    },
+                    createElement(PhoneIcon, { size: 16 }),
+                    createElement('span', null, 'Kontinye — Place order')
+                ),
+                createElement(
+                    'button',
+                    {
+                        type: 'button',
+                        onClick: function () { setStage('idle'); setPhone(''); },
+                        style: {
+                            padding: '12px 16px',
+                            background: '#fff',
+                            border: '1px solid #e2e8f0',
+                            color: '#475569',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            borderRadius: '12px',
+                            cursor: 'pointer'
+                        }
+                    },
+                    'Anile'
+                )
             )
         );
     }
@@ -1217,7 +1362,7 @@ Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (US
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">HatexCard Plugin</h2>
-              <p className="text-slate-500 text-xs font-medium">WordPress / WooCommerce — v26.5</p>
+              <p className="text-slate-500 text-xs font-medium">WordPress / WooCommerce — v26.6</p>
             </div>
           </div>
 
@@ -1250,7 +1395,7 @@ Apre "Place order", kliyan an rete sou paj resi a, antre PIN sou telefòn li (US
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-gray-100 pt-6">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Vèsyon: 26.5.0
+              Vèsyon: 26.6.0
             </div>
             <button
               type="button"
