@@ -19,6 +19,7 @@ import {
   refreshAttempt,
 } from '@/lib/moncash/attempts';
 import { ensureProfileClientRef } from '@/lib/security/client-ref';
+import { ensureMerchantGatewayAccount } from '@/lib/billing/provision';
 
 /**
  * Demare yon peman MonCash pou yon machann (QR checkout, API machann, elatriye).
@@ -110,11 +111,26 @@ export async function startMerchantMonCashPayment(
     return { ok: false, status: 400, message: 'Referans kòmand la manke (order_id).' };
   }
 
-  const { data: acct } = await admin
+  let { data: acct } = await admin
     .from('hatex_merchant_accounts')
     .select('user_id, status, payout_provider, payout_phone')
     .eq('user_id', merchantId)
     .maybeSingle();
+
+  // Machann ki gen kle API / KYC men ki pa t chwazi plan sou /plan — kreye ranje a.
+  if (!acct) {
+    try {
+      await ensureMerchantGatewayAccount(admin, merchantId);
+    } catch {
+      /* kontinye — nou verifye anba a */
+    }
+    const again = await admin
+      .from('hatex_merchant_accounts')
+      .select('user_id, status, payout_provider, payout_phone')
+      .eq('user_id', merchantId)
+      .maybeSingle();
+    acct = again.data;
+  }
 
   if (!acct) {
     return {

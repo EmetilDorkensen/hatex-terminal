@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
+import { ensureMerchantGatewayAccount } from '@/lib/billing/provision';
 import { maskApiKey, maskPublishableKey } from '@/lib/security/api-key';
 import { rateLimitMerchantIp } from '@/lib/security/merchant-api';
 
@@ -50,6 +51,12 @@ export async function POST(request: Request) {
         { error: 'Kont ou poko elijib.', eligibility: result.eligibility },
         { status: 403 }
       );
+    }
+
+    try {
+      await ensureMerchantGatewayAccount(supabaseWriter, user.id);
+    } catch {
+      /* pa bloke provision kle si tab machann echwe — merchant-pay ap eseye ankò */
     }
 
     return NextResponse.json({

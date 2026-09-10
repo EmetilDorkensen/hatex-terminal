@@ -21,7 +21,11 @@ export async function ensureMerchantGatewayAccount(
     .limit(1)
     .maybeSingle();
 
-  const payoutPhone = bank?.phone || null;
+  const payoutPhone =
+    (typeof bank?.phone === 'string' && bank.phone.trim()) ||
+    (typeof profile?.phone === 'string' && profile.phone.replace(/\D/g, '').length >= 8
+      ? profile.phone.replace(/\D/g, '')
+      : null);
   const now = new Date().toISOString();
 
   const { data: existing } = await admin
