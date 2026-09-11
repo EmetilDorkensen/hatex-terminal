@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
   const { data: endpoints, error } = await auth.supabaseAdmin
     .from('developer_webhook_endpoints')
-    .select('id, url, events, is_active, description, created_at, updated_at')
+    .select('id, url, events, is_active, description, mode, created_at, updated_at')
     .eq('merchant_id', auth.profile.id)
     .order('created_at', { ascending: false });
 
@@ -41,11 +41,13 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { url, description, events } = body;
+  const { url, description, events, mode: rawMode } = body;
 
   if (!url || typeof url !== 'string') {
     return NextResponse.json({ error: 'URL obligatwa.' }, { status: 400 });
   }
+
+  const mode = rawMode === 'test' ? 'test' : 'live';
 
   const urlCheck = isSafeWebhookUrl(url.trim());
   if (!urlCheck.safe) {
@@ -70,9 +72,10 @@ export async function POST(req: Request) {
       secret,
       events: eventList,
       description: description?.trim() || null,
+      mode,
       is_active: true,
     })
-    .select('id, url, events, is_active, description, created_at')
+    .select('id, url, events, is_active, description, mode, created_at')
     .single();
 
   if (error || !endpoint) {

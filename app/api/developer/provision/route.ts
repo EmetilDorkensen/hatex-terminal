@@ -3,6 +3,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/sec
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
 import { ensureMerchantGatewayAccount } from '@/lib/billing/provision';
 import { maskApiKey, maskPublishableKey } from '@/lib/security/api-key';
+import { maskGatewayApiKey } from '@/lib/gateway/api-keys';
 import { rateLimitMerchantIp } from '@/lib/security/merchant-api';
 
 export async function POST(request: Request) {
@@ -53,13 +54,39 @@ export async function POST(request: Request) {
       );
     }
 
+    let gatewayRevealed: {
+      test?: { api_key: string; api_key_prefix: string; api_key_masked: string };
+      live?: { api_key: string; api_key_prefix: string; api_key_masked: string };
+    } = {};
+
     try {
-      await ensureMerchantGatewayAccount(supabaseWriter, user.id);
+      const gw = await ensureMerchantGatewayAccount(supabaseWriter, user.id);
+      if (gw.revealed.test) {
+        gatewayRevealed.test = {
+          api_key: gw.revealed.test.token,
+          api_key_prefix: gw.revealed.test.keyPrefix,
+          api_key_masked: maskGatewayApiKey(gw.revealed.test.keyPrefix),
+        };
+      }
+      if (gw.revealed.live) {
+        gatewayRevealed.live = {
+          api_key: gw.revealed.live.token,
+          api_key_prefix: gw.revealed.live.keyPrefix,
+          api_key_masked: maskGatewayApiKey(gw.revealed.live.keyPrefix),
+        };
+      }
     } catch {
       /* pa bloke provision kle si tab machann echwe — merchant-pay ap eseye ankò */
     }
 
+    const { data: gatewayKeys } = await supabaseWriter
+      .from('hatex_api_keys')
+      .select('mode, key_prefix')
+      .eq('merchant_id', user.id)
+      .eq('is_active', true);
+
     return NextResponse.json({
+      // Ansyen kle hx_live_ (plugin/legacy) — live sèlman, pa melanje ak test
       api_key: result.api_key,
       api_key_prefix: result.api_key_prefix,
       api_key_masked: maskApiKey(result.api_key_prefix),
@@ -67,6 +94,13 @@ export async function POST(request: Request) {
       api_key_pk_prefix: result.api_key_pk_prefix,
       api_key_pk_masked: maskPublishableKey(result.api_key_pk_prefix),
       revealed_once: !!result.api_key,
+      // Kle v2 separe: hx_sk_test_ + hx_sk_live_
+      gateway_keys: (gatewayKeys || []).map((k) => ({
+        mode: k.mode,
+        key_prefix: k.key_prefix,
+        key_masked: maskGatewayApiKey(k.key_prefix),
+      })),
+      gateway_revealed: gatewayRevealed,
       is_merchant: result.is_merchant,
       webhook_secret: result.webhook_secret,
       provisioned: result.provisioned,

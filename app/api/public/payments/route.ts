@@ -172,7 +172,7 @@ export async function POST(request: Request) {
     // Kreye peman MonCash la
     let cfg;
     try {
-      cfg = getMonCashConfigForGateway(merchant.api_key_mode || 'test');
+      cfg = getMonCashConfigForGateway('live');
     } catch (err) {
       if (idempotencyKey) await releaseIdempotencyKey(supabase, merchant.id, idempotencyKey);
       return jsonWithBuild({ error: err instanceof Error ? err.message : 'Konfigirasyon MonCash manke.' }, 500);
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
       .from('hatex_payments')
       .insert({
         merchant_id: merchant.id,
-        mode: merchant.api_key_mode || 'test',
+        mode: 'live',
         status: 'pending',
         purpose: 'merchant',
         gateway_order_id: monCashOrderId,

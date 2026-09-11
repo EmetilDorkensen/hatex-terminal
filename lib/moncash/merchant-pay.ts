@@ -60,13 +60,14 @@ export async function startMerchantMonCashPayment(
 ): Promise<StartMerchantMonCashResult> {
   const { merchantId } = input;
 
-  // Mòd Machann nan — baze sou api_key_mode li (default 'live').
+  // Ansyen endpoin /api/moncash/payments ak kle hx_live_ = TOUJOU live.
+  // Pou test, itilize hx_sk_test_ sou POST /api/v2/payments.
   const { data: profile } = await admin
     .from('profiles')
-    .select('api_key_mode, client_ref')
+    .select('client_ref')
     .eq('id', merchantId)
     .maybeSingle();
-  const mode: GatewayMode = profile?.api_key_mode === 'test' ? 'test' : 'live';
+  const mode: GatewayMode = 'live';
 
   // Referans opak machann nan — pou konnen kiyès k ap resevwa lajan an.
   const clientRef =

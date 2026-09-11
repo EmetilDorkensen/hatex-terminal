@@ -345,11 +345,37 @@ export async function settleMonCashPayment(
     };
   }
 
-  // PREMYE RÈGLEMAN (nou menm ki fè tranzisyon an): voye imèl konfimasyon yo.
-  // Se sèlman isit la — konsa rechaj/resettle pa janm voye doub imèl.
+  // PREMYE RÈGLEMAN (nou menm ki fè tranzisyon an): voye imèl + webhook.
+  // Se sèlman isit la — konsa rechaj/resettle pa janm voye doub imèl/webhook.
   {
     const { notifyPaymentPaid } = await import('@/lib/notify/sale-emails');
     await notifyPaymentPaid(admin, payment);
+
+    // Webhook estil Stripe: payment.success → sèlman endpoint ki gen menm mòd
+    try {
+      const { deliverWebhookEvent } = await import('@/lib/security/webhook-delivery');
+      const payMode = payment.mode === 'test' ? 'test' : 'live';
+      await deliverWebhookEvent(
+        admin,
+        payment.merchant_id,
+        'payment.success',
+        {
+          payment_id: payment.id,
+          order_id:
+            (typeof payment.metadata?.order_id === 'string' && payment.metadata.order_id) ||
+            payment.gateway_order_id,
+          amount: Number(payment.merchant_amount),
+          currency: 'HTG',
+          mode: payMode,
+          purpose: payment.purpose,
+          moncash_transaction_id: payment.moncash_transaction_id || null,
+          paid_at: new Date().toISOString(),
+        },
+        payMode
+      );
+    } catch (err) {
+      console.error('[settle] webhook delivery error:', err);
+    }
   }
 
   // Yon frè KYC pa gen payout — li debloke soumisyon dosye a olye

@@ -26,11 +26,18 @@ import {
   Zap,
 } from 'lucide-react';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
-import { maskApiKey, maskPublishableKey } from '@/lib/security/api-key';
+import { maskPublishableKey } from '@/lib/security/api-key';
+import { maskGatewayApiKey } from '@/lib/gateway/api-keys';
 
 const AVAILABLE_EVENTS = ['payment.success'];
 
 type Section = 'overview' | 'keys' | 'webhooks' | 'logs';
+type GatewayKeyRow = {
+  id?: string;
+  mode: 'test' | 'live';
+  key_prefix: string;
+  key_masked: string;
+};
 
 export default function DeveloperDashboard() {
   const router = useRouter();
@@ -40,8 +47,13 @@ export default function DeveloperDashboard() {
   const [copiedKey, setCopiedKey] = useState('');
   const [activeTab, setActiveTab] = useState<'js' | 'php' | 'curl'>('js');
   const [section, setSection] = useState<Section>('overview');
-  const [mode, setMode] = useState<'test' | 'live'>('live');
-  const [togglingMode, setTogglingMode] = useState(false);
+  /** Filtre UI sèlman — pa chanje anyen nan DB. Kle test/live separe. */
+  const [mode, setMode] = useState<'test' | 'live'>('test');
+
+  const [gatewayKeys, setGatewayKeys] = useState<GatewayKeyRow[]>([]);
+  const [revealedKeys, setRevealedKeys] = useState<Partial<Record<'test' | 'live', string>>>({});
+  const [showKey, setShowKey] = useState<Partial<Record<'test' | 'live', boolean>>>({});
+  const [rotatingMode, setRotatingMode] = useState<'test' | 'live' | null>(null);
 
   // Webhook endpoints state
   const [endpoints, setEndpoints] = useState<any[]>([]);
@@ -51,9 +63,6 @@ export default function DeveloperDashboard() {
   const [creatingEndpoint, setCreatingEndpoint] = useState(false);
   const [busyEndpoint, setBusyEndpoint] = useState<string | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<{ url: string; secret: string } | null>(null);
-  const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [rotatingKey, setRotatingKey] = useState(false);
 
   // Litij / rapò kliyan sou peman machann (spec §5)
   const [disputes, setDisputes] = useState<any[]>([]);
@@ -63,6 +72,18 @@ export default function DeveloperDashboard() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  const loadGatewayKeys = async () => {
+    try {
+      const res = await fetch('/api/developer/api-keys');
+      if (res.ok) {
+        const data = await res.json();
+        setGatewayKeys(data.keys || []);
+      }
+    } catch {
+      /* pa bloke */
+    }
+  };
 
   const loadWebhooks = async () => {
     try {
@@ -80,18 +101,6 @@ export default function DeveloperDashboard() {
       }
     } catch {
       /* pa bloke paj la si webhook yo pa chaje */
-    }
-  };
-
-  const loadMode = async () => {
-    try {
-      const res = await fetch('/api/developer/mode');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.mode === 'test' || data.mode === 'live') setMode(data.mode);
-      }
-    } catch {
-      /* default live */
     }
   };
 
@@ -142,46 +151,49 @@ export default function DeveloperDashboard() {
       }
 
       if (elig && elig.eligible && profileData) {
-        let apiKeyPrefix = profileData.api_key_prefix || null;
-        let apiKeyMasked = maskApiKey(apiKeyPrefix);
+        setEligibility(elig);
         let pkPrefix = profileData.api_key_pk_prefix || null;
         let pk = profileData.api_key_pk || null;
         let isMerchant = profileData.is_merchant === true;
-        let webhookSecret = profileData.webhook_secret;
 
         try {
           const provRes = await fetch('/api/developer/provision', { method: 'POST' });
           if (provRes.ok) {
             const prov = await provRes.json();
-            apiKeyPrefix = prov.api_key_prefix ?? apiKeyPrefix;
-            apiKeyMasked = prov.api_key_masked ?? apiKeyMasked;
             pkPrefix = prov.api_key_pk_prefix ?? pkPrefix;
             pk = prov.api_key_pk ?? pk;
             isMerchant = prov.is_merchant ?? isMerchant;
-            webhookSecret = prov.webhook_secret ?? webhookSecret;
-            if (prov.api_key) {
-              setRevealedApiKey(prov.api_key);
-              setShowApiKey(true);
+            if (prov.gateway_keys?.length) {
+              setGatewayKeys(prov.gateway_keys);
+            }
+            const revealed: Partial<Record<'test' | 'live', string>> = {};
+            if (prov.gateway_revealed?.test?.api_key) {
+              revealed.test = prov.gateway_revealed.test.api_key;
+            }
+            if (prov.gateway_revealed?.live?.api_key) {
+              revealed.live = prov.gateway_revealed.live.api_key;
+            }
+            if (Object.keys(revealed).length) {
+              setRevealedKeys(revealed);
+              setShowKey({ test: !!revealed.test, live: !!revealed.live });
             }
           }
         } catch {
-          /* fallback deja nan eligibility */
+          /* fallback */
         }
 
         setMerchant({
           ...profileData,
-          api_key_prefix: apiKeyPrefix,
-          api_key_masked: apiKeyMasked,
           api_key_pk: pk,
           api_key_pk_prefix: pkPrefix,
           api_key_pk_masked: pk ? pk : maskPublishableKey(pkPrefix),
           is_merchant: isMerchant,
-          webhook_secret: webhookSecret,
         });
+        await loadGatewayKeys();
         await loadWebhooks();
-        await loadMode();
         void loadDisputes();
       } else {
+        setEligibility(elig);
         setMerchant(profileData);
       }
 
@@ -197,30 +209,14 @@ export default function DeveloperDashboard() {
     setTimeout(() => setCopiedKey(''), 2000);
   };
 
-  const handleToggleMode = async (next: 'test' | 'live') => {
-    if (next === mode) return;
+  const handleSelectMode = (next: 'test' | 'live') => {
     if (next === 'live') {
       const ok = window.confirm(
-        'Ou pral aktive mòd LIVE — peman ap fèt ak VRE LAJAN sou MonCash. Ou sèten?'
+        'Ou pral gade mòd LIVE (vre lajan). Kle TEST ou a pa chanje — se de kle diferan.'
       );
       if (!ok) return;
     }
-    setTogglingMode(true);
-    try {
-      const res = await fetch('/api/developer/mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: next }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erè.');
-      setMode(next);
-      if (data.message) alert(data.message);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setTogglingMode(false);
-    }
+    setMode(next);
   };
 
   const handleCreateEndpoint = async () => {
@@ -230,7 +226,12 @@ export default function DeveloperDashboard() {
       const res = await fetch('/api/developer/webhooks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: newUrl.trim(), description: newDesc.trim(), events: AVAILABLE_EVENTS }),
+        body: JSON.stringify({
+          url: newUrl.trim(),
+          description: newDesc.trim(),
+          events: AVAILABLE_EVENTS,
+          mode,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erè pandan kreyasyon an.');
@@ -290,27 +291,42 @@ export default function DeveloperDashboard() {
     }
   };
 
-  const handleRotateApiKey = async () => {
-    if (!window.confirm('Ou pral jenere yon NOUVO kle API. Ansyen kle a pa mache ankò. Kontinye?')) return;
-    setRotatingKey(true);
+  const handleRotateApiKey = async (keyMode: 'test' | 'live') => {
+    const label = keyMode === 'test' ? 'TEST (hx_sk_test_)' : 'LIVE (hx_sk_live_)';
+    if (
+      !window.confirm(
+        `Ou pral jenere yon NOUVO kle ${label}. Ansyen kle ${keyMode} la pa mache ankò. Lòt kle a (${keyMode === 'test' ? 'live' : 'test'}) pa chanje. Kontinye?`
+      )
+    ) {
+      return;
+    }
+    setRotatingMode(keyMode);
     try {
-      const res = await fetch('/api/developer/api-key/rotate', { method: 'POST' });
+      const res = await fetch('/api/developer/api-key/rotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: keyMode }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erè');
-      setRevealedApiKey(data.api_key);
-      setShowApiKey(true);
-      setMerchant((prev: any) => ({
-        ...prev,
-        api_key_prefix: data.api_key_prefix,
-        api_key_masked: data.api_key_masked,
-        api_key_pk: data.api_key_pk || prev?.api_key_pk,
-        api_key_pk_prefix: data.api_key_pk_prefix || prev?.api_key_pk_prefix,
-      }));
-      alert(data.message || 'Yo jenere yon nouvo kle API.');
+      setRevealedKeys((prev) => ({ ...prev, [keyMode]: data.api_key }));
+      setShowKey((prev) => ({ ...prev, [keyMode]: true }));
+      setGatewayKeys((prev) => {
+        const rest = prev.filter((k) => k.mode !== keyMode);
+        return [
+          ...rest,
+          {
+            mode: keyMode,
+            key_prefix: data.api_key_prefix,
+            key_masked: data.api_key_masked,
+          },
+        ].sort((a, b) => a.mode.localeCompare(b.mode));
+      });
+      alert(data.message || `Nouvo kle ${keyMode} jenere.`);
     } catch (err: any) {
       alert(err.message);
     } finally {
-      setRotatingKey(false);
+      setRotatingMode(null);
     }
   };
 
@@ -348,16 +364,18 @@ export default function DeveloperDashboard() {
     );
   }
 
-  // Kle FIKTIF pou egzanp — pa janm itilize yo pou vre lajan.
-  // Mòd TEST sèvi yon kle tès APA (hx_sk_test_...); mòd LIVE sèvi kle live la (hx_live_...).
-  const TEST_SNIPPET_KEY = 'hx_sk_test_KLE_TÈS_OU';
-  const LIVE_SNIPPET_KEY = 'hx_live_KLE_OU_LA';
-  const snippetKey = mode === 'test' ? TEST_SNIPPET_KEY : LIVE_SNIPPET_KEY;
+  const keyForMode = (m: 'test' | 'live') => gatewayKeys.find((k) => k.mode === m);
+  const testKey = keyForMode('test');
+  const liveKey = keyForMode('live');
+  const snippetKey =
+    revealedKeys[mode] ||
+    (mode === 'test' ? 'hx_sk_test_KLE_TÈS_OU' : 'hx_sk_live_KLE_LIVE_OU');
+  const filteredEndpoints = endpoints.filter((ep) => (ep.mode || 'live') === mode);
 
   const codeSnippets = {
     js: `// ⚠️ Sèlman sou SÈVÈ ou a — pa nan navigatè kliyan an
-// Kreye sesyon checkout — kliyan peye MonCash
-const response = await fetch('https://hatexcard.com/api/moncash/payments', {
+// Mòd ${mode.toUpperCase()} — kle ${mode === 'test' ? 'hx_sk_test_' : 'hx_sk_live_'} (pa melanje)
+const response = await fetch('https://hatexcard.com/api/v2/payments', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer ${snippetKey}',
@@ -369,19 +387,17 @@ const response = await fetch('https://hatexcard.com/api/moncash/payments', {
     order_id: 'CMD-123',
     description: 'Kòmand #123',
     return_url: 'https://sit-ou.com/done',
-    customer_phone: '509xxxxxxxx', // nimewo MonCash kliyan an (telefòn-premye / USSD)
-    flow: 'auto' // 'auto' | 'redirect' | 'ussd'
+    customer_phone: '509xxxxxxxx',
+    flow: 'auto'
   })
 });
 const data = await response.json();
-// data.payment_id    → swiv peman an
-// data.checkout_mode → 'hosted' (paj MonCash) oswa 'ussd' (USSD sou telefòn kliyan an)
-// data.checkout_url  → si 'hosted', louvri li nan yon lòt onglet epi swiv estati a`,
+// data.checkout_url / data.payment_id`,
     php: `<?php
-// ⚠️ Sèlman sou sèvè PHP ou a
+// Mòd ${mode.toUpperCase()} — pa melanje ak kle ${mode === 'test' ? 'live' : 'test'}
 $curl = curl_init();
 curl_setopt_array($curl, [
-  CURLOPT_URL => 'https://hatexcard.com/api/moncash/payments',
+  CURLOPT_URL => 'https://hatexcard.com/api/v2/payments',
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_CUSTOMREQUEST => 'POST',
   CURLOPT_POSTFIELDS => json_encode([
@@ -401,9 +417,9 @@ $response = curl_exec($curl);
 curl_close($curl);
 echo $response;
 ?>`,
-    curl: `# ⚠️ Sèlman depi sèvè ou a (pa navigatè)
+    curl: `# Mòd ${mode.toUpperCase()}
 curl --request POST \\
-  --url https://hatexcard.com/api/moncash/payments \\
+  --url https://hatexcard.com/api/v2/payments \\
   --header 'Authorization: Bearer ${snippetKey}' \\
   --header 'Content-Type: application/json' \\
   --header 'Idempotency-Key: CMD-123-v1' \\
@@ -440,24 +456,21 @@ curl --request POST \\
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* TOGGLE TEST / LIVE — estil Stripe */}
+            {/* TOGGLE TEST / LIVE — filtre UI sèlman (2 kle separe nan DB) */}
             <div className="flex items-center bg-slate-100 border border-gray-200 rounded-full p-1">
               <button
-                onClick={() => handleToggleMode('test')}
-                disabled={togglingMode}
+                onClick={() => handleSelectMode('test')}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${mode === 'test' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Test
               </button>
               <button
-                onClick={() => handleToggleMode('live')}
-                disabled={togglingMode}
+                onClick={() => handleSelectMode('live')}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${mode === 'live' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Live
               </button>
             </div>
-            {togglingMode && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
             <button
               onClick={() => router.push('/developer/docs')}
               className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all"
@@ -512,28 +525,30 @@ curl --request POST \\
                 <div className="p-6">
                   <ol className="text-sm text-slate-600 space-y-3 list-decimal list-inside font-medium">
                     <li>
-                      Kopye <strong>kle sekrè</strong> ou nan tab <strong>API keys</strong>. Li lye ak kont ou — tout peman yo ale sou MonCash ou.
+                      Ou gen <strong>2 kle separe</strong>: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">hx_sk_test_</code> ak{' '}
+                      <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono text-xs">hx_sk_live_</code> — yo pa melanje.
                     </li>
                     <li>
                       Sou <strong>sèvè ou a</strong>, kreye yon peman ak{' '}
-                      <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">POST /api/moncash/payments</code>{' '}
-                      ak Bearer token (oswa plugin HatexCard).
+                      <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">POST /api/v2/payments</code>{' '}
+                      ak Bearer token (kle test oswa live).
                     </li>
                     <li>
                       Kliyan an peye sou <strong>checkout MonCash</strong>. Ou swiv estati a ak{' '}
                       <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">payment_id</code> oswa nan webhook.
                     </li>
                     <li>
-                      Konfigire <strong>webhook</strong> pou <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs">payment.success</code> nan tab Webhooks.
+                      Konfigire <strong>webhook</strong> pou menm mòd la (test→test, live→live) — tankou Stripe.
                     </li>
                   </ol>
 
                   <div className="mt-5 flex items-start gap-3 bg-indigo-50 border border-indigo-100 rounded-xl p-4">
                     <Zap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                     <p className="text-sm text-indigo-900 font-medium leading-relaxed">
-                      Mòd <strong>{activeModeLabel}</strong> aktif. {mode === 'test'
-                        ? 'Peman yo ale nan sandbox MonCash — yo pa touche vre lajan. Chanje an Live lè ou pare.'
-                        : 'Peman yo fèt ak vre lajan sou MonCash. Pa kenbe kle a nan frontend.'}
+                      Ou ap gade <strong>{activeModeLabel}</strong>. Sa a se yon filtre UI sèlman — li pa chanje lòt kle a nan baz done a.
+                      {mode === 'test'
+                        ? ' Peman ak kle tès ale nan sandbox MonCash.'
+                        : ' Peman ak kle live se vre lajan.'}
                     </p>
                   </div>
                 </div>
@@ -553,7 +568,7 @@ curl --request POST \\
                   <div className="flex items-center justify-between gap-3 mb-4 bg-slate-50 border border-gray-200 p-3.5 rounded-xl">
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        {mode === 'test' ? 'Kle tès (fiktif) — apa de kle live' : 'Kle live (fiktif)'}
+                        {mode === 'test' ? 'Kle TEST (hx_sk_test_) — sandbox' : 'Kle LIVE (hx_sk_live_) — vre lajan'}
                       </p>
                       <code className="font-mono text-sm text-indigo-600 break-all font-semibold select-all">
                         {snippetKey}
@@ -590,8 +605,8 @@ curl --request POST \\
                     )}
                     <p className="text-sm font-medium leading-relaxed text-slate-700">
                       {mode === 'test'
-                        ? 'Kle tès sa a voye peman an nan sandbox MonCash — PA GEN VRE LAJAN. Lè ou chanje an Live, egzanp lan ap sèvi ak kle live a.'
-                        : 'Kle live sa a voye VRE LAJAN sou MonCash. Pa janm mete l nan frontend — sèlman sou sèvè ou a.'}
+                        ? 'Kle TEST voye peman nan sandbox MonCash. Kle LIVE ou a pa chanje — se 2 kle diferan nan DB.'
+                        : 'Kle LIVE voye VRE LAJAN. Pa janm mete l nan frontend. Kle TEST rete disponib apa.'}
                     </p>
                   </div>
                 </div>
@@ -606,12 +621,20 @@ curl --request POST \\
                 </div>
                 <div className="p-6 space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Publishable key</span>
-                    <code className="font-mono text-sm text-indigo-600 break-all">{merchant?.api_key_pk || merchant?.api_key_pk_masked || maskPublishableKey(merchant?.api_key_pk_prefix)}</code>
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Secret key (test)</span>
+                    <code className="font-mono text-sm text-indigo-600 break-all">
+                      {revealedKeys.test && showKey.test ? revealedKeys.test : (testKey?.key_masked || maskGatewayApiKey(testKey?.key_prefix))}
+                    </code>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Secret key</span>
-                    <code className="font-mono text-sm text-indigo-600 break-all">{merchant?.api_key_masked || maskApiKey(merchant?.api_key_prefix)}</code>
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Secret key (live)</span>
+                    <code className="font-mono text-sm text-emerald-700 break-all">
+                      {revealedKeys.live && showKey.live ? revealedKeys.live : (liveKey?.key_masked || maskGatewayApiKey(liveKey?.key_prefix))}
+                    </code>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Publishable key</span>
+                    <code className="font-mono text-sm text-slate-600 break-all">{merchant?.api_key_pk || merchant?.api_key_pk_masked || maskPublishableKey(merchant?.api_key_pk_prefix)}</code>
                   </div>
                 </div>
               </div>
@@ -683,17 +706,19 @@ curl --request POST \\
                   <button onClick={() => setSection('webhooks')} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">Jere →</button>
                 </div>
                 <div className="p-6">
-                  {endpoints.length === 0 ? (
-                    <p className="text-sm text-slate-400 italic">Ou poko gen okenn pwen webhook. Ajoute yon URL pou resevwa notifikasyon <code className="font-mono text-xs">payment.success</code>.</p>
+                  {filteredEndpoints.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic">Pa gen webhook {mode}. Ajoute yon URL nan tab Webhooks (mòd {mode}).</p>
                   ) : (
                     <div className="space-y-2">
-                      {endpoints.map((ep) => (
+                      {filteredEndpoints.map((ep) => (
                         <div key={ep.id} className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3">
                           <div className="min-w-0 flex items-center gap-2">
                             <span className={`inline-block w-2 h-2 rounded-full ${ep.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                             <code className="font-mono text-sm text-slate-800 truncate">{ep.url}</code>
                           </div>
-                          <span className="text-xs text-slate-400 shrink-0">{(ep.events || []).join(', ')}</span>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${ep.mode === 'test' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                            {ep.mode || 'live'}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -710,13 +735,75 @@ curl --request POST \\
               <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
                 <div className="border-b border-gray-200 px-6 py-4">
                   <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                    <KeyRound className="text-indigo-600 w-5 h-5" /> Standard keys
+                    <KeyRound className="text-indigo-600 w-5 h-5" /> Secret keys (test + live)
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">Mòd: <strong>{activeModeLabel}</strong></p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    De kle diferan nan DB — tankou Stripe. <code className="font-mono">hx_sk_test_</code> pa janm fè peman live.
+                  </p>
                 </div>
                 <div className="p-6 space-y-5">
+                  {(['test', 'live'] as const).map((keyMode) => {
+                    const row = keyMode === 'test' ? testKey : liveKey;
+                    const revealed = revealedKeys[keyMode];
+                    const showing = showKey[keyMode];
+                    const isRotating = rotatingMode === keyMode;
+                    return (
+                      <div
+                        key={keyMode}
+                        className={`border rounded-xl p-4 ${keyMode === 'test' ? 'border-indigo-200 bg-indigo-50/30' : 'border-emerald-200 bg-emerald-50/30'}`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                          <label className={`text-xs font-bold uppercase tracking-wider ${keyMode === 'test' ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                            Secret key — {keyMode}
+                          </label>
+                          <button
+                            onClick={() => handleRotateApiKey(keyMode)}
+                            disabled={!!rotatingMode}
+                            className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 bg-white hover:bg-slate-50 border border-gray-200 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
+                          >
+                            {isRotating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                            Rotate {keyMode}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white border border-gray-200 p-3.5 rounded-xl">
+                          <code className="flex-1 font-mono text-sm text-slate-800 break-all font-semibold">
+                            {showing && revealed ? revealed : (row?.key_masked || maskGatewayApiKey(row?.key_prefix))}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!revealed) {
+                                alert(`Kle ${keyMode} konplè a pa estoke (hash sèlman). Klike "Rotate ${keyMode}" pou jwenn yon nouvo kle.`);
+                                return;
+                              }
+                              setShowKey((prev) => ({ ...prev, [keyMode]: !prev[keyMode] }));
+                            }}
+                            className="p-2.5 bg-slate-50 hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0"
+                          >
+                            {showing ? <EyeOff className="w-5 h-5 text-slate-500" /> : <Eye className="w-5 h-5 text-slate-400" />}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!revealed) {
+                                alert(`Rotate kle ${keyMode} pou kopye yon nouvo kle.`);
+                                return;
+                              }
+                              handleCopy(revealed, keyMode);
+                            }}
+                            className="p-2.5 bg-slate-50 hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0"
+                          >
+                            {copiedKey === keyMode ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5 text-slate-400" />}
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">
+                          {keyMode === 'test'
+                            ? 'Sandbox MonCash — pa touche vre lajan. Prefiks: hx_sk_test_'
+                            : 'Vre lajan MonCash. Prefiks: hx_sk_live_'}
+                        </p>
+                      </div>
+                    );
+                  })}
 
-                  {/* PUBLISHABLE KEY */}
                   <div className="border border-gray-200 rounded-xl p-4">
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Publishable key</label>
@@ -729,75 +816,18 @@ curl --request POST \\
                       <button
                         onClick={() => handleCopy(merchant?.api_key_pk || '', 'pk')}
                         className="p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
-                        title="Kopye publishable key"
                       >
                         {copiedKey === 'pk' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5 text-slate-400" />}
                       </button>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Ka parèt nan frontend/navigatè. Itilize li pou checkout kliyan an — li pa janm gen aksè pou modifikasyon.
-                    </p>
-
                   </div>
 
-
-                  {/* SECRET KEY */}
-                  <div className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Secret key</label>
-                      <button
-                        onClick={handleRotateApiKey}
-                        disabled={rotatingKey}
-                        className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
-                      >
-                        {rotatingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
-                        Rotate kle
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 p-3.5 rounded-xl">
-                      <code className="flex-1 font-mono text-sm text-indigo-600 break-all font-semibold">
-                        {showApiKey && revealedApiKey ? revealedApiKey : (merchant?.api_key_masked || maskApiKey(merchant?.api_key_prefix))}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!revealedApiKey) {
-                            alert('Kle konplè a pa estoke sou sèvè a (hash sèlman). Klike "Rotate kle" pou jwenn yon nouvo kle.');
-                            return;
-                          }
-                          setShowApiKey(!showApiKey);
-                        }}
-                        className="p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
-                        title={showApiKey ? 'Kache kle a' : 'Montre kle a'}
-                      >
-                        {showApiKey ? <EyeOff className="w-5 h-5 text-slate-500" /> : <Eye className="w-5 h-5 text-slate-400" />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!revealedApiKey) {
-                            alert('Rotate kle a pou kopye yon nouvo kle.');
-                            return;
-                          }
-                          handleCopy(revealedApiKey, 'api');
-                        }}
-                        className="p-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shrink-0 shadow-sm"
-                        title="Kopye kle a"
-                      >
-                        {copiedKey === 'api' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5 text-slate-400 hover:text-indigo-600" />}
-                      </button>
-                    </div>
-                    <div className="mt-3 flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-800">
-                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider mb-1">ATANSYON</p>
-                        <p className="text-sm font-medium leading-relaxed">
-                          Kle sekrè a bay aksè total sou API a. Pa janm mete l nan GitHub, frontend, oswa
-                          screenshot. Egzanp yo sèvi ak kle FIKTIF: <code className="bg-amber-100 px-1 rounded">hx_live_KLE_OU_LA</code> pou
-                          LIVE, <code className="bg-amber-100 px-1 rounded">hx_sk_test_KLE_TÈS_OU</code> pou TEST. Kole kle reyèl la
-                          sèlman sou sèvè ou a.
-                        </p>
-                      </div>
-                    </div>
+                  <div className="flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-800">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+                    <p className="text-sm font-medium leading-relaxed">
+                      Pa janm mete kle sekrè nan frontend. Si ou te pèdi kle a, rotate sèlman mòd sa a —
+                      lòt mòd la rete entak.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -812,9 +842,17 @@ curl --request POST \\
                   <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                     <Webhook className="text-indigo-600 w-5 h-5" /> Webhooks
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">Resevwa notifikasyon evènman sou sèvè ou a — chak pwen gen yon secret <code className="font-mono">whsec_...</code>.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Tankou Stripe: chak pwen gen mòd <strong>{mode}</strong> + secret <code className="font-mono">whsec_...</code>.
+                    Peman test pa touche endpoint live (epi vice versa).
+                  </p>
                 </div>
                 <div className="p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${mode === 'test' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      Nouvo endpoint ap kreye an mòd {mode}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
                     <input
                       type="url"
@@ -837,31 +875,49 @@ curl --request POST \\
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold uppercase text-[11px] tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
                   >
                     {creatingEndpoint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Ajoute Pwen
+                    Ajoute Pwen ({mode})
                   </button>
 
                   <div className="mt-6">
-                    {endpoints.length === 0 ? (
-                      <p className="text-sm text-slate-400 italic text-center py-6">Ou poko gen okenn pwen webhook.</p>
+                    {filteredEndpoints.length === 0 ? (
+                      <p className="text-sm text-slate-400 italic text-center py-6">Pa gen pwen webhook pou mòd {mode}.</p>
                     ) : (
                       <div className="space-y-3">
-                        {endpoints.map((ep) => (
+                        {filteredEndpoints.map((ep) => (
                           <div key={ep.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-200 rounded-xl p-4">
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mb-1">
                                 <span className={`inline-block w-2 h-2 rounded-full ${ep.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                                <code className="font-mono text-sm text-slate-800 truncate">{ep.url}</code>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${ep.mode === 'test' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                  {ep.mode || 'live'}
+                                </span>
                               </div>
-                              <p className="text-xs text-slate-400 mt-1">{(ep.events || []).join(', ')} {ep.description ? `· ${ep.description}` : ''}</p>
+                              <code className="font-mono text-sm text-slate-800 break-all">{ep.url}</code>
+                              <p className="text-xs text-slate-400 mt-1">{(ep.events || []).join(', ')}</p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <button onClick={() => handleTestEndpoint(ep.id)} disabled={busyEndpoint === ep.id} className="p-2 bg-white hover:bg-slate-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50" title="Voye tès">
-                                {busyEndpoint === ep.id ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <Send className="w-4 h-4 text-indigo-600" />}
+                              <button
+                                onClick={() => handleTestEndpoint(ep.id)}
+                                disabled={busyEndpoint === ep.id}
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-slate-50 disabled:opacity-50"
+                                title="Voye tès ping"
+                              >
+                                {busyEndpoint === ep.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 text-indigo-600" />}
                               </button>
-                              <button onClick={() => handleRotateSecret(ep.id, ep.url)} disabled={busyEndpoint === ep.id} className="p-2 bg-white hover:bg-slate-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50" title="Wotasyon secret">
-                                <RotateCw className="w-4 h-4 text-amber-600" />
+                              <button
+                                onClick={() => handleRotateSecret(ep.id, ep.url)}
+                                disabled={busyEndpoint === ep.id}
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-slate-50 disabled:opacity-50"
+                                title="Rotate secret"
+                              >
+                                <RotateCw className="w-4 h-4 text-slate-600" />
                               </button>
-                              <button onClick={() => handleDeleteEndpoint(ep.id)} disabled={busyEndpoint === ep.id} className="p-2 bg-white hover:bg-red-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50" title="Efase">
+                              <button
+                                onClick={() => handleDeleteEndpoint(ep.id)}
+                                disabled={busyEndpoint === ep.id}
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-red-50 disabled:opacity-50"
+                                title="Efase"
+                              >
                                 <Trash2 className="w-4 h-4 text-red-500" />
                               </button>
                             </div>

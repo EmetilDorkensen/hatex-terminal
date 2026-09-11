@@ -1,11 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { rotateGatewayApiKey } from '@/lib/gateway/api-keys';
+import { rotateGatewayApiKey, type GeneratedApiKey } from '@/lib/gateway/api-keys';
+import type { GatewayMode } from '@/lib/moncash/config';
 
-/** Kreye / aktive kont machann pasrèl (san KYC pou plan gratis). */
+export type GatewayProvisionResult = {
+  /** Kle an klè — sèlman pou mòd ki FÈK kreye (montre yon sèl fwa). */
+  revealed: Partial<Record<GatewayMode, GeneratedApiKey>>;
+};
+
+/** Kreye / aktive kont machann pasrèl + kle test/live separe. */
 export async function ensureMerchantGatewayAccount(
   admin: SupabaseClient,
   userId: string
-): Promise<void> {
+): Promise<GatewayProvisionResult> {
+  const revealed: GatewayProvisionResult['revealed'] = {};
+
   const { data: profile } = await admin
     .from('profiles')
     .select('account_type, full_name, business_name, phone')
@@ -63,9 +71,13 @@ export async function ensureMerchantGatewayAccount(
 
   const have = new Set((keys || []).map((k) => k.mode));
   if (!have.has('test')) {
-    await rotateGatewayApiKey(admin, userId, 'test', 'Kle tès');
+    const r = await rotateGatewayApiKey(admin, userId, 'test', 'Kle tès');
+    if (r.ok) revealed.test = r.key;
   }
   if (!have.has('live')) {
-    await rotateGatewayApiKey(admin, userId, 'live', 'Kle live');
+    const r = await rotateGatewayApiKey(admin, userId, 'live', 'Kle live');
+    if (r.ok) revealed.live = r.key;
   }
+
+  return { revealed };
 }

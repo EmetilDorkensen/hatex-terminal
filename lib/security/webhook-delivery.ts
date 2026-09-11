@@ -84,6 +84,7 @@ type EndpointRow = {
   secret: string;
   events: string[];
   is_active: boolean;
+  mode?: 'test' | 'live' | null;
 };
 
 /**
@@ -163,21 +164,23 @@ async function sendToEndpoint(
 
 /**
  * Voye yon evènman bay TOUT pwen webhook aktif yon machann ki abòne a
- * `eventType`. Pa janm lanse yon eksepsyon (yon webhook ki echwe pa dwe kraze
- * peman an) — echèk yo anrejistre pou re-eseye pita.
+ * `eventType` EPI ki gen menm mòd (test/live) ak peman an — tankou Stripe.
+ * Pa janm lanse yon eksepsyon (yon webhook ki echwe pa dwe kraze peman an).
  */
 export async function deliverWebhookEvent(
   supabase: SupabaseClient,
   merchantId: string,
   eventType: string,
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
+  mode: 'test' | 'live' = 'live'
 ): Promise<void> {
   try {
     const { data: endpoints } = await supabase
       .from('developer_webhook_endpoints')
-      .select('id, merchant_id, url, secret, events, is_active')
+      .select('id, merchant_id, url, secret, events, is_active, mode')
       .eq('merchant_id', merchantId)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .eq('mode', mode);
 
     if (!endpoints || endpoints.length === 0) return;
 
@@ -250,7 +253,7 @@ export async function sendTestWebhook(
 export async function processWebhookRetries(supabase: SupabaseClient): Promise<number> {
   const { data: pending } = await supabase
     .from('developer_webhook_deliveries')
-    .select('id, endpoint_id, merchant_id, event_type, payload, attempt_count, developer_webhook_endpoints(id, merchant_id, url, secret, events, is_active)')
+    .select('id, endpoint_id, merchant_id, event_type, payload, attempt_count, developer_webhook_endpoints(id, merchant_id, url, secret, events, is_active, mode)')
     .eq('success', false)
     .not('next_retry_at', 'is', null)
     .lte('next_retry_at', new Date().toISOString())
