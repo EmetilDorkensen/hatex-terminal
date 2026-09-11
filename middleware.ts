@@ -196,6 +196,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [String.raw`/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)`],
-  runtime: 'nodejs',
+  // Literal string required — Next.js cannot statically analyze String.raw() in matcher.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

@@ -7,6 +7,23 @@ import { useSearchParams } from 'next/navigation';
 import { User, Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { checkStrongPassword } from '@/lib/security/password-strength';
 
+function errorText(err: unknown, fallback: string): string {
+  if (typeof err === 'string') {
+    const t = err.trim();
+    if (t && t !== '{}' && t !== '[object Object]') return t;
+  }
+  if (err && typeof err === 'object') {
+    const anyErr = err as { message?: unknown; error?: unknown; error_description?: unknown };
+    for (const candidate of [anyErr.message, anyErr.error_description, anyErr.error]) {
+      if (typeof candidate === 'string') {
+        const t = candidate.trim();
+        if (t && t !== '{}' && t !== '[object Object]') return t;
+      }
+    }
+  }
+  return fallback;
+}
+
 function SignupForm() {
   const searchParams = useSearchParams();
   const supabase = createBrowserClient(
@@ -20,7 +37,7 @@ function SignupForm() {
   const [promoCode, setPromoCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
-  const [msg, setMsg] = useState({ type: '', text: '' });
+  const [msg, setMsg] = useState<{ type: string; text: string }>({ type: '', text: '' });
 
   useEffect(() => {
     const promoFromUrl = searchParams.get("promo");
@@ -88,33 +105,43 @@ function SignupForm() {
       });
 
       if (authError) {
-        if (authError.message.includes("User already registered") || authError.status === 400) {
-          throw new Error("Imèl sa a gen yon kont sou li deja! Tanpri fè Konekte (Login).");
+        const authMsg = errorText(authError, '');
+        if (
+          authMsg.toLowerCase().includes('already registered') ||
+          authMsg.toLowerCase().includes('user already') ||
+          authError.status === 422
+        ) {
+          throw new Error('Imèl sa a gen yon kont sou li deja! Tanpri fè Konekte (Login).');
         }
-        throw authError;
+        throw new Error(authMsg || 'Pa t kapab kreye kont lan. Eseye ankò.');
       }
 
       if (authData.user) {
         // A) Sove Pwofil la
-        await supabase.from('profiles').insert([{
+        const { error: profileError } = await supabase.from('profiles').insert([{
           id: authData.user.id,
           full_name: fullName,
           kyc_status: 'not_submitted',
           used_promo: cleanPromo !== '' ? cleanPromo : null
         }]);
+        if (profileError) {
+          console.error('profile insert:', profileError);
+          // Kont auth deja kreye — pa bloke itilizatè a sou erè pwofil (trigger / RLS)
+        }
 
         // B) NOUVO: Sove ID kliyan an ak rediksyon an nan espas apa a (Tiroir a)
         if (finalDiscountAmount > 0) {
-          await supabase.from('user_discounts').insert([{
+          const { error: discountError } = await supabase.from('user_discounts').insert([{
             user_id: authData.user.id,
             promo_code: cleanPromo,
             discount_amount: finalDiscountAmount
           }]);
+          if (discountError) console.error('user_discounts insert:', discountError);
         }
 
         localStorage.removeItem('hatex_promo');
 
-        // Voye konfimasyon atravè Resend (SMTP Supabase souvan bloke / rate-limit)
+        // Voye konfimasyon atravè Brevo (SMTP Supabase souvan bloke / rate-limit)
         try {
           await fetch('/api/auth/send-confirm', {
             method: 'POST',
@@ -129,10 +156,18 @@ function SignupForm() {
           type: 'success',
           text: 'Kont la kreye! Nou voye yon imèl konfimasyon — tcheke inbox / spam ou.',
         });
+      } else {
+        setMsg({
+          type: 'error',
+          text: 'Pa t kapab kreye kont lan. Verifye imèl ak modpas ou.',
+        });
       }
 
-    } catch (error: any) {
-      setMsg({ type: 'error', text: error.message || 'Gen yon erè ki rive pandan kreyasyon an.' });
+    } catch (error: unknown) {
+      setMsg({
+        type: 'error',
+        text: errorText(error, 'Gen yon erè ki rive pandan kreyasyon an.'),
+      });
     } finally {
       setLoading(false);
     }
@@ -152,10 +187,11 @@ function SignupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: clean }),
       });
-      const json = await res.json().catch(() => ({}));
+      const json = await res.json().catch(() => ({} as Record<string, unknown>));
+      const apiMsg = errorText(json.message ?? json.error, '');
       setMsg({
         type: res.ok ? 'success' : 'error',
-        text: json.message || (res.ok ? 'Imèl konfimasyon renouvle.' : 'Pa t kapab voye.'),
+        text: apiMsg || (res.ok ? 'Imèl konfimasyon renouvle.' : 'Pa t kapab voye.'),
       });
     } catch {
       setMsg({ type: 'error', text: 'Koneksyon echwe.' });
