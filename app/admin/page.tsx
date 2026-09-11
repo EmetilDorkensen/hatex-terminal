@@ -26,7 +26,6 @@ export default function AdminSuperPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [suspendedAccounts, setSuspendedAccounts] = useState<any[]>([]);
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
-    const [missingCards, setMissingCards] = useState<any[]>([]);
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('support');
@@ -122,7 +121,6 @@ export default function AdminSuperPage() {
             setAllUsers(data.users || []);
             setSuspendedAccounts(data.suspendedAccounts || []);
             setPendingKyc(data.pendingKyc || []);
-            setMissingCards(data.missingCards || []);
             setStaffMembers(data.staffMembers || []);
 
             if (data.announcement) {
@@ -685,7 +683,6 @@ export default function AdminSuperPage() {
                                                     <div className="flex flex-wrap gap-2 mt-3">
                                                         <span className="text-[10px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-bold tracking-wider">BALANS: <span className="text-slate-900">{Number(user.wallet_balance || 0).toLocaleString()} HTG</span></span>
                                                         <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase ${user.kyc_status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>KYC: {user.kyc_status}</span>
-                                                        {user.is_card_activated && <span className="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-bold tracking-wider uppercase">KAT AKTIVE</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -781,35 +778,10 @@ export default function AdminSuperPage() {
                         </div>
                         </>
                     ) : view === 'kyc' ? (
-                        pendingKyc.length === 0 && missingCards.length === 0 ? (
+                        pendingKyc.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn KYC k ap tann</div>
                         ) : (
                             <div className="space-y-4">
-                                {missingCards.length > 0 && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 sm:p-6 space-y-3">
-                                        <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wider">
-                                            KYC apwouve san kat ({missingCards.length})
-                                        </h3>
-                                        <p className="text-xs text-amber-800">
-                                            Apre migrasyon kolòn kat (TEXT), klike « Kreye kat » pou chak kliyan.
-                                        </p>
-                                        {missingCards.map((user) => (
-                                            <div key={`missing-card-${user.id}`} className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between bg-white/80 rounded-2xl border border-amber-100 px-4 py-3">
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-900">{user.full_name || 'San Non'}</p>
-                                                    <p className="text-xs text-slate-500">{user.email}</p>
-                                                </div>
-                                                <button
-                                                    onClick={() => jereKyc(user.id, user.full_name, user.email, 'approved')}
-                                                    disabled={processingId === user.id}
-                                                    className="bg-amber-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition-all shadow-sm flex items-center justify-center gap-2"
-                                                >
-                                                    {processingId === user.id ? <Loader2 size={16} className="animate-spin" /> : 'Kreye kat'}
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
                                 {pendingKyc.map((user) => (
                                     <div key={user.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col md:flex-row gap-6 items-center transition-all hover:shadow-md">
                                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0"><UserX size={32} /></div>

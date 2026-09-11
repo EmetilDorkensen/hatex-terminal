@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import {
   Building2, ShieldCheck, Loader2, CheckCircle2, AlertTriangle,
-  ArrowLeft, ChevronRight, Lock, XCircle, Wallet, CreditCard, ArrowRightLeft, ArrowUpFromLine
+  ArrowLeft, ChevronRight, Lock, XCircle, Wallet, ArrowRightLeft, ArrowUpFromLine
 } from 'lucide-react';
-import { ENTERPRISE_APPLICATION_FEE, ENTERPRISE_CARD_DAILY_LIMIT, ENTERPRISE_CARD_MONTHLY_LIMIT, INDIVIDUAL_DAILY_LIMIT, INDIVIDUAL_MONTHLY_LIMIT, API_RECEIVE_INDIVIDUAL_LIMIT, API_RECEIVE_ENTERPRISE_LIMIT } from '@/lib/security/spending-limits';
+import { ENTERPRISE_APPLICATION_FEE, INDIVIDUAL_DAILY_LIMIT, INDIVIDUAL_MONTHLY_LIMIT, API_RECEIVE_INDIVIDUAL_LIMIT, API_RECEIVE_ENTERPRISE_LIMIT } from '@/lib/security/spending-limits';
 
 type Step = 'loading' | 'kyc_denied' | 'intro' | 'upload_docs' | 'confirm_fee' | 'pending' | 'rejected' | 'approved';
 
@@ -263,7 +263,7 @@ function EnterprisePortalContent() {
             <h2 className="text-2xl font-bold mb-2">Kont Antrepriz Aktif</h2>
             <p className="text-sm text-slate-500 mb-8">Kont ou gen tout avantaj Antrepriz yo aktive.</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
               <div className="bg-slate-50 p-4 rounded-xl border">
                 <ArrowRightLeft className="text-indigo-600 mb-2" size={20} />
                 <p className="text-xs font-bold uppercase text-slate-500">Transfè</p>
@@ -273,12 +273,6 @@ function EnterprisePortalContent() {
                 <ArrowUpFromLine className="text-indigo-600 mb-2" size={20} />
                 <p className="text-xs font-bold uppercase text-slate-500">Retrè</p>
                 <p className="text-sm font-black text-emerald-600">Ilimite</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border">
-                <CreditCard className="text-indigo-600 mb-2" size={20} />
-                <p className="text-xs font-bold uppercase text-slate-500">Limit Kat</p>
-                <p className="text-sm font-black text-slate-800">{ENTERPRISE_CARD_DAILY_LIMIT.toLocaleString()}/j</p>
-                <p className="text-[10px] text-slate-400">{ENTERPRISE_CARD_MONTHLY_LIMIT.toLocaleString()} HTG/mwa</p>
               </div>
             </div>
           </div>
@@ -334,7 +328,7 @@ function EnterprisePortalContent() {
             <p className="text-sm text-slate-300">
               {fromDeveloper
                 ? `Ogmante kapasite API ou a: resevwa jiska ${API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG pa peman (kont endividyèl limite a ${API_RECEIVE_INDIVIDUAL_LIMIT.toLocaleString()} HTG).`
-                : 'Debloke plis posiblite pou biznis ou: transfè ak retrè ilimite, limit kat pi wo, epi yon kont Ajan PRO gratis.'}
+                : 'Debloke plis posiblite pou biznis ou: transfè ak retrè ilimite, epi yon kont Ajan PRO gratis.'}
             </p>
           </div>
 
@@ -344,10 +338,6 @@ function EnterprisePortalContent() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
                 <p className="text-sm text-slate-600">Transfè ak Retrè <strong>ilimite</strong> (kont endividyèl limite a {INDIVIDUAL_DAILY_LIMIT.toLocaleString()} HTG/jou, {INDIVIDUAL_MONTHLY_LIMIT.toLocaleString()} HTG/mwa)</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
-                <p className="text-sm text-slate-600">Kat ka depanse jiska <strong>{ENTERPRISE_CARD_DAILY_LIMIT.toLocaleString()} HTG/jou</strong> ak <strong>{ENTERPRISE_CARD_MONTHLY_LIMIT.toLocaleString()} HTG/mwa</strong></p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />

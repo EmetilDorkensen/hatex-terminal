@@ -401,7 +401,7 @@ export default function WorkspacePage() {
     const jereKyc = async (id: string, full_name: string, aksyon: 'approved' | 'rejected') => {
         let rezon = "";
         if (aksyon === 'rejected') { rezon = prompt("Rezon ki fè w rejte l la:") || ""; if (!rezon) return; }
-        else { if (!confirm(`Apwouve KYC pou ${full_name}? Kat ap kreye otomatikman.`)) return; }
+        else { if (!confirm(`Apwouve KYC pou ${full_name}?`)) return; }
         
         setProcessingId(id);
         try {
@@ -415,11 +415,7 @@ export default function WorkspacePage() {
 
             await logActivity(`KYC_${aksyon.toUpperCase()}`, 'profile', id, aksyon === 'rejected' ? { reason: rezon, full_name } : { full_name });
             if (aksyon === 'approved') {
-                alert(
-                    data.card_ok === false
-                        ? (data.message || 'KYC apwouve, men kat pa t kreye.')
-                        : (data.message || 'KYC apwouve — kat kreye otomatikman!')
-                );
+                alert(data.message || 'KYC apwouve!');
             } else {
                 alert('KYC rejte!');
             }

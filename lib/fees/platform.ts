@@ -9,7 +9,6 @@ export const FEE_KEYS = [
   'agent_withdraw_fee_per_1000',
   'api_fee_per_1000',
   'enterprise_application_fee',
-  'card_activation_fee',
 ] as const;
 
 export type FeeKey = (typeof FEE_KEYS)[number];
@@ -23,7 +22,6 @@ const DEFAULTS: Record<FeeKey, number> = {
   agent_withdraw_fee_per_1000: 50,
   api_fee_per_1000: 0,
   enterprise_application_fee: 49000,
-  card_activation_fee: 525,
 };
 
 /** Rezoud frè depi baz (override kont > global > default). */

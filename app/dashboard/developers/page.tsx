@@ -27,11 +27,7 @@ const response = await fetch('https://hatexcard.com/api/public/payments', {
     amount: 2500, // Montan an HTG
     currency: 'HTG',
     order_id: 'CMD-98765',
-    card_info: {
-       number: '0000 0000 0000 0000',
-       exp: '12/28',
-       cvv: '123'
-    }
+    payment_method: 'moncash'
   })
 });
 

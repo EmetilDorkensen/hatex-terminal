@@ -228,7 +228,7 @@ export default function HatexcardDocs() {
     currency: 'HTG', // oswa 'USD' — to admin aplike
     order_id: 'CMD-99812',
     description: 'Kòmand #99812',
-    payment_methods: ['moncash', 'card', 'stripe'],
+    payment_methods: ['moncash', 'stripe'],
     return_url: 'https://sit-ou.com/done',
     customer_phone: '509xxxxxxxx', // nimewo MonCash kliyan an (telefòn-premye / USSD)
     flow: 'auto' // 'auto' | 'redirect' | 'ussd'
@@ -241,14 +241,14 @@ const data = await res.json();
           </div>
         </section>
 
-        {/* Legacy card API */}
+        {/* API piblik MonCash */}
         <section className="space-y-4">
           <div className="flex items-center space-x-3">
             <CreditCard className="w-8 h-8 text-green-500" />
-            <h2 className="text-2xl font-semibold text-white">Peman dirèk ak kat HatexCard</h2>
+            <h2 className="text-2xl font-semibold text-white">API piblik — peman MonCash</h2>
           </div>
           <p className="text-gray-400 text-sm">
-            Pou debit kat vityèl HatexCard kliyan an san paj checkout (sèvè-a-sèvè).
+            Kreye yon peman MonCash dirèkteman (sèvè-a-sèvè), san paj checkout HatexCard.
           </p>
           <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
             <p className="text-white mb-2 font-mono text-sm bg-black p-2 rounded">
@@ -258,11 +258,7 @@ const data = await res.json();
   "amount": 1500,
   "currency": "HTG",
   "order_id": "CMD-99812",
-  "card_info": {
-    "number": "0000111122223333",
-    "exp": "12/28",
-    "cvv": "123"
-  }
+  "payment_method": "moncash"
 }`}</pre>
           </div>
         </section>

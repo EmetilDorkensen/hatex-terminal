@@ -9,8 +9,8 @@ const PROFILE_DOSSIER_SELECT = `
   created_at, account_status, account_type, enterprise_status,
   kyc_status, kyc_doc_type, kyc_front, kyc_back, kyc_selfie,
   kyc_submitted_at, kyc_rejection_reason, kyc_face_match_score, kyc_fee_paid,
-  wallet_balance, card_balance, is_card_activated, is_merchant,
-  agent_status, agent_tier, card_number
+  wallet_balance, is_merchant,
+  agent_status, agent_tier
 `;
 
 function sanitizeSearchTerm(raw: string): string {
@@ -77,13 +77,9 @@ export async function GET(request: Request) {
       ip,
     });
 
-    const maskedCard = profile.card_number
-      ? `****${String(profile.card_number).slice(-4)}`
-      : null;
-
     return NextResponse.json({
       dossier: {
-        profile: { ...profile, card_number: maskedCard },
+        profile,
         enterprise_applications: enterpriseApps || [],
         agent_applications: agentApps || [],
         recent_transactions: recentTx || [],

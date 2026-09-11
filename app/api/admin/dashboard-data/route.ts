@@ -9,12 +9,8 @@ const PROFILE_SECRET_KEYS = new Set([
   'pin_code_hash',
   'transaction_pin',
   'transaction_pin_hash',
-  'cvv',
-  'card_number',
   'api_key',
   'webhook_secret',
-  'card_number_hash',
-  'cvv_hash',
   'kyc_id_number_hash',
   'current_session_token',
 ]);
@@ -36,7 +32,6 @@ function mapProfileForAdmin(p: Record<string, unknown>): Record<string, unknown>
     ...clean,
     kyc_front: clean.kyc_id_front ?? clean.kyc_front ?? null,
     kyc_back: clean.kyc_id_back ?? clean.kyc_back ?? null,
-    has_card: !!(p.card_last4 || p.card_number_hash || p.is_card_activated),
   };
 }
 
@@ -124,7 +119,6 @@ export async function GET() {
               u.kyc_status === 'pending' &&
               (u.kyc_selfie || u.kyc_front || u.kyc_id_front)
           );
-    const missingCards: typeof users = [];
     const suspendedAccounts = users.filter((u) => u.account_status === 'suspended');
 
     const staffMembers = (staffRes.data || []).map((s) => ({
@@ -163,7 +157,6 @@ export async function GET() {
       users,
       suspendedAccounts,
       pendingKyc,
-      missingCards,
       staffMembers,
       announcement: {
         text: anonsRes.data?.announcement_text || '',

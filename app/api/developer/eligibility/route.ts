@@ -6,7 +6,6 @@ import { maskApiKey, maskPublishableKey, profileHasApiKey } from '@/lib/security
 type EligibilityProfile = {
   id: string;
   kyc_status?: string | null;
-  is_card_activated?: boolean | null;
   is_merchant?: boolean | null;
   api_key_hash?: string | null;
   api_key_prefix?: string | null;
@@ -14,8 +13,6 @@ type EligibilityProfile = {
   api_key_pk_hash?: string | null;
   api_key_pk_prefix?: string | null;
   api_key_pk?: string | null;
-  card_last4?: string | null;
-  card_number_hash?: string | null;
   account_type?: string | null;
   enterprise_status?: string | null;
   api_key_mode?: 'test' | 'live' | null;
@@ -42,7 +39,7 @@ export async function GET() {
         const { data } = await supabaseAdmin
           .from('profiles')
           .select(
-            'id, kyc_status, is_card_activated, is_merchant, api_key_hash, api_key_prefix, api_key, api_key_pk_hash, api_key_pk_prefix, api_key_pk, card_last4, card_number_hash, account_type, enterprise_status, plan, api_key_mode'
+            'id, kyc_status, is_merchant, api_key_hash, api_key_prefix, api_key, api_key_pk_hash, api_key_pk_prefix, api_key_pk, account_type, enterprise_status, plan, api_key_mode'
           )
           .eq('id', user.id)
           .single();
@@ -59,7 +56,7 @@ export async function GET() {
       const { data } = await supabaseSession
         .from('profiles')
         .select(
-          'id, kyc_status, is_card_activated, is_merchant, api_key_prefix, api_key_pk_prefix, api_key_pk, card_last4, account_type, enterprise_status, plan, api_key_mode'
+          'id, kyc_status, is_merchant, api_key_prefix, api_key_pk_prefix, api_key_pk, account_type, enterprise_status, plan, api_key_mode'
         )
         .eq('id', user.id)
         .single();
@@ -78,7 +75,6 @@ export async function GET() {
       profile: {
         id: authoritative.id,
         kyc_status: authoritative.kyc_status,
-        is_card_activated: authoritative.is_card_activated,
         is_merchant: authoritative.is_merchant,
         has_api_key: profileHasApiKey(authoritative),
         api_key_prefix: authoritative.api_key_prefix || null,
@@ -86,7 +82,6 @@ export async function GET() {
         api_key_pk: authoritative.api_key_pk || null,
         api_key_pk_prefix: authoritative.api_key_pk_prefix || null,
         api_key_pk_masked: maskPublishableKey(authoritative.api_key_pk_prefix),
-        has_card: !!(authoritative.card_last4 || authoritative.card_number_hash),
         account_type: authoritative.account_type || 'individual',
         enterprise_status: authoritative.enterprise_status || 'none',
         api_key_mode: authoritative.api_key_mode || 'live',

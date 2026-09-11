@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getAuthenticatedUser } from '@/lib/kyc/access';
 import { KYC_STATUS } from '@/lib/kyc/status';
-import { provisionCardForUser } from '@/lib/kyc/card-provision';
 import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
 
 /**
@@ -30,7 +29,6 @@ export async function GET() {
     wallet_balance_htg: 0,
     kyc_status: profile?.kyc_status,
     features_unlock_paid: kycApproved,
-    is_card_activated: kycApproved,
     can_unlock: false,
   });
 }
@@ -61,14 +59,13 @@ export async function POST() {
 
   await admin
     .from('profiles')
-    .update({ features_unlock_paid: true, is_card_activated: true })
+    .update({ features_unlock_paid: true })
     .eq('id', user.id);
 
   try {
-    await provisionCardForUser(admin, user.id, { activate: true });
     const { data: fresh } = await admin
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, api_key_hash, api_key_prefix, is_merchant, webhook_secret')
+      .select('id, kyc_status, api_key_hash, api_key_prefix, is_merchant, webhook_secret')
       .eq('id', user.id)
       .single();
     if (fresh) await ensureMerchantApiCredentials(admin, fresh);

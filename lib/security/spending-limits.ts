@@ -6,9 +6,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export const INDIVIDUAL_DAILY_LIMIT = 75000;
 export const INDIVIDUAL_MONTHLY_LIMIT = 250000;
 
-export const ENTERPRISE_CARD_DAILY_LIMIT = 100000;
-export const ENTERPRISE_CARD_MONTHLY_LIMIT = 480000;
-
 export const ENTERPRISE_APPLICATION_FEE = 49000;
 export const ENTERPRISE_AUTO_AGENT_TIER = 'pro';
 export const ENTERPRISE_AUTO_AGENT_CAPACITY = 55000;
@@ -86,11 +83,11 @@ export function calcApiReceiveFee(
   return { fee: Math.max(0, fee), net: Math.max(0, net) };
 }
 
-export type SpendingChannel = 'transfer' | 'withdraw' | 'card' | 'invoice';
+export type SpendingChannel = 'transfer' | 'withdraw' | 'invoice';
 
 const TRANSFER_TYPES = ['TRANSFER', 'P2P'];
 const WITHDRAW_TYPES = ['WITHDRAWAL', 'AGENT_WITHDRAWAL_CLIENT'];
-const CARD_SPEND_TYPES = ['PURCHASE', 'PAYMENT', 'API_GATEWAY_PAYMENT'];
+const OTHER_SPEND_TYPES = ['PURCHASE', 'PAYMENT', 'API_GATEWAY_PAYMENT'];
 
 export function isEnterpriseAccount(accountType?: string | null): boolean {
   return accountType === 'business';
@@ -209,13 +206,13 @@ export async function checkSpendingLimit(
     return { allowed: true, todayTotal: 0, monthTotal: 0, dailyLimit: maxPerTx, monthlyLimit: Infinity };
   }
 
-  if (enterprise && channel !== 'card') {
+  if (enterprise) {
     return { allowed: true, todayTotal: 0, monthTotal: 0, dailyLimit: Infinity, monthlyLimit: Infinity };
   }
 
-  const dailyLimit = enterprise ? ENTERPRISE_CARD_DAILY_LIMIT : INDIVIDUAL_DAILY_LIMIT;
-  const monthlyLimit = enterprise ? ENTERPRISE_CARD_MONTHLY_LIMIT : INDIVIDUAL_MONTHLY_LIMIT;
-  const types = channel === 'transfer' ? TRANSFER_TYPES : CARD_SPEND_TYPES;
+  const dailyLimit = INDIVIDUAL_DAILY_LIMIT;
+  const monthlyLimit = INDIVIDUAL_MONTHLY_LIMIT;
+  const types = channel === 'transfer' ? TRANSFER_TYPES : OTHER_SPEND_TYPES;
 
   const [todayTotal, monthTotal] = await Promise.all([
     sumOutgoing(supabase, userId, types, startOfToday().toISOString()),
@@ -316,7 +313,8 @@ async function sumApiReceivedToday(
  * Kontwole TOUDE: montan yon sèl peman (pa-tranzaksyon) AK total jounalye.
  *
  * ⚠️ Sa a se yon pre-check rapid. Verifikasyon final la (kont kous ant plizyè
- * rekèt similtane) fèt ATOMIKMAN anndan RPC `process_direct_card_payment`.
+ * rekèt similtane) fèt ATOMIKMAN nan `checkMerchantDailyReceive` anvan kreye
+ * peman MonCash la.
  */
 export async function checkApiReceiveLimit(
   supabase: SupabaseClient,

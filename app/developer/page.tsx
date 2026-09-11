@@ -132,7 +132,7 @@ export default function DeveloperDashboard() {
       if (!elig || !profileData) {
         const { data } = await supabase
           .from('profiles')
-          .select('id, kyc_status, is_card_activated')
+          .select('id, kyc_status')
           .eq('id', user.id)
           .maybeSingle();
         if (data) {

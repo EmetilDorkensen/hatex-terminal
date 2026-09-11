@@ -29,12 +29,9 @@ type DossierProfile = Match & {
   kyc_face_match_score?: number | null;
   kyc_fee_paid?: boolean | null;
   wallet_balance?: number | null;
-  card_balance?: number | null;
-  is_card_activated?: boolean | null;
   is_merchant?: boolean | null;
   agent_status?: string | null;
   agent_tier?: string | null;
-  card_number?: string | null;
 };
 
 type EnterpriseApp = {
@@ -402,18 +399,10 @@ export default function AdminClientDossier({ initialUserId }: { initialUserId?: 
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-gray-100">
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-gray-100">
               <div className="bg-slate-50 p-3 rounded-xl">
                 <p className="text-[10px] font-bold uppercase text-slate-500">Wallet</p>
                 <p className="text-sm font-black text-slate-900">{Number(p.wallet_balance || 0).toLocaleString()} HTG</p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-xl">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Kat</p>
-                <p className="text-sm font-black text-slate-900">{Number(p.card_balance || 0).toLocaleString()} HTG</p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-xl">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Nimewo Kat</p>
-                <p className="text-sm font-mono font-bold text-slate-900">{p.card_number || '—'}</p>
               </div>
               <div className="bg-slate-50 p-3 rounded-xl">
                 <p className="text-[10px] font-bold uppercase text-slate-500">Ajan</p>

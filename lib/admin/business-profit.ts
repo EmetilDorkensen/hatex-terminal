@@ -7,7 +7,6 @@ export type BusinessProfitBreakdown = {
   ajan_aktivasyon: number;
   ajan_retrè_hatex: number;
   antrepriz: number;
-  kat: number;
   kyc: number;
   api: number;
 };
@@ -45,7 +44,6 @@ const EMPTY_BREAKDOWN: BusinessProfitBreakdown = {
   ajan_aktivasyon: 0,
   ajan_retrè_hatex: 0,
   antrepriz: 0,
-  kat: 0,
   kyc: 0,
   api: 0,
 };
@@ -102,7 +100,6 @@ export function sumBreakdown(b: BusinessProfitBreakdown): number {
       b.ajan_aktivasyon +
       b.ajan_retrè_hatex +
       b.antrepriz +
-      b.kat +
       b.kyc +
       b.api
   );

@@ -45,8 +45,6 @@ export type ProvisionResult = {
 type MerchantProfileLike = {
   id: string;
   kyc_status?: string | null;
-  is_card_activated?: boolean | null;
-  features_unlock_paid?: boolean | null;
   api_key?: string | null;
   api_key_hash?: string | null;
   api_key_prefix?: string | null;

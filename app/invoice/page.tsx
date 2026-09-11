@@ -154,7 +154,7 @@ export default function InvoicePage() {
 
       const { data: freshProfile } = await supabase
         .from('profiles')
-        .select('kyc_status, is_card_activated, features_unlock_paid, business_name, full_name, account_type, plan')
+        .select('kyc_status, business_name, full_name, account_type, plan')
         .eq('id', user.id)
         .single();
 

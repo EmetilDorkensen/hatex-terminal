@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const supabaseAdmin = createSupabaseAdminClient();
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, kyc_status, is_card_activated, is_merchant')
+      .select('id, kyc_status, is_merchant')
       .eq('id', user.id)
       .single();
 

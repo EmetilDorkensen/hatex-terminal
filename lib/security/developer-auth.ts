@@ -13,7 +13,7 @@ export async function requireEligibleMerchant() {
   const supabaseAdmin = createSupabaseAdminClient();
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret, api_key_mode')
+    .select('id, kyc_status, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret, api_key_mode')
     .eq('id', user.id)
     .single();
 
@@ -23,7 +23,7 @@ export async function requireEligibleMerchant() {
 
   const eligibility = checkMerchantEligibility(profile);
   if (!eligibility.eligible) {
-    return { error: 'Kont ou poko elijib pou API devlopè a (KYC apwouve + kat aktive obligatwa).', status: 403 as const, user: null, profile: null, supabaseAdmin: null };
+    return { error: 'Kont ou poko elijib pou API devlopè a (KYC apwouve obligatwa).', status: 403 as const, user: null, profile: null, supabaseAdmin: null };
   }
 
   const provision = await ensureMerchantApiCredentials(supabaseAdmin, profile);

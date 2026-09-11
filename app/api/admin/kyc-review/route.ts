@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { assertFinanceOperatorWithGate } from '@/lib/admin/auth';
-import { provisionCardForUser } from '@/lib/kyc/card-provision';
 import { KYC_STATUS } from '@/lib/kyc/status';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { getAuthenticatedUser } from '@/lib/kyc/access';
@@ -48,7 +47,7 @@ export async function POST(request: Request) {
     const admin = createSupabaseAdminClient();
     const { data: profile, error: profileErr } = await admin
       .from('profiles')
-      .select('id, full_name, email, kyc_status, kyc_fee_paid, is_card_activated, features_unlock_paid, intended_plan, plan_status')
+      .select('id, full_name, email, kyc_status, kyc_fee_paid, features_unlock_paid, intended_plan, plan_status')
       .eq('id', userId)
       .single();
 
@@ -60,10 +59,8 @@ export async function POST(request: Request) {
     }
 
     if (action === 'approved') {
-      const alreadyUnlocked = profile.features_unlock_paid === true;
       const alreadyApproved = profile.kyc_status === KYC_STATUS.APPROVED;
 
-      // Si KYC deja apwouve men kat manke (echèk anvan), eseye kreye kat sèlman.
       if (!alreadyApproved) {
         const { error: approveErr } = await admin
           .from('profiles')
@@ -71,9 +68,7 @@ export async function POST(request: Request) {
             kyc_status: KYC_STATUS.APPROVED,
             kyc_rejection_reason: null,
             is_activated: true,
-            ...(alreadyUnlocked
-              ? {}
-              : { is_card_activated: false, features_unlock_paid: false }),
+            features_unlock_paid: true,
           })
           .eq('id', userId);
 
@@ -117,72 +112,26 @@ export async function POST(request: Request) {
         }
       }
 
-      let cardOk = true;
-      let cardWarning: string | undefined;
-      let cardCreated = false;
-      try {
-        const result = await provisionCardForUser(admin, userId, {
-          activate: alreadyUnlocked,
-        });
-        cardCreated = result.created === true;
-        if (alreadyApproved && !cardCreated) {
-          return NextResponse.json({
-            success: true,
-            action: 'approved',
-            message: 'KYC deja apwouve epi kat deja egziste.',
-            features_locked: !alreadyUnlocked,
-            card_ok: true,
-            card_created: false,
-            fresh_approval: false,
-          });
-        }
-      } catch (cardErr: unknown) {
-        cardOk = false;
-        const msg =
-          cardErr instanceof Error
-            ? cardErr.message
-            : typeof cardErr === 'object' &&
-                cardErr &&
-                'message' in cardErr &&
-                typeof (cardErr as { message: unknown }).message === 'string'
-              ? (cardErr as { message: string }).message
-              : 'Erè kreye kat';
-        cardWarning = msg;
-        console.error('[kyc-review] provisionCard failed', userId, msg);
-      }
-
-      if (gate.role === 'admin' && (!alreadyApproved || cardCreated || !cardOk)) {
+      if (gate.role === 'admin' && !alreadyApproved) {
         await logAdminAction(admin, {
           adminEmail: user.email,
-          action: alreadyApproved ? 'KYC_CARD_RETRY' : 'KYC_APPROVED',
+          action: 'KYC_APPROVED',
           targetType: 'profile',
           targetId: userId,
-          details: {
-            locked_until_unlock_fee: !alreadyUnlocked,
-            card_provisioned: cardOk,
-            card_created: cardCreated,
-            card_warning: cardWarning || null,
-          },
+          details: {},
           ip,
         });
       }
 
-      const successMsg = !cardOk
-        ? `KYC apwouve, men kat pa t kreye: ${cardWarning}`
-        : alreadyApproved && cardCreated
-          ? 'Kat kreye avèk siksè pou KYC ki te deja apwouve.'
-          : alreadyUnlocked
-            ? 'KYC apwouve. Kat deja debloke.'
-            : 'KYC apwouve. Si kliyan an te peye abonnman an, kapasite jou a ap ogmante otomatikman.';
+      const successMsg = alreadyApproved
+        ? 'KYC deja te apwouve.'
+        : 'KYC apwouve. Si kliyan an te peye abonnman an, kapasite jou a ap ogmante otomatikman.';
 
       return NextResponse.json({
         success: true,
         action: 'approved',
         message: successMsg,
-        features_locked: !alreadyUnlocked,
-        card_ok: cardOk,
-        card_created: cardCreated,
-        card_warning: cardWarning,
+        features_locked: false,
         fresh_approval: !alreadyApproved,
       });
     }

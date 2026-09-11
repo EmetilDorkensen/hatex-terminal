@@ -56,7 +56,7 @@ export function HistoryRefundButton({
         : 'kob la';
     if (
       !confirm(
-        `Ranbouse ${amtLabel}? Kob la soti nan wallet ou epi tounen sou kat moun ki te peye a (san frè).`
+        `Ranbouse ${amtLabel}? Kob la soti nan wallet ou epi tounen sou wallet moun ki te peye a (san frè).`
       )
     ) {
       return;

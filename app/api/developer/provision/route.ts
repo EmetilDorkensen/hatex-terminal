@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const loadProfile = async (client: ReturnType<typeof createSupabaseAdminClient>) =>
       client
         .from('profiles')
-        .select('id, kyc_status, is_card_activated, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret')
+        .select('id, kyc_status, is_merchant, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, webhook_secret')
         .eq('id', user.id)
         .single();
 

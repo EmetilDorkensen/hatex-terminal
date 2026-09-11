@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hashApiKey } from '@/lib/security/api-key';
-import { hashCardNumber } from '@/lib/security/hash';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 
 /** Headers sekirite pou tout repons API machann (sèvè-a-sèvè). */
@@ -73,12 +72,6 @@ export async function rateLimitMerchantApiKey(apiKey: string, limit: number, win
 
 export async function rateLimitInvalidApiKey(ip: string) {
   return rateLimit(`merchant-api:bad-key:${ip}`, 20, 300);
-}
-
-/** Menm modèl ak verify-card: limit tantativ pa nimewo kat (anti brute-force). */
-export async function rateLimitCardPaymentAttempts(cardNumber: string) {
-  const cardHash = hashCardNumber(cardNumber);
-  return rateLimit(`merchant-api:card:${cardHash}`, 6, 900);
 }
 
 export function parseBearerApiKey(request: Request): string | null {

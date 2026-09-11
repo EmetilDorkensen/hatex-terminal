@@ -14,7 +14,6 @@ const PROTECTED_APP_PREFIXES = [
   '/developer',
   '/notifikasyon',
   '/agent',
-  '/kat',
   '/support',
   '/update-pin',
 ];
@@ -131,7 +130,6 @@ export async function proxy(request: NextRequest) {
       url.pathname.startsWith('/workspace') ||
       url.pathname.startsWith('/plan') ||
       url.pathname.startsWith('/agent') ||
-      url.pathname.startsWith('/kat') ||
       url.pathname.startsWith('/support') ||
       url.pathname.startsWith('/update-pin') ||
       needsAppAuth)

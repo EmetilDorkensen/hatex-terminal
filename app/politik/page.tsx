@@ -312,11 +312,7 @@ export default function PolitikPage() {
                 <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider">Gratis</span>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <span className="font-medium text-slate-600">Peman bay machann ak kat</span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider">Gratis</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <span className="font-medium text-slate-600">Rechaj kat</span>
+                <span className="font-medium text-slate-600">Peman bay machann (MonCash)</span>
                 <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider">Gratis</span>
               </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
