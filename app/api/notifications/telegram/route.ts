@@ -4,7 +4,7 @@ import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 type TelegramChannel = 'admin' | 'finance';
 
-const MAX_MESSAGE_LEN = 2000;
+const MAX_MESSAGE_LEN = 1800;
 
 function getTelegramConfig(channel: TelegramChannel) {
   if (channel === 'finance') {
@@ -19,19 +19,28 @@ function getTelegramConfig(channel: TelegramChannel) {
   };
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'Aksè refize.' }, { status: 401 });
     }
 
-    // Anpeche yon itilizatè voye kantite mesaj san limit sou chanèl ops yo
-    // (spam / enjenyeri sosyal). Chak itilizatè gen yon kota rezonab.
+    // Anpeche spam: 6 mesaj / 15 min pou chak itilizatè + IP
     const ip = getClientIp(request);
-    const rl = await rateLimit(`telegram-notify:${user.id}:${ip}`, 12, 300);
+    const rl = await rateLimit(`telegram-notify:${user.id}:${ip}`, 6, 900);
     if (!rl.allowed) {
       return NextResponse.json({ success: false, message: 'Twòp notifikasyon. Eseye pita.' }, { status: 429 });
     }
@@ -43,10 +52,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Mesaj vid.' }, { status: 400 });
     }
 
-    // Sèlman 2 chanèl valab; nenpòt lòt valè tonbe sou 'admin'.
     const safeChannel: TelegramChannel = channel === 'finance' ? 'finance' : 'admin';
-    const safeMessage = typeof message === 'string' ? message.slice(0, MAX_MESSAGE_LEN) : '';
-    const safeParseMode = parseMode === 'MarkdownV2' || parseMode === 'Markdown' ? parseMode : 'HTML';
+    const rawMessage = typeof message === 'string' ? message.slice(0, MAX_MESSAGE_LEN) : '';
+    // Mare mesaj la ak imèl itilizatè a — pa kite anonim spam.
+    const safeMessage = `<b>Soti:</b> ${escapeHtml(user.email || user.id)}\n${rawMessage}`;
+    const safeParseMode =
+      parseMode === 'MarkdownV2' || parseMode === 'Markdown' ? parseMode : 'HTML';
 
     const { token, chatId } = getTelegramConfig(safeChannel);
     if (!token || !chatId) {

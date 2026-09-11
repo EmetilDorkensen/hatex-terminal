@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import crypto from 'crypto';
 import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { createSupabaseServerClient } from '@/lib/security/supabase-server';
-import { ADMIN_GATE_COOKIE, ADMIN_GATE_MAX_AGE_MS, verifyAdminGateToken } from '@/lib/security/admin-gate';
+import {
+  ADMIN_GATE_COOKIE,
+  ADMIN_GATE_MAX_AGE_MS,
+  signAdminGateToken,
+  verifyAdminGateToken,
+} from '@/lib/security/admin-gate';
+import { ADMIN_EMAIL, verifyAdminPassword } from '@/lib/admin/auth';
+import { cookieSecureFlag } from '@/lib/security/timing';
 
-const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 const COOKIE_MAX_AGE = Math.floor(ADMIN_GATE_MAX_AGE_MS / 1000);
-
-function signGateToken(): string {
-  const secret = process.env.ADMIN_GATE_SECRET || process.env.ADMIN_GATE_PASSWORD || '';
-  const payload = `${Date.now()}`;
-  const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  return `${payload}.${sig}`;
-}
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -25,33 +23,34 @@ export async function POST(request: Request) {
     );
   }
 
-  const gatePassword = process.env.ADMIN_GATE_PASSWORD;
-  if (!gatePassword) {
+  if (!process.env.ADMIN_GATE_PASSWORD) {
     return NextResponse.json({ success: false, message: 'ADMIN_GATE_PASSWORD pa konfigire.' }, { status: 500 });
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ success: false, message: 'Ou pa konekte. Konekte sou /login anvan.' }, { status: 403 });
-  }
-  if (user.email !== ADMIN_EMAIL) {
     return NextResponse.json(
-      { success: false, message: 'Kont sa a pa gen dwa admin.' },
+      { success: false, message: 'Ou pa konekte. Konekte sou /login anvan.' },
       { status: 403 }
     );
   }
+  if (user.email?.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return NextResponse.json({ success: false, message: 'Kont sa a pa gen dwa admin.' }, { status: 403 });
+  }
 
-  const { password } = await request.json();
-  if (password !== gatePassword) {
+  const { password } = await request.json().catch(() => ({}));
+  if (!verifyAdminPassword(typeof password === 'string' ? password : '')) {
     return NextResponse.json({ success: false, message: 'Modpas pa bon.' }, { status: 401 });
   }
 
-  const token = signGateToken();
+  const token = signAdminGateToken();
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_GATE_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecureFlag(request.url),
     sameSite: 'strict',
     maxAge: COOKIE_MAX_AGE,
     path: '/',

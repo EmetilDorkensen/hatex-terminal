@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
+import { checkStrongPassword } from '@/lib/security/password-strength';
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('');
@@ -63,8 +64,9 @@ export default function ResetPassword() {
       setMsg({ type: 'error', text: 'Modpas yo pa menm.' });
       return;
     }
-    if (newPassword.length < 8) {
-      setMsg({ type: 'error', text: 'Modpas la dwe gen omwen 8 karaktè.' });
+    const strength = checkStrongPassword(newPassword);
+    if (!strength.valid) {
+      setMsg({ type: 'error', text: strength.message || 'Modpas la twò fèb.' });
       return;
     }
 
@@ -122,13 +124,18 @@ export default function ResetPassword() {
               <label className="text-[8px] text-zinc-600 ml-2">NOUVO MODPAS</label>
               <input
                 type="password"
-                placeholder="••••••••"
+                placeholder="Min 10 + majiskil + chif + senbòl"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full bg-black border border-white/5 p-5 rounded-2xl focus:border-red-600 outline-none transition-all font-bold text-xs text-white"
                 required
+                minLength={10}
+                autoComplete="new-password"
                 disabled={!ready}
               />
+              <p className="text-[8px] text-zinc-500 ml-2 normal-case not-italic font-medium tracking-normal">
+                Omwen 10 karaktè, majiskil, miniskil, chif, senbòl.
+              </p>
             </div>
 
             <div className="space-y-2 text-left">

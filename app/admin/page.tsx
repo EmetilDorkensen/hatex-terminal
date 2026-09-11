@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Send, UserX, ShieldCheck, AlertTriangle, Search, Lock, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, KeyRound, Mail } from 'lucide-react';
+import { Send, UserX, ShieldCheck, AlertTriangle, Search, Lock, DollarSign, EyeOff, Loader2, CheckCircle2, FileText, XCircle, Users, UserPlus, UserMinus, UserCheck as UserCheckIcon, Activity, KeyRound, Mail, Bell } from 'lucide-react';
 import AdminMfaSettings from './AdminMfaSettings';
 import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
@@ -33,6 +33,9 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
+    const [notifTitle, setNotifTitle] = useState('');
+    const [notifBody, setNotifBody] = useState('');
+    const [notifTargetEmail, setNotifTargetEmail] = useState('');
     const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'sispandi' | 'kyc' | 'kyc-survey' | 'ekip' | 'sekirite' | 'frais' | 'payout'>('dashboard');
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -341,6 +344,29 @@ export default function AdminSuperPage() {
             await adminOps({ action: 'update_announcement', text: anonsText, active: anonsActive });
             alert("Notifikasyon an chanje avèk siksè e li rive sou tout kliyan yo!");
             raleDone();
+        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
+    };
+
+    const handleSendNotification = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!notifTitle.trim()) return alert('Antre yon tit pou notifikasyon an.');
+        if (!window.confirm(
+            notifTargetEmail.trim()
+                ? `Voye notifikasyon sa a bay ${notifTargetEmail.trim()}?`
+                : 'Voye notifikasyon sa a bay TOUT kliyan yo?'
+        )) return;
+        setProcessingId('sending_notification');
+        try {
+            const data: any = await adminOps({
+                action: 'broadcast_notification',
+                title: notifTitle,
+                body: notifBody,
+                target_email: notifTargetEmail.trim(),
+            });
+            alert(`Notifikasyon an voye bay ${data.count ?? 'kliyan'} kliyan! Li ap parèt nan klòch "Notifikasyon" yo.`);
+            setNotifTitle('');
+            setNotifBody('');
+            setNotifTargetEmail('');
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -704,6 +730,7 @@ export default function AdminSuperPage() {
                     ) : view === 'dosye' ? (
                         <AdminClientDossier initialUserId={dossierUserId} />
                     ) : view === 'anons' ? (
+                        <>
                         <div className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
                                 <span className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Send size={24} /></span>
@@ -728,6 +755,31 @@ export default function AdminSuperPage() {
                                 </button>
                             </form>
                         </div>
+                        <div className="bg-white p-8 rounded-3xl border border-indigo-200 mb-8 shadow-sm">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Bell size={24} /></span>
+                                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Voye Notifikasyon nan klòch kliyan yo</h2>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-6">Mesaj sa a ap parèt dirèkteman nan pati « Notifikasyon » (klòch la) chak kliyan — pa sèlman sou paj dakèy la.</p>
+                            <form onSubmit={handleSendNotification} className="space-y-5">
+                                <div className="space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Tit notifikasyon an:</label>
+                                    <input value={notifTitle} onChange={(e) => setNotifTitle(e.target.value)} placeholder="Pa egzanp: Nouvèl fason pou peye!" className="w-full bg-slate-50 border border-gray-200 px-5 py-4 rounded-2xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm text-slate-900 placeholder:text-slate-400" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Detay (opsyonèl):</label>
+                                    <textarea value={notifBody} onChange={(e) => setNotifBody(e.target.value)} placeholder="Ekri mesaj konplè kliyan an ap li nan notifikasyon an..." className="w-full bg-slate-50 border border-gray-200 p-5 rounded-2xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm min-h-[110px] text-slate-900 placeholder:text-slate-400 resize-none" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Voye bay (kite vid pou tout kliyan):</label>
+                                    <input value={notifTargetEmail} onChange={(e) => setNotifTargetEmail(e.target.value)} type="email" placeholder="imèl yon kliyan espesifik (opsyonèl)" className="w-full bg-slate-50 border border-gray-200 px-5 py-4 rounded-2xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm text-slate-900 placeholder:text-slate-400" />
+                                </div>
+                                <button type="submit" disabled={processingId === 'sending_notification'} className="w-full bg-indigo-600 hover:bg-indigo-700 px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all text-white shadow-sm flex items-center justify-center gap-2">
+                                    {processingId === 'sending_notification' ? <Loader2 size={18} className="animate-spin" /> : "Voye Notifikasyon an"}
+                                </button>
+                            </form>
+                        </div>
+                        </>
                     ) : view === 'kyc' ? (
                         pendingKyc.length === 0 && missingCards.length === 0 ? (
                             <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300 text-slate-500 text-sm font-bold uppercase tracking-wider">Pa gen okenn KYC k ap tann</div>

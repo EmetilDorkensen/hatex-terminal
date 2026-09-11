@@ -2,16 +2,17 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { useSearchParams } from 'next/navigation';
 import { User, Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { checkStrongPassword } from '@/lib/security/password-strength';
 
 function SignupForm() {
   const searchParams = useSearchParams();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,6 +43,13 @@ function SignupForm() {
         type: 'error',
         text: 'Ou dwe aksepte Akò Sèvis ak Kondisyon Itilizasyon HatexCard anvan ou kreye kont.',
       });
+      setLoading(false);
+      return;
+    }
+
+    const strength = checkStrongPassword(password);
+    if (!strength.valid) {
+      setMsg({ type: 'error', text: strength.message || 'Modpas la twò fèb.' });
       setLoading(false);
       return;
     }
@@ -219,12 +227,17 @@ function SignupForm() {
             </div>
             <input 
               type="password" 
-              placeholder="••••••••" 
+              placeholder="Min 10 karaktè + majiskil + chif + senbòl" 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium tracking-widest text-slate-900 placeholder:text-slate-400" 
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400" 
+              minLength={10}
+              autoComplete="new-password"
               required 
             />
+            <p className="text-[10px] text-slate-400 mt-1.5 ml-1">
+              Omwen 10 karaktè, yon majiskil, yon miniskil, yon chif, ak yon senbòl.
+            </p>
           </div>
         </div>
 

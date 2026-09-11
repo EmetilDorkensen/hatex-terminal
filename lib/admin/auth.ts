@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { ADMIN_GATE_COOKIE, verifyAdminGateToken } from '@/lib/security/admin-gate';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { WORKSPACE_GATE_COOKIE, verifyWorkspaceGateToken } from '@/lib/security/workspace-gate';
+import { timingSafeEqualString } from '@/lib/security/timing';
 
 export const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 
@@ -26,8 +27,8 @@ export async function hasValidAdminGate(): Promise<boolean> {
 
 export function verifyAdminPassword(password: string): boolean {
   const gatePassword = process.env.ADMIN_GATE_PASSWORD;
-  if (!gatePassword) return false;
-  return password === gatePassword;
+  if (!gatePassword || !password) return false;
+  return timingSafeEqualString(password, gatePassword);
 }
 
 /** Admin ak gate cookie, oswa staff aktif ak workspace gate. */
@@ -86,7 +87,7 @@ export async function assertFinanceCashierWithGate(
     .eq('status', 'active')
     .maybeSingle();
 
-  if (!staff || staff.role !== 'finance') return { ok: false };
+  if (staff?.role !== 'finance') return { ok: false };
 
   const wsToken = cookieStore.get(WORKSPACE_GATE_COOKIE)?.value;
   if (!verifyWorkspaceGateToken(wsToken, normalized)) return { ok: false };

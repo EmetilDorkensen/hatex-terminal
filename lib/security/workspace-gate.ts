@@ -1,4 +1,5 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
+import { timingSafeEqualString } from '@/lib/security/timing';
 
 export const WORKSPACE_GATE_COOKIE = 'hatex_workspace_gate';
 export const WORKSPACE_GATE_MAX_AGE_MS = 8 * 3600 * 1000; // 8 èdtan (yon jounen travay)
@@ -25,7 +26,10 @@ export function signWorkspaceGateToken(email: string): string {
   return `${payload}.${sig}`;
 }
 
-export function verifyWorkspaceGateToken(token: string | undefined, email: string | undefined | null): boolean {
+export function verifyWorkspaceGateToken(
+  token: string | undefined,
+  email: string | undefined | null
+): boolean {
   if (!token || !email) return false;
   const secret = getWorkspaceGateSecret();
   if (!secret) return false;
@@ -36,14 +40,14 @@ export function verifyWorkspaceGateToken(token: string | undefined, email: strin
 
   const payload = `${ts}.${emailB64}`;
   const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  if (sig !== expected) return false;
+  if (!timingSafeEqualString(sig, expected)) return false;
 
   const age = Date.now() - Number(ts);
   if (!(age >= 0 && age <= WORKSPACE_GATE_MAX_AGE_MS)) return false;
 
   try {
     const decodedEmail = Buffer.from(emailB64, 'base64url').toString('utf8');
-    return decodedEmail === email.trim().toLowerCase();
+    return timingSafeEqualString(decodedEmail, email.trim().toLowerCase());
   } catch {
     return false;
   }

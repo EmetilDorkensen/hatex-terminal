@@ -4,7 +4,7 @@ export interface PasswordStrengthResult {
 }
 
 /**
- * Règ modpas fò pou Espas Travay (Workspace) anplwaye yo:
+ * Règ modpas fò pou kont kliyan, reset, ak Espas Travay:
  * omwen 10 karaktè, yon majiskil, yon miniskil, yon chif, ak yon senbòl.
  */
 export function checkStrongPassword(password: string): PasswordStrengthResult {

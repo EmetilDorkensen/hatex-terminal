@@ -4,10 +4,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { 
-    ShieldCheck, DollarSign, UserCheck as UserCheckIcon, Users, 
-    Search, Loader2, CheckCircle2, 
-    XCircle, AlertTriangle, Store, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
-    Crown, MessageCircle, Activity, Radio, Mail
+    ShieldCheck, DollarSign, Users, 
+    Search, Loader2, 
+    XCircle, AlertTriangle, EyeOff, LogOut, MessageSquare, Clock, Send, Building2,
+    Crown, MessageCircle, Activity, Radio, Mail, Bell
 } from 'lucide-react';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
 import {
@@ -58,6 +58,10 @@ export default function WorkspacePage() {
     const [teamMessages, setTeamMessages] = useState<any[]>([]);
     const [teamMessageInput, setTeamMessageInput] = useState('');
     const [sendingTeamMessage, setSendingTeamMessage] = useState(false);
+    const [notifTitle, setNotifTitle] = useState('');
+    const [notifBody, setNotifBody] = useState('');
+    const [notifTargetEmail, setNotifTargetEmail] = useState('');
+    const [sendingNotification, setSendingNotification] = useState(false);
     const teamMessagesEndRef = useRef<HTMLDivElement>(null);
 
     // ==========================================
@@ -213,6 +217,39 @@ export default function WorkspacePage() {
         }
     };
 
+    const handleSendBroadcastNotification = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!notifTitle.trim()) return alert('Antre yon tit pou notifikasyon an.');
+        if (!window.confirm(
+            notifTargetEmail.trim()
+                ? `Voye notifikasyon sa a bay ${notifTargetEmail.trim()}?`
+                : 'Voye notifikasyon sa a bay TOUT kliyan yo?'
+        )) return;
+        setSendingNotification(true);
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    title: notifTitle.trim(),
+                    body: notifBody.trim(),
+                    target_email: notifTargetEmail.trim(),
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) throw new Error(data.error || 'Aksyon echwe.');
+            alert(`Notifikasyon an voye bay ${data.count ?? 'kliyan'} kliyan!`);
+            setNotifTitle('');
+            setNotifBody('');
+            setNotifTargetEmail('');
+        } catch (err: any) {
+            alert(err.message || 'Erè pandan voye notifikasyon an.');
+        } finally {
+            setSendingNotification(false);
+        }
+    };
+
     const handleLogout = async () => {
         // Efase cookie gate espas travay la imedyatman sou sèvè a.
         try { await fetch('/api/workspace/verify-gate', { method: 'DELETE' }); } catch {}
@@ -316,7 +353,8 @@ export default function WorkspacePage() {
             await logActivity('TICKET_CLOSED', 'support_ticket', selectedTicket.id, { subject: selectedTicket.subject });
             setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: 'closed' } : t));
             setSelectedTicket({ ...selectedTicket, status: 'closed' });
-        } catch (err) {
+        } catch {
+            // UI feedback sèlman — erè DB deja trete nan alert.
             alert("Erè nan fèmen dosye a.");
         } finally {
             setProcessingId(null);
@@ -843,7 +881,28 @@ export default function WorkspacePage() {
                 {/* Stripe/PayPal genyen pou ekip sipò/finans/konfòmite)  */}
                 {/* ==================================================== */}
                 {activeDept === 'team' && (
-                    <div className="animate-in fade-in duration-500">
+                    <div className="animate-in fade-in duration-500 space-y-4">
+                        {canSeeSupport && (
+                            <div className="bg-white border border-indigo-200 rounded-3xl shadow-sm p-5 sm:p-6">
+                                <div className="flex items-center gap-3 mb-1">
+                                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                        <Bell size={18} />
+                                    </div>
+                                    <h3 className="font-bold text-slate-900 text-sm">Voye Notifikasyon bay kliyan yo</h3>
+                                </div>
+                                <p className="text-xs text-slate-500 mb-4">Mesaj sa a parèt nan klòch « Notifikasyon » chak kliyan.</p>
+                                <form onSubmit={handleSendBroadcastNotification} className="space-y-3">
+                                    <input type="text" value={notifTitle} onChange={(e) => setNotifTitle(e.target.value)} placeholder="Tit notifikasyon an" className="w-full bg-slate-50 border border-gray-200 px-4 py-3 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all text-slate-900 placeholder:text-slate-400" required />
+                                    <textarea value={notifBody} onChange={(e) => setNotifBody(e.target.value)} placeholder="Detay (opsyonèl)" className="w-full bg-slate-50 border border-gray-200 px-4 py-3 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all text-slate-900 placeholder:text-slate-400 resize-none min-h-[80px]" />
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <input type="email" value={notifTargetEmail} onChange={(e) => setNotifTargetEmail(e.target.value)} placeholder="Imèl espesifik (vid = tout kliyan)" className="flex-1 bg-slate-50 border border-gray-200 px-4 py-3 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all text-slate-900 placeholder:text-slate-400" />
+                                        <button type="submit" disabled={sendingNotification || !notifTitle.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                                            {sendingNotification ? <Loader2 size={16} className="animate-spin" /> : <Bell size={14} />} Voye
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
                         <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden h-[75vh] flex flex-col">
                             <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">

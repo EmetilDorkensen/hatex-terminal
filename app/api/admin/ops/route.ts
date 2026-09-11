@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
 import { logAdminAction } from '@/lib/admin/audit-log';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
+import { broadcastNotification } from '@/lib/notify/broadcast';
 
 /**
  * Aksyon admin (sispann, promo, anons, ekip) — service_role.
@@ -81,12 +82,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    // Notifikasyon in-app: admin/anplwaye ekri yon mesaj ki parèt nan
+    // klòch "Notifikasyon" chak kliyan (tab hatex_notifications).
+    if (action === 'broadcast_notification') {
+      const result = await broadcastNotification(db, {
+        title: String(body.title || ''),
+        body: String(body.body || ''),
+        kind: String(body.kind || 'announcement'),
+        href: typeof body.href === 'string' ? body.href : undefined,
+        targetEmail: typeof body.target_email === 'string' ? body.target_email : undefined,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.message }, { status: result.status });
+      }
+
+      await logAdminAction(db, {
+        adminEmail: email,
+        action: 'NOTIFICATION_BROADCAST',
+        targetType: 'hatex_notifications',
+        targetId: String(body.target_email || '').trim() || 'all',
+        details: {
+          count: result.count,
+          title: String(body.title || '').trim().slice(0, 120),
+          kind: String(body.kind || 'announcement'),
+        },
+        ip,
+      });
+
+      return NextResponse.json({ success: true, count: result.count });
+    }
+
     if (action === 'create_promo') {
       const code = String(body.code || '')
         .trim()
         .toUpperCase();
       const reward = Number(body.reward_amount);
-      if (!code || !(reward > 0)) {
+      if (!code || reward <= 0) {
         return NextResponse.json({ error: 'Kòd ak reward obligatwa.' }, { status: 400 });
       }
       const { error } = await db.from('promo_codes').insert([{ code, reward_amount: reward }]);
@@ -107,7 +138,7 @@ export async function POST(request: Request) {
         .trim()
         .toLowerCase();
       const role = String(body.role || 'support');
-      if (!inviteEmail || !inviteEmail.includes('@')) {
+      if (!inviteEmail?.includes('@')) {
         return NextResponse.json({ error: 'Imèl pa valab.' }, { status: 400 });
       }
       const { data: existing } = await db

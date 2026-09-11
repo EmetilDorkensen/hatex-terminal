@@ -5,7 +5,7 @@ import { SESSION_TAG_COOKIE } from '@/lib/security/session-tag';
 
 const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 
-const PROTECTED_WALLET_PREFIXES = [
+const PROTECTED_APP_PREFIXES = [
   '/kyc',
   '/plugin',
   '/invoice',
@@ -13,7 +13,30 @@ const PROTECTED_WALLET_PREFIXES = [
   '/setting',
   '/developer',
   '/notifikasyon',
+  '/agent',
+  '/kat',
+  '/support',
+  '/update-pin',
 ];
+
+/** API ki pa bezwen sesyon cookie (kle API / webhook / cron / checkout piblik). */
+const PUBLIC_API_PREFIXES = [
+  '/api/moncash',
+  '/api/create-payment',
+  '/api/public',
+  '/api/cron',
+  '/api/checkout',
+  '/api/checkout-invoice',
+  '/api/v2/payments',
+];
+
+function isAdminEmail(email: string | undefined | null): boolean {
+  return !!email && email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+}
+
+function isPublicApi(pathname: string): boolean {
+  return PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
+}
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
@@ -23,7 +46,9 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return request.cookies.get(name)?.value; },
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
         set(name: string, value: string, options: CookieOptions) {
           response.cookies.set({ name, value, ...options });
         },
@@ -35,7 +60,9 @@ export async function middleware(request: NextRequest) {
   );
 
   // getUser() verifye JWT kont Auth API — pi solid pase getSession() (cache lokal)
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const url = request.nextUrl.clone();
   const hostname = request.headers.get('host') || '';
 
@@ -48,17 +75,29 @@ export async function middleware(request: NextRequest) {
 
   let profile: { current_session_token?: string | null; plan?: string | null } | null = null;
 
-  if (user && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/login')) {
+  const shouldCheckSessionTag =
+    !!user &&
+    !url.pathname.startsWith('/login') &&
+    (!url.pathname.startsWith('/api') ||
+      (url.pathname.startsWith('/api') && !isPublicApi(url.pathname)));
+
+  if (shouldCheckSessionTag) {
     const { data } = await supabase
       .from('profiles')
       .select('current_session_token, plan')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .maybeSingle();
     profile = data;
 
     const deviceTag = request.cookies.get(SESSION_TAG_COOKIE)?.value;
     if (profile?.current_session_token && profile.current_session_token !== deviceTag) {
       await supabase.auth.signOut();
+      if (url.pathname.startsWith('/api')) {
+        return NextResponse.json(
+          { error: 'Sesyon ranplase sou yon lòt aparèy. Konekte ankò.' },
+          { status: 401 }
+        );
+      }
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('reason', 'session_replaced');
       return NextResponse.redirect(loginUrl);
@@ -66,13 +105,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (url.pathname.startsWith('/admin')) {
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user || !isAdminEmail(user.email)) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
   }
 
-  const needsWalletAuth = PROTECTED_WALLET_PREFIXES.some((p) => url.pathname.startsWith(p));
-  if (needsWalletAuth && !user) {
+  const needsAppAuth = PROTECTED_APP_PREFIXES.some((p) => url.pathname.startsWith(p));
+  if (needsAppAuth && !user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -87,24 +126,27 @@ export async function middleware(request: NextRequest) {
       url.pathname.startsWith('/setting') ||
       url.pathname.startsWith('/workspace') ||
       url.pathname.startsWith('/plan') ||
-      needsWalletAuth)
+      url.pathname.startsWith('/agent') ||
+      url.pathname.startsWith('/kat') ||
+      url.pathname.startsWith('/support') ||
+      url.pathname.startsWith('/update-pin') ||
+      needsAppAuth)
   ) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+    if (aal?.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // MFA OBLIGATWA — si itilizatè a pa gen okenn TOTP factor verifye, fose
-    // paj /mfa-setup anvan li ka fè anyen sou aplikasyon an.
+    // MFA OBLIGATWA pou tout kont — admin enkli.
     const { data: factorList } = await supabase.auth.mfa.listFactors();
     const hasVerifiedTotp = (factorList?.totp || []).some((f) => f.status === 'verified');
-    if (!hasVerifiedTotp && user.email !== ADMIN_EMAIL) {
+    if (!hasVerifiedTotp) {
       return NextResponse.redirect(new URL('/mfa-setup', request.url));
     }
 
     // Premye koneksyon: chwazi plan anvan dashboard
     if (
-      user.email !== ADMIN_EMAIL &&
+      !isAdminEmail(user.email) &&
       !profile?.plan &&
       !url.pathname.startsWith('/plan') &&
       !url.pathname.startsWith('/mfa-setup')
@@ -113,7 +155,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (url.pathname.startsWith('/workspace') && !url.pathname.startsWith('/workspace-login') && !url.pathname.startsWith('/workspace-setup')) {
+  if (
+    url.pathname.startsWith('/workspace') &&
+    !url.pathname.startsWith('/workspace-login') &&
+    !url.pathname.startsWith('/workspace-setup')
+  ) {
     if (!user?.email) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
@@ -150,8 +196,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: [String.raw`/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)`],
   runtime: 'nodejs',
 };

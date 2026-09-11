@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getBrevoApiKey, isEmailConfigured, parseSender } from '@/lib/notify/email';
+import { requireAdminUser, hasValidAdminGate } from '@/lib/admin/auth';
 
 /**
- * Dyagnostik rapid: èske Brevo konfigire sou sèvè a?
- * Pa ekspoze kle a — sèlman estati + ekspeditè.
+ * Dyagnostik Brevo — admin + gate sèlman (pa piblik).
  */
 export async function GET() {
+  const admin = await requireAdminUser();
+  if (!admin) return NextResponse.json({ error: 'Aksè refize.' }, { status: 403 });
+  if (!(await hasValidAdminGate())) {
+    return NextResponse.json({ error: 'Sesyon admin ekspire.' }, { status: 401 });
+  }
+
   if (!isEmailConfigured()) {
     return NextResponse.json(
       {
@@ -32,7 +38,7 @@ export async function GET() {
       const parsed = JSON.parse(raw) as { email?: string };
       email = parsed.email || null;
     } catch {
-      /* ignore */
+      /* ignore parse */
     }
 
     if (!res.ok) {
