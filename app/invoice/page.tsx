@@ -5,10 +5,10 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Loader2, Receipt, Send, CheckCircle2,
-  AlertTriangle, Building2, Clock, XCircle, Trash2, ShieldCheck, Link as LinkIcon,
+  AlertTriangle, Building2, Clock, XCircle, Trash2, Link as LinkIcon,
   RefreshCw, Smartphone
 } from 'lucide-react';
-import { checkSpendingLimit, INDIVIDUAL_INVOICE_DAILY_LIMIT, isEnterpriseAccount } from '@/lib/security/spending-limits';
+import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { CANONICAL_SITE_URL, invoicePublicUrl } from '@/lib/urls/public';
 
 type BankAccount = {
@@ -55,9 +55,6 @@ export default function InvoicePage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resyncingId, setResyncingId] = useState<string | null>(null);
-  const [todayInvoiced, setTodayInvoiced] = useState(0);
-
-  const enterprise = isEnterpriseAccount(profile?.account_type);
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -94,13 +91,6 @@ export default function InvoicePage() {
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
     setInvoices(inv || []);
-
-    const startToday = new Date();
-    startToday.setHours(0, 0, 0, 0);
-    const totalToday = (inv || [])
-      .filter(i => i.status !== 'cancelled' && new Date(i.created_at) >= startToday)
-      .reduce((acc, i) => acc + Number(i.amount || 0), 0);
-    setTodayInvoiced(totalToday);
 
     await loadAccounts();
     setLoading(false);
@@ -168,8 +158,8 @@ export default function InvoicePage() {
         .eq('id', user.id)
         .single();
 
-      if (freshProfile?.kyc_status !== 'approved' && !freshProfile?.plan) {
-        setMessage({ type: 'error', text: 'Chwazi yon plan sou paj Plan anvan ou voye fakti.' });
+      if (freshProfile?.kyc_status !== 'approved') {
+        setMessage({ type: 'error', text: 'Ou dwe konplete KYC ou (apwouve) anvan ou voye fakti.' });
         setSending(false);
         return;
       }
@@ -351,7 +341,7 @@ export default function InvoicePage() {
     );
   }
 
-  const invoiceUnlocked = Boolean(profile?.plan) || profile?.kyc_status === 'approved';
+  const invoiceUnlocked = profile?.kyc_status === 'approved';
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-16">
@@ -375,30 +365,14 @@ export default function InvoicePage() {
           </div>
         </div>
 
-        {profile?.kyc_status !== 'approved' && (profile?.intended_plan === 'capacity' || profile?.intended_plan === 'premium') && (
+        {!invoiceUnlocked && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
-            Plan peye a mande KYC. Ou ka voye fakti kounye a ak limit plan Gratis.{' '}
+            Ou dwe konplete KYC ou (apwouve) anvan ou ka voye fakti.{' '}
             <button type="button" className="font-bold underline" onClick={() => router.push('/kyc/v2')}>
               Ale nan KYC
             </button>
           </div>
         )}
-
-        <div className={`p-4 rounded-2xl border mb-6 flex items-start gap-3 ${enterprise ? 'bg-emerald-50 border-emerald-100' : 'bg-indigo-50 border-indigo-100'}`}>
-          {enterprise ? <Building2 size={18} className="text-emerald-600 shrink-0 mt-0.5" /> : <ShieldCheck size={18} className="text-indigo-600 shrink-0 mt-0.5" />}
-          <div>
-            {enterprise ? (
-              <p className="text-xs font-bold text-emerald-700">
-                Kont Antrepriz: ou ka voye fakti san limit jounalye.
-              </p>
-            ) : (
-              <p className="text-xs font-bold text-indigo-700">
-                Kont Endividyèl: limit jounalye pou fakti se {INDIVIDUAL_INVOICE_DAILY_LIMIT.toLocaleString()} HTG.
-                {' '}Ou gentan kreye {todayInvoiced.toLocaleString()} HTG jodi a.
-              </p>
-            )}
-          </div>
-        </div>
 
         <form onSubmit={handleSendInvoice} className="bg-white border border-gray-200 rounded-3xl shadow-sm p-6 sm:p-8 mb-8 space-y-5">
           <div>

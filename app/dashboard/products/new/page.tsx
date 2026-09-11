@@ -205,7 +205,7 @@ export default function NewProductPage() {
   };
 
 
-  const unlocked = Boolean(profile?.plan) || profile?.kyc_status === 'approved';
+  const unlocked = profile?.kyc_status === 'approved';
 
   if (loading) {
     return (
@@ -239,9 +239,9 @@ export default function NewProductPage() {
 
         {!unlocked && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
-            Ou bezwen yon plan oswa yon KYC apwouve pou kreye pwodwi.{' '}
-            <button type="button" className="font-bold underline" onClick={() => router.push('/plan')}>
-              Ale nan Plan
+            Ou bezwen konplete KYC ou (apwouve) anvan ou kreye pwodwi.{' '}
+            <button type="button" className="font-bold underline" onClick={() => router.push('/kyc/v2')}>
+              Ale nan KYC
             </button>
           </div>
         )}

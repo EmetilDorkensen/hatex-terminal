@@ -115,7 +115,7 @@ export default function MerchantProductsPage() {
     setBusyId(null);
   };
 
-  const productUnlocked = Boolean(profile?.plan) || profile?.kyc_status === 'approved';
+  const productUnlocked = profile?.kyc_status === 'approved';
 
   if (loading) {
     return (
@@ -148,19 +148,25 @@ export default function MerchantProductsPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/dashboard/products/new"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-3 rounded-xl flex items-center gap-2 shadow-sm transition-colors shrink-0"
-          >
-            <Plus size={18} /> Kreye yon pwodwi
-          </Link>
+          {productUnlocked ? (
+            <Link
+              href="/dashboard/products/new"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-3 rounded-xl flex items-center gap-2 shadow-sm transition-colors shrink-0"
+            >
+              <Plus size={18} /> Kreye yon pwodwi
+            </Link>
+          ) : (
+            <span className="bg-slate-200 text-slate-500 text-sm font-bold px-5 py-3 rounded-xl flex items-center gap-2 shrink-0 cursor-not-allowed">
+              <Plus size={18} /> Kreye yon pwodwi
+            </span>
+          )}
         </div>
 
         {!productUnlocked && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
-            Chwazi yon plan oswa konplete KYC ou anvan ou kreye pwodwi.{' '}
-            <button type="button" className="font-bold underline" onClick={() => router.push('/plan')}>
-              Ale nan Plan
+            Konplete KYC ou (apwouve) anvan ou kreye pwodwi.{' '}
+            <button type="button" className="font-bold underline" onClick={() => router.push('/kyc/v2')}>
+              Ale nan KYC
             </button>
           </div>
         )}
@@ -182,18 +188,28 @@ export default function MerchantProductsPage() {
               Kreyasyon an fasil: non, pri, yon foto (si ou vle), epi chwazi kote ou resevwa
               lajan an. Apre sa HatexCard ba ou yon lyen peman pou voye kliyan ou yo.
             </p>
-            <Link
-              href="/dashboard/products/new"
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-6 py-3.5 rounded-xl mt-6 transition-colors"
-            >
-              <Plus size={18} /> Kreye premye pwodwi mwen
-            </Link>
+            {productUnlocked ? (
+              <Link
+                href="/dashboard/products/new"
+                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-6 py-3.5 rounded-xl mt-6 transition-colors"
+              >
+                <Plus size={18} /> Kreye premye pwodwi mwen
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push('/kyc/v2')}
+                className="inline-flex items-center gap-2 bg-slate-200 text-slate-600 text-sm font-bold px-6 py-3.5 rounded-xl mt-6 transition-colors"
+              >
+                <Plus size={18} /> Ale nan KYC
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
             {products.map((p) => {
               const url = productUrl(p);
-              const waText = `Achte «${p.name}» sou HatexCard — ${Math.round(p.price_htg).toLocaleString('fr-FR')} HTG. Peye ak MonCash isit la: ${url}`;
+              const waText = `Achte «${p.name}» sou HatexCard — ${Math.round(p.price_htg).toLocaleString('fr-FR')} HTG. Peye ak Hatexcard isit la: ${url}`;
               const waLink = `https://wa.me/?text=${encodeURIComponent(waText)}`;
               const fbLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
               return (

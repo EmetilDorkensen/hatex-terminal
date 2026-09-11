@@ -532,7 +532,7 @@ export default function LandingPage() {
           <div className="relative max-w-md mx-auto">
             <BrandPhoto
               src="/img/hx-demo-woocommerce.png"
-              alt="Plugin WooCommerce Hatexcard — Peye ak MonCash, resevwa sou MonCash / NatCash"
+              alt="Plugin WooCommerce Hatexcard — Peye ak Hatexcard, resevwa sou MonCash / NatCash"
               className="w-full rounded-2xl border border-white/10 shadow-2xl aspect-square"
             />
           </div>
