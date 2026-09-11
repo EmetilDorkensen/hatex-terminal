@@ -29,6 +29,11 @@ const PUBLIC_API_PREFIXES = [
   '/api/v2/payments',
 ];
 
+/** Auth / MFA — pa tcheke session-tag isit (cookie a mete apre track-login). */
+function isAuthApi(pathname: string): boolean {
+  return pathname.startsWith('/api/auth/');
+}
+
 function isAdminEmail(email: string | undefined | null): boolean {
   return !!email && email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
 }
@@ -81,6 +86,8 @@ export async function proxy(request: NextRequest) {
   const shouldCheckSessionTag =
     !!user &&
     !url.pathname.startsWith('/login') &&
+    !url.pathname.startsWith('/mfa-setup') &&
+    !isAuthApi(url.pathname) &&
     (!url.pathname.startsWith('/api') ||
       (url.pathname.startsWith('/api') && !isPublicApi(url.pathname)));
 

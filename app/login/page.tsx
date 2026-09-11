@@ -258,6 +258,7 @@ export default function Login() {
         await supabase.auth.refreshSession();
       }
 
+      // Tag deja mete apre modpas; refresh li apre MFA pou konfime cookie a
       await trackDeviceAndIP(email);
       await goAfterLogin();
     } catch (err: unknown) {
@@ -390,19 +391,15 @@ export default function Login() {
             body: JSON.stringify({ email: emailLower, action: 'success' }),
           }).catch(() => {});
 
+          // Mete session-tag ANVAN MFA — sinon /api/auth/mfa/verify ka wè
+          // "Sesyon ekspire" (cookie poko la, ansyen token nan DB).
+          await trackDeviceAndIP(email);
+
           // Si kont sa a gen MFA aktive, kanpe isit la epi mande kòd la
           if (await requiresMfaStepUp()) {
             setLoading(false);
             return;
           }
-
-          // 🚨 PRAN IP AK APARÈY LA ANVAN L ALE 🚨
-
-          await trackDeviceAndIP(email);
-
-
-
-          // Sèvi ak replace epi fose yon refresh pou Middleware la wè nouvo Cookie a
 
           await goAfterLogin();
 
@@ -457,12 +454,14 @@ export default function Login() {
           return;
         }
 
+        // Session-tag anvan MFA (menm rezon ak koneksyon modpas)
+        await trackDeviceAndIP(email);
+
         if (await requiresMfaStepUp()) {
           setLoading(false);
           return;
         }
 
-        await trackDeviceAndIP(email);
         await goAfterLogin();
 
       }
