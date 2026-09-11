@@ -83,7 +83,10 @@ export default function HatexcardDocs() {
             </li>
             <li>
               Kreye peman ak <code className="text-gray-300">POST /api/v2/payments</code>, apre
-              redireksyone kliyan an sou <code className="text-gray-300">checkout_url</code>.
+              voye kliyan an sou <code className="text-gray-300">checkout_url</code> — se yon{' '}
+              <strong className="text-white">paj peman HatexCard</strong> (menm eksperyans ak
+              pwodwi/fakti): kliyan an antre nimewo MonCash li epi konfime ak PIN li sou telefòn
+              li. <strong className="text-white">Pa gen redireksyon sou paj eksteryè.</strong>
             </li>
           </ol>
         </section>
@@ -198,9 +201,16 @@ const res = await fetch('${V2_PAY_URL}', {
   })
 });
 const data = await res.json();
-// data.checkout_url → redireksyone kliyan an
-// data.payment_id   → pou swiv estati a`}</pre>
+// data.checkout_url → paj peman HatexCard (voye kliyan an la)
+// data.payment_id   → pou swiv estati a (GET /api/v2/payments/{id})`}</pre>
           </div>
+          <p className="text-gray-400 text-sm leading-relaxed">
+            Lè peman an konfime, HatexCard voye <strong className="text-white">2 notifikasyon
+            otomatik</strong>: yon webhook <code className="text-gray-300">payment.success</code>{' '}
+            sou sit ou (si w konfigire youn) ak yon <strong className="text-white">imèl</strong> sou
+            adrès kont ou. Si w mete <code className="text-gray-300">
+            metadata.customer_email</code> nan demann lan, kliyan an resevwa yon resi pa imèl tou.
+          </p>
         </section>
 
         <section className="space-y-4">
@@ -235,7 +245,8 @@ header('Location: ' . $data['checkout_url']);`}</pre>
           <p className="text-gray-400 text-sm leading-relaxed">
             Ajoute yon URL HTTPS sou <code className="text-indigo-400">/developer</code>. Chak
             pwen gen yon mòd (test oswa live) ak yon secret. Lè peman an konfime, HatexCard voye{' '}
-            <code className="text-gray-300">payment.success</code>.
+            <code className="text-gray-300">payment.success</code> sou sit ou — anplis imèl
+            otomatik la. Si sit ou pa reponn, nou eseye ankò jiska 6 fwa.
           </p>
           <ul className="list-disc list-inside text-gray-400 space-y-2 ml-2 text-sm">
             <li>Peman test → sèlman webhook test</li>

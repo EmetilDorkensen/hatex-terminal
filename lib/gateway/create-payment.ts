@@ -11,6 +11,7 @@ import {
   type MonCashFlowMode,
 } from '@/lib/moncash/ussd-push';
 import { safeExternalUrl } from '@/lib/security/safe-url';
+import { publicSiteUrl } from '@/lib/urls/public';
 import type { MerchantAccount } from './auth';
 import { checkAmountLimits, checkMonthlyLimit } from './limits';
 import { checkMerchantDailyReceive } from '@/lib/billing/receive-limit';
@@ -49,7 +50,14 @@ export type PaymentResource = {
     payout_fee: number;
     client_total: number;
   };
+  /**
+   * Paj peman HatexCard-hosted la (https://hatexcard.com/checkout/<id>).
+   * Voye kliyan an la — li peye menm jan ak pwodwi/fakti (nimewo MonCash +
+   * konfimasyon sou telefòn li), SAN redireksyon sou paj eksteryè.
+   */
   checkout_url: string | null;
+  /** Lyen dirèk paj MonCash Digicel la (pou entegrasyon avanse sèlman). */
+  moncash_url: string | null;
   /** 'ussd' lè MonCash voye yon USSD dirèk sou telefòn kliyan an (pa gen paj). */
   checkout_mode: 'hosted' | 'ussd';
   description: string | null;
@@ -118,7 +126,13 @@ export function checkoutModeOf(row: {
   return row.metadata?.moncash_flow === 'ussd_push' ? 'ussd' : 'hosted';
 }
 
-export function toPaymentResource(row: PaymentRow, checkoutUrl: string | null): PaymentResource {
+/** Paj checkout HatexCard-hosted la — sèlman lè peman an toujou pending. */
+export function hostedCheckoutUrl(row: { id: string; status: string }): string | null {
+  if (row.status !== 'pending') return null;
+  return `${publicSiteUrl()}/checkout/${row.id}`;
+}
+
+export function toPaymentResource(row: PaymentRow, moncashUrl: string | null): PaymentResource {
   return {
     id: row.id,
     mode: row.mode,
@@ -132,7 +146,8 @@ export function toPaymentResource(row: PaymentRow, checkoutUrl: string | null): 
       payout_fee: Number(row.payout_fee),
       client_total: Number(row.client_total),
     },
-    checkout_url: checkoutUrl,
+    checkout_url: hostedCheckoutUrl(row),
+    moncash_url: moncashUrl,
     checkout_mode: checkoutModeOf(row),
     description: row.description,
     return_url: row.return_url,
