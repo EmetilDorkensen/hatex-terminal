@@ -38,7 +38,11 @@ function isPublicApi(pathname: string): boolean {
   return PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-export async function middleware(request: NextRequest) {
+/**
+ * Next.js 16: proxy.ts ranplase middleware.ts epi li kouri sou Node.js
+ * (node:crypto OK pou workspace gate HMAC).
+ */
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
