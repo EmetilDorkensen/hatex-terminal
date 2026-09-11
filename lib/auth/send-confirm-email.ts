@@ -27,8 +27,8 @@ export type SendConfirmResult =
   | { ok: false; message: string; status?: number };
 
 /**
- * Voye imèl konfimasyon atravè Brevo (pa SMTP Supabase ki rate-limit).
- * Itilize magiclink hashed_token → /auth/confirm sou sit la.
+ * Voye imèl konfimasyon atravè Brevo (pa SMTP Supabase ki rate-limit / kraze).
+ * Itilize generateLink type signup → /auth/confirm.
  */
 export async function sendSignupConfirmEmail(
   admin: SupabaseClient,
@@ -44,19 +44,35 @@ export async function sendSignupConfirmEmail(
     return { ok: false, message: 'Sèvis imèl pa konfigire.', status: 500 };
   }
 
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
+  // 'signup' konfime imèl; si sa echwe (kont deja konfime), eseye magiclink.
+  let tokenHash: string | undefined;
+  let linkType: 'signup' | 'magiclink' = 'signup';
+
+  const signupLink = await admin.auth.admin.generateLink({
+    type: 'signup',
     email,
     options: { redirectTo: `${SITE_URL}/auth/callback` },
   });
 
-  const tokenHash = data?.properties?.hashed_token;
-  if (error || !tokenHash) {
-    console.error('generateLink confirm failed:', error?.message);
-    return { ok: false, message: 'Pa t kapab kreye lyen konfimasyon.', status: 400 };
+  tokenHash = signupLink.data?.properties?.hashed_token;
+  if (signupLink.error || !tokenHash) {
+    const magic = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+      options: { redirectTo: `${SITE_URL}/auth/callback` },
+    });
+    tokenHash = magic.data?.properties?.hashed_token;
+    linkType = 'magiclink';
+    if (magic.error || !tokenHash) {
+      console.error(
+        'generateLink confirm failed:',
+        signupLink.error?.message || magic.error?.message
+      );
+      return { ok: false, message: 'Pa t kapab kreye lyen konfimasyon.', status: 400 };
+    }
   }
 
-  const actionLink = `${SITE_URL}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
+  const actionLink = `${SITE_URL}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=${linkType}`;
 
   const result = await sendMail({
     to: email,

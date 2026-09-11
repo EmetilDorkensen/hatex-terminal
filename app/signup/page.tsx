@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { createBrowserClient } from '@supabase/ssr';
 import { useSearchParams } from 'next/navigation';
 import { User, Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { checkStrongPassword } from '@/lib/security/password-strength';
@@ -13,8 +12,18 @@ function errorText(err: unknown, fallback: string): string {
     if (t && t !== '{}' && t !== '[object Object]') return t;
   }
   if (err && typeof err === 'object') {
-    const anyErr = err as { message?: unknown; error?: unknown; error_description?: unknown };
-    for (const candidate of [anyErr.message, anyErr.error_description, anyErr.error]) {
+    const anyErr = err as {
+      message?: unknown;
+      msg?: unknown;
+      error?: unknown;
+      error_description?: unknown;
+    };
+    for (const candidate of [
+      anyErr.message,
+      anyErr.msg,
+      anyErr.error_description,
+      anyErr.error,
+    ]) {
       if (typeof candidate === 'string') {
         const t = candidate.trim();
         if (t && t !== '{}' && t !== '[object Object]') return t;
@@ -26,11 +35,7 @@ function errorText(err: unknown, fallback: string): string {
 
 function SignupForm() {
   const searchParams = useSearchParams();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +45,7 @@ function SignupForm() {
   const [msg, setMsg] = useState<{ type: string; text: string }>({ type: '', text: '' });
 
   useEffect(() => {
-    const promoFromUrl = searchParams.get("promo");
+    const promoFromUrl = searchParams.get('promo');
     if (promoFromUrl) {
       localStorage.setItem('hatex_promo', promoFromUrl);
       setPromoCode(promoFromUrl.toUpperCase());
@@ -71,102 +76,41 @@ function SignupForm() {
       return;
     }
 
-    const cleanPromo = promoCode.trim().toUpperCase();
-    let finalDiscountAmount = 0; 
-
     try {
-      // 1. VERIFYE KÒD LA EPI PRAN KANTITE REDIKSYON AN
-      if (cleanPromo !== '') {
-        const { data: promoData, error: promoError } = await supabase
-          .from('promo_codes')
-          .select('code, usage_count, max_uses, reward_amount')
-          .eq('code', cleanPromo)
-          .maybeSingle();
-
-        if (promoError || !promoData) {
-          setMsg({ type: 'error', text: 'Kòd Pwomo sa a pa valab oswa li pa egziste nan sistèm nan!' });
-          setLoading(false);
-          return; 
-        }
-
-        if (promoData.max_uses !== null && promoData.usage_count >= promoData.max_uses) {
-          setMsg({ type: 'error', text: `Kòd Pwomo ${cleanPromo} an atenn limit li. Li pa valab ankò!` });
-          setLoading(false);
-          return;
-        }
-        finalDiscountAmount = promoData.reward_amount || 0;
-      }
-
-      // 2. KREYE KONT KLIYAN AN
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+      // Enskripsyon sou sèvè (admin) — pa itilize SMTP Supabase ki ap kraze.
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          promo_code: promoCode.trim().toUpperCase(),
+          accept_terms: true,
+        }),
       });
+      const json = await res.json().catch(() => ({} as Record<string, unknown>));
+      const text = errorText(json.message ?? json.msg ?? json.error, '');
 
-      if (authError) {
-        const authMsg = errorText(authError, '');
-        if (
-          authMsg.toLowerCase().includes('already registered') ||
-          authMsg.toLowerCase().includes('user already') ||
-          authError.status === 422
-        ) {
-          throw new Error('Imèl sa a gen yon kont sou li deja! Tanpri fè Konekte (Login).');
-        }
-        throw new Error(authMsg || 'Pa t kapab kreye kont lan. Eseye ankò.');
-      }
-
-      if (authData.user) {
-        // A) Sove Pwofil la
-        const { error: profileError } = await supabase.from('profiles').insert([{
-          id: authData.user.id,
-          full_name: fullName,
-          kyc_status: 'not_submitted',
-          used_promo: cleanPromo !== '' ? cleanPromo : null
-        }]);
-        if (profileError) {
-          console.error('profile insert:', profileError);
-          // Kont auth deja kreye — pa bloke itilizatè a sou erè pwofil (trigger / RLS)
-        }
-
-        // B) NOUVO: Sove ID kliyan an ak rediksyon an nan espas apa a (Tiroir a)
-        if (finalDiscountAmount > 0) {
-          const { error: discountError } = await supabase.from('user_discounts').insert([{
-            user_id: authData.user.id,
-            promo_code: cleanPromo,
-            discount_amount: finalDiscountAmount
-          }]);
-          if (discountError) console.error('user_discounts insert:', discountError);
-        }
-
-        localStorage.removeItem('hatex_promo');
-
-        // Voye konfimasyon atravè Brevo (SMTP Supabase souvan bloke / rate-limit)
-        try {
-          await fetch('/api/auth/send-confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email.trim().toLowerCase() }),
-          });
-        } catch {
-          /* pa kraze siksè enskripsyon */
-        }
-
-        setMsg({
-          type: 'success',
-          text: 'Kont la kreye! Nou voye yon imèl konfimasyon — tcheke inbox / spam ou.',
-        });
-      } else {
+      if (!res.ok || json.success === false) {
         setMsg({
           type: 'error',
-          text: 'Pa t kapab kreye kont lan. Verifye imèl ak modpas ou.',
+          text: text || 'Pa t kapab kreye kont lan. Eseye ankò.',
         });
+        return;
       }
 
-    } catch (error: unknown) {
+      localStorage.removeItem('hatex_promo');
+      setMsg({
+        type: 'success',
+        text:
+          text ||
+          'Kont la kreye! Nou voye yon imèl konfimasyon — tcheke inbox / spam ou.',
+      });
+    } catch {
       setMsg({
         type: 'error',
-        text: errorText(error, 'Gen yon erè ki rive pandan kreyasyon an.'),
+        text: 'Koneksyon echwe. Verifye entènèt ou epi eseye ankò.',
       });
     } finally {
       setLoading(false);
@@ -188,7 +132,7 @@ function SignupForm() {
         body: JSON.stringify({ email: clean }),
       });
       const json = await res.json().catch(() => ({} as Record<string, unknown>));
-      const apiMsg = errorText(json.message ?? json.error, '');
+      const apiMsg = errorText(json.message ?? json.msg ?? json.error, '');
       setMsg({
         type: res.ok ? 'success' : 'error',
         text: apiMsg || (res.ok ? 'Imèl konfimasyon renouvle.' : 'Pa t kapab voye.'),
@@ -202,8 +146,6 @@ function SignupForm() {
 
   return (
     <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-3xl border border-gray-200 shadow-xl shadow-slate-200/50">
-      
-      {/* LOGO AK TIT */}
       <div className="text-center mb-8">
         <div className="flex justify-center mb-4">
           <div className="bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
@@ -217,59 +159,55 @@ function SignupForm() {
       </div>
 
       <form onSubmit={handleSignup} className="space-y-5">
-        
-        {/* NON KONPLÈ */}
         <div className="space-y-1.5 text-left">
           <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Non Konplè Ou</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <User className="h-5 w-5 text-slate-400" />
             </div>
-            <input 
-              type="text" 
-              placeholder="Ex: Jean Jacques" 
-              value={fullName} 
-              onChange={(e) => setFullName(e.target.value)} 
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400" 
-              required 
+            <input
+              type="text"
+              placeholder="Ex: Jean Jacques"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
+              required
             />
           </div>
         </div>
 
-        {/* IMÈL */}
         <div className="space-y-1.5 text-left">
           <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Adrès Imèl</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Mail className="h-5 w-5 text-slate-400" />
             </div>
-            <input 
-              type="email" 
-              placeholder="kliyan@email.com" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400" 
-              required 
+            <input
+              type="email"
+              placeholder="kliyan@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
+              required
             />
           </div>
         </div>
 
-        {/* MODPAS */}
         <div className="space-y-1.5 text-left">
           <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Modpas Sekirize</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Lock className="h-5 w-5 text-slate-400" />
             </div>
-            <input 
-              type="password" 
-              placeholder="Min 10 karaktè + majiskil + chif + senbòl" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400" 
+            <input
+              type="password"
+              placeholder="Min 10 karaktè + majiskil + chif + senbòl"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
               minLength={10}
               autoComplete="new-password"
-              required 
+              required
             />
             <p className="text-[10px] text-slate-400 mt-1.5 ml-1">
               Omwen 10 karaktè, yon majiskil, yon miniskil, yon chif, ak yon senbòl.
@@ -277,24 +215,22 @@ function SignupForm() {
           </div>
         </div>
 
-        {/* PWOMO */}
         <div className="space-y-1.5 text-left">
           <label className="text-[10px] font-bold uppercase text-indigo-500 tracking-wider ml-1">Kòd Pwomo (Opsyonèl)</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Gift className="h-5 w-5 text-indigo-400" />
             </div>
-            <input 
-              type="text" 
-              placeholder="EX: Hatex2026" 
-              value={promoCode} 
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())} 
-              className="w-full pl-11 pr-4 py-3.5 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all text-sm font-bold text-indigo-700 placeholder:text-indigo-300 uppercase tracking-widest" 
+            <input
+              type="text"
+              placeholder="EX: Hatex2026"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              className="w-full pl-11 pr-4 py-3.5 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all text-sm font-bold text-indigo-700 placeholder:text-indigo-300 uppercase tracking-widest"
             />
           </div>
         </div>
 
-        {/* AKÒ SÈVIS */}
         <label className="flex items-start gap-3 text-left cursor-pointer select-none mt-2">
           <input
             type="checkbox"
@@ -316,20 +252,19 @@ function SignupForm() {
           </span>
         </label>
 
-        {/* MESSAGES */}
         {msg.text && (
           <div className={`p-4 rounded-xl mt-4 flex items-start gap-3 border ${msg.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-             {msg.type === 'error' ? <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />}
-             <p className="text-[11px] font-bold uppercase tracking-wider leading-relaxed">{msg.text}</p>
+            {msg.type === 'error' ? <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />}
+            <p className="text-[11px] font-bold uppercase tracking-wider leading-relaxed">{msg.text}</p>
           </div>
         )}
 
-        <button 
-          type="submit" 
-          disabled={loading} 
+        <button
+          type="submit"
+          disabled={loading}
           className="w-full bg-indigo-600 hover:bg-indigo-700 py-4 rounded-xl font-bold uppercase tracking-wider shadow-sm shadow-indigo-200 active:scale-[0.98] transition-all text-xs mt-6 text-white disabled:opacity-70 flex justify-center items-center gap-2"
         >
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Ap Kreye Kont Lan...</> : "Kreye Kont Mwen"}
+          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Ap Kreye Kont Lan...</> : 'Kreye Kont Mwen'}
         </button>
       </form>
 
@@ -353,19 +288,21 @@ function SignupForm() {
 export default function Signup() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
-      <Suspense fallback={
-        <div className="flex flex-col items-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
-          <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="flex flex-col items-center">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-4" />
+            <p className="text-sm font-semibold text-slate-600 tracking-wide uppercase">Chajman...</p>
+          </div>
+        }
+      >
         <SignupForm />
       </Suspense>
-      
+
       <div className="mt-10 flex items-center gap-3 opacity-40">
-         <div className="h-px w-8 bg-slate-400"></div>
-         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Secured by Hatex Group</span>
-         <div className="h-px w-8 bg-slate-400"></div>
+        <div className="h-px w-8 bg-slate-400"></div>
+        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Secured by Hatex Group</span>
+        <div className="h-px w-8 bg-slate-400"></div>
       </div>
     </div>
   );
