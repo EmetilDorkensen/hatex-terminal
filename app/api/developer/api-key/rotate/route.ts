@@ -3,12 +3,13 @@ import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
 import { rotateGatewayApiKey, maskGatewayApiKey } from '@/lib/gateway/api-keys';
+import { requireMfaTotpCode } from '@/lib/security/require-mfa-code';
 import type { GatewayMode } from '@/lib/moncash/config';
 
 /**
  * Woule kle API v2 pou yon mòd (test | live) — tankou Stripe.
- * Body: { mode: 'test' | 'live' }
- * Retounen kle an klè YON SÈL FWA.
+ * Body: { mode: 'test' | 'live', mfa_code: '123456' }
+ * Retounen kle an klè YON SÈL FWA. MFA obligatwa (step-up).
  */
 export async function POST(req: Request) {
   const ip = getClientIp(req);
@@ -28,9 +29,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Ou dwe konekte.' }, { status: 401 });
     }
 
-    let body: { mode?: unknown } = {};
+    let body: { mode?: unknown; mfa_code?: unknown } = {};
     try {
-      body = (await req.json()) as { mode?: unknown };
+      body = (await req.json()) as { mode?: unknown; mfa_code?: unknown };
     } catch {
       /* mode manke → erè anba */
     }
@@ -41,6 +42,11 @@ export async function POST(req: Request) {
         { error: 'Di ki kle: body { "mode": "test" } oswa { "mode": "live" }.' },
         { status: 400 }
       );
+    }
+
+    const mfa = await requireMfaTotpCode(supabaseSession, body?.mfa_code);
+    if (!mfa.ok) {
+      return NextResponse.json({ error: mfa.error, code: mfa.code }, { status: mfa.status });
     }
 
     const supabaseAdmin = createSupabaseAdminClient();

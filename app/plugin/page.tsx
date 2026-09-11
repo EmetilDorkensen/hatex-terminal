@@ -155,9 +155,20 @@ export default function PluginPage() {
   }, [profile, supabase]);
 
   const rotateApiKey = useCallback(async (): Promise<string | null> => {
+    const mfaCode = window.prompt(
+      'Antre kòd MFA (6 chif) pou jenere yon nouvo kle LIVE:'
+    );
+    if (!mfaCode || mfaCode.replace(/\D/g, '').length !== 6) {
+      alert('Kòd MFA 6 chif obligatwa pou rotate kle a.');
+      return null;
+    }
     setRotatingApiKey(true);
     try {
-      const res = await fetch('/api/developer/api-key/rotate', { method: 'POST' });
+      const res = await fetch('/api/developer/api-key/rotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'live', mfa_code: mfaCode.replace(/\D/g, '').trim() }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erè');
       setRevealedApiKey(data.api_key);

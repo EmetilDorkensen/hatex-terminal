@@ -54,6 +54,10 @@ export default function DeveloperDashboard() {
   const [revealedKeys, setRevealedKeys] = useState<Partial<Record<'test' | 'live', string>>>({});
   const [showKey, setShowKey] = useState<Partial<Record<'test' | 'live', boolean>>>({});
   const [rotatingMode, setRotatingMode] = useState<'test' | 'live' | null>(null);
+  /** Modal MFA step-up anvan rotate kle. */
+  const [rotateMfaMode, setRotateMfaMode] = useState<'test' | 'live' | null>(null);
+  const [rotateMfaCode, setRotateMfaCode] = useState('');
+  const [rotateMfaError, setRotateMfaError] = useState('');
 
   // Webhook endpoints state
   const [endpoints, setEndpoints] = useState<any[]>([]);
@@ -291,21 +295,35 @@ export default function DeveloperDashboard() {
     }
   };
 
-  const handleRotateApiKey = async (keyMode: 'test' | 'live') => {
+  const openRotateMfa = (keyMode: 'test' | 'live') => {
     const label = keyMode === 'test' ? 'TEST (hx_sk_test_)' : 'LIVE (hx_sk_live_)';
     if (
       !window.confirm(
-        `Ou pral jenere yon NOUVO kle ${label}. Ansyen kle ${keyMode} la pa mache ankò. Lòt kle a (${keyMode === 'test' ? 'live' : 'test'}) pa chanje. Kontinye?`
+        `Ou pral jenere yon NOUVO kle ${label}. Ansyen kle ${keyMode} la pa mache ankò. Lòt kle a (${keyMode === 'test' ? 'live' : 'test'}) pa chanje. Ou pral bezwen kòd MFA ou. Kontinye?`
       )
     ) {
       return;
     }
+    setRotateMfaError('');
+    setRotateMfaCode('');
+    setRotateMfaMode(keyMode);
+  };
+
+  const handleRotateApiKey = async () => {
+    const keyMode = rotateMfaMode;
+    if (!keyMode) return;
+    const code = rotateMfaCode.replace(/\D/g, '').trim();
+    if (code.length !== 6) {
+      setRotateMfaError('Antre kòd MFA 6 chif nan aplikasyon otantifikatè a.');
+      return;
+    }
     setRotatingMode(keyMode);
+    setRotateMfaError('');
     try {
       const res = await fetch('/api/developer/api-key/rotate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: keyMode }),
+        body: JSON.stringify({ mode: keyMode, mfa_code: code }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erè');
@@ -322,9 +340,11 @@ export default function DeveloperDashboard() {
           },
         ].sort((a, b) => a.mode.localeCompare(b.mode));
       });
+      setRotateMfaMode(null);
+      setRotateMfaCode('');
       alert(data.message || `Nouvo kle ${keyMode} jenere.`);
     } catch (err: any) {
-      alert(err.message);
+      setRotateMfaError(err.message || 'Erè');
     } finally {
       setRotatingMode(null);
     }
@@ -757,8 +777,8 @@ curl --request POST \\
                             Secret key — {keyMode}
                           </label>
                           <button
-                            onClick={() => handleRotateApiKey(keyMode)}
-                            disabled={!!rotatingMode}
+                            onClick={() => openRotateMfa(keyMode)}
+                            disabled={!!rotatingMode || !!rotateMfaMode}
                             className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 bg-white hover:bg-slate-50 border border-gray-200 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
                           >
                             {isRotating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
@@ -993,6 +1013,75 @@ curl --request POST \\
               </button>
             </div>
             <button onClick={() => setRevealedSecret(null)} className="w-full bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all">Mwen kopye l</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MFA pou rotate kle API */}
+      {rotateMfaMode && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => {
+            if (!rotatingMode) {
+              setRotateMfaMode(null);
+              setRotateMfaCode('');
+              setRotateMfaError('');
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Verifye MFA pou rotate</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Antre kòd 6 chif nan aplikasyon otantifikatè ou pou jenere yon nouvo kle{' '}
+              <strong className="text-slate-800 uppercase">{rotateMfaMode}</strong>. Ansyen kle{' '}
+              {rotateMfaMode} la ap sispann mache.
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              value={rotateMfaCode}
+              onChange={(e) => setRotateMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleRotateApiKey();
+              }}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-center text-2xl font-mono tracking-[0.4em] font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 mb-3"
+              autoFocus
+              disabled={!!rotatingMode}
+            />
+            {rotateMfaError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">
+                {rotateMfaError}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRotateMfaMode(null);
+                  setRotateMfaCode('');
+                  setRotateMfaError('');
+                }}
+                disabled={!!rotatingMode}
+                className="flex-1 bg-white border border-gray-200 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 disabled:opacity-50"
+              >
+                Anile
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRotateApiKey()}
+                disabled={!!rotatingMode || rotateMfaCode.replace(/\D/g, '').length !== 6}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              >
+                {rotatingMode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Konfime rotate
+              </button>
+            </div>
           </div>
         </div>
       )}

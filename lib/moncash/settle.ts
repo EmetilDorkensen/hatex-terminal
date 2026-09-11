@@ -36,6 +36,7 @@ type PaymentRow = {
   status: string;
   purpose: 'merchant' | 'kyc_fee' | 'crypto_buy' | 'invoice' | 'plan_fee' | 'product';
   gateway_order_id: string;
+  merchant_order_id: string | null;
   merchant_amount: number;
   platform_fee: number;
   client_total: number;
@@ -44,7 +45,7 @@ type PaymentRow = {
 };
 
 const PAYMENT_SELECT =
-  'id, merchant_id, mode, status, purpose, gateway_order_id, merchant_amount, platform_fee, client_total, moncash_transaction_id, metadata';
+  'id, merchant_id, mode, status, purpose, gateway_order_id, merchant_order_id, merchant_amount, platform_fee, client_total, moncash_transaction_id, metadata';
 
 async function findPayment(
   admin: SupabaseClient,
@@ -361,7 +362,9 @@ export async function settleMonCashPayment(
         'payment.success',
         {
           payment_id: payment.id,
+          // Preferans: referans machann lan (API order_id), sinon metadata, sinon ID pòtay.
           order_id:
+            (typeof payment.merchant_order_id === 'string' && payment.merchant_order_id) ||
             (typeof payment.metadata?.order_id === 'string' && payment.metadata.order_id) ||
             payment.gateway_order_id,
           amount: Number(payment.merchant_amount),
