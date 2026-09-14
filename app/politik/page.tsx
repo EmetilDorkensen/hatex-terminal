@@ -1,448 +1,506 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, ArrowLeft, AlertTriangle, Info, Mail, Globe, MessageCircle } from 'lucide-react';
+import {
+  ShieldCheck,
+  ArrowLeft,
+  AlertTriangle,
+  Mail,
+  Globe,
+  MessageCircle,
+  Lock,
+} from 'lucide-react';
+
+/**
+ * Politik Konfidansyalite HatexCard — estriktire tankou Privacy Statement
+ * Authorize.net: pòte klè, kategori done, itilizasyon, pataj limite,
+ * sekirite, dwa itilizatè, responsablite machann, limit responsablite.
+ */
+
+const SECTIONS: { id: string; title: string }[] = [
+  { id: 's1', title: '1. Pòte politik sa a' },
+  { id: 's2', title: '2. Enfòmasyon nou kolekte' },
+  { id: 's3', title: '3. Kijan nou itilize enfòmasyon yo' },
+  { id: 's4', title: '4. Kijan nou pataje enfòmasyon yo' },
+  { id: 's5', title: '5. Cookies ak teknoloji swiv' },
+  { id: 's6', title: '6. Sekirite done yo' },
+  { id: 's7', title: '7. Konsèvasyon done' },
+  { id: 's8', title: '8. Dwa ou ak chwa ou' },
+  { id: 's9', title: '9. Done kliyan machann yo' },
+  { id: 's10', title: '10. Sèvis twazyèm pati' },
+  { id: 's11', title: '11. Minè' },
+  { id: 's12', title: '12. Responsablite itilizatè & limit responsablite' },
+  { id: 's13', title: '13. Chanjman nan politik sa a' },
+  { id: 's14', title: '14. Kontakte nou' },
+];
+
+function H2({ id, children }: Readonly<{ id: string; children: React.ReactNode }>) {
+  return (
+    <h2
+      id={id}
+      className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-5 border-b border-gray-200 pb-3 scroll-mt-24"
+    >
+      {children}
+    </h2>
+  );
+}
+
+function H3({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">{children}</h3>;
+}
 
 export default function PolitikPage() {
   const router = useRouter();
-  const [depositFeePct, setDepositFeePct] = useState(5);
-  const [withdrawFeePct, setWithdrawFeePct] = useState(5);
-
-  useEffect(() => {
-    fetch('/api/public/fees')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.fees?.deposit_fee_percent != null) setDepositFeePct(Number(d.fees.deposit_fee_percent));
-        if (d?.fees?.withdraw_fee_percent != null) setWithdrawFeePct(Number(d.fees.withdraw_fee_percent));
-      })
-      .catch(() => {});
-  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-600 font-sans selection:bg-indigo-100">
-      
+    <div className="min-h-screen bg-slate-50 text-slate-600 font-sans selection:bg-blue-100">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto p-4 flex items-center gap-4">
-          <button 
-            onClick={() => router.push('/')} 
-            className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition-colors shadow-sm shrink-0"
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-slate-600 hover:text-[#1d4ed8] hover:bg-slate-50 transition-colors shadow-sm shrink-0"
+            aria-label="Retounen"
           >
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <div className="bg-indigo-50 p-1.5 rounded-lg border border-indigo-100">
-              <ShieldCheck className="text-indigo-600" size={20} />
+            <div className="bg-blue-50 p-1.5 rounded-lg border border-blue-100">
+              <ShieldCheck className="text-[#1d4ed8]" size={20} />
             </div>
-            <span className="text-slate-900 font-bold tracking-tight uppercase text-sm">HatexCard</span>
+            <span className="text-slate-900 font-bold tracking-tight text-sm">
+              Politik Konfidansyalite
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Kontni Politik la */}
       <div className="max-w-4xl mx-auto p-5 md:p-8 pb-32">
-        <div className="mb-12">
+        {/* Tit */}
+        <div className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-4">
-            Politik Konfidansyalite <span className="text-indigo-600 font-semibold">Hatexcard</span>
+            Politik Konfidansyalite{' '}
+            <span className="text-[#1d4ed8] font-semibold">HatexCard</span>
           </h1>
-          <p className="text-slate-500 font-semibold tracking-wider uppercase text-xs border-l-4 border-indigo-500 pl-4 py-1 mb-4">
-            Dènye mizajou : Septanm 2026
+          <p className="text-slate-500 font-semibold tracking-wider uppercase text-xs border-l-4 border-[#1d4ed8] pl-4 py-1 mb-5">
+            Dènye mizajou : Septanm 2026 · An vigè imedyatman
           </p>
-          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900 font-medium leading-relaxed">
-            Pou <strong>Akò Sèvis ak Kondisyon Itilizasyon</strong> (pasèl / gateway,
-            absans wallet, ranbousman, API, KYC) — gade dokiman ofisyèl la:{' '}
-            <a href="/terms" className="font-bold underline text-indigo-700">
-              hatexcard.com/terms
-            </a>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-slate-700 font-medium leading-relaxed">
+            Lè ou kreye yon kont, itilize sit la, API a, oswa peye yon machann atravè
+            HatexCard, <strong className="text-slate-900">ou aksepte politik sa a</strong>.
+            Si ou pa dakò, pa itilize sèvis la. Pou Akò Sèvis konplè a (pasèl, absans
+            wallet, ranbousman, frè) gade{' '}
+            <a href="/terms" className="font-bold underline text-[#1d4ed8]">hatexcard.com/terms</a>.
           </div>
         </div>
 
-        <div className="space-y-10 text-sm md:text-base text-slate-600 leading-relaxed">
-          
-          {/* SEKSYON 1 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">1</span> 
-              Kondisyon Jeneral Itilizasyon
-            </h2>
-            
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">1.1 Akseptasyon Kondisyon Yo</h3>
-            <p className="mb-4">Lè ou kreye yon kont Hatexcard oswa itilize nenpòt sèvis nou ofri, ou aksepte otomatikman tout kondisyon ki ekri nan dokiman sa a. Si ou pa dakò ak youn nan kondisyon sa yo, ou pa dwe itilize sèvis Hatexcard.</p>
-            <p className="mb-4">Hatexcard rezève dwa pou modifye kondisyon sa yo nenpòt ki lè. Nou ap notifye itilizatè yo pa imèl oswa pa notifikasyon sou platfòm nan. Kontinye itilize sèvis la apre yon modifikasyon vle di ou aksepte nouvo kondisyon yo.</p>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">1.2 Elijibilite</h3>
-            <p className="mb-2">Pou itilize Hatexcard, ou dwe :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Gen omwen 18 an</li>
-              <li>Rezide oswa fè biznis an Ayiti</li>
-              <li>Bay enfòmasyon idantifikasyon ki veridik ak konplè pandan pwosesis KYC la</li>
-              <li>Pa dwe sou yon lis entèdiksyon finansyè lokal oswa entènasyonal</li>
-              <li>Pa gen yon istwa fwod oswa aktivite ilegal sou nenpòt platfòm finansyè</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">1.3 Kont Itilizatè</h3>
-            <p className="mb-2">Ou responsab pou :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Konfidansyalite modpas ou ak tout enfòmasyon aksè kont ou</li>
-              <li>Tout aktivite ki fèt sou kont ou, ke ou otorize yo oswa non</li>
-              <li>Notifye Hatexcard imedyatman si ou sispèk yon aksè non otorize sou kont ou</li>
-            </ul>
-            <div className="flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 mt-4">
-               <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-               <p className="text-amber-800 font-semibold text-sm">Hatexcard p ap janm mande modpas ou pa imèl, pa telefòn, oswa pa nenpòt lòt kanal.</p>
-            </div>
-          </section>
-
-          {/* SEKSYON 2 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">2</span> 
-              Politik Konfidansyalite (Privacy Policy)
-            </h2>
-            
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">2.1 Enfòmasyon Nou Kolekte</h3>
-            <p className="mb-3">Hatexcard kolekte kategori enfòmasyon sa yo :</p>
-            <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5 mb-6">
-              <div>
-                <span className="font-bold text-slate-800 flex items-center gap-2 mb-1">
-                   <Info size={16} className="text-indigo-500" /> Enfòmasyon Idantite :
-                </span>
-                <p className="text-sm text-slate-500 ml-6">Non konplè, dat nesans, nasyonalite. Foto idantite (CIN, paspo, lisans). Selfie pou verifikasyon byometrik.</p>
-              </div>
-              <div className="h-px bg-gray-100 ml-6"></div>
-              <div>
-                <span className="font-bold text-slate-800 flex items-center gap-2 mb-1">
-                   <Info size={16} className="text-indigo-500" /> Enfòmasyon Finansyè :
-                </span>
-                <p className="text-sm text-slate-500 ml-6">Nimewo kont, istwa tranzaksyon. Sous lajan ak destinasyon tranzaksyon yo. Balans ak mouvman kont.</p>
-              </div>
-              <div className="h-px bg-gray-100 ml-6"></div>
-              <div>
-                <span className="font-bold text-slate-800 flex items-center gap-2 mb-1">
-                   <Info size={16} className="text-indigo-500" /> Enfòmasyon Teknik :
-                </span>
-                <p className="text-sm text-slate-500 ml-6">Adrès IP, tip aparèy, sistèm operasyon. Lokalizasyon jeyografik (si ou pèmèt li). Dat ak lè koneksyon yo.</p>
-              </div>
-            </div>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">2.2 Kijan Nou Itilize Enfòmasyon Ou</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Verifye idantite ou ak konfòme nou ak règleman KYC/AML</li>
-              <li>Trete tranzaksyon ou yo epi pwoteje kont ou</li>
-              <li>Detekte ak prevni fwod ak aktivite sispèk</li>
-              <li>Amelyore sèvis nou yo epi rezoud pwoblèm teknik</li>
-              <li>Voye notifikasyon enpòtan sou kont ou</li>
-              <li>Konfòme nou ak obligasyon legal ak règlemantasyon</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">2.3 Pataj Enfòmasyon</h3>
-            <p className="mb-2 font-bold text-slate-800">Hatexcard pa vann enfòmasyon pèsonèl ou bay tès pati pou rezon komèsyal.</p>
-            <p className="mb-2">Nou ka pataje enfòmasyon ou sèlman nan sitiyasyon sa yo :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Lè lalwa oswa yon otorite jiridik mande li</li>
-              <li>Pou konfòme nou ak règleman anti-blanchiman lajan (AML)</li>
-              <li>Avèk patnè teknik nou yo ki ede nou opere platfòm nan (avèk akò konfidansyalite)</li>
-              <li>Pou pwoteje dwa, pwopriyete, oswa sekirite Hatexcard ak itilizatè li yo</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">2.4 Konsèvasyon Done</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Tout dire kont ou aktif la</li>
-              <li>5 an apre ou fèmen kont ou pou rezon legal ak règlemantè</li>
-              <li>Pi lontan si lalwa mande li nan ka envestigasyon</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">2.5 Dwa Ou Genyen</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Aksede ak done pèsonèl ou nou genyen</li>
-              <li>Mande koreksyon done ki pa egzak</li>
-              <li>Mande efasman done ou (si lalwa pèmèt li)</li>
-              <li>Opoze trete done ou nan sèten sitiyasyon</li>
-              <li>Pòte plent devan otorite konpetan si ou kwè dwa ou vyole</li>
-            </ul>
-            <p className="mb-4">Pou egzèse dwa sa yo, kontakte nou nan : <a href="mailto:contact@hatexcard.com" className="text-indigo-600 font-bold hover:underline">contact@hatexcard.com</a></p>
-          </section>
-
-          {/* SEKSYON 3 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">3</span> 
-              Politik Anti-Fwod & Sekirite
-            </h2>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">3.1 Sistèm Deteksyon Fwod</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Siveyans tranzaksyon an tan reyèl 24h/7j</li>
-              <li>Deteksyon konpòtman etranj sou kont yo</li>
-              <li>Verifikasyon idantite milti-nivo (KYC)</li>
-              <li>Otantifikasyon de faktè (2FA) pou tout aksè sansib</li>
-              <li>Chifreman done SSL/TLS pou tout kominikasyon</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">3.2 Tranzaksyon Entèdi</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4 text-slate-600">
-              <li>Blanchiman lajan oswa finansman aktivite kriminèl</li>
-              <li>Tranzaksyon ki asosye ak dwòg, zam, oswa aktivite ilegal</li>
-              <li>Fwod, eskwokri, oswa manipilasyon lòt itilizatè</li>
-              <li>Finanse òganizasyon teworis oswa aktivite ki mete lavi moun an danje</li>
-              <li>Evasyon fiskal oswa kachèt revni</li>
-              <li>Vann oswa achte machandiz fo, vòlè, oswa ilegal</li>
-              <li>Jwe ilegal oswa sistèm ponzi</li>
-              <li>Nenpòt aktivite ki vyole lwa Repiblik Ayiti</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">3.3 Konsekans Vyolasyon</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Kont ou ka sispann imedyatman san avètisman</li>
-              <li>Tranzaksyon an ka bloke ak revèse</li>
-              <li>Enfòmasyon ou ka transmèt bay otorite konpetan</li>
-              <li>Ou ka pèdi tout dwa sou fon ki nan kont ou si fwod konfime</li>
-              <li>Ou ka fè fas ak pouswit jiridik selon lwa ayisyen</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">3.4 Responsabilite Itilizatè</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Pwoteje enfòmasyon koneksyon ou — pa janm pataje yo</li>
-              <li>Verifikasyon kont ou regilyèman pou detekte aktivite etranj</li>
-              <li>Rapòte imedyatman tout tranzaksyon ou pa rekonèt</li>
-              <li>Pa itilize aparèy piblik oswa WiFi piblik pou aksede kont ou</li>
-              <li>Pa klike sou lyen sispèk ki reklame yo se Hatexcard</li>
-            </ul>
-          </section>
-
-          {/* SEKSYON 4 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">4</span> 
-              Politik KYC & AML
-            </h2>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">4.1 Obligasyon KYC (Know Your Customer)</h3>
-            <p className="mb-2">Konfòmeman ak règleman finansyè entènasyonal ak lwa ayisyen, Hatexcard oblije verifye idantite tout itilizatè anvan yo ka itilize sèvis konplè yo.</p>
-            <p className="mb-2">Dokiman obligatwa :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-6">
-              <li>Yon pyès idantite valid (CIN, paspo, oswa lisans)</li>
-              <li>Yon selfie ak pyès idantite a</li>
-              <li>Pafwa : prèv adrès (bòdwo sèvis piblik, relvè bank)</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">4.2 Nivo Verifikasyon</h3>
-            <div className="overflow-x-auto mb-6 shadow-sm rounded-2xl border border-gray-200 hidden md:block">
-              <table className="w-full text-left bg-white border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider border-b border-gray-200">
-                    <th className="p-4">Nivo</th>
-                    <th className="p-4">Limit Tranzaksyon</th>
-                    <th className="p-4">Dokiman Obligatwa</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  <tr className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-bold text-slate-800">Debaz</td>
-                    <td className="p-4 text-slate-600">5,000 HTG/jou</td>
-                    <td className="p-4 text-slate-600">Imèl + telefòn</td>
-                  </tr>
-                  <tr className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-bold text-slate-800">Estanda</td>
-                    <td className="p-4 text-slate-600">50,000 HTG/jou</td>
-                    <td className="p-4 text-slate-600">CIN + selfie</td>
-                  </tr>
-                  <tr className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-bold text-slate-800">Avanse</td>
-                    <td className="p-4 text-slate-600">30,000 HTG/jou</td>
-                    <td className="p-4 text-slate-600">CIN + prèv adrès + entèvyou</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-bold text-slate-800">Biznis</td>
-                    <td className="p-4 text-slate-600">Selon kontra</td>
-                    <td className="p-4 text-slate-600">Dokiman antrepriz konplè</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Tablo vèsyon mobil */}
-            <div className="md:hidden space-y-4 mb-6">
-              {[
-                { nivo: 'Debaz', limit: '5,000 HTG/jou', doc: 'Imèl + telefòn' },
-                { nivo: 'Estanda', limit: '50,000 HTG/jou', doc: 'CIN + selfie' },
-                { nivo: 'Avanse', limit: '30,000 HTG/jou', doc: 'CIN + prèv adrès + entèvyou' },
-                { nivo: 'Biznis', limit: 'Selon kontra', doc: 'Dokiman antrepriz konplè' }
-              ].map((item, i) => (
-                <div key={i} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3 text-sm">
-                  <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                     <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Nivo</span> 
-                     <span className="text-slate-800 font-bold">{item.nivo}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                     <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Limit</span> 
-                     <span className="text-slate-600 font-medium">{item.limit}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                     <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Dokiman</span> 
-                     <span className="text-slate-600 font-medium text-right max-w-[150px]">{item.doc}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">4.3 Politik AML (Anti-Money Laundering)</h3>
-            <p className="mb-2">Hatexcard aplike yon pwogram AML konplè ki gen ladan :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Siveyans kontinyèl tranzaksyon yo</li>
-              <li>Rapòtaj tranzaksyon sispèk bay otorite konpetan</li>
-              <li>Fòmasyon regilye ekip nou an sou deteksyon fwod</li>
-              <li>Revizyon peryodik pwofil itilizatè ki gen gwo volim tranzaksyon</li>
-              <li>Blokaj imedyat kont ki montre siy aktivite kriminèl</li>
-            </ul>
-          </section>
-
-          {/* SEKSYON 5 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">5</span> 
-              Politik Retrè & Depo
-            </h2>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">5.1 Frè Ofisyèl</h3>
-            <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 mb-6 text-sm">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <span className="font-medium text-slate-600">Tranzaksyon P2P (ant itilizatè)</span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider">Gratis</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <span className="font-medium text-slate-600">Peman bay machann (MonCash)</span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider">Gratis</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <span className="font-medium text-slate-600">Depo</span>
-                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-md text-[10px] tracking-wider">{depositFeePct}%</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-medium text-slate-600">Retrè</span>
-                <span className="font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-md text-[10px] tracking-wider">{withdrawFeePct}%</span>
-              </div>
-            </div>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">5.2 Limit & Delè</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Retrè yo trete nan 24-48 è ouvrab</li>
-              <li>Hatexcard rezève dwa pou mande verifikasyon adisyonèl pou gwo tranzaksyon</li>
-              <li>Limit yo ka ajiste selon nivo verifikasyon itilizatè a</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">5.3 Tranzaksyon ki Pa Kapab Revèse</h3>
-            <div className="flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 mt-4 mb-4">
-               <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-               <p className="text-amber-800 font-medium text-sm leading-relaxed">
-                 <span className="font-bold block mb-1">Atansyon :</span> Majorite tranzaksyon sou Hatexcard pa kapab revèse apre konfimasyon. Ou responsab pou verifye tout detay anvan ou konfime yon peman.
-               </p>
-            </div>
-            <p className="mb-2">Sèl sitiyasyon kote yon tranzaksyon ka revèse :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Fwod konfime ak dokiman</li>
-              <li>Erè teknik ki soti nan sistèm Hatexcard</li>
-              <li>Yon òd jiridik valid</li>
-            </ul>
-          </section>
-
-          {/* SEKSYON 6 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">6</span> 
-              Politik Rezilyasyon & Fèmti Kont
-            </h2>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">6.1 Fèmti Volontè</h3>
-            <p className="mb-2">Ou ka fèmen kont ou nenpòt ki lè an kontaktant sipò nou. Anvan fèmti :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Retire tout fon ki nan kont ou</li>
-              <li>Asire tout tranzaksyon an kouri yo fini</li>
-              <li>Anile tout abònman aktif</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">6.2 Sispansyon oswa Fèmti Fòse</h3>
-            <p className="mb-2">Hatexcard ka sispann oswa fèmen yon kont san avètisman si :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Itilizatè a vyole kondisyon itilizasyon yo</li>
-              <li>Kont lan montre siy fwod oswa aktivite ilegal</li>
-              <li>Itilizatè a bay fo enfòmasyon pandan KYC</li>
-              <li>Yon otorite legal mande li</li>
-              <li>Kont lan pa aktif pandan plis pase 12 mwa</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">6.3 Fon Apre Fèmti</h3>
-            <p className="mb-2">Si kont lan fèmen ak fon ladan :</p>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Hatexcard ap kontakte ou pou aranje retrè fon yo</li>
-              <li>Ou gen 90 jou pou reklame fon ou yo</li>
-              <li>Apre 90 jou, Hatexcard ka pran dispozisyon legal pou jere fon yo selon lwa an vigè</li>
-            </ul>
-          </section>
-
-          {/* SEKSYON 7 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">7</span> 
-              Limit Responsabilite
-            </h2>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">7.1 Sa Hatexcard Responsab Pou</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Sekirite enfòmasyon ou sou platfòm nou an</li>
-              <li>Trete tranzaksyon ou yo fidèlman jan sistèm nan mande li</li>
-              <li>Disponibilite sèvis la nan yon nivo rezonab</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">7.2 Sa Hatexcard Pa Responsab Pou</h3>
-            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
-              <li>Pèt ki soti nan yon aksè non otorize akòz neglijans itilizatè (pataje modpas, etc.)</li>
-              <li>Tranzaksyon ou fè pa erè bay move destinatè</li>
-              <li>Entèripsyon sèvis akòz faktè deyò nou kontwòl (katastwòf natirèl, pwoblèm entènèt nasyonal, etc.)</li>
-              <li>Pèt komèsyal endirèk ki soti nan entèripsyon sèvis la</li>
-              <li>Aksyon tès pati ki aji mal ak enfòmasyon yo jwenn ilegalman</li>
-            </ul>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">7.3 Fòs Majè</h3>
-            <p className="mb-4">Hatexcard pa ka teni responsab pou nenpòt echèk oswa reta nan sèvis li si sa soti nan evènman ki deyò kontwòl rezonab nou — tankou katastwòf natirèl, tranzisyon politik, oswa pandemi.</p>
-          </section>
-
-          {/* SEKSYON 8, 9, 10 */}
-          <section>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-12 mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
-              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-sm">8</span> 
-              Rezoud Diferan & Politik Cookie
-            </h2>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">8.1 Sipò ak Rezolisyon</h3>
-            <p className="mb-4">Si ou gen yon plent, kontakte nou. Nou angaje pou rezoud tout diferan nan 15 jou ouvrab amikalman. Si pa gen akò, tout diferan yo soumèt ak jiridiksyon tribinal konpetan Repiblik Ayiti.</p>
-
-            <h3 className="text-base font-bold text-slate-800 mt-6 mb-3">9. Politik Cookie</h3>
-            <p className="mb-4">Hatexcard itilize cookies pou kenbe sesyon koneksyon ou aktif, amelyore eksperyans platfòm nan, ak detekte aktivite fwodilè. Ou ka dezaktive yo, men sa ka afekte sèvis la.</p>
-            
-            <div className="bg-indigo-50 border border-indigo-100 p-8 rounded-3xl mt-12 text-center shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wider mb-6">10. Kontakte Nou</h3>
-              <div className="space-y-4 text-sm font-medium text-slate-700 flex flex-col items-center justify-center">
-                <a href="mailto:support@hatexcard.com" className="flex items-center gap-2 hover:text-indigo-600 transition-colors bg-white px-5 py-2.5 rounded-xl border border-indigo-100 w-full max-w-[250px] justify-center shadow-sm">
-                  <Mail size={18} className="text-indigo-500" /> support@hatexcard.com
-                </a>
-                <a href="https://www.hatexcard.com" target="_blank" className="flex items-center gap-2 hover:text-indigo-600 transition-colors bg-white px-5 py-2.5 rounded-xl border border-indigo-100 w-full max-w-[250px] justify-center shadow-sm">
-                  <Globe size={18} className="text-indigo-500" /> www.hatexcard.com
-                </a>
-                <a href="https://wa.me/50937201241" target="_blank" className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors bg-white px-5 py-2.5 rounded-xl border border-emerald-100 w-full max-w-[250px] justify-center shadow-sm">
-                  <MessageCircle size={18} /> +509 3720 1241
-                </a>
-              </div>
-            </div>
-          </section>
-
+        {/* Tab matyè */}
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 md:p-6 mb-12">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+            Tab matyè
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+            {SECTIONS.map((s) => (
+              <a
+                key={s.id}
+                href={`#${s.id}`}
+                className="text-sm font-semibold text-slate-600 hover:text-[#1d4ed8] transition-colors"
+              >
+                {s.title}
+              </a>
+            ))}
+          </div>
         </div>
 
-        {/* Footer Text */}
+        <div className="space-y-2 text-sm md:text-[15px] text-slate-600 leading-relaxed">
+          {/* 1 */}
+          <section>
+            <H2 id="s1">1. Pòte politik sa a</H2>
+            <p className="mb-4">
+              Politik sa a eksplike kijan <strong className="text-slate-900">HatexCard</strong>{' '}
+              (« nou ») kolekte, itilize, pataje, ak pwoteje enfòmasyon pèsonèl lè ou :
+            </p>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>vizite <strong className="text-slate-900">hatexcard.com</strong> oswa app nou yo;</li>
+              <li>ouvri yon kont machann epi pase verifikasyon KYC;</li>
+              <li>itilize API, plugin, fakti, lyen pwodwi, oswa webhook nou yo;</li>
+              <li>peye yon machann atravè yon paj checkout HatexCard.</li>
+            </ul>
+            <p className="mb-4">
+              Politik sa a <strong className="text-slate-900">pa kouvri</strong> sit entènèt
+              machann yo, ni sèvis twazyèm pati (tankou MonCash / Digicel) ki gen pwòp
+              politik pa yo. Nou pa responsab pratik konfidansyalite sit sa yo (gade
+              seksyon 9 ak 10).
+            </p>
+          </section>
+
+          {/* 2 */}
+          <section>
+            <H2 id="s2">2. Enfòmasyon nou kolekte</H2>
+
+            <H3>2.1 Enfòmasyon ou ban nou dirèkteman</H3>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>
+                <strong className="text-slate-900">Idantite (KYC) :</strong> non konplè, dat
+                nesans, nasyonalite, foto pyès idantite (CIN, paspò, lisans), selfie
+                verifikasyon.
+              </li>
+              <li>
+                <strong className="text-slate-900">Kontak :</strong> imèl, nimewo telefòn,
+                non biznis.
+              </li>
+              <li>
+                <strong className="text-slate-900">Payout :</strong> nimewo MonCash /
+                NatCash oswa kont bank kote ou resevwa lajan ou.
+              </li>
+              <li>
+                <strong className="text-slate-900">Kominikasyon :</strong> mesaj ou voye bay
+                sipò nou.
+              </li>
+            </ul>
+
+            <H3>2.2 Enfòmasyon tranzaksyon</H3>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>montan, dat, referans kòmand, estati chak peman;</li>
+              <li>nimewo telefòn MonCash moun k ap peye a (pou konfime peman an);</li>
+              <li>istorik fakti, pwodwi, ak payout.</li>
+            </ul>
+
+            <H3>2.3 Enfòmasyon teknik (otomatik)</H3>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>adrès IP, tip aparèy ak navigatè, sistèm operasyon;</li>
+              <li>dat/lè koneksyon, paj ou vizite, aktivite sou kont lan;</li>
+              <li>done cookies ak sesyon (gade seksyon 5).</li>
+            </ul>
+
+            <div className="flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 mt-4">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
+              <p className="text-amber-800 font-medium text-sm leading-relaxed">
+                <strong>Sa nou PA kolekte :</strong> nou pa janm mande ni estoke PIN MonCash
+                ou. Kle API sekrè yo estoke sèlman an fòm chifre (hash) — pèsonn, menm
+                anplwaye nou, pa ka li yo.
+              </p>
+            </div>
+          </section>
+
+          {/* 3 */}
+          <section>
+            <H2 id="s3">3. Kijan nou itilize enfòmasyon yo</H2>
+            <p className="mb-3">Nou itilize enfòmasyon ou sèlman pou :</p>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>bay sèvis la : kreye kont, trete peman, fè payout, voye fakti;</li>
+              <li>
+                <strong className="text-slate-900">verifye idantite ou (KYC)</strong> epi
+                respekte obligasyon anti-blanchiman lajan (AML) ak lwa Repiblik Ayiti;
+              </li>
+              <li>detekte ak anpeche fwod, abi, ak aktivite ilegal;</li>
+              <li>sekirize kont lan (MFA, alèt koneksyon, siveyans aktivite etranj);</li>
+              <li>voye notifikasyon sèvis (konfimasyon peman, alèt sekirite, resi);</li>
+              <li>reponn demann sipò ou epi amelyore pwodwi a;</li>
+              <li>reponn yon demann legal valab.</li>
+            </ul>
+            <p className="mb-4 font-semibold text-slate-800">
+              Nou pa itilize done KYC ou pou piblisite, epi nou pa voye piblisite twazyèm
+              pati ba ou.
+            </p>
+          </section>
+
+          {/* 4 */}
+          <section>
+            <H2 id="s4">4. Kijan nou pataje enfòmasyon yo</H2>
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-5">
+              <p className="font-bold text-slate-900 mb-1">
+                HatexCard pa vann, pa lwe, ni pa fè komès ak enfòmasyon pèsonèl ou.
+              </p>
+              <p className="text-sm">
+                Nou pataje done sèlman nan ka limite sa yo, ak pwoteksyon kontraktyèl :
+              </p>
+            </div>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>
+                <strong className="text-slate-900">Founisè peman :</strong> MonCash / Digicel
+                — pou egzekite ak konfime tranzaksyon yo.
+              </li>
+              <li>
+                <strong className="text-slate-900">Founisè teknik :</strong> ebèjman,
+                deliverabilite imèl, verifikasyon idantite — anba akò konfidansyalite,
+                sèlman sa ki nesesè.
+              </li>
+              <li>
+                <strong className="text-slate-900">Machann lan :</strong> lè ou peye yon
+                machann, machann lan wè detay kòmand li a (montan, referans, estati, nimewo
+                telefòn peman an) — li pa janm wè dokiman KYC ou.
+              </li>
+              <li>
+                <strong className="text-slate-900">Otorite legal :</strong> si yon lwa, yon
+                lòd tribinal, oswa yon otorite konpetan egzije sa, oswa pou rapòte
+                tranzaksyon sispèk (AML).
+              </li>
+              <li>
+                <strong className="text-slate-900">Pwoteksyon dwa :</strong> pou defann dwa,
+                pwopriyete, oswa sekirite HatexCard, itilizatè nou yo, oswa piblik la.
+              </li>
+              <li>
+                <strong className="text-slate-900">Transfè biznis :</strong> nan ka fizyon,
+                akizisyon, oswa vant aktif, done yo ka transfere — politik sa a ap kontinye
+                aplike.
+              </li>
+            </ul>
+          </section>
+
+          {/* 5 */}
+          <section>
+            <H2 id="s5">5. Cookies ak teknoloji swiv</H2>
+            <p className="mb-3">Nou itilize cookies estrikteman nesesè pou :</p>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>kenbe sesyon koneksyon ou aktif ak an sekirite;</li>
+              <li>egzekite pwoteksyon kont vòl sesyon (yon sèl aparèy alafwa);</li>
+              <li>detekte aktivite fwodilè.</li>
+            </ul>
+            <p className="mb-4">
+              Ou ka bloke cookies nan navigatè ou, men lè sa a ou p ap ka konekte sou kont
+              ou. Nou pa itilize cookies piblisite twazyèm pati.
+            </p>
+          </section>
+
+          {/* 6 */}
+          <section>
+            <H2 id="s6">6. Sekirite done yo</H2>
+            <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Lock size={18} className="text-[#1d4ed8]" />
+                <span className="font-bold text-slate-900">Mezi nou aplike</span>
+              </div>
+              <ul className="list-disc list-inside space-y-2 ml-1 text-sm">
+                <li>Chifreman TLS/SSL pou tout kominikasyon</li>
+                <li>Otantifikasyon de faktè (MFA) obligatwa pou operasyon sansib</li>
+                <li>Kle API ak secret webhook estoke an fòm hash (pa lizib)</li>
+                <li>Kle test ak kle live separe — yo pa janm melanje</li>
+                <li>Siveyans tranzaksyon ak koneksyon an tan reyèl</li>
+                <li>Aksè entèn limite : sèlman pèsonèl otorize, sou baz bezwen</li>
+              </ul>
+            </div>
+            <p className="mb-4">
+              <strong className="text-slate-900">Okenn sistèm pa garanti 100%.</strong>{' '}
+              Malgre mezi sa yo, nou pa ka garanti sekirite absoli done ki transmèt sou
+              entènèt. Ou rekonèt ke ou voye done yo sou pwòp risk ou, epi ou gen
+              responsablite pa ou (gade seksyon 12). Si nou dekouvri yon vyolasyon ki
+              afekte done ou, n ap fè w konnen jan lalwa mande sa.
+            </p>
+          </section>
+
+          {/* 7 */}
+          <section>
+            <H2 id="s7">7. Konsèvasyon done</H2>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>
+                <strong className="text-slate-900">Kont aktif :</strong> pandan tout dire
+                kont lan.
+              </li>
+              <li>
+                <strong className="text-slate-900">Apre fèmti kont :</strong> omwen 5 an —
+                obligasyon legal, kontab, ak AML.
+              </li>
+              <li>
+                <strong className="text-slate-900">Done tranzaksyon :</strong> konsève
+                pandan peryòd lalwa egzije pou dosye finansye.
+              </li>
+              <li>
+                <strong className="text-slate-900">Pi lontan si nesesè :</strong> nan ka
+                envestigasyon, litij, oswa demann otorite.
+              </li>
+            </ul>
+          </section>
+
+          {/* 8 */}
+          <section>
+            <H2 id="s8">8. Dwa ou ak chwa ou</H2>
+            <p className="mb-3">Ou gen dwa pou :</p>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>mande yon kopi done pèsonèl nou genyen sou ou;</li>
+              <li>mande koreksyon done ki pa egzak;</li>
+              <li>
+                mande efasman done ou — <strong className="text-slate-900">eksepte</strong>{' '}
+                done nou oblije kenbe pou rezon legal, AML, oswa kontab (seksyon 7);
+              </li>
+              <li>fèmen kont ou nenpòt lè;</li>
+              <li>pote plent devan otorite konpetan si ou kwè dwa ou vyole.</li>
+            </ul>
+            <p className="mb-4">
+              Pou egzèse dwa sa yo, ekri nou nan{' '}
+              <a
+                href="mailto:contact@hatexcard.com"
+                className="text-[#1d4ed8] font-bold hover:underline"
+              >contact@hatexcard.com</a>.
+              Nou ka mande verifikasyon idantite anvan nou reponn — pou pwoteje ou. Nou
+              reponn nan yon delè rezonab (an jeneral 30 jou).
+            </p>
+          </section>
+
+          {/* 9 */}
+          <section>
+            <H2 id="s9">9. Done kliyan machann yo</H2>
+            <p className="mb-4">
+              Lè yon kliyan peye yon machann atravè HatexCard, nou trete done peman an{' '}
+              <strong className="text-slate-900">nan non machann lan</strong> pou egzekite
+              tranzaksyon an. Nan ka sa a :
+            </p>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>
+                <strong className="text-slate-900">Machann lan responsab</strong> pou pwòp
+                sit li, pwòp politik konfidansyalite li, ak fason li itilize done kliyan li
+                yo (non, imèl, adrès livrezon, elatriye);
+              </li>
+              <li>
+                HatexCard itilize done kliyan an sèlman pou trete ak konfime peman an,
+                voye resi, epi anpeche fwod;
+              </li>
+              <li>
+                HatexCard <strong className="text-slate-900">pa responsab</strong> pou fason
+                yon machann kolekte, itilize, oswa pwoteje done sou pwòp sit pa li.
+              </li>
+            </ul>
+          </section>
+
+          {/* 10 */}
+          <section>
+            <H2 id="s10">10. Sèvis twazyèm pati</H2>
+            <p className="mb-4">
+              Sèvis nou an depann de founisè deyò — espesyalman{' '}
+              <strong className="text-slate-900">MonCash (Digicel)</strong> pou egzekisyon
+              peman. Lè ou konfime yon peman sou telefòn ou oswa sou paj MonCash, se
+              politik konfidansyalite Digicel ki aplike pou etap sa a. Sit nou ka gen lyen
+              vè sit deyò; nou pa responsab kontni ni pratik sit sa yo. Nou ankouraje ou li
+              politik pa yo.
+            </p>
+          </section>
+
+          {/* 11 */}
+          <section>
+            <H2 id="s11">11. Minè</H2>
+            <p className="mb-4">
+              Sèvis HatexCard rezève pou moun ki gen{' '}
+              <strong className="text-slate-900">18 an oswa plis</strong>. Nou pa kolekte
+              done timoun fè espre. Si nou dekouvri yon kont ki kreye pa yon minè, n ap
+              fèmen l epi efase done yo jan lalwa pèmèt.
+            </p>
+          </section>
+
+          {/* 12 */}
+          <section>
+            <H2 id="s12">12. Responsablite itilizatè & limit responsablite</H2>
+
+            <H3>12.1 Responsablite pa ou</H3>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>kenbe modpas, kòd MFA, ak kle API ou yo sekrè — pa janm pataje yo;</li>
+              <li>bay enfòmasyon veridik ak ajou pandan KYC ak sou kont lan;</li>
+              <li>pa mete kle sekrè nan kòd frontend, GitHub piblik, oswa screenshot;</li>
+              <li>siyale nou imedyatman nenpòt aksè oswa tranzaksyon ou pa rekonèt;</li>
+              <li>verifye detay yon peman anvan ou konfime l.</li>
+            </ul>
+
+            <H3>12.2 Limit responsablite HatexCard</H3>
+            <p className="mb-3">
+              Nan limit maksimòm lalwa pèmèt, HatexCard{' '}
+              <strong className="text-slate-900">pa responsab</strong> pou pèt oswa domaj ki
+              soti nan :
+            </p>
+            <ul className="list-disc list-inside space-y-2 ml-4 mb-4">
+              <li>
+                neglijans itilizatè a (modpas / kle API / kòd MFA pataje oswa mal pwoteje);
+              </li>
+              <li>fo enfòmasyon itilizatè a te bay pandan KYC oswa sou kont lan;</li>
+              <li>
+                pratik done, kontni, oswa vyolasyon sekirite sou sit machann yo oswa
+                sèvis twazyèm pati (MonCash/Digicel, ebèjman, entènèt);
+              </li>
+              <li>
+                evènman fòs majè : katastwòf natirèl, pàn kouran oswa entènèt nasyonal,
+                enstabilite politik, pandemi;
+              </li>
+              <li>pèt endirèk, pèt pwofi, oswa pèt komèsyal ki soti nan entèripsyon sèvis.</li>
+            </ul>
+            <div className="flex items-start gap-3 bg-amber-50 p-4 rounded-xl border border-amber-200 mt-2 mb-4">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
+              <p className="text-amber-800 font-medium text-sm leading-relaxed">
+                HatexCard p ap janm mande w modpas ou, kòd MFA ou, ni PIN MonCash ou — ni
+                pa imèl, ni pa telefòn, ni pa WhatsApp. Nenpòt moun ki mande sa se yon
+                eskwo — pa reponn, epi siyale nou li.
+              </p>
+            </div>
+
+            <H3>12.3 Vyolasyon & konsekans</H3>
+            <p className="mb-4">
+              Si ou itilize sèvis la pou fwod, blanchiman lajan, oswa nenpòt aktivite
+              ilegal : kont lan ka sispann san avètisman, tranzaksyon yo ka bloke, epi
+              enfòmasyon yo ka transmèt bay otorite konpetan, jan{' '}
+              <a href="/terms" className="text-[#1d4ed8] font-bold hover:underline">Akò Sèvis la (/terms)</a>{' '}
+              prevwa sa.
+            </p>
+          </section>
+
+          {/* 13 */}
+          <section>
+            <H2 id="s13">13. Chanjman nan politik sa a</H2>
+            <p className="mb-4">
+              Nou ka mete politik sa a ajou nenpòt lè. Pou chanjman enpòtan, n ap fè w
+              konnen pa imèl oswa pa notifikasyon sou platfòm nan omwen{' '}
+              <strong className="text-slate-900">30 jou</strong> davans. Dat « dènye
+              mizajou » a anlè paj la ap toujou montre vèsyon ki an vigè. Si ou kontinye
+              itilize sèvis la apre chanjman yo antre an vigè, sa vle di ou aksepte yo.
+            </p>
+          </section>
+
+          {/* 14 */}
+          <section>
+            <H2 id="s14">14. Kontakte nou</H2>
+            <p className="mb-6">
+              Pou nenpòt kesyon sou politik sa a oswa sou done pèsonèl ou :
+            </p>
+            <div className="bg-blue-50 border border-blue-100 p-8 rounded-3xl text-center shadow-sm">
+              <div className="space-y-4 text-sm font-medium text-slate-700 flex flex-col items-center justify-center">
+                <a
+                  href="mailto:contact@hatexcard.com"
+                  className="flex items-center gap-2 hover:text-[#1d4ed8] transition-colors bg-white px-5 py-2.5 rounded-xl border border-blue-100 w-full max-w-[280px] justify-center shadow-sm"
+                >
+                  <Mail size={18} className="text-[#1d4ed8]" /> contact@hatexcard.com
+                </a>
+                <a
+                  href="mailto:support@hatexcard.com"
+                  className="flex items-center gap-2 hover:text-[#1d4ed8] transition-colors bg-white px-5 py-2.5 rounded-xl border border-blue-100 w-full max-w-[280px] justify-center shadow-sm"
+                >
+                  <Mail size={18} className="text-[#1d4ed8]" /> support@hatexcard.com
+                </a>
+                <a
+                  href="https://wa.me/50937201241"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors bg-white px-5 py-2.5 rounded-xl border border-emerald-100 w-full max-w-[280px] justify-center shadow-sm"
+                >
+                  <MessageCircle size={18} /> +509 3720 1241
+                </a>
+                <a
+                  href="https://www.hatexcard.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 hover:text-[#1d4ed8] transition-colors bg-white px-5 py-2.5 rounded-xl border border-blue-100 w-full max-w-[280px] justify-center shadow-sm"
+                >
+                  <Globe size={18} className="text-[#1d4ed8]" /> www.hatexcard.com
+                </a>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Footer */}
         <div className="mt-16 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest border-t border-gray-200 pt-8">
-          <p className="mb-2">Tout politik sa yo an vigè depi Jen 2026. Hatexcard rezève dwa pou mete yo ajou nenpòt ki lè ak yon avètisman 30 jou.</p>
-          <p>© 2026 Hatexcard. Tout dwa rezève. Platfòm peman digital 100% an goud pou Ayiti.</p>
+          <p className="mb-2">
+            Politik sa a an vigè depi Septanm 2026. HatexCard rezève dwa pou mete l ajou ak
+            yon avètisman 30 jou pou chanjman enpòtan.
+          </p>
+          <p>© 2026 HatexCard. Tout dwa rezève. Pasèl peman 100% an Goud pou Ayiti.</p>
         </div>
       </div>
     </div>

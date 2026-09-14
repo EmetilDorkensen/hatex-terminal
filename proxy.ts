@@ -27,6 +27,8 @@ const PUBLIC_API_PREFIXES = [
   '/api/checkout',
   '/api/checkout-invoice',
   '/api/v2/payments',
+  '/api/contact',
+  '/api/webhooks',
 ];
 
 /** Auth / MFA — pa tcheke session-tag isit (cookie a mete apre track-login). */

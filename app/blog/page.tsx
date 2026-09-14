@@ -1,43 +1,91 @@
 "use client";
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, BookOpen, ArrowRight } from 'lucide-react';
+
+import React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
+import { BLOG_POSTS } from "@/lib/blog/posts";
+
+/**
+ * Blog HatexCard — lis atik yo.
+ * Stil: menm jan ak landing (#F7F8FA, ble #1d4ed8).
+ */
 
 export default function BlogPage() {
   const router = useRouter();
 
-  const posts = [
-    { id: 1, title: "Kòman pou w ogmante lavant ou ak Plugin WooCommerce HatexCard la", date: "15 Jen 2026", category: "E-Commerce", desc: "Dekouvri kòman entegre peman an Goud dirèkteman sou sit entènèt ou ka diminye kantite moun ki abandone panyen yo epi fè kliyan yo achte pi fasil." },
-    { id: 2, title: "Peman ak QR Kòd: Poukisa li pi an sekirite pase Lajan Kach", date: "10 Jen 2026", category: "Sekirite", desc: "Lajan kach ka pèdi, li ka chire, e li riske. Aprann kòman sistèm QR kòd HatexCard la pwoteje machann yo kont fo biyè ak vòl, nan mwens pase 3 segonn." },
-    { id: 3, title: "5 Fason pou Pwoteje Kont Finansye w sou Entènèt", date: "02 Jen 2026", category: "Konsèy", desc: "Ekip sekirite HatexCard la pataje meyè pratik pou w jere modpas ou, kòd PIN ou, ak kòman pou evite fwod sou entènèt." }
-  ];
-
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white font-sans selection:bg-red-600/30 pb-20">
-      <div className="sticky top-0 z-50 bg-[#0a0b14]/80 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-4xl mx-auto p-4 flex items-center gap-4">
-          <button onClick={() => router.push('/')} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-white/5 hover:bg-zinc-800 transition-all text-white"><ArrowLeft size={18} /></button>
-          <span className="font-black italic tracking-widest uppercase">Blog</span>
+    <div className="min-h-screen bg-[#F7F8FA] text-slate-900 font-sans selection:bg-blue-100 pb-24">
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200">
+        <div className="max-w-5xl mx-auto p-4 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="w-10 h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-600 hover:text-[#1d4ed8] hover:bg-slate-50 transition-colors shadow-sm"
+            aria-label="Retounen"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/img/hatexcard-logo.png"
+              alt=""
+              className="w-8 h-8 rounded-lg border border-slate-200 object-cover"
+            />
+            <span className="font-extrabold text-[16px] tracking-tight">
+              Hatex<span className="text-[#1d4ed8]">card</span>
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 border-l border-slate-200 pl-3 ml-1">
+              Blog
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6 md:p-8 mt-8">
-        <div className="flex items-center gap-4 mb-12">
-          <div className="w-16 h-16 bg-red-600 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-red-600/30"><BookOpen size={32} /></div>
-          <div><h1 className="text-3xl md:text-5xl font-black uppercase italic tracking-tighter">Hatex<span className="text-red-600">Blog</span></h1><p className="text-zinc-500 font-bold uppercase tracking-widest text-xs mt-1">Nouvèl ak Konsèy</p></div>
+      <div className="max-w-5xl mx-auto p-5 md:p-8 mt-6">
+        <div className="flex items-start gap-4 mb-12">
+          <div className="w-14 h-14 bg-[#1d4ed8] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20 shrink-0">
+            <BookOpen size={26} />
+          </div>
+          <div>
+            <p className="text-[#1d4ed8] text-xs font-extrabold uppercase tracking-[0.25em] mb-1">
+              Nouvèl & Konsèy
+            </p>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+              Blog HatexCard
+            </h1>
+            <p className="text-slate-500 text-sm font-medium mt-2 max-w-xl">
+              Konsèy pou machann, e-commerce, API, ak sekirite — tout sou fason pou
+              resevwa peman MonCash an Goud.
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
-          {posts.map(post => (
-            <div key={post.id} className="bg-[#121420] p-6 md:p-8 rounded-[2rem] border border-white/5 hover:border-red-500/30 transition-all group cursor-pointer shadow-lg">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-[10px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-md">{post.category}</span>
-                <span className="text-[10px] font-bold text-zinc-500">{post.date}</span>
+        <div className="grid grid-cols-1 gap-5">
+          {BLOG_POSTS.map((post) => (
+            <Link
+              key={post.slug}
+              href={`/blog/${post.slug}`}
+              className="block bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm hover:border-[#1d4ed8]/40 hover:shadow-md transition-all group"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#1d4ed8] bg-blue-50 border border-blue-100 px-3 py-1 rounded-md">
+                  {post.category}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {post.date} · {post.readMin} min li
+                </span>
               </div>
-              <h2 className="text-xl font-black text-white mb-3 group-hover:text-red-500 transition-colors leading-tight">{post.title}</h2>
-              <p className="text-zinc-400 text-sm leading-relaxed mb-6">{post.desc}</p>
-              <button className="text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2 group-hover:gap-4 transition-all">Li plis <ArrowRight size={14} className="text-red-500"/></button>
-            </div>
+              <h2 className="text-xl font-extrabold text-slate-900 mb-2 group-hover:text-[#1d4ed8] transition-colors leading-snug">
+                {post.title}
+              </h2>
+              <p className="text-slate-600 text-sm leading-relaxed font-medium mb-5">
+                {post.desc}
+              </p>
+              <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#1d4ed8] group-hover:gap-3 transition-all">
+                Li atik la <ArrowRight size={14} />
+              </span>
+            </Link>
           ))}
         </div>
       </div>

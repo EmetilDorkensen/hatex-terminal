@@ -10,6 +10,7 @@ import {
     Crown, MessageCircle, Activity, Radio, Mail, Bell
 } from 'lucide-react';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
+import ContactInboxPanel from '@/app/admin/ContactInboxPanel';
 import {
   ADMIN_PROFILE_SAFE_COLUMNS,
 } from '@/lib/admin/safe-columns';
@@ -560,11 +561,16 @@ export default function WorkspacePage() {
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="flex gap-2 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm w-fit mb-4">
                             <button onClick={() => { setActiveTab('tickets'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'tickets' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Mesaj Kliyan ({tickets.filter(t => t.status === 'open').length})</button>
+                            <button onClick={() => { setActiveTab('inbox'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <Mail size={13} /> Kontak Email
+                            </button>
                             <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kliyan</button>
                             <button onClick={() => { setActiveTab('kyc-survey'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc-survey' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kesyonman KYC</button>
                         </div>
 
-                        {activeTab === 'kyc-survey' ? (
+                        {activeTab === 'inbox' ? (
+                            <ContactInboxPanel compact />
+                        ) : activeTab === 'kyc-survey' ? (
                             <KycSurveyPanel mode="workspace" />
                         ) : activeTab === 'clients' ? (
                             <>

@@ -1,0 +1,11 @@
+name = "hatex-inbound-email"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Apre deploy: nan Cloudflare Dashboard → Email Routing →
+# Routing rules → Edit → Action = "Send to a Worker" → hatex-inbound-email
+
+# Secrets (pa mete nan fichye sa a):
+#   npx wrangler secret put INBOUND_EMAIL_WEBHOOK_SECRET
+#   npx wrangler secret put INGEST_URL

@@ -8,6 +8,7 @@ import AdminAuditLog from './AdminAuditLog';
 import AdminClientDossier from './AdminClientDossier';
 import AdminFeesPanel from './AdminFeesPanel';
 import AdminPayoutsPanel from './AdminPayoutsPanel';
+import ContactInboxPanel from './ContactInboxPanel';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
 
 export default function AdminSuperPage() {
@@ -35,7 +36,7 @@ export default function AdminSuperPage() {
     const [notifTitle, setNotifTitle] = useState('');
     const [notifBody, setNotifBody] = useState('');
     const [notifTargetEmail, setNotifTargetEmail] = useState('');
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'sispandi' | 'kyc' | 'kyc-survey' | 'ekip' | 'sekirite' | 'frais' | 'payout'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'sispandi' | 'kyc' | 'kyc-survey' | 'ekip' | 'sekirite' | 'frais' | 'payout' | 'mesaj'>('dashboard');
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -446,6 +447,9 @@ export default function AdminSuperPage() {
                     </button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     <button onClick={() => setView('kyc-survey')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc-survey' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kesyonman KYC</button>
+                    <button onClick={() => setView('mesaj')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'mesaj' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Mail size={14}/> Mesaj
+                    </button>
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
                     <button onClick={() => setView('frais')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'frais' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Frè</button>
                     <button onClick={() => setView('payout')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'payout' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Payout</button>
@@ -853,6 +857,8 @@ export default function AdminSuperPage() {
                                 ))
                             )}
                         </div>
+                    ) : view === 'mesaj' ? (
+                        <ContactInboxPanel />
                     ) : view === 'sekirite' ? (
                         <div className="space-y-6">
                             <AdminMfaSettings supabase={supabase} />
