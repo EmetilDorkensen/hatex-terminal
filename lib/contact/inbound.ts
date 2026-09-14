@@ -3,7 +3,7 @@
  */
 
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
-import { sendMail, escapeHtml, shellHtml } from '@/lib/notify/email';
+import { notifyStaffOfContactMessage } from '@/lib/contact/notify-staff';
 
 export type InboundChannel = 'support' | 'business' | 'contact' | 'notifications';
 
@@ -165,27 +165,20 @@ export async function ingestInboundEmail(
     return { ok: false, status: 500, message: 'Pa t kapab sove mesaj la.' };
   }
 
-  const notifyTo =
-    process.env.SUPPORT_NOTIFY_EMAIL?.trim() ||
-    process.env.CONTACT_NOTIFY_EMAIL?.trim() ||
-    '';
-  if (notifyTo.includes('@')) {
-    void sendMail({
-      to: notifyTo,
-      subject: `[Imèl → HatexCard] ${subject}`,
-      html: shellHtml(
-        'Nouvo imèl',
-        `
-        <p style="margin:0 0 8px;color:#4b5563;font-size:14px;"><strong>De:</strong> ${escapeHtml(fromName)} &lt;${escapeHtml(fromEmail)}&gt;</p>
-        <p style="margin:0 0 8px;color:#4b5563;font-size:14px;"><strong>Pou:</strong> ${escapeHtml(toEmail)}</p>
-        <p style="margin:0 0 8px;color:#4b5563;font-size:14px;"><strong>Sijè:</strong> ${escapeHtml(subject)}</p>
-        <div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:10px;white-space:pre-wrap;font-size:14px;">${escapeHtml(body.slice(0, 2000))}</div>
-        <p style="margin:12px 0 0;font-size:13px;color:#64748b;">Reponn nan Admin → Mesaj oswa Workspace → Kontak Email.</p>
-        `
-      ),
-      logLabel: 'inbound:notify',
-    }).catch(() => {});
-  }
+  void notifyStaffOfContactMessage({
+    channelLabel:
+      channel === 'business'
+        ? 'Biznis & Patenarya'
+        : channel === 'contact'
+          ? 'Kontak / Sekirite'
+          : 'Sipò Kliyan',
+    fromName,
+    fromEmail,
+    subject,
+    body,
+    source: 'email',
+    attachmentCount: attachmentPaths.length,
+  }).catch(() => {});
 
   return { ok: true, id: data.id };
 }

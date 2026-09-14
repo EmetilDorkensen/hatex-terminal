@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
-import { sendMail, escapeHtml, shellHtml } from '@/lib/notify/email';
+import { notifyStaffOfContactMessage } from '@/lib/contact/notify-staff';
 
 export const dynamic = 'force-dynamic';
 
@@ -175,32 +175,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const notifyTo =
-    process.env.SUPPORT_NOTIFY_EMAIL?.trim() ||
-    process.env.CONTACT_NOTIFY_EMAIL?.trim() ||
-    '';
-  if (notifyTo && isValidEmail(notifyTo)) {
-    const photoNote =
-      attachmentPaths.length > 0
-        ? `<p style="margin:12px 0 0;font-size:13px;color:#64748b;">${attachmentPaths.length} foto/fichye — wè yo nan Admin → Mesaj.</p>`
-        : '';
-    void sendMail({
-      to: notifyTo,
-      subject: `[HatexCard ${CHANNEL_LABEL[channel]}] ${subject}`,
-      html: shellHtml(
-        'Nouvo mesaj kontak',
-        `
-        <h2 style="margin:0 0 12px;font-size:18px;">Nouvo mesaj — ${escapeHtml(CHANNEL_LABEL[channel])}</h2>
-        <p style="margin:0 0 8px;color:#4b5563;font-size:14px;"><strong>De:</strong> ${escapeHtml(fromName)} &lt;${escapeHtml(fromEmail)}&gt;</p>
-        <p style="margin:0 0 8px;color:#4b5563;font-size:14px;"><strong>Sijè:</strong> ${escapeHtml(subject)}</p>
-        <div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;color:#334155;font-size:14px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(message)}</div>
-        ${photoNote}
-        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">Reponn nan Admin → Mesaj oswa Workspace → Kontak Email.</p>
-        `
-      ),
-      logLabel: 'contact:notify-staff',
-    }).catch(() => {});
-  }
+  void notifyStaffOfContactMessage({
+    channelLabel: CHANNEL_LABEL[channel] || channel,
+    fromName,
+    fromEmail,
+    subject,
+    body: message,
+    source: 'web_form',
+    attachmentCount: attachmentPaths.length,
+  }).catch(() => {});
 
   return NextResponse.json({
     ok: true,

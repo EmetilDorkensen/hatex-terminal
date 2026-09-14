@@ -436,6 +436,9 @@ export default function AdminSuperPage() {
                     <button onClick={() => setView('dashboard')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'dashboard' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         <Activity size={14}/> Tablodbò
                     </button>
+                    <button onClick={() => setView('mesaj')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'mesaj' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <Mail size={14}/> Imèl Kontak
+                    </button>
                     
                     <button onClick={() => setView('ekip')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'ekip' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         <Users size={14}/> Jere Ekip
@@ -447,9 +450,6 @@ export default function AdminSuperPage() {
                     </button>
                     <button onClick={() => setView('kyc')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>KYC ({pendingKyc.length})</button>
                     <button onClick={() => setView('kyc-survey')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'kyc-survey' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Kesyonman KYC</button>
-                    <button onClick={() => setView('mesaj')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'mesaj' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
-                        <Mail size={14}/> Mesaj
-                    </button>
                     <button onClick={() => setView('anons')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'anons' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Anons</button>
                     <button onClick={() => setView('frais')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'frais' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Frè</button>
                     <button onClick={() => setView('payout')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${view === 'payout' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>Payout</button>
@@ -474,6 +474,21 @@ export default function AdminSuperPage() {
                                     <p className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1"><ShieldCheck size={14} className="text-emerald-500" /> Kontwòl frè, KYC, ak abonnman</p>
                                 </div>
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setView('mesaj')}
+                              className="w-full text-left bg-blue-50 border border-blue-100 hover:border-blue-300 rounded-2xl p-5 flex items-center justify-between gap-4 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="p-3 bg-white rounded-xl text-[#1d4ed8] border border-blue-100"><Mail size={22} /></span>
+                                <div>
+                                  <p className="font-bold text-slate-900">Imèl Kontak</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">support@ / business@ / contact@ — li epi reponn isit la</p>
+                                </div>
+                              </div>
+                              <span className="text-xs font-bold uppercase tracking-wider text-[#1d4ed8]">Louvri →</span>
+                            </button>
 
                             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>

@@ -59,7 +59,7 @@ export default function ContactInboxPanel({
     setError("");
     try {
       const qs = filter === "all" ? "" : `?status=${filter}`;
-      const res = await fetch(`/api/contact/inbox${qs}`);
+      const res = await fetch(`/api/contact/inbox${qs}`, { credentials: 'include' });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.message || "Erè chajman.");
       setItems(data.items || []);
@@ -78,7 +78,9 @@ export default function ContactInboxPanel({
     setSelected(item);
     setReplyText("");
     try {
-      const res = await fetch(`/api/contact/inbox?id=${encodeURIComponent(item.id)}`);
+      const res = await fetch(`/api/contact/inbox?id=${encodeURIComponent(item.id)}`, {
+        credentials: 'include',
+      });
       const data = await res.json();
       if (res.ok && data.ok) {
         setSelected(data.item);
@@ -95,6 +97,7 @@ export default function ContactInboxPanel({
     try {
       const res = await fetch("/api/contact/inbox", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inbox_id: selected.id,
@@ -121,6 +124,7 @@ export default function ContactInboxPanel({
     try {
       const res = await fetch("/api/contact/inbox", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inbox_id: selected.id, close: true }),
       });
