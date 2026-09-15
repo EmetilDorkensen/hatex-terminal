@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { User, Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { checkStrongPassword } from '@/lib/security/password-strength';
 
 function errorText(err: unknown, fallback: string): string {
@@ -36,7 +36,6 @@ function errorText(err: unknown, fallback: string): string {
 function SignupForm() {
   const searchParams = useSearchParams();
 
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [promoCode, setPromoCode] = useState('');
@@ -82,7 +81,6 @@ function SignupForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           password,
           promo_code: promoCode.trim().toUpperCase(),
@@ -159,23 +157,6 @@ function SignupForm() {
       </div>
 
       <form onSubmit={handleSignup} className="space-y-5">
-        <div className="space-y-1.5 text-left">
-          <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Non Konplè Ou</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <User className="h-5 w-5 text-slate-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Ex: Jean Jacques"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
-              required
-            />
-          </div>
-        </div>
-
         <div className="space-y-1.5 text-left">
           <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Adrès Imèl</label>
           <div className="relative">

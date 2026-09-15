@@ -8,6 +8,7 @@ import {
   Loader2, Key, Edit2, X, Lock, ShieldCheck
 } from 'lucide-react';
 import MfaSettings from '@/app/components/MfaSettings';
+import RecoveryCodeCard from '@/app/components/RecoveryCodeCard';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -284,6 +285,7 @@ export default function SettingsPage() {
                 subtitle="Google Authenticator, Authy, elatriye"
                 emptyMessage="Aktive MFA pou plis sekirite. Chak fwa ou konekte, ou ap bezwen yon kòd 6 chif soti nan app otantifikatè w la."
               />
+              <RecoveryCodeCard />
             </div>
           </div>
         </div>

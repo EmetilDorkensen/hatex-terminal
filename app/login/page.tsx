@@ -16,13 +16,15 @@ import { Mail, Lock, KeyRound, AlertCircle, Loader2, ShieldCheck } from 'lucide-
 
 export default function Login() {
 
-  const [loginMethod, setLoginMethod] = useState<'password' | 'pin'>('password');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'pin' | 'recovery'>('password');
 
   const [email, setEmail] = useState('');
 
   const [password, setPassword] = useState('');
 
   const [pin, setPin] = useState('');
+
+  const [recoveryCode, setRecoveryCode] = useState('');
 
   const [loading, setLoading] = useState(false);
 
@@ -407,6 +409,51 @@ export default function Login() {
 
 
 
+      } else if (loginMethod === 'recovery') {
+
+        // ==========================================
+        // 3. KONEKSYON AK KÒD AKSÈ INIK (REKIPERASYON)
+        // Pou kliyan ki bliye/efase kòd MFA li, modpas oswa PIN li.
+        // Kòd la boule apre itilizasyon; MFA reyinisyalize → /mfa-setup.
+        // ==========================================
+
+        if (recoveryCode.trim().length < 10) {
+          setErrorMsg("Antre kòd aksè inik ou (fòma: HTX-XXXX-XXXX-XXXX-XXXX).");
+          setLoading(false);
+          return;
+        }
+
+        const recRes = await fetch('/api/auth/recovery-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), code: recoveryCode.trim() }),
+        });
+        const recData = await recRes.json().catch(() => ({}));
+
+        if (!recRes.ok || !recData.success) {
+          setErrorMsg(recData.message || "Email oswa kòd aksè pa bon.");
+          setLoading(false);
+          return;
+        }
+
+        const { error: recOtpErr } = await supabase.auth.verifyOtp({
+          token_hash: recData.token_hash,
+          type: 'magiclink',
+        });
+
+        if (recOtpErr) {
+          console.error('Recovery session error:', recOtpErr.message);
+          setErrorMsg("Pa kapab kreye sesyon. Eseye ankò oswa kontakte sipò.");
+          setLoading(false);
+          return;
+        }
+
+        await trackDeviceAndIP(email);
+
+        // MFA efase — proxy ap voye l sou /mfa-setup pou konfigire yon nouvo
+        alert("Kòd aksè verifye! Kòd MFA ou reyinisyalize — w ap konfigire yon nouvo kounye a. Sonje jenere yon NOUVO kòd aksè nan Paramèt apre sa.");
+        window.location.href = '/mfa-setup';
+
       } else {
 
         // ==========================================
@@ -590,6 +637,20 @@ export default function Login() {
 
           </button>
 
+          <button
+
+            type="button"
+
+            onClick={() => { setLoginMethod('recovery'); setErrorMsg(''); }}
+
+            className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${loginMethod === 'recovery' ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+
+          >
+
+            Kòd Aksè
+
+          </button>
+
         </div>
 
 
@@ -661,6 +722,47 @@ export default function Login() {
                 />
 
               </div>
+
+            </div>
+
+          ) : loginMethod === 'recovery' ? (
+
+            <div className="space-y-1.5 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+              <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider ml-1">Kòd Aksè Inik</label>
+
+              <div className="relative">
+
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+
+                  <KeyRound className="h-5 w-5 text-slate-400" />
+
+                </div>
+
+                <input
+
+                  type="text"
+
+                  placeholder="HTX-XXXX-XXXX-XXXX-XXXX"
+
+                  value={recoveryCode}
+
+                  onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
+
+                  className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-bold font-mono tracking-wider text-slate-900 placeholder:text-slate-300"
+
+                  required
+
+                />
+
+              </div>
+
+              <p className="text-[10px] text-slate-500 mt-2 ml-1 leading-relaxed bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+
+                Sèvi ak kòd aksè inik ou te sere a si ou <strong>bliye kòd MFA, modpas oswa PIN ou</strong>.
+                Apre koneksyon, MFA ou ap reyinisyalize epi w ap konfigire yon nouvo.
+
+              </p>
 
             </div>
 

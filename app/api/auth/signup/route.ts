@@ -30,8 +30,12 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const fullName = typeof body.full_name === 'string' ? body.full_name.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  // Non pa mande ankò nan signup — nou sèvi ak pati anvan @ imèl la kòm non default.
+  const fullName =
+    (typeof body.full_name === 'string' && body.full_name.trim()) ||
+    email.split('@')[0]?.replace(/[._-]+/g, ' ').trim() ||
+    'Kliyan';
   const password = typeof body.password === 'string' ? body.password : '';
   const acceptTerms = body.accept_terms === true;
   const promoCode =
@@ -43,13 +47,6 @@ export async function POST(request: Request) {
         success: false,
         message: 'Ou dwe aksepte Akò Sèvis ak Kondisyon Itilizasyon HatexCard anvan ou kreye kont.',
       },
-      { status: 400 }
-    );
-  }
-
-  if (!fullName || fullName.length < 2) {
-    return NextResponse.json(
-      { success: false, message: 'Antre non konplè ou.' },
       { status: 400 }
     );
   }
