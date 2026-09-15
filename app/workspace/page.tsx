@@ -148,7 +148,12 @@ export default function WorkspacePage() {
                 supabase.from('profiles').select(ADMIN_PROFILE_SAFE_COLUMNS).order('created_at', { ascending: false })
                     .then(({ data }) => setUsers(data || [])),
                 supabase.from('support_tickets').select('*, profiles(full_name, email)').order('created_at', { ascending: false })
-                    .then(({ data }) => setTickets(data || []))
+                    .then(({ data }) => setTickets(data || [])),
+                // Sipò ka apwouve KYC tou
+                fetch('/api/staff/kyc-pending', { credentials: 'include' })
+                    .then((r) => r.json())
+                    .then((data) => setPendingKyc(data.ok ? data.items || [] : []))
+                    .catch(() => setPendingKyc([]))
             );
         }
 
@@ -572,6 +577,9 @@ export default function WorkspacePage() {
                             <button onClick={() => { setActiveTab('rekiperasyon'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'rekiperasyon' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
                                 <ShieldCheck size={13} /> Rekiperasyon
                             </button>
+                            <button onClick={() => { setActiveTab('kyc-approve'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'kyc-approve' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <ShieldCheck size={13} /> Apwouve KYC ({pendingKyc.length})
+                            </button>
                             <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kliyan</button>
                             <button onClick={() => { setActiveTab('kyc-survey'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc-survey' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kesyonman KYC</button>
                         </div>
@@ -580,6 +588,25 @@ export default function WorkspacePage() {
                             <ContactInboxPanel compact />
                         ) : activeTab === 'rekiperasyon' ? (
                             <AccountRecoveryPanel />
+                        ) : activeTab === 'kyc-approve' ? (
+                            <div className="space-y-4">
+                                {pendingKyc.length === 0 ? (
+                                    <p className="text-center py-10 text-slate-400 text-sm font-bold uppercase">
+                                        Pa gen dosye KYC k ap tann
+                                    </p>
+                                ) : (
+                                    pendingKyc.map((user) => (
+                                        <KycReviewCard
+                                            key={user.application_id || user.id}
+                                            user={user}
+                                            processingId={processingId}
+                                            onOpenDoc={(uid, doc, path) => void handleOpenKycDocument(uid, doc, path)}
+                                            onApprove={() => void jereKyc(user.id, user.full_name, 'approved')}
+                                            onReject={() => void jereKyc(user.id, user.full_name, 'rejected')}
+                                        />
+                                    ))
+                                )}
+                            </div>
                         ) : activeTab === 'kyc-survey' ? (
                             <KycSurveyPanel mode="workspace" />
                         ) : activeTab === 'clients' ? (
