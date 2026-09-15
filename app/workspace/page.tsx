@@ -12,6 +12,7 @@ import {
 import KycSurveyPanel from '@/components/KycSurveyPanel';
 import ContactInboxPanel from '@/app/admin/ContactInboxPanel';
 import AccountRecoveryPanel from '@/app/components/AccountRecoveryPanel';
+import KycReviewCard from '@/app/components/KycReviewCard';
 import {
   ADMIN_PROFILE_SAFE_COLUMNS,
 } from '@/lib/admin/safe-columns';
@@ -153,8 +154,10 @@ export default function WorkspacePage() {
 
         if (canSeeCompliance) {
             tasks.push(
-                supabase.from('hatex_kyc_applications').select('id, user_id, status, full_name, email, account_type, submitted_at, created_at').eq('status', 'submitted').order('created_at', { ascending: false })
-                    .then(({ data }) => setPendingKyc(data || [])),
+                fetch('/api/staff/kyc-pending', { credentials: 'include' })
+                    .then((r) => r.json())
+                    .then((data) => setPendingKyc(data.ok ? data.items || [] : []))
+                    .catch(() => setPendingKyc([])),
                 supabase.from('enterprise_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false })
                     .then(({ data }) => setPendingEnterprises(data || []))
             );
@@ -383,18 +386,19 @@ export default function WorkspacePage() {
         }
     };
 
-    const handleOpenKycDocument = async (userId: string, doc: 'front' | 'back' | 'selfie', legacyValue?: string | null) => {
-        if (!legacyValue) return;
-        if (legacyValue.startsWith('http://') || legacyValue.startsWith('https://')) {
+    const handleOpenKycDocument = async (
+        userId: string,
+        doc: 'front' | 'back' | 'selfie' | 'business' | 'nif' | 'tax' | 'establishment' | 'address' | 'articles',
+        legacyValue?: string | null
+    ) => {
+        if (!legacyValue && !userId) return;
+        if (legacyValue && (legacyValue.startsWith('http://') || legacyValue.startsWith('https://'))) {
             if (!openSafeUrl(legacyValue)) alert('Lyèn dokiman an pa valab.');
             return;
         }
         try {
-            const res = await fetch(`/api/kyc/document?userId=${userId}&doc=${doc}`);
-            const data = await res.json();
-            if (res.ok && data.url) {
-                if (!openSafeUrl(data.url)) alert('Lyèn dokiman an pa valab.');
-            } else alert(data.error || 'Pa t kapab louvri dokiman an.');
+            const openUrl = `/api/kyc/document?userId=${encodeURIComponent(userId)}&doc=${doc}&redirect=1`;
+            window.open(openUrl, '_blank', 'noopener,noreferrer');
         } catch {
             alert('Erè nan louvri dokiman an.');
         }
@@ -803,21 +807,14 @@ export default function WorkspacePage() {
 
                         <div className="space-y-4">
                             {activeTab === 'kyc' ? pendingKyc.map(user => (
-                                <div key={user.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="flex-1 text-center md:text-left w-full">
-                                        <h3 className="text-lg font-bold text-slate-900">{user.full_name}</h3>
-                                        <p className="text-xs text-slate-500 mb-4">{user.email}</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {user.kyc_front && <button onClick={() => handleOpenKycDocument(user.id, 'front', user.kyc_front)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Devan</button>}
-                                            {user.kyc_back && <button onClick={() => handleOpenKycDocument(user.id, 'back', user.kyc_back)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Dèyè</button>}
-                                            {user.kyc_selfie && <button onClick={() => handleOpenKycDocument(user.id, 'selfie', user.kyc_selfie)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600 transition-colors"><EyeOff size={14}/> Selfie</button>}
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2 w-full md:w-auto">
-                                        <button onClick={() => jereKyc(user.id, user.full_name, 'approved')} className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Apwouve</button>
-                                        <button onClick={() => jereKyc(user.id, user.full_name, 'rejected')} className="flex-1 bg-white border border-rose-200 text-rose-600 px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Rejte</button>
-                                    </div>
-                                </div>
+                                <KycReviewCard
+                                    key={user.application_id || user.id}
+                                    user={user}
+                                    processingId={processingId}
+                                    onOpenDoc={(uid, doc, path) => void handleOpenKycDocument(uid, doc, path)}
+                                    onApprove={() => void jereKyc(user.id, user.full_name, 'approved')}
+                                    onReject={() => void jereKyc(user.id, user.full_name, 'rejected')}
+                                />
                             )) : activeTab === 'ajan' ? pendingAgents.map(agent => (
                                 <div key={agent.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col gap-4">
                                     <div className="flex justify-between items-center border-b border-gray-100 pb-4">

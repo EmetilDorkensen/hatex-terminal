@@ -119,7 +119,7 @@ export async function GET(request: Request) {
     const { data: v2 } = await db
       .from('hatex_kyc_applications')
       .select(
-        'id, status, first_name, last_name, date_of_birth, phone_primary, address_street, address_city, address_department, id_front_path, id_back_path, selfie_path, created_at'
+        'id, status, full_name, date_of_birth, phone_primary, address_street, address_city, address_department, id_front_path, id_back_path, selfie_path, id_document_type, id_number_last4, business_name, business_nif, activity_category, created_at'
       )
       .eq('user_id', profile.id)
       .order('created_at', { ascending: false })

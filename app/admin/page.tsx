@@ -10,6 +10,7 @@ import AdminFeesPanel from './AdminFeesPanel';
 import AdminPayoutsPanel from './AdminPayoutsPanel';
 import ContactInboxPanel from './ContactInboxPanel';
 import AccountRecoveryPanel from '@/app/components/AccountRecoveryPanel';
+import KycReviewCard from '@/app/components/KycReviewCard';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
 
 export default function AdminSuperPage() {
@@ -806,46 +807,14 @@ export default function AdminSuperPage() {
                         ) : (
                             <div className="space-y-4">
                                 {pendingKyc.map((user) => (
-                                    <div key={user.id} className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col md:flex-row gap-6 items-center transition-all hover:shadow-md">
-                                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0"><UserX size={32} /></div>
-                                        <div className="flex-1 text-center md:text-left w-full">
-                                            <h3 className="text-lg font-bold text-slate-900">{user.full_name || 'San Non'}</h3>
-                                            <p className="text-xs text-slate-500 mt-1 mb-4">{user.email}</p>
-                                            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                                                {user.kyc_doc_type && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 font-bold uppercase">{user.kyc_doc_type}</span>}
-                                                {user.account_type && <span className="text-[10px] bg-slate-50 text-slate-700 px-2 py-1 rounded border border-gray-200 font-bold uppercase">{user.account_type}</span>}
-                                                {user.kyc_face_match_score != null && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 font-bold">Figi: {Number(user.kyc_face_match_score).toFixed(1)}%</span>}
-                                                {user.needs_manual_review && <span className="text-[10px] bg-amber-50 text-amber-800 px-2 py-1 rounded border border-amber-200 font-bold uppercase">Revizyon imen</span>}
-                                                {user.account_type === 'business' && (
-                                                  <div className="w-full text-left mt-3 bg-slate-50 border border-gray-100 rounded-xl p-3 space-y-1">
-                                                    {user.service_description && <p className="text-[11px] text-slate-700"><span className="font-bold">Sèvis:</span> {user.service_description}</p>}
-                                                    {user.business_nif && <p className="text-[11px] text-slate-700"><span className="font-bold">NIF:</span> {user.business_nif}</p>}
-                                                    {user.business_rccm && <p className="text-[11px] text-slate-700"><span className="font-bold">RCCM:</span> {user.business_rccm}</p>}
-                                                    <p className="text-[11px] text-slate-700"><span className="font-bold">Pati 1 WA/MC:</span> {user.party1_whatsapp || '—'} / {user.party1_moncash || '—'}</p>
-                                                    <p className="text-[11px] text-slate-700"><span className="font-bold">Pati 2:</span> {user.party2_full_name || '—'} ({user.party2_role || '—'}) · WA {user.party2_whatsapp || '—'} · MC {user.party2_moncash || '—'}</p>
-                                                  </div>
-                                                )}
-                                                {user.kyc_front && <button onClick={() => handleOpenKycDocument(user.id, 'front', user.kyc_front)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Devan</button>}
-                                                {user.kyc_back && <button onClick={() => handleOpenKycDocument(user.id, 'back', user.kyc_back)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Fasad Dèyè</button>}
-                                                {user.kyc_selfie && <button onClick={() => handleOpenKycDocument(user.id, 'selfie', user.kyc_selfie)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Selfie</button>}
-                                                {user.business_registration && <button onClick={() => handleOpenKycDocument(user.id, 'business', user.business_registration)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Patant/RCCM</button>}
-                                                {user.business_nif_doc && <button onClick={() => handleOpenKycDocument(user.id, 'nif', user.business_nif_doc)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> NIF</button>}
-                                                {user.tax_clearance && <button onClick={() => handleOpenKycDocument(user.id, 'tax', user.tax_clearance)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Kitan</button>}
-                                                {user.establishment_photo && <button onClick={() => handleOpenKycDocument(user.id, 'establishment', user.establishment_photo)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Lokal</button>}
-                                                {user.proof_of_address && <button onClick={() => handleOpenKycDocument(user.id, 'address', user.proof_of_address)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Adrès</button>}
-                                                {user.articles && <button onClick={() => handleOpenKycDocument(user.id, 'articles', user.articles)} className="text-[10px] bg-slate-50 px-4 py-2.5 rounded-lg text-slate-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all font-bold tracking-wider uppercase flex items-center gap-1.5"><EyeOff size={14}/> Statu</button>}
-                                                {!user.kyc_front && !user.kyc_selfie && <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 font-bold uppercase tracking-wider">Okenn imaj sou sistèm nan</span>}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-2 md:mt-0 shrink-0">
-                                            <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'approved')} disabled={processingId === user.id} className="bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                {processingId === user.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={16} /> Apwouve</>}
-                                            </button>
-                                            <button onClick={() => jereKyc(user.id, user.full_name, user.email, 'rejected')} disabled={processingId === user.id} className="bg-white border border-rose-200 text-rose-600 px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                                                <XCircle size={16} /> Rejte
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <KycReviewCard
+                                      key={user.application_id || user.id}
+                                      user={user}
+                                      processingId={processingId}
+                                      onOpenDoc={(uid, doc, path) => void handleOpenKycDocument(uid, doc, path)}
+                                      onApprove={() => void jereKyc(user.id, user.full_name, user.email, 'approved')}
+                                      onReject={() => void jereKyc(user.id, user.full_name, user.email, 'rejected')}
+                                    />
                                 ))}
                             </div>
                         )

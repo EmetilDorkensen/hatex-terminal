@@ -3,9 +3,10 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
 import { logAdminAction } from '@/lib/admin/audit-log';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
+import { mapKycAppForStaff } from '@/lib/kyc-v2/staff-view';
 
 const PROFILE_DOSSIER_SELECT = `
-  id, email, full_name, business_name,
+  id, email, full_name, business_name, phone,
   created_at, account_status, account_type, enterprise_status,
   kyc_status, kyc_doc_type, kyc_front, kyc_back, kyc_selfie,
   kyc_submitted_at, kyc_rejection_reason, kyc_face_match_score, kyc_fee_paid,
@@ -47,7 +48,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Kliyan pa jwenn.' }, { status: 404 });
     }
 
-    const [{ data: enterpriseApps }, { data: agentApps }, { data: recentTx }] = await Promise.all([
+    const [{ data: enterpriseApps }, { data: agentApps }, { data: recentTx }, { data: kycApp }] =
+      await Promise.all([
       db
         .from('enterprise_applications')
         .select('*')
@@ -66,6 +68,13 @@ export async function GET(request: Request) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(15),
+      db
+        .from('hatex_kyc_applications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     await logAdminAction(db, {
@@ -77,9 +86,17 @@ export async function GET(request: Request) {
       ip,
     });
 
+    const kyc = kycApp
+      ? mapKycAppForStaff(kycApp as unknown as Record<string, unknown>, {
+          full_name: profile.full_name,
+          email: profile.email,
+        })
+      : null;
+
     return NextResponse.json({
       dossier: {
         profile,
+        kyc_application: kyc,
         enterprise_applications: enterpriseApps || [],
         agent_applications: agentApps || [],
         recent_transactions: recentTx || [],

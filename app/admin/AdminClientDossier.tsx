@@ -68,6 +68,45 @@ type AgentApp = {
 
 type Dossier = {
   profile: DossierProfile;
+  kyc_application?: {
+    id?: string;
+    full_name?: string | null;
+    email?: string | null;
+    account_type?: string | null;
+    kyc_doc_type?: string | null;
+    id_number?: string | null;
+    date_of_birth?: string | null;
+    address_street?: string | null;
+    address_city?: string | null;
+    address_department?: string | null;
+    phone_primary?: string | null;
+    activity_category?: string | null;
+    monthly_volume_estimate?: number | null;
+    business_name?: string | null;
+    business_url?: string | null;
+    service_description?: string | null;
+    business_nif?: string | null;
+    business_rccm?: string | null;
+    party1_whatsapp?: string | null;
+    party1_moncash?: string | null;
+    party2_full_name?: string | null;
+    party2_role?: string | null;
+    party2_whatsapp?: string | null;
+    party2_moncash?: string | null;
+    payout_phone?: string | null;
+    kyc_face_match_score?: number | null;
+    kyc_front?: string | null;
+    kyc_back?: string | null;
+    kyc_selfie?: string | null;
+    business_registration?: string | null;
+    business_nif_doc?: string | null;
+    tax_clearance?: string | null;
+    establishment_photo?: string | null;
+    proof_of_address?: string | null;
+    articles?: string | null;
+    submitted_at?: string | null;
+    status?: string | null;
+  } | null;
   enterprise_applications: EnterpriseApp[];
   agent_applications: AgentApp[];
   recent_transactions: Array<{
@@ -130,7 +169,7 @@ function KycDocButton({
   stored,
 }: {
   userId: string;
-  doc: 'front' | 'back' | 'selfie';
+  doc: 'front' | 'back' | 'selfie' | 'business' | 'nif' | 'tax' | 'establishment' | 'address' | 'articles';
   label: string;
   stored?: string | null;
 }) {
@@ -417,28 +456,63 @@ export default function AdminClientDossier({ initialUserId }: { initialUserId?: 
               <ShieldCheck className="text-emerald-600" size={22} />
               <h4 className="font-bold text-slate-900">Verifikasyon Idantite (KYC)</h4>
             </div>
-            <div className="text-sm text-slate-600 space-y-1 mb-4">
-              <p><strong>Tip dokiman:</strong> {p.kyc_doc_type || '—'}</p>
-              {p.kyc_submitted_at && (
-                <p><strong>Soumèt:</strong> {new Date(p.kyc_submitted_at).toLocaleString('ht-HT')}</p>
-              )}
-              {p.kyc_face_match_score != null && (
-                <p><strong>Match figi:</strong> {p.kyc_face_match_score}%</p>
-              )}
-              {p.kyc_rejection_reason && (
-                <p className="text-rose-700"><strong>Rezon rejè:</strong> {p.kyc_rejection_reason}</p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <KycDocButton userId={p.id} doc="front" label="ID Devan" stored={p.kyc_front} />
-              <KycDocButton userId={p.id} doc="back" label="ID Dèyè" stored={p.kyc_back} />
-              <KycDocButton userId={p.id} doc="selfie" label="Selfie" stored={p.kyc_selfie} />
-              {!p.kyc_front && !p.kyc_selfie && (
-                <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 font-bold uppercase">
-                  Okenn dokiman KYC sou sistèm nan
-                </span>
-              )}
-            </div>
+            {(() => {
+              const k = dossier.kyc_application;
+              const addr = k
+                ? [k.address_street, k.address_city, k.address_department].filter(Boolean).join(', ')
+                : '';
+              return (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-slate-600 mb-4">
+                    <p><strong>Tip:</strong> {k?.account_type === 'business' ? 'Antrepriz' : k?.account_type || p.account_type || '—'}</p>
+                    <p><strong>Tip dokiman:</strong> {k?.kyc_doc_type || p.kyc_doc_type || '—'}</p>
+                    <p><strong>Nimewo ID:</strong> {k?.id_number || '—'}</p>
+                    <p><strong>Dat nesans:</strong> {k?.date_of_birth || '—'}</p>
+                    <p><strong>Telefòn:</strong> {k?.phone_primary || p.phone || '—'}</p>
+                    <p><strong>Adrès:</strong> {addr || '—'}</p>
+                    <p><strong>Aktivite:</strong> {k?.activity_category || '—'}</p>
+                    <p><strong>Volim/mwa:</strong> {k?.monthly_volume_estimate != null ? `${k.monthly_volume_estimate} HTG` : '—'}</p>
+                    <p><strong>MonCash:</strong> {k?.payout_phone || '—'}</p>
+                    {(k?.submitted_at || p.kyc_submitted_at) && (
+                      <p><strong>Soumèt:</strong> {new Date(String(k?.submitted_at || p.kyc_submitted_at)).toLocaleString('ht-HT')}</p>
+                    )}
+                    {(k?.kyc_face_match_score ?? p.kyc_face_match_score) != null && (
+                      <p><strong>Match figi:</strong> {k?.kyc_face_match_score ?? p.kyc_face_match_score}%</p>
+                    )}
+                    {p.kyc_rejection_reason && (
+                      <p className="text-rose-700 col-span-2"><strong>Rezon rejè:</strong> {p.kyc_rejection_reason}</p>
+                    )}
+                  </div>
+                  {k?.account_type === 'business' && (
+                    <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 mb-4 grid grid-cols-2 gap-2 text-xs text-slate-700">
+                      <p><strong>Biznis:</strong> {k.business_name || '—'}</p>
+                      <p><strong>URL:</strong> {k.business_url || '—'}</p>
+                      <p><strong>NIF:</strong> {k.business_nif || '—'}</p>
+                      <p><strong>RCCM:</strong> {k.business_rccm || '—'}</p>
+                      <p className="col-span-2"><strong>Sèvis:</strong> {k.service_description || '—'}</p>
+                      <p><strong>Pati 1 WA/MC:</strong> {k.party1_whatsapp || '—'} / {k.party1_moncash || '—'}</p>
+                      <p><strong>Pati 2:</strong> {k.party2_full_name || '—'} ({k.party2_role || '—'}) · {k.party2_whatsapp || '—'} / {k.party2_moncash || '—'}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <KycDocButton userId={p.id} doc="front" label="ID Devan" stored={k?.kyc_front || p.kyc_front} />
+                    <KycDocButton userId={p.id} doc="back" label="ID Dèyè" stored={k?.kyc_back || p.kyc_back} />
+                    <KycDocButton userId={p.id} doc="selfie" label="Selfie" stored={k?.kyc_selfie || p.kyc_selfie} />
+                    <KycDocButton userId={p.id} doc="business" label="Patant/RCCM" stored={k?.business_registration} />
+                    <KycDocButton userId={p.id} doc="nif" label="NIF dok" stored={k?.business_nif_doc} />
+                    <KycDocButton userId={p.id} doc="tax" label="Kitan" stored={k?.tax_clearance} />
+                    <KycDocButton userId={p.id} doc="establishment" label="Lokal" stored={k?.establishment_photo} />
+                    <KycDocButton userId={p.id} doc="address" label="Prèv adrès" stored={k?.proof_of_address} />
+                    <KycDocButton userId={p.id} doc="articles" label="Statu" stored={k?.articles} />
+                    {!k?.kyc_front && !p.kyc_front && !k?.kyc_selfie && !p.kyc_selfie && (
+                      <span className="text-[10px] text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 font-bold uppercase">
+                        Okenn dokiman KYC sou sistèm nan
+                      </span>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* Antrepriz */}

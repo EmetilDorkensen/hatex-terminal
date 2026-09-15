@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { hashKycIdNumber, normalizeIdNumber } from '@/lib/kyc/id-hash';
+import { hashKycIdNumber, normalizeIdNumber, encryptKycIdNumber } from '@/lib/kyc/id-hash';
 import { getGatewaySettings, resolveKycFeeHtg } from '@/lib/moncash/settings';
 import {
   requiredDocuments,
@@ -152,13 +152,14 @@ export async function saveDraft(
 
   const patch: Record<string, unknown> = { ...validated.values, updated_at: new Date().toISOString() };
 
-  // Nimewo idantite: nou sere yon hash + 4 dènye chif, pa nimewo an klè
+  // Nimewo idantite: hash (dedup) + last4 + vèsyon chifre (admin/asistans sèlman)
   if (typeof validated.values.id_number === 'string') {
     const raw = validated.values.id_number as string;
     delete patch.id_number;
     try {
       patch.id_number_hash = hashKycIdNumber(raw);
       patch.id_number_last4 = normalizeIdNumber(raw).slice(-4);
+      patch.id_number_enc = encryptKycIdNumber(raw);
     } catch {
       return {
         ok: false,

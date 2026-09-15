@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
 import { getBusinessProfitSummary } from '@/lib/admin/business-profit';
+import { mapKycAppForStaff } from '@/lib/kyc-v2/staff-view';
 
 /** Kolòn / kle ki pa dwe ale nan navigatè menm pou admin. */
 const PROFILE_SECRET_KEYS = new Set([
@@ -73,46 +74,14 @@ export async function GET() {
     const users = (usersRes.data || []).map((u) => mapProfileForAdmin(u as Record<string, unknown>));
     const byId = new Map(users.map((u) => [String(u.id), u]));
 
-    // KYC v2: dokiman yo nan hatex_kyc_applications (bucket kyc-documents-v2),
-    // pa nan profiles.kyc_front. Map pou UI admin ki atann kyc_front / selfie.
-    const v2Apps = (agentsRes.data || []) as Record<string, unknown>[];
+    const v2Apps = (agentsRes.data || []) as unknown as Record<string, unknown>[];
     const pendingKyc =
       v2Apps.length > 0
         ? v2Apps.map((app) => {
-            const profile = byId.get(String(app.user_id)) || {};
-            return {
-              id: String(app.user_id),
-              application_id: app.id,
-              full_name: app.full_name || (profile as any).full_name || 'San Non',
-              email: app.email || (profile as any).email || '',
-              account_type: app.account_type,
-              kyc_doc_type: app.id_document_type,
-              kyc_face_match_score: app.face_match_score,
-              kyc_front: app.id_front_path || null,
-              kyc_back: app.id_back_path || null,
-              kyc_selfie: app.selfie_path || null,
-              business_registration: app.business_registration_path || null,
-              tax_clearance: app.tax_clearance_path || null,
-              establishment_photo: app.establishment_photo_path || null,
-              proof_of_address: app.proof_of_address_path || null,
-              articles: app.articles_path || null,
-              business_nif_doc: app.business_nif_doc_path || null,
-              service_description: app.service_description || null,
-              business_nif: app.business_nif || null,
-              business_rccm: app.business_rccm || null,
-              party1_whatsapp: app.party1_whatsapp || null,
-              party1_moncash: app.party1_moncash || null,
-              party2_full_name: app.party2_full_name || null,
-              party2_role: app.party2_role || null,
-              party2_whatsapp: app.party2_whatsapp || null,
-              party2_moncash: app.party2_moncash || null,
-              needs_manual_review: app.needs_manual_review === true,
-              fee_paid: app.fee_paid === true,
-              submitted_at: app.submitted_at,
-              phone_primary: app.phone_primary,
-              payout_phone: app.payout_phone,
-              status: app.status,
-            };
+            const profile = byId.get(String(app.user_id)) as
+              | { full_name?: string; email?: string }
+              | undefined;
+            return mapKycAppForStaff(app, profile);
           })
         : users.filter(
             (u) =>

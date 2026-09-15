@@ -8,6 +8,7 @@ import {
   getOpenApplication,
   markApplicationSubmitted,
 } from '@/lib/kyc-v2/application';
+import { profileSyncFromKycApp } from '@/lib/kyc-v2/staff-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,12 +74,23 @@ export async function POST(request: Request) {
     );
   }
 
+  // Sync tout enfo KYC nan profiles (idantite + pyès) pou Admin/Dosye/Asistans
+  const { data: freshApp } = await admin
+    .from('hatex_kyc_applications')
+    .select(
+      'full_name, phone_primary, account_type, business_name, id_document_type, id_number_hash, id_front_path, id_back_path, selfie_path, face_match_score, submitted_at'
+    )
+    .eq('id', app.id)
+    .maybeSingle();
+
   await admin
     .from('profiles')
-    .update({
-      kyc_status: 'pending',
-      kyc_fee_paid: true,
-    })
+    .update(
+      profileSyncFromKycApp({
+        ...(freshApp || app),
+        submitted_at: freshApp?.submitted_at || new Date().toISOString(),
+      })
+    )
     .eq('id', user.id)
     .neq('kyc_status', 'approved');
 
