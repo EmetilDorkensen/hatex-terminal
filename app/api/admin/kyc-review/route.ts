@@ -5,6 +5,7 @@ import { KYC_STATUS } from '@/lib/kyc/status';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { getAuthenticatedUser } from '@/lib/kyc/access';
 import { logAdminAction } from '@/lib/admin/audit-log';
+import { ensureKycMoncashPayoutAccounts } from '@/lib/kyc-v2/ensure-moncash-payout';
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -88,6 +89,18 @@ export async function POST(request: Request) {
           })
           .eq('user_id', userId)
           .in('status', ['submitted', 'in_review', 'draft']);
+
+        // Asire nimewo MonCash KYC a anrejistre kòm premye nimewo payout
+        const { data: kycApp } = await admin
+          .from('hatex_kyc_applications')
+          .select('payout_phone, party1_moncash, party2_moncash, account_type')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (kycApp) {
+          await ensureKycMoncashPayoutAccounts(admin, userId, kycApp);
+        }
       }
 
       if (profile.intended_plan === 'capacity' || profile.intended_plan === 'premium') {

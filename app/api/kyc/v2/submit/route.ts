@@ -9,6 +9,7 @@ import {
   markApplicationSubmitted,
 } from '@/lib/kyc-v2/application';
 import { profileSyncFromKycApp } from '@/lib/kyc-v2/staff-view';
+import { ensureKycMoncashPayoutAccounts } from '@/lib/kyc-v2/ensure-moncash-payout';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
   const { data: freshApp } = await admin
     .from('hatex_kyc_applications')
     .select(
-      'full_name, phone_primary, account_type, business_name, id_document_type, id_number_hash, id_front_path, id_back_path, selfie_path, face_match_score, submitted_at'
+      'full_name, phone_primary, account_type, business_name, id_document_type, id_number_hash, id_front_path, id_back_path, selfie_path, face_match_score, submitted_at, payout_phone, party1_moncash, party2_moncash'
     )
     .eq('id', app.id)
     .maybeSingle();
@@ -107,47 +108,8 @@ export async function POST(request: Request) {
       .eq('id', user.id);
   }
 
-  const phones: { phone: string; label: string; isDefault: boolean }[] = [];
-  const p1 = String(app.party1_moncash || app.payout_phone || '').replace(/\D/g, '');
-  const p2 = String(app.party2_moncash || '').replace(/\D/g, '');
-  if (p1.length >= 8) phones.push({ phone: p1, label: 'MonCash reprezantan', isDefault: true });
-  if (p2.length >= 8 && p2 !== p1) {
-    phones.push({ phone: p2, label: 'MonCash dezyèm moun', isDefault: false });
-  }
-
-  const { data: defaultMoncash } = await admin
-    .from('hatex_bank_accounts')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('kind', 'moncash')
-    .eq('is_default', true)
-    .maybeSingle();
-
-  for (const row of phones) {
-    const { data: existing } = await admin
-      .from('hatex_bank_accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('kind', 'moncash')
-      .eq('phone', row.phone)
-      .maybeSingle();
-    if (existing) continue;
-    await admin.from('hatex_bank_accounts').insert({
-      user_id: user.id,
-      kind: 'moncash',
-      label: row.label,
-      phone: row.phone,
-      is_default: row.isDefault && !defaultMoncash,
-      is_verified: true,
-    });
-  }
-
-  if (p1.length >= 8) {
-    await admin
-      .from('hatex_merchant_accounts')
-      .update({ payout_phone: p1, payout_provider: 'moncash' })
-      .eq('user_id', user.id);
-  }
+  // Anrejistre nimewo MonCash KYC kòm premye nimewo payout (kliyan ka siprime l pita)
+  await ensureKycMoncashPayoutAccounts(admin, user.id, freshApp || app);
 
   return NextResponse.json({
     ok: true,

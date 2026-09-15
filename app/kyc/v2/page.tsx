@@ -656,19 +656,22 @@ export default function KycV2Page() {
 
             <div className="border-t border-gray-100 pt-5 space-y-5">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                Kote ou vle resevwa lajan ou
+                Kote ou vle resevwa lajan ou (MonCash sèlman pou kounye a)
               </p>
 
-              <Field label="Sèvis" error={fieldErrors.payout_provider}>
+              <Field label="Sèvis payout" error={fieldErrors.payout_provider}>
                 <input
                   type="text"
                   value="MonCash"
                   readOnly
                   className={inputClass(fieldErrors.payout_provider)}
                 />
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  Pou kounye a, sèl nimewo MonCash ki aksepte pou resevwa lajan sou sistèm nan.
+                </p>
               </Field>
 
-              <Field label="Nimewo payout" error={fieldErrors.payout_phone}>
+              <Field label="Nimewo MonCash (payout)" error={fieldErrors.payout_phone}>
                 <input
                   type="tel"
                   value={form.payout_phone}
@@ -676,6 +679,9 @@ export default function KycV2Page() {
                   placeholder="3720 1241"
                   className={inputClass(fieldErrors.payout_phone)}
                 />
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  Nimewo sa a ap vin premye nimewo payout ou — ou ka siprime l pita si w vle.
+                </p>
               </Field>
             </div>
 
