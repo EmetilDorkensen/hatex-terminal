@@ -63,14 +63,38 @@ export async function POST(request: Request) {
       const alreadyApproved = profile.kyc_status === KYC_STATUS.APPROVED;
 
       if (!alreadyApproved) {
+        // Non ki sou pyès idantite a (KYC) — ranplase non default ki te soti nan email
+        const { data: kycApp } = await admin
+          .from('hatex_kyc_applications')
+          .select(
+            'full_name, business_name, account_type, payout_phone, party1_moncash, party2_moncash, phone_primary'
+          )
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const kycName = String(kycApp?.full_name || '').trim();
+        const profilePatch: Record<string, unknown> = {
+          kyc_status: KYC_STATUS.APPROVED,
+          kyc_rejection_reason: null,
+          is_activated: true,
+          features_unlock_paid: true,
+        };
+        if (kycName.length >= 2) {
+          profilePatch.full_name = kycName;
+        }
+        if (kycApp?.account_type === 'business' && kycApp.business_name) {
+          profilePatch.business_name = String(kycApp.business_name).trim();
+          profilePatch.account_type = 'enterprise';
+        }
+        if (kycApp?.phone_primary) {
+          profilePatch.phone = String(kycApp.phone_primary).trim();
+        }
+
         const { error: approveErr } = await admin
           .from('profiles')
-          .update({
-            kyc_status: KYC_STATUS.APPROVED,
-            kyc_rejection_reason: null,
-            is_activated: true,
-            features_unlock_paid: true,
-          })
+          .update(profilePatch)
           .eq('id', userId);
 
         if (approveErr) {
@@ -78,6 +102,15 @@ export async function POST(request: Request) {
             { error: `Pa t kapab apwouve KYC: ${approveErr.message}` },
             { status: 500 }
           );
+        }
+
+        // Sync non an nan Auth metadata tou (pwofil / UI ki li user_metadata)
+        if (kycName.length >= 2) {
+          await admin.auth.admin
+            .updateUserById(userId, {
+              user_metadata: { full_name: kycName },
+            })
+            .catch(() => {});
         }
 
         await admin
@@ -91,13 +124,6 @@ export async function POST(request: Request) {
           .in('status', ['submitted', 'in_review', 'draft']);
 
         // Asire nimewo MonCash KYC a anrejistre kòm premye nimewo payout
-        const { data: kycApp } = await admin
-          .from('hatex_kyc_applications')
-          .select('payout_phone, party1_moncash, party2_moncash, account_type')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
         if (kycApp) {
           await ensureKycMoncashPayoutAccounts(admin, userId, kycApp);
         }
