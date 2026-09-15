@@ -9,6 +9,7 @@ import AdminClientDossier from './AdminClientDossier';
 import AdminFeesPanel from './AdminFeesPanel';
 import AdminPayoutsPanel from './AdminPayoutsPanel';
 import ContactInboxPanel from './ContactInboxPanel';
+import AccountRecoveryPanel from '@/app/components/AccountRecoveryPanel';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
 
 export default function AdminSuperPage() {
@@ -36,7 +37,7 @@ export default function AdminSuperPage() {
     const [notifTitle, setNotifTitle] = useState('');
     const [notifBody, setNotifBody] = useState('');
     const [notifTargetEmail, setNotifTargetEmail] = useState('');
-    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'sispandi' | 'kyc' | 'kyc-survey' | 'ekip' | 'sekirite' | 'frais' | 'payout' | 'mesaj'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'anons' | 'kliyan' | 'dosye' | 'sispandi' | 'kyc' | 'kyc-survey' | 'ekip' | 'sekirite' | 'frais' | 'payout' | 'mesaj' | 'rekiperasyon'>('dashboard');
     const [dossierUserId, setDossierUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -438,6 +439,9 @@ export default function AdminSuperPage() {
                     </button>
                     <button onClick={() => setView('mesaj')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'mesaj' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
                         <Mail size={14}/> Imèl Kontak
+                    </button>
+                    <button onClick={() => setView('rekiperasyon')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'rekiperasyon' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
+                        <KeyRound size={14}/> Rekiperasyon
                     </button>
                     
                     <button onClick={() => setView('ekip')} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${view === 'ekip' ? 'bg-indigo-600 shadow-sm text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
@@ -874,6 +878,8 @@ export default function AdminSuperPage() {
                         </div>
                     ) : view === 'mesaj' ? (
                         <ContactInboxPanel />
+                    ) : view === 'rekiperasyon' ? (
+                        <AccountRecoveryPanel />
                     ) : view === 'sekirite' ? (
                         <div className="space-y-6">
                             <AdminMfaSettings supabase={supabase} />

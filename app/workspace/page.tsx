@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import KycSurveyPanel from '@/components/KycSurveyPanel';
 import ContactInboxPanel from '@/app/admin/ContactInboxPanel';
+import AccountRecoveryPanel from '@/app/components/AccountRecoveryPanel';
 import {
   ADMIN_PROFILE_SAFE_COLUMNS,
 } from '@/lib/admin/safe-columns';
@@ -564,12 +565,17 @@ export default function WorkspacePage() {
                             <button onClick={() => { setActiveTab('inbox'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
                                 <Mail size={13} /> Kontak Email
                             </button>
+                            <button onClick={() => { setActiveTab('rekiperasyon'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'rekiperasyon' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <ShieldCheck size={13} /> Rekiperasyon
+                            </button>
                             <button onClick={() => { setActiveTab('clients'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'clients' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kliyan</button>
                             <button onClick={() => { setActiveTab('kyc-survey'); setSelectedTicket(null); }} className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'kyc-survey' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Kesyonman KYC</button>
                         </div>
 
                         {activeTab === 'inbox' ? (
                             <ContactInboxPanel compact />
+                        ) : activeTab === 'rekiperasyon' ? (
+                            <AccountRecoveryPanel />
                         ) : activeTab === 'kyc-survey' ? (
                             <KycSurveyPanel mode="workspace" />
                         ) : activeTab === 'clients' ? (

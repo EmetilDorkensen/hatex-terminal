@@ -94,6 +94,29 @@ export function recoveryCodeExpiry(from = new Date()): Date {
   return new Date(from.getTime() + RECOVERY_CODE_TTL_MS);
 }
 
+// ─────────────────────────────────────────────────────────────
+// Token rekiperasyon kont (lyen email 1 èdtan — reset MFA)
+// ─────────────────────────────────────────────────────────────
+
+export const RECOVERY_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 èdtan
+
+/** Token URL-safe (64 hex chars) — voye nan lyen email la sèlman. */
+export function generateRecoveryToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/** HMAC-SHA256 — sèl fòm ki sere nan baz done a. */
+export function hashRecoveryToken(token: string): string {
+  return crypto
+    .createHmac('sha256', secretKey())
+    .update(`recovery-token:${String(token || '').trim()}`)
+    .digest('hex');
+}
+
+export function recoveryTokenExpiry(from = new Date()): Date {
+  return new Date(from.getTime() + RECOVERY_TOKEN_TTL_MS);
+}
+
 export function isRecoveryCodeExpired(expiresAt: string | Date | null | undefined): boolean {
   if (!expiresAt) return true;
   const t = typeof expiresAt === 'string' ? Date.parse(expiresAt) : expiresAt.getTime();

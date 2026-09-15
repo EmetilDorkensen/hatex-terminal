@@ -764,6 +764,13 @@ export default function Login() {
 
               </p>
 
+              <Link
+                href="/rekiperasyon"
+                className="block text-center mt-3 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-[11px] font-bold uppercase tracking-wider hover:bg-amber-100 transition-colors"
+              >
+                Ou pa t gentan kopye kòd aksè a? Itilize yon lòt mwayen →
+              </Link>
+
             </div>
 
           ) : (
