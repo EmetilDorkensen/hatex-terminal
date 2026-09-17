@@ -35,6 +35,10 @@ export default function AdminSuperPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [anonsText, setAnonsText] = useState('');
     const [anonsActive, setAnonsActive] = useState(true);
+    const [loginEnabled, setLoginEnabled] = useState(true);
+    const [loginClosedMessage, setLoginClosedMessage] = useState(
+        'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la. Eseye ankò pita.'
+    );
     const [notifTitle, setNotifTitle] = useState('');
     const [notifBody, setNotifBody] = useState('');
     const [notifTargetEmail, setNotifTargetEmail] = useState('');
@@ -129,6 +133,13 @@ export default function AdminSuperPage() {
             if (data.announcement) {
                 setAnonsText(data.announcement.text || '');
                 setAnonsActive(data.announcement.active !== false);
+            }
+
+            if (data.loginAccess) {
+                setLoginEnabled(data.loginAccess.enabled !== false);
+                if (data.loginAccess.message) {
+                    setLoginClosedMessage(data.loginAccess.message);
+                }
             }
 
             if (data.gateway) {
@@ -348,6 +359,45 @@ export default function AdminSuperPage() {
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
+    const handleToggleLogin = async (enabled: boolean) => {
+        const confirmMsg = enabled
+            ? 'Ouvri paj koneksyon an? Kliyan yo ap kapab antre ankò.'
+            : 'Fèmen paj koneksyon an? Se sèlman ou (admin) ki ap kapab konekte pandan w ap travay.';
+        if (!confirm(confirmMsg)) return;
+        setProcessingId('toggling_login');
+        try {
+            await adminOps({
+                action: 'set_login_enabled',
+                enabled,
+                message: loginClosedMessage.trim(),
+            });
+            setLoginEnabled(enabled);
+            alert(enabled ? 'Paj koneksyon an louvri.' : 'Paj koneksyon an fèmen. Admin ka toujou antre.');
+            raleDone();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleSaveLoginMessage = async () => {
+        setProcessingId('saving_login_msg');
+        try {
+            await adminOps({
+                action: 'set_login_enabled',
+                enabled: loginEnabled,
+                message: loginClosedMessage.trim(),
+            });
+            alert('Mesaj fèmen koneksyon an sove.');
+            raleDone();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const handleSendNotification = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!notifTitle.trim()) return alert('Antre yon tit pou notifikasyon an.');
@@ -494,6 +544,33 @@ export default function AdminSuperPage() {
                               </div>
                               <span className="text-xs font-bold uppercase tracking-wider text-[#1d4ed8]">Louvri →</span>
                             </button>
+
+                            <div className={`rounded-2xl p-5 border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${loginEnabled ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-200'}`}>
+                                <div className="flex items-start gap-3">
+                                    <span className={`p-3 rounded-xl border ${loginEnabled ? 'bg-white text-emerald-600 border-emerald-100' : 'bg-white text-rose-600 border-rose-100'}`}>
+                                        <Lock size={22} />
+                                    </span>
+                                    <div>
+                                        <p className={`text-sm font-bold ${loginEnabled ? 'text-emerald-900' : 'text-rose-900'}`}>
+                                            Paj koneksyon: {loginEnabled ? 'LOUVRI' : 'FÈMEN'}
+                                        </p>
+                                        <p className={`text-xs mt-1 ${loginEnabled ? 'text-emerald-800/80' : 'text-rose-800/80'}`}>
+                                            {loginEnabled
+                                                ? 'Kliyan yo ka konekte, enskri, epi rekipere kont yo.'
+                                                : 'Kliyan yo bloke. Se sèlman kont admin ki ka antre pandan w ap travay.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={processingId === 'toggling_login'}
+                                    onClick={() => handleToggleLogin(!loginEnabled)}
+                                    className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold uppercase tracking-wider disabled:opacity-60 shrink-0 ${loginEnabled ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                >
+                                    {processingId === 'toggling_login' ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                                    {loginEnabled ? 'Fèmen koneksyon' : 'Ouvri koneksyon'}
+                                </button>
+                            </div>
 
                             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>
@@ -752,6 +829,53 @@ export default function AdminSuperPage() {
                         <AdminClientDossier initialUserId={dossierUserId} />
                     ) : view === 'anons' ? (
                         <>
+                        <div className={`p-8 rounded-3xl border mb-8 shadow-sm ${loginEnabled ? 'bg-white border-gray-200' : 'bg-rose-50 border-rose-200'}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className={`p-3 rounded-xl ${loginEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}><Lock size={24} /></span>
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-900 tracking-tight">Ouvri / Fèmen paj koneksyon</h2>
+                                    <p className="text-xs text-slate-500 mt-1">Lè w ap travay sou sit la, fèmen li pou anpeche kliyan konekte. Admin ka toujou antre.</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-3 mb-6">
+                                <button
+                                    type="button"
+                                    disabled={processingId === 'toggling_login' || loginEnabled}
+                                    onClick={() => handleToggleLogin(true)}
+                                    className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold uppercase tracking-wider"
+                                >
+                                    Ouvri
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={processingId === 'toggling_login' || !loginEnabled}
+                                    onClick={() => handleToggleLogin(false)}
+                                    className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold uppercase tracking-wider"
+                                >
+                                    Fèmen
+                                </button>
+                                <span className={`inline-flex items-center px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider ${loginEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                    Estati: {loginEnabled ? 'Louvri' : 'Fèmen'}
+                                </span>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Mesaj kliyan wè lè li fèmen:</label>
+                                <textarea
+                                    value={loginClosedMessage}
+                                    onChange={(e) => setLoginClosedMessage(e.target.value)}
+                                    className="w-full bg-white border border-gray-200 p-4 rounded-2xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm min-h-[100px] text-slate-900 resize-none"
+                                />
+                                <button
+                                    type="button"
+                                    disabled={processingId === 'saving_login_msg'}
+                                    onClick={handleSaveLoginMessage}
+                                    className="mt-2 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-60"
+                                >
+                                    {processingId === 'saving_login_msg' ? <Loader2 size={16} className="animate-spin" /> : null}
+                                    Sove mesaj la
+                                </button>
+                            </div>
+                        </div>
                         <div className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
                                 <span className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Send size={24} /></span>

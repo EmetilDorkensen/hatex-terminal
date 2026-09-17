@@ -41,6 +41,8 @@ export default function Login() {
   // sou menm kont lan, epi sèlman si sit la konfigire ak yon site key.
   const [requireCaptcha, setRequireCaptcha] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [loginClosed, setLoginClosed] = useState(false);
+  const [loginClosedMessage, setLoginClosedMessage] = useState('');
   const captchaRef = useRef<HTMLDivElement>(null);
   const captchaWidgetId = useRef<string | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
@@ -52,6 +54,29 @@ export default function Login() {
     if (params.get('reason') === 'session_replaced') {
       setErrorMsg("Ou te dekonekte paske kont ou konekte sou yon lòt aparèy. Yon kont Hatexcard ka sèlman konekte sou YON SÈL aparèy alafwa.");
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/login-guard');
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (data.login_enabled === false) {
+          setLoginClosed(true);
+          setLoginClosedMessage(
+            data.message ||
+              'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la. Eseye ankò pita.'
+          );
+        }
+      } catch {
+        /* ignore — kite fòm nan louvri si check echwe */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -283,7 +308,19 @@ export default function Login() {
 
     try {
 
-      const guardRes = await fetch('/api/auth/login-guard', { method: 'POST' });
+      const guardRes = await fetch('/api/auth/login-guard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      if (guardRes.status === 503) {
+        const guardData = await guardRes.json().catch(() => ({}));
+        setLoginClosed(true);
+        setLoginClosedMessage(guardData.message || '');
+        setErrorMsg(guardData.message || "Paj koneksyon an fèmen tanporèman.");
+        setLoading(false);
+        return;
+      }
       if (guardRes.status === 429) {
         const guardData = await guardRes.json();
         setErrorMsg(guardData.message || "Twòp tantativ koneksyon. Eseye pita.");
@@ -557,7 +594,19 @@ export default function Login() {
 
         </div>
 
+        {loginClosed && (
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-amber-900 text-xs font-bold uppercase tracking-wider mb-1">Koneksyon fèmen</p>
+              <p className="text-amber-800 text-[11px] font-medium leading-relaxed">
+                {loginClosedMessage || 'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la.'}
+              </p>
+            </div>
+          </div>
+        )}
 
+       
 
         {mfaRequired ? (
           <form onSubmit={handleMfaVerify} className="space-y-5">

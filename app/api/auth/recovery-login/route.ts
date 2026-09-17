@@ -6,6 +6,7 @@ import {
   isRecoveryCodeExpired,
   normalizeRecoveryCode,
 } from '@/lib/security/recovery-code';
+import { assertLoginAllowed } from '@/lib/auth/login-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { success: false, message: 'Email oswa kòd aksè pa valab.' },
       { status: 400 }
+    );
+  }
+
+  const access = await assertLoginAllowed(email);
+  if (!access.ok) {
+    return NextResponse.json(
+      { success: false, login_closed: true, message: access.message },
+      { status: 503 }
     );
   }
 

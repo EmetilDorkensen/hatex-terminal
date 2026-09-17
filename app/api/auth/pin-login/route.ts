@@ -8,6 +8,7 @@ import {
   buildPinFailureUpdate,
   buildPinSuccessUpdate,
 } from '@/lib/security/pin-lockout';
+import { assertLoginAllowed } from '@/lib/auth/login-access';
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -25,6 +26,14 @@ export async function POST(request: Request) {
 
     if (!cleanEmail || String(pin || '').length !== 4) {
       return NextResponse.json({ success: false, message: 'Email oswa PIN pa valab.' }, { status: 400 });
+    }
+
+    const access = await assertLoginAllowed(cleanEmail);
+    if (!access.ok) {
+      return NextResponse.json(
+        { success: false, login_closed: true, message: access.message },
+        { status: 503 }
+      );
     }
 
     const supabase = createSupabaseAdminClient();

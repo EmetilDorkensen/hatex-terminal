@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { checkStrongPassword } from '@/lib/security/password-strength';
 import { sendSignupConfirmEmail } from '@/lib/auth/send-confirm-email';
+import { assertLoginAllowed } from '@/lib/auth/login-access';
 
 function errMsg(err: unknown): string {
   if (!err || typeof err !== 'object') return '';
@@ -40,6 +41,14 @@ export async function POST(request: Request) {
   const acceptTerms = body.accept_terms === true;
   const promoCode =
     typeof body.promo_code === 'string' ? body.promo_code.trim().toUpperCase() : '';
+
+  const access = await assertLoginAllowed(email);
+  if (!access.ok) {
+    return NextResponse.json(
+      { success: false, login_closed: true, message: access.message },
+      { status: 503 }
+    );
+  }
 
   if (!acceptTerms) {
     return NextResponse.json(

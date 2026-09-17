@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { isEmailConfigured, sendMail, untrackedUrlBlock } from '@/lib/notify/email';
 import { publicSiteUrl } from '@/lib/urls/public';
+import { assertLoginAllowed } from '@/lib/auth/login-access';
 
 const SITE_URL = publicSiteUrl();
 
@@ -48,6 +49,14 @@ export async function POST(request: Request) {
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return genericOk;
+  }
+
+  const access = await assertLoginAllowed(email);
+  if (!access.ok) {
+    return NextResponse.json(
+      { success: false, login_closed: true, message: access.message },
+      { status: 503 }
+    );
   }
 
   if (!isEmailConfigured()) {

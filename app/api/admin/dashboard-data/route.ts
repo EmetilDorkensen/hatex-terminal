@@ -131,6 +131,13 @@ export async function GET() {
         text: anonsRes.data?.announcement_text || '',
         active: anonsRes.data?.announcement_active ?? true,
       },
+      loginAccess: {
+        enabled: anonsRes.data?.login_enabled !== false,
+        message:
+          (typeof anonsRes.data?.login_closed_message === 'string' &&
+            anonsRes.data.login_closed_message.trim()) ||
+          'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la. Eseye ankò pita.',
+      },
       profit: {
         gross_htg: profitSummary.gross_htg,
         refunded_htg: profitSummary.refunded_htg,

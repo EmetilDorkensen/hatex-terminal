@@ -42,6 +42,8 @@ function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [msg, setMsg] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const [loginClosed, setLoginClosed] = useState(false);
+  const [loginClosedMessage, setLoginClosedMessage] = useState('');
 
   useEffect(() => {
     const promoFromUrl = searchParams.get('promo');
@@ -54,10 +56,42 @@ function SignupForm() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/login-guard');
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (data.login_enabled === false) {
+          setLoginClosed(true);
+          setLoginClosedMessage(
+            data.message ||
+              'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la. Eseye ankò pita.'
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMsg({ type: '', text: '' });
+
+    if (loginClosed) {
+      setMsg({
+        type: 'error',
+        text: loginClosedMessage || 'Enskripsyon fèmen tanporèman.',
+      });
+      setLoading(false);
+      return;
+    }
 
     if (!acceptTerms) {
       setMsg({
@@ -91,6 +125,10 @@ function SignupForm() {
       const text = errorText(json.message ?? json.msg ?? json.error, '');
 
       if (!res.ok || json.success === false) {
+        if (res.status === 503 || json.login_closed) {
+          setLoginClosed(true);
+          if (text) setLoginClosedMessage(text);
+        }
         setMsg({
           type: 'error',
           text: text || 'Pa t kapab kreye kont lan. Eseye ankò.',
@@ -155,6 +193,18 @@ function SignupForm() {
           <ShieldCheck size={14} className="text-indigo-500" /> Kreye Yon Kont Nouvo
         </p>
       </div>
+
+      {loginClosed && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-900 text-xs font-bold uppercase tracking-wider mb-1">Enskripsyon fèmen</p>
+            <p className="text-amber-800 text-[11px] font-medium leading-relaxed">
+              {loginClosedMessage || 'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSignup} className="space-y-5">
         <div className="space-y-1.5 text-left">
@@ -242,7 +292,7 @@ function SignupForm() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || loginClosed}
           className="w-full bg-indigo-600 hover:bg-indigo-700 py-4 rounded-xl font-bold uppercase tracking-wider shadow-sm shadow-indigo-200 active:scale-[0.98] transition-all text-xs mt-6 text-white disabled:opacity-70 flex justify-center items-center gap-2"
         >
           {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Ap Kreye Kont Lan...</> : 'Kreye Kont Mwen'}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { notifyStaffOfContactMessage } from '@/lib/contact/notify-staff';
+import { assertLoginAllowed } from '@/lib/auth/login-access';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -79,6 +80,15 @@ export async function POST(request: Request) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ success: false, message: 'Antre imèl kont lan.' }, { status: 400 });
   }
+
+  const access = await assertLoginAllowed(email);
+  if (!access.ok) {
+    return NextResponse.json(
+      { success: false, login_closed: true, message: access.message },
+      { status: 503 }
+    );
+  }
+
   if (!idFront || !idFront.size) {
     return NextResponse.json(
       { success: false, message: 'Foto pyès idantite w (devan) obligatwa.' },

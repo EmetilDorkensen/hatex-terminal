@@ -82,6 +82,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'set_login_enabled') {
+      const enabled = body.enabled !== false && body.enabled !== 'false' && body.enabled !== 0;
+      const message =
+        typeof body.message === 'string' ? body.message.trim().slice(0, 500) : undefined;
+      const patch: Record<string, unknown> = { login_enabled: enabled };
+      if (message !== undefined) patch.login_closed_message = message;
+      const { error } = await db.from('global_settings').update(patch).eq('id', 1);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      await logAdminAction(db, {
+        adminEmail: email,
+        action: enabled ? 'LOGIN_OPENED' : 'LOGIN_CLOSED',
+        targetType: 'global_settings',
+        targetId: '1',
+        details: { login_enabled: enabled, message_len: message?.length ?? null },
+        ip,
+      });
+      return NextResponse.json({ success: true, login_enabled: enabled });
+    }
+
     // Notifikasyon in-app: admin/anplwaye ekri yon mesaj ki parèt nan
     // klòch "Notifikasyon" chak kliyan (tab hatex_notifications).
     if (action === 'broadcast_notification') {
