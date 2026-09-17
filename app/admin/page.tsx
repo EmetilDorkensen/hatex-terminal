@@ -39,6 +39,8 @@ export default function AdminSuperPage() {
     const [loginClosedMessage, setLoginClosedMessage] = useState(
         'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la. Eseye ankò pita.'
     );
+    const [loginBypassEmails, setLoginBypassEmails] = useState<string[]>([]);
+    const [bypassEmailInput, setBypassEmailInput] = useState('');
     const [notifTitle, setNotifTitle] = useState('');
     const [notifBody, setNotifBody] = useState('');
     const [notifTargetEmail, setNotifTargetEmail] = useState('');
@@ -140,6 +142,11 @@ export default function AdminSuperPage() {
                 if (data.loginAccess.message) {
                     setLoginClosedMessage(data.loginAccess.message);
                 }
+                setLoginBypassEmails(
+                    Array.isArray(data.loginAccess.bypassEmails)
+                        ? data.loginAccess.bypassEmails
+                        : []
+                );
             }
 
             if (data.gateway) {
@@ -398,6 +405,45 @@ export default function AdminSuperPage() {
         }
     };
 
+    const saveBypassEmails = async (emails: string[]) => {
+        setProcessingId('saving_bypass');
+        try {
+            const data: any = await adminOps({
+                action: 'set_login_bypass_emails',
+                emails,
+            });
+            setLoginBypassEmails(Array.isArray(data.emails) ? data.emails : emails);
+            setBypassEmailInput('');
+            alert('Lis imèl ki ka konekte lè paj la fèmen an sove.');
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleAddBypassEmail = async () => {
+        const email = bypassEmailInput.trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+            alert('Antre yon imèl valab.');
+            return;
+        }
+        if (email === 'adminhatexcard@gmail.com') {
+            alert('Imèl admin prensipal la deja otorize otomatikman.');
+            return;
+        }
+        if (loginBypassEmails.includes(email)) {
+            alert('Imèl sa a deja nan lis la.');
+            return;
+        }
+        await saveBypassEmails([...loginBypassEmails, email]);
+    };
+
+    const handleRemoveBypassEmail = async (email: string) => {
+        if (!confirm(`Retire ${email} nan lis la?`)) return;
+        await saveBypassEmails(loginBypassEmails.filter((e) => e !== email));
+    };
+
     const handleSendNotification = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!notifTitle.trim()) return alert('Antre yon tit pou notifikasyon an.');
@@ -557,7 +603,7 @@ export default function AdminSuperPage() {
                                         <p className={`text-xs mt-1 ${loginEnabled ? 'text-emerald-800/80' : 'text-rose-800/80'}`}>
                                             {loginEnabled
                                                 ? 'Kliyan yo ka konekte, enskri, epi rekipere kont yo.'
-                                                : 'Kliyan yo bloke. Se sèlman kont admin ki ka antre pandan w ap travay.'}
+                                                : `Kliyan yo bloke. Admin + ${loginBypassEmails.length} lòt imèl otorize ka antre.`}
                                         </p>
                                     </div>
                                 </div>
@@ -874,6 +920,62 @@ export default function AdminSuperPage() {
                                     {processingId === 'saving_login_msg' ? <Loader2 size={16} className="animate-spin" /> : null}
                                     Sove mesaj la
                                 </button>
+                            </div>
+
+                            <div className="mt-8 pt-6 border-t border-gray-200 space-y-4">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900">Imèl ki ka konekte lè paj la fèmen</h3>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        <span className="font-semibold text-slate-700">adminhatexcard@gmail.com</span> toujou otorize.
+                                        Ou ka ajoute lòt imèl isit la (staff, ou menm, elatriye).
+                                    </p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <input
+                                        type="email"
+                                        value={bypassEmailInput}
+                                        onChange={(e) => setBypassEmailInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleAddBypassEmail();
+                                            }
+                                        }}
+                                        placeholder="egzanp: staff@email.com"
+                                        className="flex-1 bg-white border border-gray-200 px-4 py-3 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm text-slate-900"
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={processingId === 'saving_bypass'}
+                                        onClick={handleAddBypassEmail}
+                                        className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-60"
+                                    >
+                                        {processingId === 'saving_bypass' ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                                        Ajoute
+                                    </button>
+                                </div>
+                                <ul className="space-y-2">
+                                    <li className="flex items-center justify-between gap-3 bg-slate-50 border border-gray-200 rounded-xl px-4 py-3">
+                                        <span className="text-sm font-medium text-slate-800">adminhatexcard@gmail.com</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">Admin · toujou</span>
+                                    </li>
+                                    {loginBypassEmails.map((em) => (
+                                        <li key={em} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                                            <span className="text-sm font-medium text-slate-800 break-all">{em}</span>
+                                            <button
+                                                type="button"
+                                                disabled={processingId === 'saving_bypass'}
+                                                onClick={() => handleRemoveBypassEmail(em)}
+                                                className="text-[10px] font-bold uppercase tracking-wider text-rose-600 hover:text-rose-700 disabled:opacity-50 shrink-0"
+                                            >
+                                                Retire
+                                            </button>
+                                        </li>
+                                    ))}
+                                    {loginBypassEmails.length === 0 && (
+                                        <li className="text-xs text-slate-400 px-1">Pa gen lòt imèl ajoute ankò.</li>
+                                    )}
+                                </ul>
                             </div>
                         </div>
                         <div className="bg-white p-8 rounded-3xl border border-gray-200 mb-8 shadow-sm">

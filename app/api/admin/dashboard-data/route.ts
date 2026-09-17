@@ -137,6 +137,12 @@ export async function GET() {
           (typeof anonsRes.data?.login_closed_message === 'string' &&
             anonsRes.data.login_closed_message.trim()) ||
           'Paj koneksyon an fèmen tanporèman. Nou ap travay sou sit la. Eseye ankò pita.',
+        bypassEmails: Array.isArray(anonsRes.data?.login_bypass_emails)
+          ? anonsRes.data.login_bypass_emails
+              .filter((e: unknown): e is string => typeof e === 'string')
+              .map((e: string) => e.trim().toLowerCase())
+              .filter(Boolean)
+          : [],
       },
       profit: {
         gross_htg: profitSummary.gross_htg,

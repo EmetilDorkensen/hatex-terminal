@@ -4,6 +4,7 @@ import { hasValidAdminGate, requireAdminUser } from '@/lib/admin/auth';
 import { logAdminAction } from '@/lib/admin/audit-log';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import { broadcastNotification } from '@/lib/notify/broadcast';
+import { sanitizeBypassEmailList } from '@/lib/auth/login-access';
 
 /**
  * Aksyon admin (sispann, promo, anons, ekip) — service_role.
@@ -99,6 +100,24 @@ export async function POST(request: Request) {
         ip,
       });
       return NextResponse.json({ success: true, login_enabled: enabled });
+    }
+
+    if (action === 'set_login_bypass_emails') {
+      const emails = sanitizeBypassEmailList(body.emails);
+      const { error } = await db
+        .from('global_settings')
+        .update({ login_bypass_emails: emails })
+        .eq('id', 1);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      await logAdminAction(db, {
+        adminEmail: email,
+        action: 'LOGIN_BYPASS_EMAILS_UPDATED',
+        targetType: 'global_settings',
+        targetId: '1',
+        details: { count: emails.length, emails },
+        ip,
+      });
+      return NextResponse.json({ success: true, emails });
     }
 
     // Notifikasyon in-app: admin/anplwaye ekri yon mesaj ki parèt nan
