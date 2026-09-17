@@ -62,7 +62,7 @@ export default function GoogleContinueButton({
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: googleOAuthRedirectTo('/auth/complete'),
@@ -74,7 +74,24 @@ export default function GoogleContinueButton({
       });
 
       if (error) {
-        onError?.(error.message || 'Pa t kapab louvri Google.');
+        const raw = `${error.message || ''} ${error.code || ''}`.toLowerCase();
+        let message = error.message || 'Pa t kapab louvri Google.';
+        if (
+          raw.includes('provider is not enabled') ||
+          raw.includes('unsupported provider') ||
+          raw.includes('validation_failed')
+        ) {
+          message =
+            'Google poko aktive nan Supabase. Ale nan Authentication → Providers → Google, mete Client ID / Secret, epi aktive li.';
+        }
+        onError?.(message);
+        setLoading(false);
+        return;
+      }
+
+      // Si pa gen URL (kèk ka erè), pa rete loading
+      if (!data?.url) {
+        onError?.('Pa t kapab louvri paj Google. Verifye konfigirasyon OAuth la.');
         setLoading(false);
       }
     } catch {
