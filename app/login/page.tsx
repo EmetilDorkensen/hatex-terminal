@@ -11,6 +11,7 @@ import Script from 'next/script';
 import { createBrowserClient } from '@supabase/ssr';
 
 import { Mail, Lock, KeyRound, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
+import GoogleContinueButton from '@/components/auth/GoogleContinueButton';
 
 
 
@@ -53,6 +54,19 @@ export default function Login() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('reason') === 'session_replaced') {
       setErrorMsg("Ou te dekonekte paske kont ou konekte sou yon lòt aparèy. Yon kont Hatexcard ka sèlman konekte sou YON SÈL aparèy alafwa.");
+    }
+    const err = params.get('error');
+    if (err === 'login_closed') {
+      const message = params.get('message');
+      setLoginClosed(true);
+      if (message) setLoginClosedMessage(message);
+      setErrorMsg(message || 'Paj koneksyon an fèmen tanporèman.');
+    } else if (err === 'google_no_email') {
+      setErrorMsg('Google pa bay yon imèl. Eseye yon lòt kont Google.');
+    } else if (err === 'auth_callback' || err === 'google_session' || err === 'google_complete') {
+      setErrorMsg('Koneksyon Google echwe. Eseye ankò.');
+    } else if (err === 'missing_code') {
+      setErrorMsg('Koneksyon an pa t konplete. Eseye ankò.');
     }
   }, []);
 
@@ -899,6 +913,20 @@ export default function Login() {
           </button>
 
         </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-100" />
+          </div>
+          <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold text-slate-400">
+            <span className="bg-white px-3">oswa</span>
+          </div>
+        </div>
+
+        <GoogleContinueButton
+          disabled={loading || mfaRequired}
+          onError={(message) => setErrorMsg(message)}
+        />
           </>
         )}
 

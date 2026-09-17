@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Mail, Lock, Gift, AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { checkStrongPassword } from '@/lib/security/password-strength';
+import GoogleContinueButton from '@/components/auth/GoogleContinueButton';
 
 function errorText(err: unknown, fallback: string): string {
   if (typeof err === 'string') {
@@ -298,6 +299,27 @@ function SignupForm() {
           {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Ap Kreye Kont Lan...</> : 'Kreye Kont Mwen'}
         </button>
       </form>
+
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-100" />
+        </div>
+        <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold text-slate-400">
+          <span className="bg-white px-3">oswa</span>
+        </div>
+      </div>
+
+      <GoogleContinueButton
+        disabled={loading || !acceptTerms}
+        blocked={loginClosed}
+        blockedMessage={loginClosedMessage || 'Enskripsyon fèmen tanporèman.'}
+        onError={(message) => setMsg({ type: 'error', text: message })}
+      />
+      {!acceptTerms && !loginClosed && (
+        <p className="text-[10px] text-slate-400 text-center mt-2 font-medium">
+          Make bwat kondisyon yo anvan ou kontinye ak Google.
+        </p>
+      )}
 
       <div className="mt-8 text-center space-y-4 pt-6 border-t border-gray-100">
         <button
