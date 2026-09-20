@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';
 import { checkMerchantEligibility, ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
 import { maskApiKey, profileHasApiKey } from '@/lib/security/api-key';

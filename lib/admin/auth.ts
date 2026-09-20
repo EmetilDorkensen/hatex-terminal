@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { cookies } from 'next/headers';
 import { ADMIN_GATE_COOKIE, verifyAdminGateToken } from '@/lib/security/admin-gate';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/security/supabase-server';

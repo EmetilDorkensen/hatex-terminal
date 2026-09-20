@@ -1,3 +1,5 @@
+import 'server-only';
+
 export type MonCashMode = 'sandbox' | 'live';
 
 /** Mòd yon kle API machann. Yon kle `test` pa janm touche vre lajan. */

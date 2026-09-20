@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { ADMIN_EMAIL } from '@/lib/admin/auth';
 import { createSupabaseAdminClient } from '@/lib/security/supabase-server';
 

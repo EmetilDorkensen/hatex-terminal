@@ -1,3 +1,5 @@
+import 'server-only';
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildStoredApiKeyFields,
@@ -7,26 +9,17 @@ import {
   generateWebhookSecretToken,
   profileHasApiKey,
 } from '@/lib/security/api-key';
+import {
+  checkMerchantEligibility,
+  canAccessTerminal,
+  type MerchantEligibility,
+} from '@/lib/security/merchant-eligibility';
+
+export { checkMerchantEligibility, canAccessTerminal, type MerchantEligibility };
 
 // ============================================================================
-// ELIJIBILITE & PWOVIZYON KREDANSYÈL API MACHANN
+// ELIJIBILITE & PWOVIZYON KREDANSYÈL API MACHANN (SÈVÈ SÈLMAN)
 // ============================================================================
-// Yon kont ka jwenn aksè API / fakti SÈLMAN si:
-//   1. KYC apwouve (kyc_status === 'approved')
-//
-// Kle API yo estoke HASH nan baz done (api_key_hash + api_key_prefix).
-// Kle an klè retounen SÈLMAN yon sèl fwa lè li fèk jenere oswa lè li rotate.
-// Chak machann gen DE kalite kle, menm jan ak Stripe:
-//   • Secret key (hx_live_...) — sèlman sou sèvè, janm ekspoze.
-//   • Publishable key (pk_live_...) — san danje, ka parèt nan frontend/checkout.
-// ============================================================================
-
-export type MerchantEligibility = {
-  eligible: boolean;
-  missingKyc: boolean;
-  /** @deprecated Toujou false — frè 525 retire */
-  missingCardActivation: boolean;
-};
 
 export type ProvisionResult = {
   /** Kle an klè — sèlman lè fèk jenere/rotate. */
@@ -56,21 +49,6 @@ type MerchantProfileLike = {
   plan?: string | null;
 };
 
-/** Menm kondisyon ak Dashboard: KYC apwouve = debloke. */
-export function canAccessTerminal(profile: MerchantProfileLike | null | undefined): boolean {
-  return checkMerchantEligibility(profile).eligible;
-}
-
-export function checkMerchantEligibility(profile: MerchantProfileLike | null | undefined): MerchantEligibility {
-  const kycOk = profile?.kyc_status === 'approved';
-  const hasPlan = profile?.plan === 'free' || profile?.plan === 'capacity' || profile?.plan === 'premium';
-  return {
-    eligible: hasPlan || kycOk,
-    missingKyc: !kycOk,
-    missingCardActivation: false,
-  };
-}
-
 /**
  * Asire yon kont elijib gen tout kredansyèl API li yo. Si kont lan poko elijib,
  * pa jenere anyen. Si l elijib men manke youn nan kredansyèl yo, konplete sa ki
@@ -90,7 +68,7 @@ export async function ensureMerchantApiCredentials(
     api_key_pk: profile.api_key_pk || null,
     api_key_pk_prefix: profile.api_key_pk_prefix || null,
     is_merchant: profile.is_merchant === true,
-    webhook_secret: null as string | null, // reveal-once sèlman
+    webhook_secret: null as string | null,
     provisioned: false,
     rotated: false,
     eligibility,
@@ -141,7 +119,9 @@ export async function ensureMerchantApiCredentials(
     api_key: plainApiKey,
     api_key_prefix: plainApiKey ? plainApiKey.slice(0, 12) : profile.api_key_prefix || null,
     api_key_pk: plainPublishableKey || profile.api_key_pk || null,
-    api_key_pk_prefix: plainPublishableKey ? plainPublishableKey.slice(0, 12) : profile.api_key_pk_prefix || null,
+    api_key_pk_prefix: plainPublishableKey
+      ? plainPublishableKey.slice(0, 12)
+      : profile.api_key_pk_prefix || null,
     is_merchant: true,
     webhook_secret: needsWebhook ? webhookSecret : null,
     provisioned: needsNewApiKey || needsPublishable || needsWebhook || needsMerchantFlag,

@@ -18,8 +18,18 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { MerchantShell } from '@/components/app-shell/MerchantShell';
-import { ensureMerchantApiCredentials } from '@/lib/security/merchant-provisioning';
-import { profileHasApiKey, maskApiKey } from '@/lib/security/api-key';
+import { profileHasApiKey, maskApiKey } from '@/lib/security/api-key-display';
+
+type ProvisionClientResult = {
+  api_key: string | null;
+  api_key_prefix: string | null;
+  api_key_pk: string | null;
+  api_key_pk_prefix: string | null;
+  is_merchant: boolean;
+  webhook_secret: string | null;
+  provisioned: boolean;
+  eligibility: { eligible: boolean; missingKyc: boolean; missingCardActivation?: boolean };
+};
 
 export default function PluginPage() {
   const router = useRouter();
@@ -60,7 +70,7 @@ export default function PluginPage() {
         const { data: prof } = await supabase
           .from('profiles')
           .select(
-            'id, full_name, email, avatar_url, business_name, kyc_status, plan, api_key, api_key_hash, api_key_prefix, api_key_pk, api_key_pk_hash, api_key_pk_prefix, is_merchant, webhook_secret'
+            'id, full_name, email, avatar_url, business_name, kyc_status, plan, api_key_prefix, api_key_pk_prefix, is_merchant'
           )
           .eq('id', authUser.id)
           .maybeSingle();
@@ -94,7 +104,7 @@ export default function PluginPage() {
     if (!profile?.id) return null;
     try {
       setGeneratingApiKey(true);
-      let result: Awaited<ReturnType<typeof ensureMerchantApiCredentials>> | null = null;
+      let result: ProvisionClientResult | null = null;
       try {
         const res = await fetch('/api/developer/provision', { method: 'POST' });
         const payload = await res.json();
@@ -105,30 +115,29 @@ export default function PluginPage() {
             api_key_pk: payload.api_key_pk ?? null,
             api_key_pk_prefix: payload.api_key_pk_prefix ?? null,
             is_merchant: payload.is_merchant,
-            webhook_secret: payload.webhook_secret,
+            webhook_secret: payload.webhook_secret ?? null,
             provisioned: payload.provisioned,
-            rotated: false,
             eligibility: payload.eligibility,
           };
         } else if (payload.eligibility) {
           result = {
-            api_key: profile.api_key || null,
+            api_key: null,
             api_key_prefix: profile.api_key_prefix || null,
-            api_key_pk: profile.api_key_pk || null,
+            api_key_pk: null,
             api_key_pk_prefix: profile.api_key_pk_prefix || null,
             is_merchant: profile.is_merchant === true,
-            webhook_secret: profile.webhook_secret || null,
+            webhook_secret: null,
             provisioned: false,
-            rotated: false,
             eligibility: payload.eligibility,
           };
         }
       } catch {
-        /* sevè indisponib — eseye lokal */
+        /* sèvè indisponib */
       }
 
       if (!result) {
-        result = await ensureMerchantApiCredentials(supabase, profile);
+        alert('Pa t kapab jenere kle API a. Eseye ankò.');
+        return null;
       }
 
       if (!result.eligibility.eligible) {
@@ -143,7 +152,7 @@ export default function PluginPage() {
         api_key_prefix: result.api_key_prefix || profile.api_key_prefix,
         api_key_pk_prefix: result.api_key_pk_prefix || profile.api_key_pk_prefix,
         is_merchant: true,
-        webhook_secret: result.webhook_secret,
+        has_api_key: true,
       });
       if (result.api_key) setRevealedApiKey(result.api_key);
       return result.api_key;
@@ -152,7 +161,7 @@ export default function PluginPage() {
     } finally {
       setGeneratingApiKey(false);
     }
-  }, [profile, supabase]);
+  }, [profile]);
 
   const rotateApiKey = useCallback(async (): Promise<string | null> => {
     const mfaCode = window.prompt(
@@ -176,10 +185,10 @@ export default function PluginPage() {
         prev
           ? {
               ...prev,
-              api_key: null,
               api_key_prefix: data.api_key_prefix,
-              api_key_hash: 'set',
               api_key_pk_prefix: data.api_key_pk_prefix || prev.api_key_pk_prefix,
+              has_api_key: true,
+              is_merchant: true,
             }
           : prev
       );

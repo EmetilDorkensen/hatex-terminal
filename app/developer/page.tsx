@@ -25,9 +25,8 @@ import {
   AlertTriangle,
   Zap,
 } from 'lucide-react';
-import { checkMerchantEligibility } from '@/lib/security/merchant-provisioning';
-import { maskPublishableKey } from '@/lib/security/api-key';
-import { maskGatewayApiKey } from '@/lib/gateway/api-keys';
+import { maskPublishableKey } from '@/lib/security/api-key-display';
+import { maskGatewayApiKey } from '@/lib/gateway/api-key-display';
 
 const AVAILABLE_EVENTS = ['payment.success'];
 
@@ -139,19 +138,15 @@ export default function DeveloperDashboard() {
           profileData = payload.profile;
         }
       } catch {
-        /* eseye fallback kliyan anba */
+        /* API indisponib */
       }
 
+      // Pa gen fallback kliyan ki rale lojik sèvè — si API echwe, bloke aksè.
       if (!elig || !profileData) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, kyc_status')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (data) {
-          elig = checkMerchantEligibility(data as any);
-          profileData = data;
-        }
+        setEligibility({ eligible: false, missingKyc: true });
+        setMerchant(null);
+        setLoading(false);
+        return;
       }
 
       if (elig && elig.eligible && profileData) {

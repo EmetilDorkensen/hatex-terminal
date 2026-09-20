@@ -1,17 +1,19 @@
+import 'server-only';
+
 import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hashApiKey } from '@/lib/security/api-key';
 import type { GatewayMode } from '@/lib/moncash/config';
+import { maskGatewayApiKey } from '@/lib/gateway/api-key-display';
+
+export { maskGatewayApiKey };
 
 /**
- * Kle API pasrèl v2.
+ * Kle API pasrèl v2 (SÈVÈ SÈLMAN).
  *
  * Chak machann gen yon kle `test` ak yon kle `live`. Kle a montre yon sèl fwa
  * lè li kreye — nou kenbe yon HMAC sèlman, donk menm si baz done a fwite,
  * pèsonn pa ka rekonstwi kle a.
- *
- * Prefiks yo espesyalman diferan de ansyen kle `hx_live_` ki nan tab `profiles`
- * pou pa gen konfizyon ant de sistèm yo pandan tranzisyon an.
  */
 
 const PREFIXES: Record<GatewayMode, string> = {
@@ -48,11 +50,6 @@ export function gatewayKeyMode(token: string): GatewayMode | null {
   return null;
 }
 
-export function maskGatewayApiKey(keyPrefix: string | null | undefined): string {
-  if (!keyPrefix) return `${PREFIXES.test}${'•'.repeat(16)}`;
-  return `${keyPrefix}${'•'.repeat(16)}`;
-}
-
 export type GatewayApiKeyRow = {
   id: string;
   merchant_id: string;
@@ -63,9 +60,6 @@ export type GatewayApiKeyRow = {
 
 /**
  * Jwenn kle a nan baz done a. Rechèch fèt sou hash la sèlman.
- *
- * Nou verifye tou ke mòd ki nan baz done a matche prefiks kle a — konsa yon
- * antre kowonpi pa ka fè yon kle tès pase kòm live.
  */
 export async function lookupGatewayApiKey(
   admin: SupabaseClient,
@@ -114,7 +108,6 @@ export async function rotateGatewayApiKey(
 ): Promise<{ ok: true; key: GeneratedApiKey } | { ok: false; message: string }> {
   const now = new Date().toISOString();
 
-  // Endèks inik la pèmèt yon sèl kle aktif pa mòd, donk revoke anvan ensere
   const { error: revokeErr } = await admin
     .from('hatex_api_keys')
     .update({ is_active: false, revoked_at: now })

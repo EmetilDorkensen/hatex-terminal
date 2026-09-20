@@ -1,3 +1,5 @@
+import 'server-only';
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { rotateGatewayApiKey, type GeneratedApiKey } from '@/lib/gateway/api-keys';
 import type { GatewayMode } from '@/lib/moncash/config';
