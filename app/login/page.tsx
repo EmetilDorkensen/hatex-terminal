@@ -397,132 +397,69 @@ export default function Login() {
       if (loginMethod === 'password') {
 
         // ==========================================
-
-        // 1. KONEKSYON AK MODPAS
-
+        // 1. KONEKSYON AK MODPAS — sèlman atravè API sèvè
+        // (CAPTCHA + lockout anvan Auth — pa gen signInWithPassword nan navigatè)
         // ==========================================
 
         const emailLower = email.trim().toLowerCase();
-
-        // Lockout pa KONT (an plis de rate-limit pa IP anwo a) — bloke si
-        // kont sa a gen twòp echèk resamman, epi mande CAPTCHA si aktive.
-        const lockRes = await fetch('/api/auth/account-lock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailLower, action: 'check' }),
-        });
-        const lockData = await lockRes.json().catch(() => ({}));
-
-        if (!lockRes.ok || !lockData.allowed) {
-          setErrorMsg(lockData.message || "Kont ou bloke tanporèman.");
-          setLoading(false);
-          return;
-        }
-
-        if (lockData.require_captcha) {
-          setRequireCaptcha(true);
-          const token = captchaTokenRef.current || captchaToken;
-          if (!token) {
-            setErrorMsg('Tanpri konplete verifikasyon CAPTCHA anba a (bwat Cloudflare), epi eseye ankò.');
-            setLoading(false);
-            return;
-          }
-        }
-
         const activeCaptchaToken = captchaTokenRef.current || captchaToken;
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-
-          email: email.trim(),
-
-          password,
-
-        });
-
-
-
-        if (error) {
-
-          const failRes = await fetch('/api/auth/account-lock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: emailLower,
-              action: 'fail',
-              captchaToken: activeCaptchaToken || null,
-            }),
-          });
-          const failData = await failRes.json().catch(() => ({}));
-
-          setErrorMsg(failData.message || 'Imèl oswa modpas la pa kòrèk');
-          if (failData.require_captcha) setRequireCaptcha(true);
-          // Efase token + reset widget — san sa, « Succès » rete men token vid.
-          resetCaptchaWidget();
-
+        if (requireCaptcha && !activeCaptchaToken) {
+          setErrorMsg('Tanpri konplete verifikasyon CAPTCHA anba a (bwat Cloudflare), epi eseye ankò.');
           setLoading(false);
-
           return;
-
         }
 
+        const pwdRes = await fetch('/api/auth/password-login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailLower,
+            password,
+            captchaToken: activeCaptchaToken || null,
+          }),
+        });
+        const pwdData = await pwdRes.json().catch(() => ({}));
 
+        if (pwdRes.status === 503 || pwdData.login_closed) {
+          setLoginClosed(true);
+          setLoginClosedMessage(pwdData.message || '');
+          setErrorMsg(pwdData.message || 'Paj koneksyon an fèmen tanporèman.');
+          setLoading(false);
+          return;
+        }
 
-        if (data?.user) {
+        if (!pwdRes.ok || !pwdData.success) {
+          if (pwdData.require_captcha) setRequireCaptcha(true);
+          setErrorMsg(pwdData.message || 'Imèl oswa modpas la pa kòrèk');
+          resetCaptchaWidget();
+          setLoading(false);
+          return;
+        }
 
-          // VERIFYE SI KONT LAN TE SISPANDI ANVAN L ANTRE SOU DASHBOARD LA
-
-          const { data: profile } = await supabase
-
-            .from('profiles')
-
-            .select('account_status')
-
-            .eq('id', data.user.id)
-
-            .single();
-
-
-
-          if (profile?.account_status === 'suspended') {
-
-            await supabase.auth.signOut(); // Fout li deyò menm kote a!
-
-            setErrorMsg("Aksè Refize! Kont ou sispandi. Tanpri kontakte sipò a.");
-
-            setLoading(false);
-
-            return;
-
-          }
-
-
-
-          // Modpas te bon — reset konte echèk yo pou kont sa a
-          fetch('/api/auth/account-lock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: emailLower,
-              action: 'success',
-              captchaToken: activeCaptchaToken || null,
-            }),
-          }).catch(() => {});
-
-          // Mete session-tag ANVAN MFA — sinon /api/auth/mfa/verify ka wè
-          // "Sesyon ekspire" (cookie poko la, ansyen token nan DB).
-          await trackDeviceAndIP(email);
-
-          // Si kont sa a gen MFA aktive, kanpe isit la epi mande kòd la
-          if (await requiresMfaStepUp()) {
+        if (pwdData.access_token && pwdData.refresh_token) {
+          const { error: sessErr } = await supabase.auth.setSession({
+            access_token: pwdData.access_token,
+            refresh_token: pwdData.refresh_token,
+          });
+          if (sessErr) {
+            setErrorMsg('Pa t kapab kreye sesyon. Eseye ankò.');
             setLoading(false);
             return;
           }
-
-          await goAfterLogin();
-
+        } else {
+          await supabase.auth.getSession();
         }
 
+        await trackDeviceAndIP(email);
 
+        if (pwdData.mfa_required || (await requiresMfaStepUp())) {
+          setLoading(false);
+          return;
+        }
+
+        await goAfterLogin();
 
       } else if (loginMethod === 'recovery') {
 
