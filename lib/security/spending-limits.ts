@@ -7,8 +7,6 @@ export const INDIVIDUAL_DAILY_LIMIT = 75000;
 export const INDIVIDUAL_MONTHLY_LIMIT = 250000;
 
 export const ENTERPRISE_APPLICATION_FEE = 49000;
-export const ENTERPRISE_AUTO_AGENT_TIER = 'pro';
-export const ENTERPRISE_AUTO_AGENT_CAPACITY = 55000;
 
 // Limit espesifik pou Invoice/Fakti — kont endividyèl gen dwa voye jiska
 // 85,000 HTG/jou nan fakti (total montan tout fakti li kreye), pou anpeche
@@ -24,38 +22,6 @@ export const INDIVIDUAL_INVOICE_DAILY_LIMIT = 85000;
 // verifikasyon an aplike sèlman sou NOUVO kòb k ap antre yo.
 export const INDIVIDUAL_MAX_WALLET_BALANCE = 1200000;
 export const ENTERPRISE_MAX_WALLET_BALANCE = 12000000;
-
-/** Frè retrè kay ajan: 50 HTG pou chak 1,000 HTG (5%). */
-export const AGENT_WITHDRAW_FEE_PER_1000 = 50;
-export const AGENT_WITHDRAW_AGENT_SHARE_RATE = 0.2;
-export const AGENT_WITHDRAW_HATEX_SHARE_RATE = 0.8;
-
-export type AgentWithdrawFeeBreakdown = {
-  cashAmount: number;
-  fee: number;
-  agentShare: number;
-  hatexShare: number;
-  totalDebit: number;
-};
-
-/** Kalkile frè retrè ajan — rate opsyonèl (default 50 / 1000). */
-export function calcAgentWithdrawFee(
-  cashAmount: number,
-  feePer1000: number = AGENT_WITHDRAW_FEE_PER_1000
-): AgentWithdrawFeeBreakdown {
-  const amount = Math.max(0, Number(cashAmount) || 0);
-  const rate = Math.max(0, Number(feePer1000) || 0);
-  const fee = Math.round((amount / 1000) * rate * 100) / 100;
-  const agentShare = Math.round(fee * AGENT_WITHDRAW_AGENT_SHARE_RATE * 100) / 100;
-  const hatexShare = Math.round((fee - agentShare) * 100) / 100;
-  return {
-    cashAmount: amount,
-    fee,
-    agentShare,
-    hatexShare,
-    totalDebit: Math.round((amount + fee) * 100) / 100,
-  };
-}
 
 // Limit RESEPSYON via API piblik la (/api/public/payments).
 export const API_RECEIVE_INDIVIDUAL_LIMIT = 1000000;
@@ -86,7 +52,7 @@ export function calcApiReceiveFee(
 export type SpendingChannel = 'transfer' | 'withdraw' | 'invoice';
 
 const TRANSFER_TYPES = ['TRANSFER', 'P2P'];
-const WITHDRAW_TYPES = ['WITHDRAWAL', 'AGENT_WITHDRAWAL_CLIENT'];
+const WITHDRAW_TYPES = ['WITHDRAWAL'];
 const OTHER_SPEND_TYPES = ['PURCHASE', 'PAYMENT', 'API_GATEWAY_PAYMENT'];
 
 export function isEnterpriseAccount(accountType?: string | null): boolean {

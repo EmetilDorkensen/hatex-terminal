@@ -1,6 +1,6 @@
 /** Kolòn pwofil ki ka chaje nan admin/workspace — pa gen secrets. */
 export const ADMIN_PROFILE_SAFE_COLUMNS =
-  'id, full_name, email, phone, wallet_balance, agent_balance, account_status, account_type, kyc_status, kyc_fee_paid, features_unlock_paid, is_activated, is_agent, agent_tier, agent_capacity, agent_code, business_name, created_at, failed_otp_attempts';
+  'id, full_name, email, phone, wallet_balance, account_status, account_type, kyc_status, kyc_fee_paid, features_unlock_paid, is_activated, business_name, created_at, failed_otp_attempts';
 
 // Vrè non kolòn yo se kyc_front / kyc_back. Ak kyc_id_front / kyc_id_back,
 // Supabase rejte tout rekèt la epi lis KYC annatant lan parèt vid.
@@ -11,4 +11,4 @@ export const DEPOSIT_SAFE_COLUMNS =
   'id, user_id, user_email, amount, fee, total_to_pay, method, transaction_id, proof_img_1, proof_img_2, status, created_at';
 
 export const WITHDRAWAL_SAFE_COLUMNS =
-  'id, user_id, user_email, amount, fee, method, phone, agent_code, status, created_at, net_amount';
+  'id, user_id, user_email, amount, fee, method, phone, status, created_at, net_amount';

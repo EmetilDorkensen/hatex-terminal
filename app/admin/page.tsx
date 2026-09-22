@@ -263,7 +263,7 @@ export default function AdminSuperPage() {
         if (!confirm(
             `REYINISYALIZE kont ${fullName || email}?\n\n` +
             `• Wallet + kat → 0 HTG\n` +
-            `• Kont ajan / antrepriz → siprime\n` +
+            `• Kont antrepriz → siprime\n` +
             `• KYC → rete (pa bezwen refè)\n\n` +
             `Aksyon sa a pa ka anile fasil.`
         )) return;

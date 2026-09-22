@@ -10,8 +10,7 @@ const PROFILE_DOSSIER_SELECT = `
   created_at, account_status, account_type, enterprise_status,
   kyc_status, kyc_doc_type, kyc_front, kyc_back, kyc_selfie,
   kyc_submitted_at, kyc_rejection_reason, kyc_face_match_score, kyc_fee_paid,
-  wallet_balance, is_merchant,
-  agent_status, agent_tier
+  wallet_balance, is_merchant
 `;
 
 function sanitizeSearchTerm(raw: string): string {
@@ -48,16 +47,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Kliyan pa jwenn.' }, { status: 404 });
     }
 
-    const [{ data: enterpriseApps }, { data: agentApps }, { data: recentTx }, { data: kycApp }] =
+    const [{ data: enterpriseApps }, { data: recentTx }, { data: kycApp }] =
       await Promise.all([
       db
         .from('enterprise_applications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10),
-      db
-        .from('agent_applications')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -98,7 +91,6 @@ export async function GET(request: Request) {
         profile,
         kyc_application: kyc,
         enterprise_applications: enterpriseApps || [],
-        agent_applications: agentApps || [],
         recent_transactions: recentTx || [],
       },
     });

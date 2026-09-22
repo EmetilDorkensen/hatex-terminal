@@ -4,22 +4,16 @@ import { hasValidAdminGate, requireAdminUser, verifyAdminPassword } from '@/lib/
 import { logAdminAction } from '@/lib/admin/audit-log';
 import { getClientIp, rateLimit } from '@/lib/security/rate-limit';
 import {
-  AGENT_DOCS_BUCKET,
   ENTERPRISE_DOCS_BUCKET,
   resolveApplicationDocLocation,
 } from '@/lib/security/application-docs';
 
 const DOC_URL_KEYS = [
-  'id_doc_url',
-  'address_doc_url',
-  'location_photo_url',
   'patente_url',
   'cif_url',
-  'selfie_with_id_url',
-  'criminal_record_url',
+  'business_registration_url',
   'bank_statement_url',
   'lease_doc_url',
-  'business_registration_url',
   'legal_rep_id_url',
 ] as const;
 
@@ -54,19 +48,19 @@ async function collectAndPurgeBusinessDocs(
     pathsByBucket.get(loc.bucket)!.add(loc.path);
   };
 
-  const [{ data: agentApps }, { data: entApps }] = await Promise.all([
-    db.from('agent_applications').select('*').eq('user_id', userId),
-    db.from('enterprise_applications').select('*').eq('user_id', userId),
-  ]);
+  const { data: entApps } = await db
+    .from('enterprise_applications')
+    .select('*')
+    .eq('user_id', userId);
 
-  for (const row of [...(agentApps || []), ...(entApps || [])]) {
+  for (const row of entApps || []) {
     for (const key of DOC_URL_KEYS) {
       add((row as Record<string, string | null>)[key]);
     }
   }
 
-  // Lis folder {userId}/ nan de bucket yo
-  for (const bucket of [AGENT_DOCS_BUCKET, ENTERPRISE_DOCS_BUCKET]) {
+  // Lis folder {userId}/ nan bucket antrepriz
+  for (const bucket of [ENTERPRISE_DOCS_BUCKET]) {
     const { data: files } = await db.storage.from(bucket).list(userId, { limit: 200 });
     for (const f of files || []) {
       if (f.name) {
@@ -81,8 +75,8 @@ async function collectAndPurgeBusinessDocs(
 }
 
 /**
- * Reyinisyalize kont kliyan: balans 0, retire ajan/antrepriz,
- * efase dokiman biznis/ajan, kenbe KYC.
+ * Reyinisyalize kont kliyan: balans 0, retire antrepriz,
+ * efase dokiman biznis, kenbe KYC.
  * Admin + gate + modpas konfimasyon.
  */
 export async function POST(request: Request) {
@@ -155,7 +149,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     message:
-      'Kont reyinisyalize: balans 0, ajan/antrepriz retire, dokiman biznis/ajan efase, KYC kenbe.',
+      'Kont reyinisyalize: balans 0, antrepriz retire, dokiman biznis efase, KYC kenbe.',
     result: res,
     docs_deleted: storagePurge.deleted,
   });

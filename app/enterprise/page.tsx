@@ -135,16 +135,6 @@ function EnterprisePortalContent() {
     setPinError('');
 
     try {
-      const pinRes = await fetch('/api/auth/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', pin: enteredPin }),
-      });
-      const pinData = await pinRes.json();
-      if (!pinRes.ok || !pinData.success) {
-        throw new Error(pinData.message || "PIN ou antre a pa bon. Tranzaksyon an anile.");
-      }
-
       const { data: freshProf } = await supabase.from('profiles').select('wallet_balance').eq('id', profile.id).single();
       const currentBal = Number(freshProf?.wallet_balance || 0);
       if (currentBal < enterpriseFee) {
@@ -176,46 +166,36 @@ function EnterprisePortalContent() {
       const leaseUrl = await uploadFile(leaseDoc!, 'lease_doc', 'Kontra Lokasyon');
       const legalRepIdUrl = await uploadFile(legalRepIdDoc!, 'legal_rep_id', 'ID Reprezantan Legal');
 
-      // 1) Anrejistre aplikasyon an AN PREMYE (okenn kòb pa deplase la a). Konsa
-      // si sa echwe, pa gen frè ki chaje pou n bezwen ranbouse.
-      const { error: appError } = await supabase.from('enterprise_applications').insert([{
-        user_id: profile.id,
-        status: 'pending',
-        business_name: businessName.trim(),
-        business_reg_number: businessRegNumber.trim(),
-        business_activity: businessActivity.trim(),
-        patente_url: patenteUrl,
-        cif_url: cifUrl,
-        business_registration_url: businessRegUrl,
-        bank_statement_url: bankStatementUrl,
-        lease_doc_url: leaseUrl,
-        legal_rep_id_url: legalRepIdUrl,
-        confidentiality_accepted: confidentialityAccepted,
-        confidentiality_accepted_at: new Date().toISOString(),
-        metadata: { fee_paid: enterpriseFee },
-      }]);
-      if (appError) {
-        throw new Error(`Erè pandan anrejistreman aplikasyon an: ${appError.message}`);
-      }
-
-      // 2) Kounye a chaje frè a ATOMIKMAN sou sèvè (debi wallet + estati +
-      // tranzaksyon). Montan frè a fiks sou sèvè — navigatè a pa modifye balans.
-      const { data: feeResult, error: feeErr } = await supabase.rpc('process_enterprise_fee', {
-        p_user_id: profile.id,
+      const applyRes = await fetch('/api/enterprise/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pin: enteredPin,
+          business_name: businessName.trim(),
+          business_reg_number: businessRegNumber.trim(),
+          business_activity: businessActivity.trim(),
+          patente_url: patenteUrl,
+          cif_url: cifUrl,
+          business_registration_url: businessRegUrl,
+          bank_statement_url: bankStatementUrl,
+          lease_doc_url: leaseUrl,
+          legal_rep_id_url: legalRepIdUrl,
+          confidentiality_accepted: confidentialityAccepted,
+        }),
       });
-      if (feeErr || !feeResult?.success) {
-        // Frè a pa t chaje — retire aplikasyon ki fèk kreye a pou pa kite l pandye.
-        await supabase.from('enterprise_applications').delete().eq('user_id', profile.id).eq('status', 'pending');
-        throw new Error((feeErr?.message || feeResult?.message) || 'Peman frè a pa reyisi.');
+      const applyData = await applyRes.json().catch(() => ({}));
+      if (!applyRes.ok || !applyData.success) {
+        throw new Error(applyData.message || 'Peman frè a pa reyisi.');
       }
 
+      const feeCharged = Number(applyData.fee_charged ?? enterpriseFee);
       try {
         await fetch('/api/notifications/telegram', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             channel: 'admin',
-            message: `🏢 <b>Nouvo Aplikasyon Kont Antrepriz</b>\n👤 ${profile.full_name}\n✉️ ${profile.email}\n🏬 Biznis: ${businessName.trim()}\n💰 Frè peye: ${enterpriseFee.toLocaleString()} HTG`,
+            message: `🏢 <b>Nouvo Aplikasyon Kont Antrepriz</b>\n👤 ${profile.full_name}\n✉️ ${profile.email}\n🏬 Biznis: ${businessName.trim()}\n💰 Frè peye: ${feeCharged.toLocaleString()} HTG`,
             parseMode: 'HTML',
           }),
         });
@@ -328,7 +308,7 @@ function EnterprisePortalContent() {
             <p className="text-sm text-slate-300">
               {fromDeveloper
                 ? `Ogmante kapasite API ou a: resevwa jiska ${API_RECEIVE_ENTERPRISE_LIMIT.toLocaleString()} HTG pa peman (kont endividyèl limite a ${API_RECEIVE_INDIVIDUAL_LIMIT.toLocaleString()} HTG).`
-                : 'Debloke plis posiblite pou biznis ou: transfè ak retrè ilimite, epi yon kont Ajan PRO gratis.'}
+                : 'Debloke plis posiblite pou biznis ou: transfè, retrè, ak fakti ilimite, ak pi wo limit tranzaksyon.'}
             </p>
           </div>
 
@@ -345,7 +325,7 @@ function EnterprisePortalContent() {
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
-                <p className="text-sm text-slate-600">Kont <strong>Ajan PRO</strong> bay otomatikman si ou poko genyen l</p>
+                <p className="text-sm text-slate-600">Fakti ak transfè <strong>ilimite</strong>, ak pi wo limit sou volim tranzaksyon</p>
               </div>
             </div>
           </div>

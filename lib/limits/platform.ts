@@ -15,9 +15,6 @@ export const LIMIT_KEYS = [
   'min_deposit',
   'min_withdraw',
   'vip_withdraw_threshold',
-  'agent_pro_capacity',
-  'agent_premium_capacity',
-  'agent_withdraw_share_rate',
 ] as const;
 
 export type LimitKey = (typeof LIMIT_KEYS)[number];
@@ -37,9 +34,6 @@ const DEFAULTS: Record<LimitKey, number> = {
   min_deposit: 500,
   min_withdraw: 500,
   vip_withdraw_threshold: 15000,
-  agent_pro_capacity: 55000,
-  agent_premium_capacity: 110000,
-  agent_withdraw_share_rate: 0.2,
 };
 
 export async function resolvePlatformLimit(

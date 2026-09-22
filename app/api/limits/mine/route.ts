@@ -14,7 +14,7 @@ export async function GET() {
     }
     const db = createSupabaseAdminClient();
     const limits = await resolveAllPlatformLimits(db);
-    return NextResponse.json({ success: true, limits, agent_tiers: [] });
+    return NextResponse.json({ success: true, limits });
   } catch {
     return NextResponse.json({ error: 'Erè sèvè.' }, { status: 500 });
   }

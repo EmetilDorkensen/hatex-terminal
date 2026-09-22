@@ -1,4 +1,3 @@
-export const AGENT_DOCS_BUCKET = 'agent_documents';
 export const ENTERPRISE_DOCS_BUCKET = 'enterprise_documents';
 
 export type AppDocLocation = {
@@ -39,18 +38,11 @@ export function resolveApplicationDocLocation(ref: string): AppDocLocation | nul
 
   if (trimmed.startsWith('/')) return null;
 
-  // Chemen prive nouvo fòma: {userId}/agent-...
-  // Ansyen: agent-{uuid}-id-...
-  const lower = trimmed.toLowerCase();
-  if (lower.includes('enterprise') || lower.includes('business') || lower.includes('legal_rep')) {
-    return { bucket: ENTERPRISE_DOCS_BUCKET, path: trimmed };
-  }
-  return { bucket: AGENT_DOCS_BUCKET, path: trimmed };
+  return { bucket: ENTERPRISE_DOCS_BUCKET, path: trimmed };
 }
 
 export function bucketsToTryForAppDoc(primary: string): string[] {
-  if (primary === ENTERPRISE_DOCS_BUCKET) {
-    return [ENTERPRISE_DOCS_BUCKET, AGENT_DOCS_BUCKET];
-  }
-  return [AGENT_DOCS_BUCKET, ENTERPRISE_DOCS_BUCKET];
+  return [primary || ENTERPRISE_DOCS_BUCKET, ENTERPRISE_DOCS_BUCKET].filter(
+    (b, i, arr) => arr.indexOf(b) === i
+  );
 }

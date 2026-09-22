@@ -8,7 +8,6 @@ import {
   AlertTriangle, Building2, Clock, XCircle, Trash2, Link as LinkIcon,
   RefreshCw, Smartphone
 } from 'lucide-react';
-import { checkSpendingLimit } from '@/lib/security/spending-limits';
 import { CANONICAL_SITE_URL, invoicePublicUrl } from '@/lib/urls/public';
 
 type BankAccount = {
@@ -149,55 +148,29 @@ export default function InvoicePage() {
 
     setSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Ou dwe konekte.');
-
-      const { data: freshProfile } = await supabase
-        .from('profiles')
-        .select('kyc_status, business_name, full_name, account_type, plan')
-        .eq('id', user.id)
-        .single();
-
-      if (freshProfile?.kyc_status !== 'approved') {
-        setMessage({ type: 'error', text: 'Ou dwe konplete KYC ou (apwouve) anvan ou voye fakti.' });
-        setSending(false);
-        return;
-      }
-
-      const limitAmount = currency === 'USD' ? numAmount * 132 : numAmount;
-      const limitCheck = await checkSpendingLimit(
-        supabase,
-        user.id,
-        freshProfile?.account_type,
-        limitAmount,
-        'invoice'
-      );
-      if (!limitCheck.allowed) {
-        setMessage({ type: 'error', text: limitCheck.message || 'Ou depase limit jounalye fakti a.' });
-        setSending(false);
-        return;
-      }
-
-      const { data: inv, error: invErr } = await supabase
-        .from('invoices')
-        .insert({
-          owner_id: user.id,
+      const res = await fetch('/api/invoices/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           amount: numAmount,
           currency,
           payout_account_id: payoutAccountId,
           client_email: clientEmail.toLowerCase().trim(),
           description: description.trim() || null,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (invErr) throw invErr;
-
-      const payLink = invoicePublicUrl(CANONICAL_SITE_URL, {
-        id: inv.id,
-        share_token: inv.share_token || null,
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Yon erè pase pandan kreyasyon fakti a.');
+      }
+
+      const inv = data.invoice;
+      const payLink =
+        data.pay_link ||
+        invoicePublicUrl(CANONICAL_SITE_URL, {
+          id: inv.id,
+          share_token: inv.share_token || null,
+        });
 
       let copied = false;
       try {
@@ -207,7 +180,6 @@ export default function InvoicePage() {
         copied = false;
       }
 
-      // Imèl la se yon pati enpòtan — men si li echwe, fakti a toujou kreye.
       const emailIssue = await notifyInvoiceEmail(inv.id);
 
       if (emailIssue) {
@@ -249,7 +221,16 @@ export default function InvoicePage() {
 
   const handleCancelInvoice = async (invId: string) => {
     if (!confirm('Èske ou sèten ou vle anile fakti sa a?')) return;
-    await supabase.from('invoices').update({ status: 'cancelled' }).eq('id', invId);
+    const res = await fetch('/api/invoices/create', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel', invoice_id: invId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      setMessage({ type: 'error', text: data.message || 'Pa t kapab anile fakti a.' });
+      return;
+    }
     loadData();
   };
 

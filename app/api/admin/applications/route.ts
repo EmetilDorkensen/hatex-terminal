@@ -4,11 +4,10 @@ import { rateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { assertFinanceOperatorWithGate } from '@/lib/admin/auth';
 import { logAdminAction } from '@/lib/admin/audit-log';
 
-type Kind = 'agent' | 'enterprise';
 type Action = 'approved' | 'rejected';
 
 /**
- * Apwouve / rejte aplikasyon ajan oswa antrepriz via RPC atomik
+ * Apwouve / rejte aplikasyon antrepriz via RPC atomik
  * (pa modifye wallet_balance depi navigatè).
  */
 export async function POST(request: Request) {
@@ -40,14 +39,17 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const kind = String(body.kind || '') as Kind;
+    const kind = String(body.kind || '');
     const action = String(body.action || '') as Action;
     const applicationId = String(body.application_id || '');
     const userId = String(body.user_id || '');
     const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 1000) : '';
 
-    if (!['agent', 'enterprise'].includes(kind)) {
-      return NextResponse.json({ success: false, message: 'Kalite aplikasyon pa valab.' }, { status: 400 });
+    if (kind !== 'enterprise') {
+      return NextResponse.json(
+        { success: false, message: 'Kalite aplikasyon pa valab (antrepriz sèlman).' },
+        { status: 400 }
+      );
     }
     if (!['approved', 'rejected'].includes(action)) {
       return NextResponse.json({ success: false, message: 'Aksyon pa valab.' }, { status: 400 });
@@ -60,12 +62,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = createSupabaseAdminClient();
-    const rpcName =
-      kind === 'agent'
-        ? 'admin_review_agent_application'
-        : 'admin_review_enterprise_application';
-
-    const { data, error } = await supabase.rpc(rpcName, {
+    const { data, error } = await supabase.rpc('admin_review_enterprise_application', {
       p_application_id: applicationId,
       p_user_id: userId,
       p_action: action,
@@ -73,14 +70,7 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      const hint =
-        error.message?.includes('schema cache') || error.message?.includes('Could not find the function')
-          ? ' Kouri migration 20260751 / 20260753 nan Supabase SQL Editor, epi Reload schema.'
-          : '';
-      return NextResponse.json(
-        { success: false, message: error.message + hint },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
     const res = data as {
@@ -98,8 +88,8 @@ export async function POST(request: Request) {
 
     await logAdminAction(supabase, {
       adminEmail: user.email,
-      action: kind === 'agent' ? `AGENT_${action.toUpperCase()}` : `ENTERPRISE_${action.toUpperCase()}`,
-      targetType: kind === 'agent' ? 'agent_application' : 'enterprise_application',
+      action: `ENTERPRISE_${action.toUpperCase()}`,
+      targetType: 'enterprise_application',
       targetId: applicationId,
       details: {
         user_id: userId,

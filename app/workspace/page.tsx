@@ -33,7 +33,6 @@ export default function WorkspacePage() {
     const [users, setUsers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [pendingKyc, setPendingKyc] = useState<any[]>([]);
-    const [pendingAgents, setPendingAgents] = useState<any[]>([]);
     const [pendingEnterprises, setPendingEnterprises] = useState<any[]>([]);
     const [enterpriseRejectionReason, setEnterpriseRejectionReason] = useState<{ [key: string]: string }>({});
     
@@ -44,8 +43,6 @@ export default function WorkspacePage() {
     const [replyMessage, setReplyMessage] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    const [agentRejectionReason, setAgentRejectionReason] = useState<{ [key: string]: string }>({});
 
     // Views pou anplwaye yo (Support gen 'clients' oswa 'tickets')
     const [activeTab, setActiveTab] = useState('main');
@@ -166,7 +163,6 @@ export default function WorkspacePage() {
                 supabase.from('enterprise_applications').select('*, profiles(full_name, email)').eq('status', 'pending').order('created_at', { ascending: false })
                     .then(({ data }) => setPendingEnterprises(data || []))
             );
-            setPendingAgents([]);
         }
 
         // Chat Ekip la disponib pou TOUT anplwaye, kèlkeswa depatman yo.
@@ -276,7 +272,18 @@ export default function WorkspacePage() {
         
         setProcessingId(id);
         try {
-            await supabase.from('profiles').update({ account_status: newStatus, failed_otp_attempts: 0 }).eq('id', id);
+            const res = await fetch('/api/workspace/ops', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'set_account_status',
+                    user_id: id,
+                    status: newStatus,
+                    target_email: email,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.message || 'Aksyon echwe.');
             alert("Estati kont lan chanje!");
             checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
@@ -372,7 +379,7 @@ export default function WorkspacePage() {
     };
 
     // ==========================================
-    // FONKSYON POU KONFÒMITE (KYC & AJAN)
+    // FONKSYON POU KONFÒMITE (KYC & ANTREPRIZ)
     // ==========================================
     const handleOpenDocument = async (ref: string) => {
         if (!ref) { alert('Pa gen dokiman.'); return; }
@@ -431,31 +438,6 @@ export default function WorkspacePage() {
                 alert('KYC rejte!');
             }
             checkAuthAndFetchData();
-        } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
-    };
-
-    const jereAjan = async (applicationId: string, userId: string, aksyon: 'approved' | 'rejected') => {
-        let rezon = agentRejectionReason[applicationId] || "";
-        if (aksyon === 'rejected' && !rezon.trim()) return alert("Tanpri ekri yon rezon pou rejè a.");
-        if (aksyon === 'approved' && !confirm("Konfime apwobasyon ajan sa a?")) return;
-
-        setProcessingId(applicationId);
-        try {
-            const res = await fetch('/api/admin/applications', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    kind: 'agent',
-                    action: aksyon,
-                    application_id: applicationId,
-                    user_id: userId,
-                    reason: aksyon === 'rejected' ? rezon : undefined,
-                }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) throw new Error(data.message || 'Echèk review ajan.');
-            await logActivity(`AGENT_${aksyon.toUpperCase()}`, 'agent_application', applicationId, aksyon === 'rejected' ? { reason: rezon, user_id: userId } : { user_id: userId });
-            alert("Aplikasyon trete!"); checkAuthAndFetchData();
         } catch (err: any) { alert(err.message); } finally { setProcessingId(null); }
     };
 
@@ -815,7 +797,7 @@ export default function WorkspacePage() {
                 {/* ==================================================== */}
                 {activeDept === 'finance' && canSeeFinance && (
                     <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
-                        <p className="text-sm font-bold text-slate-900 mb-2">Depo, retrè ak ajan yo retire</p>
+                        <p className="text-sm font-bold text-slate-900 mb-2">Depo ak retrè retire</p>
                         <p className="text-sm text-slate-500 leading-relaxed">
                             HatexCard pa kenbe balans ankò. Peman yo pase sou MonCash, epi payout machann yo parèt nan tab pasèl yo (hatex_payments / hatex_payouts).
                         </p>
@@ -842,37 +824,6 @@ export default function WorkspacePage() {
                                     onApprove={() => void jereKyc(user.id, user.full_name, 'approved')}
                                     onReject={() => void jereKyc(user.id, user.full_name, 'rejected')}
                                 />
-                            )) : activeTab === 'ajan' ? pendingAgents.map(agent => (
-                                <div key={agent.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col gap-4">
-                                    <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                                        <div>
-                                            <h3 className="text-base font-bold text-slate-900">{agent.profiles?.full_name}</h3>
-                                            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold uppercase border border-indigo-100">Plan: {agent.tier}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {agent.id_doc_url && <button onClick={() => handleOpenDocument(agent.id_doc_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Idantite</button>}
-                                        {agent.address_doc_url && <button onClick={() => handleOpenDocument(agent.address_doc_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Adrès</button>}
-                                        {agent.location_photo_url && <button onClick={() => handleOpenDocument(agent.location_photo_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Lokal</button>}
-                                        {agent.selfie_with_id_url && <button onClick={() => handleOpenDocument(agent.selfie_with_id_url)} className="text-[10px] bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-amber-100"><EyeOff size={12}/> Selfie+ID</button>}
-                                        {agent.patente_url && <button onClick={() => handleOpenDocument(agent.patente_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Patant</button>}
-                                        {agent.cif_url && <button onClick={() => handleOpenDocument(agent.cif_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> CIF</button>}
-                                        {agent.criminal_record_url && <button onClick={() => handleOpenDocument(agent.criminal_record_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Kazye</button>}
-                                        {agent.bank_statement_url && <button onClick={() => handleOpenDocument(agent.bank_statement_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Relve Bankè</button>}
-                                        {agent.lease_doc_url && <button onClick={() => handleOpenDocument(agent.lease_doc_url)} className="text-[10px] bg-slate-50 border border-gray-200 px-3 py-2 rounded-lg font-bold uppercase flex items-center gap-1 hover:bg-blue-50 hover:text-blue-600"><EyeOff size={12}/> Kontra Lokal</button>}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-gray-100 rounded-xl p-3 text-xs">
-                                        <p><span className="text-slate-400 font-bold uppercase text-[9px] block">Ekspirasyon ID</span>{agent.id_expiry_date ? new Date(agent.id_expiry_date).toLocaleDateString('fr-HT') : '—'}</p>
-                                        <p><span className="text-slate-400 font-bold uppercase text-[9px] block">Dat Prèv Adrès</span>{agent.address_proof_date ? new Date(agent.address_proof_date).toLocaleDateString('fr-HT') : '—'}</p>
-                                        <p><span className="text-slate-400 font-bold uppercase text-[9px] block">Referans</span>{agent.reference_name || '—'}</p>
-                                        <p><span className="text-slate-400 font-bold uppercase text-[9px] block">Tel Referans</span>{agent.reference_phone || '—'}</p>
-                                    </div>
-                                    <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-gray-100">
-                                        <input type="text" placeholder="Rezon si w ap rejte l..." value={agentRejectionReason[agent.id] || ''} onChange={(e) => setAgentRejectionReason({...agentRejectionReason, [agent.id]: e.target.value})} className="flex-1 bg-slate-50 border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-blue-500" />
-                                        <button onClick={() => jereAjan(agent.id, agent.user_id, 'rejected')} className="bg-white border border-rose-200 text-rose-600 px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Rejte</button>
-                                        <button onClick={() => jereAjan(agent.id, agent.user_id, 'approved')} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm">Apwouve</button>
-                                    </div>
-                                </div>
                             )) : pendingEnterprises.map(app => (
                                 <div key={app.id} className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col gap-4">
                                     <div className="flex justify-between items-center border-b border-gray-100 pb-4">
@@ -902,7 +853,7 @@ export default function WorkspacePage() {
                                     </div>
                                 </div>
                             ))}
-                            {(activeTab === 'kyc' ? pendingKyc : activeTab === 'ajan' ? pendingAgents : pendingEnterprises).length === 0 && <p className="text-center py-10 text-slate-400 text-sm font-bold uppercase">Pa gen okenn dosye k ap tann.</p>}
+                            {(activeTab === 'kyc' ? pendingKyc : pendingEnterprises).length === 0 && <p className="text-center py-10 text-slate-400 text-sm font-bold uppercase">Pa gen okenn dosye k ap tann.</p>}
                         </div>
                     </div>
                 )}
@@ -1005,7 +956,7 @@ export default function WorkspacePage() {
                         <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3">
                             <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
                             <p className="text-xs font-bold text-amber-800 leading-relaxed">
-                                Jounal sa a montre chak aksyon kritik anplwaye yo fè (depo, retrè, KYC, ajan, antrepriz) — pou responsablite ak sekirite. Sèlman Sipè Admin ka wè l.
+                                Jounal sa a montre chak aksyon kritik anplwaye yo fè (depo, retrè, KYC, antrepriz) — pou responsablite ak sekirite. Sèlman Sipè Admin ka wè l.
                             </p>
                         </div>
 

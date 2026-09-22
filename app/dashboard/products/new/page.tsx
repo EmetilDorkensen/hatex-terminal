@@ -41,15 +41,6 @@ function slugify(value: string): string {
     .slice(0, 60);
 }
 
-function uniqueSlug(base: string, existing: string[]): string {
-  if (!base) return uniqueSlug('pwodwi', existing);
-  const taken = new Set(existing);
-  if (!taken.has(base)) return base;
-  let i = 2;
-  while (taken.has(`${base}-${i}`)) i += 1;
-  return `${base}-${i}`;
-}
-
 export default function NewProductPage() {
   const router = useRouter();
   const supabase = createBrowserClient(
@@ -60,7 +51,6 @@ export default function NewProductPage() {
   const [profile, setProfile] = useState<any>(null);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [hiddenBankUsCount, setHiddenBankUsCount] = useState(0);
-  const [existingSlugs, setExistingSlugs] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -86,12 +76,6 @@ export default function NewProductPage() {
       .eq('id', user.id)
       .single();
     setProfile(prof);
-
-    const { data: prods } = await supabase
-      .from('hatex_products')
-      .select('slug')
-      .eq('owner_id', user.id);
-    setExistingSlugs((prods || []).map((x: any) => x.slug));
 
     try {
       const res = await fetch('/api/v2/bank-accounts');
@@ -156,47 +140,40 @@ export default function NewProductPage() {
 
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Ou dwe konekte.');
-
-      const slug = uniqueSlug(slugify(name), existingSlugs);
-
-      const { data: product, error: productErr } = await supabase
-        .from('hatex_products')
-        .insert({
-          owner_id: user.id,
-          slug,
-          name: name.trim(),
-          description: description.trim() || null,
-          price_htg: Math.round(numPrice * 100) / 100,
-          payout_account_id: payoutAccountId,
-        })
-        .select()
-        .single();
-
-      if (productErr) throw productErr;
-      if (!product) throw new Error('Kreyasyon pwodwi echwe.');
-
-      if (file && previewUrl) {
+      let imageUrl: string | null = null;
+      if (file) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Ou dwe konekte.');
         const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
         const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from('product-images')
           .upload(path, file, { contentType: file.type, upsert: false });
-        if (upErr) {
-          setMessage({ type: 'success', text: 'Pwodwi kreye men foto a pa t ka voye.' });
-          router.push('/dashboard/products');
-          return;
-        }
-        const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
-        if (pub?.publicUrl) {
-          await supabase
-            .from('hatex_products')
-            .update({ image_url: pub.publicUrl })
-            .eq('id', product.id);
+        if (!upErr) {
+          const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
+          imageUrl = pub?.publicUrl || null;
         }
       }
 
+      const res = await fetch('/api/products/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          price: numPrice,
+          description: description.trim() || null,
+          payout_account_id: payoutAccountId,
+          ...(imageUrl ? { image_url: imageUrl } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Yon erè pase pandan kreyasyon pwodwi a.');
+      }
+
+      if (file && !imageUrl) {
+        setMessage({ type: 'success', text: 'Pwodwi kreye men foto a pa t ka voye.' });
+      }
       router.push('/dashboard/products');
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Yon erè pase pandan kreyasyon pwodwi a.' });

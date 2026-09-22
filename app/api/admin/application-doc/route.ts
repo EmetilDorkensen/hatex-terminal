@@ -75,7 +75,6 @@ export async function GET(request: Request) {
   }
 
   const db = createSupabaseAdminClient();
-  await db.storage.createBucket('agent_documents', { public: false }).catch(() => null);
   await db.storage.createBucket('enterprise_documents', { public: false }).catch(() => null);
 
   const tried = new Set<string>();

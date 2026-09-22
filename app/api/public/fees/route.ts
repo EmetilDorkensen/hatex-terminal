@@ -19,7 +19,6 @@ export async function GET() {
       success: true,
       fees,
       limits,
-      agent_tiers: [],
     });
   } catch {
     return NextResponse.json({ error: 'Erè sèvè.' }, { status: 500 });

@@ -5,8 +5,6 @@ export const FEE_KEYS = [
   'deposit_fee_percent',
   'withdraw_fee_percent',
   'transfer_fee_percent',
-  'agent_fee_per_1000',
-  'agent_withdraw_fee_per_1000',
   'api_fee_per_1000',
   'enterprise_application_fee',
 ] as const;
@@ -18,8 +16,6 @@ const DEFAULTS: Record<FeeKey, number> = {
   deposit_fee_percent: 5,
   withdraw_fee_percent: 5,
   transfer_fee_percent: 5,
-  agent_fee_per_1000: 7,
-  agent_withdraw_fee_per_1000: 50,
   api_fee_per_1000: 0,
   enterprise_application_fee: 49000,
 };

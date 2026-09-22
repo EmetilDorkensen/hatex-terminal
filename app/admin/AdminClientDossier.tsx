@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import {
-  Search, Loader2, User, Mail, ShieldCheck, Building2, Briefcase,
+  Search, Loader2, User, Mail, ShieldCheck, Building2,
   EyeOff, FileText, CreditCard, ArrowLeft, Calendar, AlertCircle,
 } from 'lucide-react';
 
@@ -30,8 +30,6 @@ type DossierProfile = Match & {
   kyc_fee_paid?: boolean | null;
   wallet_balance?: number | null;
   is_merchant?: boolean | null;
-  agent_status?: string | null;
-  agent_tier?: string | null;
 };
 
 type EnterpriseApp = {
@@ -48,22 +46,6 @@ type EnterpriseApp = {
   bank_statement_url?: string | null;
   lease_doc_url?: string | null;
   legal_rep_id_url?: string | null;
-};
-
-type AgentApp = {
-  id: string;
-  status: string;
-  created_at: string;
-  rejection_reason?: string | null;
-  id_doc_url?: string | null;
-  address_doc_url?: string | null;
-  location_photo_url?: string | null;
-  selfie_with_id_url?: string | null;
-  patente_url?: string | null;
-  cif_url?: string | null;
-  criminal_record_url?: string | null;
-  bank_statement_url?: string | null;
-  lease_doc_url?: string | null;
 };
 
 type Dossier = {
@@ -108,7 +90,6 @@ type Dossier = {
     status?: string | null;
   } | null;
   enterprise_applications: EnterpriseApp[];
-  agent_applications: AgentApp[];
   recent_transactions: Array<{
     id: string;
     amount: number;
@@ -213,22 +194,6 @@ function enterpriseDocs(app: EnterpriseApp) {
   );
 }
 
-function agentDocs(app: AgentApp) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <DocLink label="Pyès Idantite" docRef={app.id_doc_url} />
-      <DocLink label="Prèv Adrès" docRef={app.address_doc_url} />
-      <DocLink label="Foto Lokal" docRef={app.location_photo_url} />
-      <DocLink label="Selfie + ID" docRef={app.selfie_with_id_url} variant="amber" />
-      <DocLink label="Patant" docRef={app.patente_url} />
-      <DocLink label="CIF" docRef={app.cif_url} />
-      <DocLink label="Kazye Jidisyè" docRef={app.criminal_record_url} />
-      <DocLink label="Relve Bankè" docRef={app.bank_statement_url} />
-      <DocLink label="Kontra Lokal" docRef={app.lease_doc_url} />
-    </div>
-  );
-}
-
 export default function AdminClientDossier({ initialUserId }: { initialUserId?: string | null }) {
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -299,7 +264,7 @@ export default function AdminClientDossier({ initialUserId }: { initialUserId?: 
         </div>
         <p className="text-sm text-indigo-200/90 max-w-2xl">
           Chèche pa <strong>imèl</strong>, <strong>non konplè</strong>, oswa <strong>ID itilizatè</strong>.
-          Tout dokiman KYC, antrepriz, ak ajan yo santralize isit la.
+          Tout dokiman KYC ak antrepriz yo santralize isit la.
         </p>
       </div>
 
@@ -444,8 +409,8 @@ export default function AdminClientDossier({ initialUserId }: { initialUserId?: 
                 <p className="text-sm font-black text-slate-900">{Number(p.wallet_balance || 0).toLocaleString()} HTG</p>
               </div>
               <div className="bg-slate-50 p-3 rounded-xl">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Ajan</p>
-                <p className="text-sm font-bold text-slate-900 uppercase">{p.agent_status || 'none'}</p>
+                <p className="text-[10px] font-bold uppercase text-slate-500">Antrepriz</p>
+                <p className="text-sm font-bold text-slate-900 uppercase">{p.enterprise_status || 'none'}</p>
               </div>
             </div>
           </div>
@@ -545,35 +510,6 @@ export default function AdminClientDossier({ initialUserId }: { initialUserId?: 
                       <p className="text-xs text-slate-600 mb-3">Aktivite: {app.business_activity}</p>
                     )}
                     {enterpriseDocs(app)}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Ajan */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Briefcase className="text-violet-600" size={22} />
-              <h4 className="font-bold text-slate-900">Dokiman Ajan</h4>
-            </div>
-            {dossier.agent_applications.length === 0 ? (
-              <p className="text-sm text-slate-500">Pa gen aplikasyon ajan.</p>
-            ) : (
-              <div className="space-y-5">
-                {dossier.agent_applications.map((app) => (
-                  <div key={app.id} className="border border-gray-100 rounded-2xl p-4 bg-slate-50/50">
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                      {statusBadge(app.status, {
-                        approved: 'bg-emerald-50 text-emerald-700',
-                        pending: 'bg-amber-50 text-amber-700',
-                        rejected: 'bg-rose-50 text-rose-700',
-                      })}
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(app.created_at).toLocaleDateString('ht-HT')}
-                      </span>
-                    </div>
-                    {agentDocs(app)}
                   </div>
                 ))}
               </div>
