@@ -38,8 +38,7 @@ export async function POST(request: Request) {
     .eq('email', email)
     .maybeSingle();
 
-  // Pa gen kont ak email sa a — nou pa revele sa (evite enumerasyon kont),
-  // sèlman kite Supabase Auth bay erè "Imèl oswa Modpas pa bon" pi devan.
+  // Pa revele si yon imèl egziste — mesaj jenerik pi devan.
   if (!profile) {
     return NextResponse.json({ allowed: true, require_captcha: false });
   }

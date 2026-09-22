@@ -33,7 +33,7 @@ export function buildLoginFailureUpdate(currentAttempts: number) {
   }
   return {
     update: { failed_login_attempts: next },
-    message: `Modpas pa bon. Ou rete ${MAX_LOGIN_ATTEMPTS - next} chans.`,
+    message: 'Imèl oswa modpas la pa kòrèk',
     locked: false,
     attempts: next,
   };

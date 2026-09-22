@@ -51,7 +51,7 @@ export default function WooCommerceOAuthContent() {
       });
 
       if (authError || !user) {
-        setError('Imèl oswa modpas pa bon.');
+        setError('Imèl oswa modpas la pa kòrèk');
         setLoading(false);
         return;
       }

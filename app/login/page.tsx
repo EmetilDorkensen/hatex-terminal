@@ -395,7 +395,7 @@ export default function Login() {
           });
           const failData = await failRes.json().catch(() => ({}));
 
-          setErrorMsg(failData.message || "Email oswa Modpas pa bon. Verifye yo byen.");
+          setErrorMsg(failData.message || 'Imèl oswa modpas la pa kòrèk');
           if (failData.require_captcha) setRequireCaptcha(true);
           setCaptchaToken('');
 
