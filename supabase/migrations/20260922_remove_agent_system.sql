@@ -417,18 +417,11 @@ BEGIN
   END IF;
 END $$;
 
--- 6) Storage buckets ajan
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
-    DELETE FROM storage.objects
-    WHERE bucket_id IN ('agent_documents', 'agent-recharge-proofs');
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'buckets') THEN
-    DELETE FROM storage.buckets
-    WHERE id IN ('agent_documents', 'agent-recharge-proofs');
-  END IF;
-END $$;
+-- 6) Storage: PA efase storage.objects nan SQL (Supabase bloke sa).
+-- Efase buckets yo nan Dashboard → Storage:
+--   - agent_documents
+--   - agent-recharge-proofs
+-- Oswa via Storage API (service_role) nan yon script admin.
 
 NOTIFY pgrst, 'reload schema';
 
