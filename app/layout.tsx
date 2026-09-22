@@ -1,5 +1,5 @@
-// Nan app/layout.tsx
-import "./globals.css"; // Liy sa a te manke, se li ki pote tout style yo!
+import { headers } from 'next/headers';
+import "./globals.css";
 import AutoLogout from "./components/AutoLogout";
 
 export const metadata = {
@@ -8,22 +8,28 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: "/logo-hatex.png", 
+        url: "/logo-hatex.png",
         href: "/logo-hatex.png",
       },
     ],
   },
 };
 
-export default function RootLayout({
+/**
+ * Li x-nonce nan headers — fòse dynamic rendering pou Next.js kapab
+ * mete nonce sou script framework yo (CSP san 'unsafe-inline' nan script-src).
+ */
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const headerStore = await headers();
+  const nonce = headerStore.get('x-nonce') ?? undefined;
+
   return (
     <html lang="ht">
-      {/* Nou ajoute "antialiased" ak font si w genyen l, men globals.css se kle a */}
-      <body className="antialiased bg-[#0a0b14] text-white">
+      <body className="antialiased bg-[#0a0b14] text-white" data-nonce={nonce || undefined}>
         <AutoLogout />
         {children}
       </body>

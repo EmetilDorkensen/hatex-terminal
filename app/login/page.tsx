@@ -6,8 +6,6 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import Link from 'next/link';
 
-import Script from 'next/script';
-
 import { createBrowserClient } from '@supabase/ssr';
 
 import { Mail, Lock, KeyRound, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
@@ -944,10 +942,6 @@ export default function Login() {
         />
           </>
         )}
-
-        {turnstileSiteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="lazyOnload" />}
-
-
 
         <div className="mt-8 text-center space-y-4 pt-6 border-t border-gray-100">
 

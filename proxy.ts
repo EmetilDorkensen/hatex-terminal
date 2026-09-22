@@ -2,6 +2,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { WORKSPACE_GATE_COOKIE, verifyWorkspaceGateToken } from '@/lib/security/workspace-gate';
 import { SESSION_TAG_COOKIE } from '@/lib/security/session-tag';
+import {
+  applySecurityHeaders,
+  buildContentSecurityPolicy,
+  createRequestNonce,
+} from '@/lib/security/csp-headers';
 
 const ADMIN_EMAIL = 'adminhatexcard@gmail.com';
 
@@ -46,10 +51,23 @@ function isPublicApi(pathname: string): boolean {
 
 /**
  * Next.js 16: proxy.ts ranplase middleware.ts epi li kouri sou Node.js
- * (node:crypto OK pou workspace gate HMAC).
+ * (node:crypto OK pou workspace gate HMAC + nonce CSP).
  */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  const isDev = process.env.NODE_ENV !== 'production';
+  const nonce = createRequestNonce();
+  const csp = buildContentSecurityPolicy(nonce, isDev);
+
+  // Pase nonce + CSP nan request pou Next.js aplike nonce sou script framework yo
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const secure = (res: NextResponse) => applySecurityHeaders(res, nonce, { isDev });
+
+  let response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,7 +97,7 @@ export async function proxy(request: NextRequest) {
   if (hostname.includes('admin.hatexcard.com')) {
     if (!url.pathname.startsWith('/admin')) {
       url.pathname = `/admin${url.pathname}`;
-      return NextResponse.rewrite(url);
+      return secure(NextResponse.rewrite(url));
     }
   }
 
@@ -105,26 +123,28 @@ export async function proxy(request: NextRequest) {
     if (profile?.current_session_token && profile.current_session_token !== deviceTag) {
       await supabase.auth.signOut();
       if (url.pathname.startsWith('/api')) {
-        return NextResponse.json(
-          { error: 'Sesyon ranplase sou yon lòt aparèy. Konekte ankò.' },
-          { status: 401 }
+        return secure(
+          NextResponse.json(
+            { error: 'Sesyon ranplase sou yon lòt aparèy. Konekte ankò.' },
+            { status: 401 }
+          )
         );
       }
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('reason', 'session_replaced');
-      return NextResponse.redirect(loginUrl);
+      return secure(NextResponse.redirect(loginUrl));
     }
   }
 
   if (url.pathname.startsWith('/admin')) {
     if (!user || !isAdminEmail(user.email)) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      return secure(NextResponse.redirect(new URL('/login', request.url)));
     }
   }
 
   const needsAppAuth = PROTECTED_APP_PREFIXES.some((p) => url.pathname.startsWith(p));
   if (needsAppAuth && !user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return secure(NextResponse.redirect(new URL('/login', request.url)));
   }
 
   if (
@@ -145,14 +165,14 @@ export async function proxy(request: NextRequest) {
   ) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      return secure(NextResponse.redirect(new URL('/login', request.url)));
     }
 
     // MFA OBLIGATWA pou tout kont — admin enkli.
     const { data: factorList } = await supabase.auth.mfa.listFactors();
     const hasVerifiedTotp = (factorList?.totp || []).some((f) => f.status === 'verified');
     if (!hasVerifiedTotp) {
-      return NextResponse.redirect(new URL('/mfa-setup', request.url));
+      return secure(NextResponse.redirect(new URL('/mfa-setup', request.url)));
     }
 
     // Premye koneksyon: chwazi plan anvan dashboard
@@ -162,7 +182,7 @@ export async function proxy(request: NextRequest) {
       !url.pathname.startsWith('/plan') &&
       !url.pathname.startsWith('/mfa-setup')
     ) {
-      return NextResponse.redirect(new URL('/plan', request.url));
+      return secure(NextResponse.redirect(new URL('/plan', request.url)));
     }
   }
 
@@ -172,7 +192,7 @@ export async function proxy(request: NextRequest) {
     !url.pathname.startsWith('/workspace-setup')
   ) {
     if (!user?.email) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      return secure(NextResponse.redirect(new URL('/login', request.url)));
     }
 
     const { data: staff } = await supabase
@@ -182,28 +202,28 @@ export async function proxy(request: NextRequest) {
       .maybeSingle();
 
     if (!staff || staff.status === 'revoked') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return secure(NextResponse.redirect(new URL('/dashboard', request.url)));
     }
 
     if (!staff.workspace_password_hash) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return secure(NextResponse.redirect(new URL('/dashboard', request.url)));
     }
 
     const gateToken = request.cookies.get(WORKSPACE_GATE_COOKIE)?.value;
     if (!verifyWorkspaceGateToken(gateToken, user.email)) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return secure(NextResponse.redirect(new URL('/dashboard', request.url)));
     }
   }
 
   if (url.pathname.startsWith('/plan') && !user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return secure(NextResponse.redirect(new URL('/login', request.url)));
   }
 
   if (url.pathname.startsWith('/dashboard') && !user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return secure(NextResponse.redirect(new URL('/login', request.url)));
   }
 
-  return response;
+  return secure(response);
 }
 
 export const config = {
