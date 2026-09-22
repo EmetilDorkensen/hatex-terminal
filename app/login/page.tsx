@@ -38,15 +38,39 @@ export default function Login() {
   const [mfaChallengeId, setMfaChallengeId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
 
-  // CAPTCHA (Cloudflare Turnstile) — parèt sèlman apre plizyè tantativ echwe
-  // sou menm kont lan, epi sèlman si sit la konfigire ak yon site key.
+  // CAPTCHA (Cloudflare Turnstile) — parèt apre plizyè tantativ echwe.
+  // Token nan ref pou pa pèdi li si React state poko update; reset widget
+  // apre chak echèk pou itilizatè a ka verifye ankò (evite « Succès » san token).
   const [requireCaptcha, setRequireCaptcha] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [loginClosed, setLoginClosed] = useState(false);
   const [loginClosedMessage, setLoginClosedMessage] = useState('');
   const captchaRef = useRef<HTMLDivElement>(null);
-  const captchaWidgetId = useRef<string | null>(null);
+  const captchaWidgetId = useRef<string | number | null>(null);
+  const captchaTokenRef = useRef('');
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  const clearCaptchaToken = () => {
+    captchaTokenRef.current = '';
+    setCaptchaToken('');
+  };
+
+  const resetCaptchaWidget = () => {
+    clearCaptchaToken();
+    try {
+      const turnstile = (window as any).turnstile;
+      if (turnstile && captchaWidgetId.current != null) {
+        turnstile.reset(captchaWidgetId.current);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const storeCaptchaToken = (token: string) => {
+    captchaTokenRef.current = token;
+    setCaptchaToken(token);
+  };
 
   // Si sistèm nan dekonekte nou paske yon LÒT aparèy konekte sou menm kont
   // lan (gade middleware.ts), montre yon mesaj klè olye yon paj vid.
@@ -94,29 +118,57 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (!requireCaptcha || !turnstileSiteKey || !captchaRef.current || captchaWidgetId.current) return;
+    if (!requireCaptcha || !turnstileSiteKey || !captchaRef.current) return;
+    if (captchaWidgetId.current != null) return;
+
+    let cancelled = false;
+    let pollId: ReturnType<typeof setInterval> | null = null;
 
     const renderWidget = () => {
+      if (cancelled || !captchaRef.current || captchaWidgetId.current != null) return;
       const turnstile = (window as any).turnstile;
-      if (turnstile && captchaRef.current && !captchaWidgetId.current) {
-        captchaWidgetId.current = turnstile.render(captchaRef.current, {
-          sitekey: turnstileSiteKey,
-          callback: (token: string) => setCaptchaToken(token),
-        });
-      }
+      if (!turnstile) return;
+      captchaWidgetId.current = turnstile.render(captchaRef.current, {
+        sitekey: turnstileSiteKey,
+        theme: 'light',
+        size: 'normal',
+        appearance: 'always',
+        callback: (token: string) => storeCaptchaToken(token),
+        'expired-callback': () => clearCaptchaToken(),
+        'error-callback': () => {
+          clearCaptchaToken();
+          try {
+            if (captchaWidgetId.current != null) turnstile.reset(captchaWidgetId.current);
+          } catch {
+            /* ignore */
+          }
+        },
+        'timeout-callback': () => {
+          clearCaptchaToken();
+          try {
+            if (captchaWidgetId.current != null) turnstile.reset(captchaWidgetId.current);
+          } catch {
+            /* ignore */
+          }
+        },
+      });
     };
 
     if ((window as any).turnstile) {
       renderWidget();
-      return;
+    } else {
+      pollId = setInterval(() => {
+        if ((window as any).turnstile) {
+          renderWidget();
+          if (pollId) clearInterval(pollId);
+        }
+      }, 200);
     }
-    const interval = setInterval(() => {
-      if ((window as any).turnstile) {
-        renderWidget();
-        clearInterval(interval);
-      }
-    }, 300);
-    return () => clearInterval(interval);
+
+    return () => {
+      cancelled = true;
+      if (pollId) clearInterval(pollId);
+    };
   }, [requireCaptcha, turnstileSiteKey]);
 
 
@@ -369,12 +421,15 @@ export default function Login() {
 
         if (lockData.require_captcha) {
           setRequireCaptcha(true);
-          if (!captchaToken) {
-            setErrorMsg("Tanpri konplete verifikasyon CAPTCHA anba a.");
+          const token = captchaTokenRef.current || captchaToken;
+          if (!token) {
+            setErrorMsg('Tanpri konplete verifikasyon CAPTCHA anba a (bwat Cloudflare), epi eseye ankò.');
             setLoading(false);
             return;
           }
         }
+
+        const activeCaptchaToken = captchaTokenRef.current || captchaToken;
 
         const { data, error } = await supabase.auth.signInWithPassword({
 
@@ -391,13 +446,18 @@ export default function Login() {
           const failRes = await fetch('/api/auth/account-lock', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: emailLower, action: 'fail', captchaToken }),
+            body: JSON.stringify({
+              email: emailLower,
+              action: 'fail',
+              captchaToken: activeCaptchaToken || null,
+            }),
           });
           const failData = await failRes.json().catch(() => ({}));
 
           setErrorMsg(failData.message || 'Imèl oswa modpas la pa kòrèk');
           if (failData.require_captcha) setRequireCaptcha(true);
-          setCaptchaToken('');
+          // Efase token + reset widget — san sa, « Succès » rete men token vid.
+          resetCaptchaWidget();
 
           setLoading(false);
 
@@ -441,7 +501,11 @@ export default function Login() {
           fetch('/api/auth/account-lock', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: emailLower, action: 'success' }),
+            body: JSON.stringify({
+              email: emailLower,
+              action: 'success',
+              captchaToken: activeCaptchaToken || null,
+            }),
           }).catch(() => {});
 
           // Mete session-tag ANVAN MFA — sinon /api/auth/mfa/verify ka wè
@@ -877,8 +941,22 @@ export default function Login() {
 
 
           {requireCaptcha && turnstileSiteKey && (
-            <div className="flex justify-center pt-2">
-              <div ref={captchaRef}></div>
+            <div className="pt-2 space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">
+                Konplete verifikasyon an anba a anvan ou konekte
+              </p>
+              <div className="flex justify-center">
+                <div ref={captchaRef} />
+              </div>
+              {(captchaTokenRef.current || captchaToken) ? (
+                <p className="text-[10px] font-semibold text-emerald-600 text-center uppercase tracking-wider">
+                  Verifikasyon OK — ou ka konekte
+                </p>
+              ) : (
+                <p className="text-[10px] font-semibold text-amber-700 text-center uppercase tracking-wider">
+                  Tann oswa klike sou bwat Cloudflare la
+                </p>
+              )}
             </div>
           )}
 
