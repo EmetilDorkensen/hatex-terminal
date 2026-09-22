@@ -333,6 +333,7 @@ BEGIN
           'agent_restart_application',
           'hatex_agent_fee',
           'hatex_purge_agent_enterprise_docs',
+          'hatex_enforce_pro_55k_capacity',
           'process_wallet_withdrawal',
           'transfer_wallet_to_card'
         )
@@ -347,16 +348,47 @@ DROP TABLE IF EXISTS public.agent_applications CASCADE;
 DROP TABLE IF EXISTS public.agent_recharge_requests CASCADE;
 DROP TABLE IF EXISTS public.agent_tiers CASCADE;
 
+-- 3b) Trigger/fonksyon ki mare ak kolòn ajan (anvan DROP COLUMN)
+DROP TRIGGER IF EXISTS trg_hatex_enforce_pro_55k_capacity ON public.profiles;
+DROP FUNCTION IF EXISTS public.hatex_enforce_pro_55k_capacity() CASCADE;
+
+-- Nenpòt lòt trigger sou profiles ki refere kolòn ajan
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT t.tgname
+    FROM pg_trigger t
+    JOIN pg_class c ON c.oid = t.tgrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'profiles'
+      AND NOT t.tgisinternal
+      AND (
+        pg_get_triggerdef(t.oid) ILIKE '%agent_capacity%'
+        OR pg_get_triggerdef(t.oid) ILIKE '%agent_balance%'
+        OR pg_get_triggerdef(t.oid) ILIKE '%agent_tier%'
+        OR pg_get_triggerdef(t.oid) ILIKE '%agent_status%'
+        OR pg_get_triggerdef(t.oid) ILIKE '%agent_code%'
+        OR pg_get_triggerdef(t.oid) ILIKE '%agent_guarantee%'
+        OR pg_get_triggerdef(t.oid) ILIKE '%is_agent%'
+      )
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.profiles', r.tgname);
+  END LOOP;
+END $$;
+
 -- 4) Kolòn ajan sou profiles
 ALTER TABLE public.profiles
-  DROP COLUMN IF EXISTS agent_balance,
-  DROP COLUMN IF EXISTS agent_capacity,
-  DROP COLUMN IF EXISTS agent_guarantee_paid,
-  DROP COLUMN IF EXISTS agent_status,
-  DROP COLUMN IF EXISTS agent_tier,
-  DROP COLUMN IF EXISTS agent_code,
-  DROP COLUMN IF EXISTS is_agent,
-  DROP COLUMN IF EXISTS upgrade_status;
+  DROP COLUMN IF EXISTS agent_balance CASCADE,
+  DROP COLUMN IF EXISTS agent_capacity CASCADE,
+  DROP COLUMN IF EXISTS agent_guarantee_paid CASCADE,
+  DROP COLUMN IF EXISTS agent_status CASCADE,
+  DROP COLUMN IF EXISTS agent_tier CASCADE,
+  DROP COLUMN IF EXISTS agent_code CASCADE,
+  DROP COLUMN IF EXISTS is_agent CASCADE,
+  DROP COLUMN IF EXISTS upgrade_status CASCADE;
 
 -- 5) Frè / limit ajan nan konfig (si tab yo egziste)
 DO $$
