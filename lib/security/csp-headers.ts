@@ -1,6 +1,10 @@
 /**
  * CSP + antèt sekirite pou proxy.ts (Next.js 16).
  * Nonce pa request — script-src SAN 'unsafe-inline'.
+ *
+ * Pa itilize 'strict-dynamic': Cloudflare Email Obfuscation / Insights
+ * enjekte /cdn-cgi/scripts/... san nonce; strict-dynamic dezaktive 'self'
+ * epi bloke yo (erè konsòl, ka kraze koule paj).
  */
 
 import type { NextResponse } from 'next/server';
@@ -13,9 +17,8 @@ export function buildContentSecurityPolicy(nonce: string, isDev: boolean): strin
   const scriptSrc = [
     "'self'",
     `'nonce-${nonce}'`,
-    "'strict-dynamic'",
     isDev ? "'unsafe-eval'" : '',
-    // Fallbacks pou navigatè ki pa sipòte strict-dynamic (CSP Level 2)
+    // Turnstile + Cloudflare (email-decode / insights sou menm orijin oswa CDN)
     'https://challenges.cloudflare.com',
     'https://static.cloudflareinsights.com',
   ]
