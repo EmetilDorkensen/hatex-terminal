@@ -163,7 +163,9 @@ export async function proxy(request: NextRequest) {
   ) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
-      return secure(NextResponse.redirect(new URL('/login', request.url)));
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('reason', 'mfa_required');
+      return secure(NextResponse.redirect(loginUrl));
     }
 
     // MFA OBLIGATWA pou tout kont — admin enkli.

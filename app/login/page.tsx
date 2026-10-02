@@ -77,6 +77,9 @@ export default function Login() {
     if (params.get('reason') === 'session_replaced') {
       setErrorMsg("Ou te dekonekte paske kont ou konekte sou yon lòt aparèy. Yon kont Hatexcard ka sèlman konekte sou YON SÈL aparèy alafwa.");
     }
+    if (params.get('reason') === 'mfa_required') {
+      setErrorMsg('Antre imèl ak modpas ou, epi verifye kòd MFA (2FA) 6 chif la pou w antre nan dashboard.');
+    }
     const err = params.get('error');
     if (err === 'login_closed') {
       const message = params.get('message');
@@ -452,7 +455,14 @@ export default function Login() {
 
         await trackDeviceAndIP(email);
 
-        if (pwdData.mfa_required || (await requiresMfaStepUp())) {
+        // TOUJOU kouri requiresMfaStepUp() pou montre UI MFA —
+        // pa kanpe sou pwdData.mfa_required sèlman (sa te kite paj la vid san mesaj).
+        if (await requiresMfaStepUp()) {
+          setLoading(false);
+          return;
+        }
+        if (pwdData.mfa_required) {
+          setErrorMsg('Kont ou mande kòd MFA (2FA). Rekonekte epi antre kòd 6 chif la.');
           setLoading(false);
           return;
         }
